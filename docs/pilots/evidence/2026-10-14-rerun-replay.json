@@ -1,0 +1,75 @@
+{
+  "root": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\pilots\\2026-10-14-diagnostic-validated",
+  "journalEvents": 981,
+  "integrity": "ok",
+  "runs": [
+    {
+      "runId": "0eafbb01-d127-4bcc-afa3-0fbb94d31b1f",
+      "databaseLoops": [
+        {
+          "loop_node_id": "delivery",
+          "state": "canceled",
+          "pause_reason": null
+        },
+        {
+          "loop_node_id": "delivery/1/specification",
+          "state": "canceled",
+          "pause_reason": null
+        }
+      ],
+      "databaseIterations": [
+        {
+          "loop_node_id": "delivery",
+          "iteration": 1,
+          "outcome": "canceled",
+          "ended_at": "2026-10-14T03:42:19.546Z"
+        },
+        {
+          "loop_node_id": "delivery/1/specification",
+          "iteration": 1,
+          "outcome": "continued",
+          "ended_at": "2026-10-14T03:33:53.778Z"
+        },
+        {
+          "loop_node_id": "delivery/1/specification",
+          "iteration": 2,
+          "outcome": "canceled",
+          "ended_at": "2026-10-14T03:42:19.546Z"
+        }
+      ],
+      "replayRun": "failed",
+      "mismatches": [],
+      "replayLoops": [
+        {
+          "loopNodeId": "delivery",
+          "state": "canceled",
+          "pauseReason": null,
+          "iterations": [
+            {
+              "iteration": 1,
+              "continue": null,
+              "outcome": "canceled"
+            }
+          ]
+        },
+        {
+          "loopNodeId": "delivery/1/specification",
+          "state": "canceled",
+          "pauseReason": null,
+          "iterations": [
+            {
+              "iteration": 1,
+              "continue": true,
+              "outcome": null
+            },
+            {
+              "iteration": 2,
+              "continue": null,
+              "outcome": "canceled"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

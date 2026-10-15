@@ -1,0 +1,53 @@
+{
+  "timestamp": "2026-10-13T15:36:59.955Z",
+  "results": [
+    {
+      "probe": "R5-error-classification",
+      "state": "waiting_for_user",
+      "expectedCode": "output_contract",
+      "actualCode": "process",
+      "message": "The CLI reported a structured result that does not match this turn's response; the stale or ambiguous value was not used."
+    },
+    {
+      "probe": "R1-shared-New-Context-history",
+      "firstRun": "21c2e946-7eb8-4d9a-bb11-fd1ee3e3529d",
+      "secondRun": "9ee3be09-fa29-463e-a64e-bca53956ca3e",
+      "memoryWriter": "succeeded",
+      "customer": "skipped",
+      "expectedCustomer": "succeeded",
+      "slot": {
+        "id": "customer",
+        "needsReview": false,
+        "priorReview": {
+          "artifact": {
+            "artifactId": "c3a3880f-0e4d-424b-8db9-56b3a3027b15",
+            "sha256": "b39c1bfc9eab537f7a0b015c6865fc1d3c7c00f764b2e56b311b90edb0989bba"
+          },
+          "recordId": "REV-520779EEB16B"
+        },
+        "reviewerFingerprint": "f4e2134d525058c59e3ea9c8d1a18f87599bc9c671cb2838f87ea1a5801256f6",
+        "role": "customer",
+        "scopeHash": "5e507deeeedc949d8c572d3c6475465531edc8c5f645768d910482ed6e3e42e3",
+        "status": "current",
+        "view": "public",
+        "viewManifest": {
+          "artifactId": "f0c3f6c9-d809-4e2b-b7c0-1b787df2f63d",
+          "sha256": "da85f8eec68dc02e6ceb580e0f76a50a1586ec593afc4076b81376cb43fc3932"
+        }
+      },
+      "root": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\root-hlz0Z6"
+    },
+    {
+      "probe": "R2-mixed-MapState-and-candidate-evidence",
+      "expectedAccepted": false,
+      "actualAccepted": true,
+      "error": null,
+      "candidateA": "bdfb9fbac0aa523b2ae3fefdaa0d9723859031a46e946fcb915cb496751e8f3f",
+      "candidateB": "4ac240c15e2922c9684f42571ecb7ff1d26d143558a18d51690be5e29a821c92",
+      "currentMapState": "MST-CDFDB34847B6",
+      "currentCandidate": "CAND-FDD78521CC76",
+      "substitutedCandidate": "CAND-89E6403AC7B0",
+      "root": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\root-NHI4Pa"
+    }
+  ]
+}

@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deszo.local/documentation/review-decision.schema.json",
+  "title": "Agent ReviewDecision for one immutable subject",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "subjectId": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9-]*$"
+    },
+    "role": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,63}$"
+    },
+    "verdict": {
+      "enum": [
+        "APPROVED",
+        "CHANGES_REQUESTED"
+      ]
+    },
+    "scopeRefs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Z][A-Z0-9-]*$"
+      },
+      "uniqueItems": true
+    },
+    "resolvedIssueIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Z][A-Z0-9-]*$"
+      },
+      "uniqueItems": true
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "localId": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+          },
+          "severity": {
+            "enum": [
+              "blocker",
+              "suggestion"
+            ]
+          },
+          "ownerRole": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "requirementRefs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9-]*$"
+            },
+            "uniqueItems": true
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "requestedChange": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "localId",
+          "severity",
+          "ownerRole",
+          "requirementRefs",
+          "message",
+          "requestedChange"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "subjectId",
+    "role",
+    "verdict",
+    "scopeRefs",
+    "resolvedIssueIds",
+    "issues"
+  ],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "verdict": {
+            "const": "CHANGES_REQUESTED"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "issues": {
+            "contains": {
+              "properties": {
+                "severity": {
+                  "const": "blocker"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "verdict": {
+            "const": "APPROVED"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "issues": {
+            "items": {
+              "properties": {
+                "severity": {
+                  "const": "suggestion"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

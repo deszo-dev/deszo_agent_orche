@@ -1,0 +1,397 @@
+{
+  "reviewApproved": {
+    "schemaVersion": 1,
+    "subjectId": "SPEC-0123456789AB",
+    "role": "implementation-readiness",
+    "verdict": "APPROVED",
+    "scopeRefs": [
+      "REQ-AUTH"
+    ],
+    "resolvedIssueIds": [
+      "ISS-READINESS-0123456789"
+    ],
+    "issues": [
+      {
+        "localId": "naming",
+        "severity": "suggestion",
+        "ownerRole": "analyst",
+        "requirementRefs": [],
+        "message": "Consider clearer names.",
+        "requestedChange": "Rename the error field."
+      }
+    ]
+  },
+  "reviewRejected": {
+    "schemaVersion": 1,
+    "subjectId": "SPEC-0123456789AB",
+    "role": "implementation-readiness",
+    "verdict": "CHANGES_REQUESTED",
+    "scopeRefs": [
+      "REQ-AUTH"
+    ],
+    "resolvedIssueIds": [],
+    "issues": [
+      {
+        "localId": "expired-token",
+        "severity": "blocker",
+        "ownerRole": "analyst",
+        "requirementRefs": [
+          "REQ-AUTH"
+        ],
+        "message": "Define the expired-token response.",
+        "requestedChange": "Specify HTTP 401."
+      }
+    ]
+  },
+  "plan": {
+    "schemaVersion": 1,
+    "kind": "ReviewPlan",
+    "subjectId": "SPEC-0123456789AB",
+    "subject": {
+      "artifactId": "00000000-0000-4000-8000-000000000031",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "policyFingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "slots": [
+      {
+        "id": "readiness",
+        "role": "implementation-readiness",
+        "view": "full",
+        "viewManifest": {
+          "artifactId": "00000000-0000-4000-8000-000000000032",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      }
+    ],
+    "openIssues": [
+      {
+        "id": "ISS-READINESS-0123456789",
+        "severity": "blocker",
+        "ownerRole": "analyst",
+        "requirementRefs": [
+          "REQ-AUTH"
+        ],
+        "message": "Define the expired-token response.",
+        "requestedChange": "Specify HTTP 401 for an expired token."
+      }
+    ]
+  },
+  "reportOpen": {
+    "schemaVersion": 1,
+    "kind": "GateReport",
+    "status": "OPEN",
+    "subjectId": "SPEC-0123456789AB",
+    "reason": "Every slot approved.",
+    "issues": [],
+    "certificate": {
+      "recordId": "CERT-0123456789AB",
+      "artifact": {
+        "artifactId": "00000000-0000-4000-8000-000000000030",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    }
+  },
+  "reportRevision": {
+    "schemaVersion": 1,
+    "kind": "GateReport",
+    "status": "REVISION_REQUIRED",
+    "subjectId": "SPEC-0123456789AB",
+    "reason": "1 open blocker.",
+    "issues": [
+      {
+        "id": "ISS-READINESS-0123456789",
+        "severity": "blocker",
+        "ownerRole": "analyst",
+        "requirementRefs": [
+          "REQ-AUTH"
+        ],
+        "message": "Define the expired-token response.",
+        "requestedChange": "Specify HTTP 401 for an expired token."
+      }
+    ],
+    "certificate": null
+  },
+  "certificate": {
+    "schemaVersion": 1,
+    "kind": "GateCertificate",
+    "recordId": "CERT-0123456789AB",
+    "subjectId": "SPEC-0123456789AB",
+    "subject": {
+      "artifactId": "00000000-0000-4000-8000-000000000031",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "policyFingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "reviews": [
+      {
+        "recordId": "REV-0123456789AB",
+        "artifact": {
+          "artifactId": "00000000-0000-4000-8000-000000000033",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      }
+    ],
+    "issuedAt": "2026-10-13T12:00:00Z",
+    "runId": "00000000-0000-4000-8000-000000000001"
+  },
+  "reviewRecord": {
+    "schemaVersion": 1,
+    "kind": "ReviewRecord",
+    "recordId": "REV-0123456789AB",
+    "subjectId": "SPEC-0123456789AB",
+    "slot": "readiness",
+    "role": "implementation-readiness",
+    "verdict": "APPROVED",
+    "decision": {
+      "artifactId": "00000000-0000-4000-8000-000000000034",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "reviewer": {
+      "runId": "00000000-0000-4000-8000-000000000001",
+      "nodeInstanceId": "delivery/1/specification/2/readiness-review",
+      "attemptId": "00000000-0000-4000-8000-000000000035",
+      "requestedModel": "sonnet",
+      "observedModel": null
+    },
+    "newIssueIds": [],
+    "resolvedIssueIds": [
+      "ISS-READINESS-0123456789"
+    ]
+  },
+  "subjectView": {
+    "schemaVersion": 1,
+    "subjectId": "SPEC-0123456789AB",
+    "slot": "customer",
+    "role": "customer",
+    "view": "public",
+    "policyFingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "events": [
+    {
+      "schemaVersion": 2,
+      "id": "00000000-0000-4000-8000-000000000801",
+      "runId": "00000000-0000-4000-8000-000000000001",
+      "sequence": 1,
+      "timestamp": "2026-10-13T12:00:00Z",
+      "nodeInstanceId": null,
+      "attemptId": null,
+      "type": "run.planned",
+      "payload": {
+        "plan": {
+          "artifactId": "00000000-0000-4000-8000-000000000040",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "mode": "node",
+        "targets": [
+          "review"
+        ]
+      }
+    },
+    {
+      "schemaVersion": 2,
+      "id": "00000000-0000-4000-8000-000000000802",
+      "runId": "00000000-0000-4000-8000-000000000001",
+      "sequence": 2,
+      "timestamp": "2026-10-13T12:00:00Z",
+      "nodeInstanceId": "research",
+      "attemptId": "00000000-0000-4000-8000-000000000044",
+      "type": "attempt.reused",
+      "payload": {
+        "sourceRunId": "00000000-0000-4000-8000-000000000041",
+        "sourceAttemptId": "00000000-0000-4000-8000-000000000042",
+        "outputs": {
+          "artifactId": "00000000-0000-4000-8000-000000000043",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      }
+    },
+    {
+      "schemaVersion": 2,
+      "id": "00000000-0000-4000-8000-000000000803",
+      "runId": "00000000-0000-4000-8000-000000000001",
+      "sequence": 3,
+      "timestamp": "2026-10-13T12:00:00Z",
+      "nodeInstanceId": "research",
+      "attemptId": "00000000-0000-4000-8000-000000000044",
+      "type": "attempt.state_changed",
+      "payload": {
+        "from": null,
+        "to": "reused",
+        "reason": "Reused from run 41.",
+        "process": null,
+        "ordinal": 1
+      }
+    },
+    {
+      "schemaVersion": 2,
+      "id": "00000000-0000-4000-8000-000000000804",
+      "runId": "00000000-0000-4000-8000-000000000001",
+      "sequence": 4,
+      "timestamp": "2026-10-13T12:00:00Z",
+      "nodeInstanceId": "checkpoint",
+      "attemptId": "00000000-0000-4000-8000-000000000047",
+      "type": "cache.reused",
+      "payload": {
+        "nodeId": "checkpoint",
+        "pin": {
+          "type": "Text",
+          "artifact": {
+            "artifactId": "00000000-0000-4000-8000-000000000045",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "encoding": "utf-8"
+        },
+        "sourceRunId": "00000000-0000-4000-8000-000000000041",
+        "sourceAttemptId": "00000000-0000-4000-8000-000000000046"
+      }
+    },
+    {
+      "schemaVersion": 2,
+      "id": "00000000-0000-4000-8000-000000000805",
+      "runId": "00000000-0000-4000-8000-000000000001",
+      "sequence": 5,
+      "timestamp": "2026-10-13T12:00:00Z",
+      "nodeInstanceId": "checkpoint",
+      "attemptId": "00000000-0000-4000-8000-000000000047",
+      "type": "cache.pinned",
+      "payload": {
+        "nodeId": "checkpoint",
+        "pin": {
+          "type": "Text",
+          "artifact": {
+            "artifactId": "00000000-0000-4000-8000-000000000045",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "encoding": "utf-8"
+        },
+        "sourceRunId": "00000000-0000-4000-8000-000000000001",
+        "sourceAttemptId": "00000000-0000-4000-8000-000000000047"
+      }
+    },
+    {
+      "schemaVersion": 2,
+      "id": "00000000-0000-4000-8000-000000000806",
+      "runId": "00000000-0000-4000-8000-000000000001",
+      "sequence": 6,
+      "timestamp": "2026-10-13T12:00:00Z",
+      "nodeInstanceId": "delivery/1/spec-route",
+      "attemptId": "00000000-0000-4000-8000-000000000049",
+      "type": "route.selected",
+      "payload": {
+        "caseId": "revise",
+        "selector": {
+          "type": "JsonValue",
+          "artifact": {
+            "artifactId": "00000000-0000-4000-8000-000000000048",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        }
+      }
+    },
+    {
+      "schemaVersion": 2,
+      "id": "00000000-0000-4000-8000-000000000807",
+      "runId": "00000000-0000-4000-8000-000000000001",
+      "sequence": 7,
+      "timestamp": "2026-10-13T12:00:00Z",
+      "nodeInstanceId": "delivery/2/specification",
+      "attemptId": "00000000-0000-4000-8000-000000000050",
+      "type": "attempt.state_changed",
+      "payload": {
+        "from": "scheduled",
+        "to": "skipped",
+        "reason": "Input from an inactive Route output.",
+        "process": null
+      }
+    },
+    {
+      "schemaVersion": 2,
+      "id": "00000000-0000-4000-8000-000000000808",
+      "runId": "00000000-0000-4000-8000-000000000001",
+      "sequence": 8,
+      "timestamp": "2026-10-13T12:00:00Z",
+      "nodeInstanceId": "delivery/1/specification/2/evaluate",
+      "attemptId": "00000000-0000-4000-8000-000000000051",
+      "type": "gate.evaluated",
+      "payload": {
+        "mode": "evaluate",
+        "subjectId": "SPEC-0123456789AB",
+        "status": "OPEN",
+        "recordId": "CERT-0123456789AB"
+      }
+    },
+    {
+      "schemaVersion": 2,
+      "id": "00000000-0000-4000-8000-000000000809",
+      "runId": "00000000-0000-4000-8000-000000000001",
+      "sequence": 9,
+      "timestamp": "2026-10-13T12:00:00Z",
+      "nodeInstanceId": "delivery/1/spec-route",
+      "attemptId": "00000000-0000-4000-8000-000000000049",
+      "type": "attempt.error",
+      "payload": {
+        "code": "route_unmatched",
+        "message": "No case matched \"PENDING\".",
+        "evidence": null
+      }
+    }
+  ],
+  "createBranch": {
+    "workflowId": "cached-research",
+    "workflowSnapshotSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "workspaceId": "main",
+    "requestId": "00000000-0000-4000-8000-000000000060",
+    "mode": "branch",
+    "targets": [
+      "review"
+    ],
+    "refreshCaches": [
+      "checkpoint"
+    ]
+  },
+  "createNode": {
+    "workflowId": "cached-research",
+    "workflowSnapshotSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "workspaceId": "main",
+    "requestId": "00000000-0000-4000-8000-000000000061",
+    "mode": "node",
+    "targets": [
+      "review"
+    ]
+  },
+  "cachePins": {
+    "pins": [
+      {
+        "nodeId": "checkpoint",
+        "value": {
+          "type": "Text",
+          "artifact": {
+            "artifactId": "00000000-0000-4000-8000-000000000045",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "encoding": "utf-8"
+        },
+        "sourceRunId": "00000000-0000-4000-8000-000000000041",
+        "sourceAttemptId": "00000000-0000-4000-8000-000000000046",
+        "fingerprint": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "sourceChanged": false,
+        "pinnedAt": "2026-10-13T12:00:00Z"
+      }
+    ]
+  },
+  "freeze": {
+    "runId": "00000000-0000-4000-8000-000000000041",
+    "nodeInstanceId": "checkpoint"
+  },
+  "chat": {
+    "requestId": "00000000-0000-4000-8000-000000000062",
+    "workspaceId": "main",
+    "model": "sonnet",
+    "prompt": "What did we decide about expiry?",
+    "timeoutSeconds": 120
+  },
+  "chatRunFilter": {
+    "kind": "chat",
+    "bindingId": "00000000-0000-4000-8000-000000000063",
+    "limit": 20
+  }
+}

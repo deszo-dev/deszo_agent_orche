@@ -1,0 +1,2072 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deszo.local/documentation/workflow.schema.json",
+  "title": "Workflow definition (core-v1 with optional loops-v1, cache-v1, pipeline-v1)",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "workflowId": {
+      "$ref": "#/$defs/id"
+    },
+    "capabilities": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "const": "core-v1"
+        }
+      ],
+      "items": {
+        "enum": [
+          "loops-v1",
+          "cache-v1",
+          "pipeline-v1",
+          "delivery-v1",
+          "revisions-v1"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 6,
+      "uniqueItems": true
+    },
+    "settings": {
+      "type": "object",
+      "properties": {
+        "nativeConfiguration": {
+          "enum": [
+            "restricted",
+            "inherit"
+          ]
+        }
+      },
+      "required": [
+        "nativeConfiguration"
+      ],
+      "additionalProperties": false
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/textNode"
+          },
+          {
+            "$ref": "#/$defs/promptTemplateNode"
+          },
+          {
+            "$ref": "#/$defs/agentNode"
+          },
+          {
+            "$ref": "#/$defs/contextNode"
+          },
+          {
+            "$ref": "#/$defs/resultViewerNode"
+          },
+          {
+            "$ref": "#/$defs/fileInputNode"
+          },
+          {
+            "$ref": "#/$defs/mergeNode"
+          },
+          {
+            "$ref": "#/$defs/jsonSelectNode"
+          },
+          {
+            "$ref": "#/$defs/conditionNode"
+          },
+          {
+            "$ref": "#/$defs/cacheNode"
+          },
+          {
+            "$ref": "#/$defs/routeNode"
+          },
+          {
+            "$ref": "#/$defs/gateNode"
+          },
+          {
+            "$ref": "#/$defs/mapNode"
+          },
+          {
+            "$ref": "#/$defs/loopNode"
+          }
+        ]
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/edge"
+      }
+    },
+    "after": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/after"
+      }
+    },
+    "view": {
+      "$ref": "#/$defs/view"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "workflowId",
+    "capabilities",
+    "settings",
+    "nodes",
+    "edges",
+    "after"
+  ],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "capabilities": {
+            "not": {
+              "contains": {
+                "const": "loops-v1"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "nodes": {
+            "items": {
+              "properties": {
+                "type": {
+                  "enum": [
+                    "text",
+                    "prompt-template",
+                    "agent",
+                    "context",
+                    "result-viewer",
+                    "cache"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "capabilities": {
+            "not": {
+              "contains": {
+                "const": "cache-v1"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "nodes": {
+            "items": {
+              "properties": {
+                "type": {
+                  "not": {
+                    "const": "cache"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "capabilities": {
+            "not": {
+              "contains": {
+                "const": "pipeline-v1"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "nodes": {
+            "items": {
+              "properties": {
+                "type": {
+                  "not": {
+                    "enum": [
+                      "gate",
+                      "route"
+                    ]
+                  }
+                }
+              },
+              "if": {
+                "properties": {
+                  "type": {
+                    "const": "loop"
+                  }
+                },
+                "required": [
+                  "type"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "config": {
+                    "properties": {
+                      "body": {
+                        "properties": {
+                          "nodes": {
+                            "items": {
+                              "properties": {
+                                "type": {
+                                  "not": {
+                                    "enum": [
+                                      "loop",
+                                      "gate",
+                                      "route"
+                                    ]
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "capabilities": {
+            "contains": {
+              "const": "pipeline-v1"
+            }
+          }
+        },
+        "required": [
+          "capabilities"
+        ]
+      },
+      "then": {
+        "properties": {
+          "capabilities": {
+            "contains": {
+              "const": "loops-v1"
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "capabilities": {
+            "not": {
+              "contains": {
+                "const": "delivery-v1"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "nodes": {
+            "items": {
+              "properties": {
+                "type": {
+                  "not": {
+                    "const": "map"
+                  }
+                }
+              },
+              "if": {
+                "properties": {
+                  "type": {
+                    "const": "loop"
+                  }
+                },
+                "required": [
+                  "type"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "config": {
+                    "properties": {
+                      "body": {
+                        "properties": {
+                          "nodes": {
+                            "items": {
+                              "properties": {
+                                "type": {
+                                  "not": {
+                                    "const": "map"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "capabilities": {
+            "contains": {
+              "const": "delivery-v1"
+            }
+          }
+        },
+        "required": [
+          "capabilities"
+        ]
+      },
+      "then": {
+        "properties": {
+          "capabilities": {
+            "contains": {
+              "const": "pipeline-v1"
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "capabilities": {
+            "contains": {
+              "const": "revisions-v1"
+            }
+          }
+        },
+        "required": [
+          "capabilities"
+        ]
+      },
+      "then": {
+        "properties": {
+          "capabilities": {
+            "contains": {
+              "const": "delivery-v1"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,63}$"
+    },
+    "artifactRef": {
+      "type": "object",
+      "properties": {
+        "artifactId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "artifactId",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "textNode": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "type": {
+          "const": "text"
+        },
+        "config": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "config"
+      ],
+      "additionalProperties": false
+    },
+    "promptTemplateNode": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "type": {
+          "const": "prompt-template"
+        },
+        "config": {
+          "type": "object",
+          "properties": {
+            "template": {
+              "type": "string"
+            },
+            "slots": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "$ref": "#/$defs/id"
+                  },
+                  "description": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id"
+                ],
+                "additionalProperties": false
+              },
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "template",
+            "slots"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "config"
+      ],
+      "additionalProperties": false
+    },
+    "agentNode": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "type": {
+          "const": "agent"
+        },
+        "config": {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "enum": [
+                "codex",
+                "claude",
+                "antigravity"
+              ]
+            },
+            "model": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/\\[\\]-]*$"
+            },
+            "contextId": {
+              "$ref": "#/$defs/id"
+            },
+            "timeoutSeconds": {
+              "type": "integer",
+              "minimum": 5
+            },
+            "output": {
+              "type": "object",
+              "properties": {
+                "format": {
+                  "enum": [
+                    "text",
+                    "json"
+                  ]
+                },
+                "schema": {
+                  "type": "object"
+                }
+              },
+              "required": [
+                "format"
+              ],
+              "additionalProperties": false,
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "format": {
+                        "const": "text"
+                      }
+                    },
+                    "required": [
+                      "format"
+                    ]
+                  },
+                  "then": {
+                    "not": {
+                      "required": [
+                        "schema"
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            "attachFiles": {
+              "type": "boolean"
+            },
+            "captures": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "provider",
+            "model",
+            "timeoutSeconds",
+            "output"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "config"
+      ],
+      "additionalProperties": false
+    },
+    "contextNode": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "type": {
+          "const": "context"
+        },
+        "config": {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "enum": [
+                "codex",
+                "claude",
+                "antigravity"
+              ]
+            },
+            "mode": {
+              "enum": [
+                "new",
+                "continue"
+              ]
+            },
+            "bindingId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "lifetime": {
+              "enum": [
+                "run",
+                "iteration"
+              ]
+            }
+          },
+          "required": [
+            "provider",
+            "mode"
+          ],
+          "additionalProperties": false,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "mode": {
+                    "const": "continue"
+                  }
+                },
+                "required": [
+                  "mode"
+                ]
+              },
+              "then": {
+                "required": [
+                  "bindingId"
+                ],
+                "not": {
+                  "required": [
+                    "lifetime"
+                  ]
+                }
+              },
+              "else": {
+                "not": {
+                  "required": [
+                    "bindingId"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "config"
+      ],
+      "additionalProperties": false
+    },
+    "resultViewerNode": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "type": {
+          "const": "result-viewer"
+        },
+        "config": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "config"
+      ],
+      "additionalProperties": false
+    },
+    "fileInputNode": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "type": {
+          "const": "file-input"
+        },
+        "config": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "mode": {
+                  "const": "files"
+                },
+                "paths": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "minItems": 1,
+                  "maxItems": 200,
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "mode",
+                "paths"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "mode": {
+                  "const": "artifact"
+                },
+                "valueType": {
+                  "enum": [
+                    "Text",
+                    "JsonValue",
+                    "ArtifactSet"
+                  ]
+                },
+                "artifact": {
+                  "$ref": "#/$defs/artifactRef"
+                }
+              },
+              "required": [
+                "mode",
+                "valueType",
+                "artifact"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "config"
+      ],
+      "additionalProperties": false
+    },
+    "mergeNode": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "type": {
+          "const": "merge"
+        },
+        "config": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "mode": {
+                  "const": "text"
+                },
+                "inputs": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "$ref": "#/$defs/id"
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true
+                },
+                "separator": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "mode",
+                "inputs",
+                "separator"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "mode": {
+                  "const": "artifacts"
+                },
+                "inputs": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "$ref": "#/$defs/id"
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "mode",
+                "inputs"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "mode": {
+                  "const": "selected"
+                },
+                "valueType": {
+                  "enum": [
+                    "Text",
+                    "JsonValue",
+                    "ArtifactSet"
+                  ]
+                },
+                "inputs": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "$ref": "#/$defs/id"
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "minItems": 2,
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "mode",
+                "valueType",
+                "inputs"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "mode": {
+                  "const": "record"
+                },
+                "inputs": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "$ref": "#/$defs/id"
+                      },
+                      "type": {
+                        "enum": [
+                          "Text",
+                          "JsonValue",
+                          "ArtifactSet"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "type"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "uniqueItems": true
+                },
+                "fields": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$"
+                      },
+                      "source": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "input": {
+                                "$ref": "#/$defs/id"
+                              },
+                              "pointer": {
+                                "type": "string",
+                                "pattern": "^(/.*)?$"
+                              }
+                            },
+                            "required": [
+                              "input"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "literal": {}
+                            },
+                            "required": [
+                              "literal"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "source"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "schema": {
+                  "type": "object"
+                }
+              },
+              "required": [
+                "mode",
+                "inputs",
+                "fields"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "config"
+      ],
+      "additionalProperties": false
+    },
+    "jsonSelectNode": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "type": {
+          "const": "json-select"
+        },
+        "config": {
+          "type": "object",
+          "properties": {
+            "pointer": {
+              "type": "string",
+              "pattern": "^(/.*)?$"
+            },
+            "outputType": {
+              "enum": [
+                "Text",
+                "JsonValue",
+                "ArtifactSet"
+              ]
+            },
+            "render": {
+              "enum": [
+                "raw-string",
+                "canonical-json"
+              ]
+            },
+            "nullAs": {
+              "enum": [
+                "error",
+                "empty"
+              ]
+            }
+          },
+          "required": [
+            "pointer",
+            "outputType"
+          ],
+          "additionalProperties": false,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "outputType": {
+                    "const": "Text"
+                  }
+                }
+              },
+              "then": {
+                "required": [
+                  "render"
+                ]
+              },
+              "else": {
+                "not": {
+                  "required": [
+                    "render"
+                  ]
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "outputType": {
+                    "const": "ArtifactSet"
+                  }
+                }
+              },
+              "then": {},
+              "else": {
+                "not": {
+                  "required": [
+                    "nullAs"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "config"
+      ],
+      "additionalProperties": false
+    },
+    "conditionNode": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "type": {
+          "const": "condition"
+        },
+        "config": {
+          "type": "object",
+          "properties": {
+            "doneWhen": {
+              "type": "object",
+              "properties": {
+                "pointer": {
+                  "type": "string",
+                  "pattern": "^(/.*)?$"
+                },
+                "op": {
+                  "enum": [
+                    "equals",
+                    "not-equals",
+                    "is-true",
+                    "is-false"
+                  ]
+                },
+                "value": {}
+              },
+              "required": [
+                "pointer",
+                "op"
+              ],
+              "additionalProperties": false,
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "op": {
+                        "enum": [
+                          "equals",
+                          "not-equals"
+                        ]
+                      }
+                    }
+                  },
+                  "then": {
+                    "required": [
+                      "value"
+                    ]
+                  },
+                  "else": {
+                    "not": {
+                      "required": [
+                        "value"
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            "reason": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "literal": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "literal"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "pointer": {
+                      "type": "string",
+                      "pattern": "^(/.*)?$"
+                    }
+                  },
+                  "required": [
+                    "pointer"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "feedback": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "literal": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "literal"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "pointer": {
+                      "type": "string",
+                      "pattern": "^(/.*)?$"
+                    }
+                  },
+                  "required": [
+                    "pointer"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "required": [
+            "doneWhen",
+            "reason",
+            "feedback"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "config"
+      ],
+      "additionalProperties": false
+    },
+    "cacheNode": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "type": {
+          "const": "cache"
+        },
+        "config": {
+          "type": "object",
+          "properties": {
+            "valueType": {
+              "enum": [
+                "Text",
+                "JsonValue",
+                "ArtifactSet"
+              ]
+            },
+            "mode": {
+              "enum": [
+                "live",
+                "frozen"
+              ]
+            }
+          },
+          "required": [
+            "valueType",
+            "mode"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "config"
+      ],
+      "additionalProperties": false
+    },
+    "routeNode": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "type": {
+          "const": "route"
+        },
+        "config": {
+          "type": "object",
+          "properties": {
+            "valueType": {
+              "enum": [
+                "Text",
+                "JsonValue",
+                "ArtifactSet"
+              ]
+            },
+            "selector": {
+              "type": "string",
+              "pattern": "^(/.*)?$"
+            },
+            "cases": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "$ref": "#/$defs/id"
+                  },
+                  "equals": {}
+                },
+                "required": [
+                  "id",
+                  "equals"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "onUnmatched": {
+              "enum": [
+                "error",
+                "pause"
+              ]
+            }
+          },
+          "required": [
+            "valueType",
+            "selector",
+            "cases",
+            "onUnmatched"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "config"
+      ],
+      "additionalProperties": false
+    },
+    "gateNode": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "type": {
+          "const": "gate"
+        },
+        "config": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "enum": [
+                "prepare",
+                "evaluate",
+                "verify"
+              ]
+            },
+            "policy": {
+              "type": "object",
+              "properties": {
+                "slots": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "$ref": "#/$defs/id"
+                      },
+                      "role": {
+                        "$ref": "#/$defs/id"
+                      },
+                      "view": {
+                        "enum": [
+                          "full",
+                          "public"
+                        ]
+                      },
+                      "scopeRefs": {
+                        "type": "array",
+                        "minItems": 1,
+                        "uniqueItems": true,
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[A-Z][A-Z0-9-]*$"
+                        }
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "role",
+                      "view"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "slots"
+              ],
+              "additionalProperties": false
+            },
+            "carry": {
+              "type": "boolean"
+            },
+            "subject": {
+              "enum": [
+                "specification",
+                "delivery"
+              ]
+            },
+            "specificationPolicy": {
+              "type": "object",
+              "properties": {
+                "slots": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "$ref": "#/$defs/id"
+                      },
+                      "role": {
+                        "$ref": "#/$defs/id"
+                      },
+                      "view": {
+                        "enum": [
+                          "full",
+                          "public"
+                        ]
+                      },
+                      "scopeRefs": {
+                        "type": "array",
+                        "minItems": 1,
+                        "uniqueItems": true,
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[A-Z][A-Z0-9-]*$"
+                        }
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "role",
+                      "view"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "slots"
+              ],
+              "additionalProperties": false
+            },
+            "technicalPolicy": {
+              "type": "object",
+              "properties": {
+                "slots": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "$ref": "#/$defs/id"
+                      },
+                      "role": {
+                        "$ref": "#/$defs/id"
+                      },
+                      "view": {
+                        "enum": [
+                          "full",
+                          "public"
+                        ]
+                      },
+                      "scopeRefs": {
+                        "type": "array",
+                        "minItems": 1,
+                        "uniqueItems": true,
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[A-Z][A-Z0-9-]*$"
+                        }
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "role",
+                      "view"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "slots"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "mode",
+            "policy"
+          ],
+          "additionalProperties": false,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "carry": {
+                    "const": true
+                  }
+                },
+                "required": [
+                  "carry"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "mode": {
+                    "const": "prepare"
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "subject": {
+                    "const": "delivery"
+                  }
+                },
+                "required": [
+                  "subject"
+                ]
+              },
+              "then": {
+                "required": [
+                  "specificationPolicy"
+                ],
+                "properties": {
+                  "mode": {
+                    "const": "prepare"
+                  }
+                },
+                "not": {
+                  "required": [
+                    "carry"
+                  ]
+                }
+              },
+              "else": {
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "specificationPolicy"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "technicalPolicy"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "config"
+      ],
+      "additionalProperties": false
+    },
+    "edge": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "source": {
+          "type": "object",
+          "properties": {
+            "nodeId": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+            },
+            "port": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "nodeId",
+            "port"
+          ],
+          "additionalProperties": false
+        },
+        "target": {
+          "type": "object",
+          "properties": {
+            "nodeId": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+            },
+            "port": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "nodeId",
+            "port"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "id",
+        "source",
+        "target"
+      ],
+      "additionalProperties": false
+    },
+    "bodyEdge": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "source": {
+          "type": "object",
+          "properties": {
+            "nodeId": {
+              "type": "string",
+              "pattern": "^(\\$input|[a-z][a-z0-9-]{0,63})$"
+            },
+            "port": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "nodeId",
+            "port"
+          ],
+          "additionalProperties": false
+        },
+        "target": {
+          "type": "object",
+          "properties": {
+            "nodeId": {
+              "type": "string",
+              "pattern": "^(\\$return|[a-z][a-z0-9-]{0,63})$"
+            },
+            "port": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "nodeId",
+            "port"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "id",
+        "source",
+        "target"
+      ],
+      "additionalProperties": false
+    },
+    "after": {
+      "type": "object",
+      "properties": {
+        "before": {
+          "$ref": "#/$defs/id"
+        },
+        "after": {
+          "$ref": "#/$defs/id"
+        }
+      },
+      "required": [
+        "before",
+        "after"
+      ],
+      "additionalProperties": false
+    },
+    "view": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^(\\$input|\\$return|[a-z][a-z0-9-]{0,63})$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "x",
+          "y"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bodyNode": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/textNode"
+        },
+        {
+          "$ref": "#/$defs/promptTemplateNode"
+        },
+        {
+          "$ref": "#/$defs/agentNode"
+        },
+        {
+          "$ref": "#/$defs/contextNode"
+        },
+        {
+          "$ref": "#/$defs/resultViewerNode"
+        },
+        {
+          "$ref": "#/$defs/fileInputNode"
+        },
+        {
+          "$ref": "#/$defs/mergeNode"
+        },
+        {
+          "$ref": "#/$defs/jsonSelectNode"
+        },
+        {
+          "$ref": "#/$defs/conditionNode"
+        },
+        {
+          "$ref": "#/$defs/cacheNode"
+        },
+        {
+          "$ref": "#/$defs/routeNode"
+        },
+        {
+          "$ref": "#/$defs/gateNode"
+        },
+        {
+          "$ref": "#/$defs/mapNode"
+        },
+        {
+          "$ref": "#/$defs/loopNode"
+        }
+      ]
+    },
+    "loopNode": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "type": {
+          "const": "loop"
+        },
+        "config": {
+          "type": "object",
+          "properties": {
+            "valueType": {
+              "enum": [
+                "Text",
+                "JsonValue",
+                "ArtifactSet"
+              ]
+            },
+            "stateSchema": {
+              "type": "object"
+            },
+            "fixedInputs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "$ref": "#/$defs/id"
+                  },
+                  "type": {
+                    "enum": [
+                      "Text",
+                      "JsonValue",
+                      "ArtifactSet"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "type"
+                ],
+                "additionalProperties": false
+              },
+              "uniqueItems": true
+            },
+            "limits": {
+              "type": "object",
+              "properties": {
+                "maxIterations": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 50
+                },
+                "maxActiveMinutes": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1440
+                }
+              },
+              "required": [
+                "maxIterations",
+                "maxActiveMinutes"
+              ],
+              "additionalProperties": false
+            },
+            "body": {
+              "type": "object",
+              "properties": {
+                "nodes": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "$ref": "#/$defs/bodyNode"
+                  }
+                },
+                "edges": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/bodyEdge"
+                  }
+                },
+                "after": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/after"
+                  }
+                },
+                "view": {
+                  "$ref": "#/$defs/view"
+                }
+              },
+              "required": [
+                "nodes",
+                "edges",
+                "after"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "valueType",
+            "fixedInputs",
+            "limits",
+            "body"
+          ],
+          "additionalProperties": false,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "valueType": {
+                    "const": "JsonValue"
+                  }
+                }
+              },
+              "then": {
+                "required": [
+                  "stateSchema"
+                ]
+              },
+              "else": {
+                "not": {
+                  "required": [
+                    "stateSchema"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "config"
+      ],
+      "additionalProperties": false
+    },
+    "mapNode": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "type": {
+          "const": "map"
+        },
+        "config": {
+          "type": "object",
+          "properties": {
+            "approvalPolicy": {
+              "type": "object",
+              "properties": {
+                "slots": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "$ref": "#/$defs/id"
+                      },
+                      "role": {
+                        "$ref": "#/$defs/id"
+                      },
+                      "view": {
+                        "enum": [
+                          "full",
+                          "public"
+                        ]
+                      },
+                      "scopeRefs": {
+                        "type": "array",
+                        "minItems": 1,
+                        "uniqueItems": true,
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[A-Z][A-Z0-9-]*$"
+                        }
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "role",
+                      "view"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "slots"
+              ],
+              "additionalProperties": false
+            },
+            "optionalInputs": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "prior-state",
+                  "repair"
+                ]
+              },
+              "uniqueItems": true
+            },
+            "limits": {
+              "type": "object",
+              "properties": {
+                "maxFailedVerificationCycles": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 20
+                },
+                "maxTaskAttempts": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 20
+                }
+              },
+              "required": [
+                "maxFailedVerificationCycles",
+                "maxTaskAttempts"
+              ],
+              "additionalProperties": false
+            },
+            "roles": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "$ref": "#/$defs/id"
+                      },
+                      "kind": {
+                        "const": "agent"
+                      },
+                      "provider": {
+                        "enum": [
+                          "codex",
+                          "claude",
+                          "antigravity"
+                        ]
+                      },
+                      "model": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/\\[\\]-]*$"
+                      },
+                      "instructions": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "timeoutSeconds": {
+                        "type": "integer",
+                        "minimum": 5
+                      },
+                      "context": {
+                        "oneOf": [
+                          {
+                            "const": "task"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "contextId": {
+                                "$ref": "#/$defs/id"
+                              }
+                            },
+                            "required": [
+                              "contextId"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "kind",
+                      "provider",
+                      "model",
+                      "instructions",
+                      "timeoutSeconds",
+                      "context"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "$ref": "#/$defs/id"
+                      },
+                      "kind": {
+                        "const": "utility"
+                      },
+                      "template": {
+                        "const": "verification"
+                      },
+                      "embeddedRoles": {
+                        "type": "object",
+                        "properties": {
+                          "triage": {
+                            "$ref": "#/$defs/id"
+                          }
+                        },
+                        "required": [
+                          "triage"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "kind",
+                      "template",
+                      "embeddedRoles"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            },
+            "carryAcrossRevisions": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "approvalPolicy",
+            "optionalInputs",
+            "limits",
+            "roles"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "config"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

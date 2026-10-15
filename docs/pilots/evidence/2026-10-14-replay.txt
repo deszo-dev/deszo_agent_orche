@@ -1,0 +1,62 @@
+- banner:
+  - generic: deszo
+  - generic: Read-only Replay — the editor draft is kept unchanged.
+- text: Replay · load-5 ·
+- code: 0871f465
+- button "First step":
+- button "Previous (←)":
+- slider: "24"
+- button "Next (→)":
+- button "Last step":
+- generic: 25 / 25
+- checkbox "Log batches"
+- text: Log batches
+- combobox:
+  - option "Workflow" [selected]
+- button "Exit replay":
+  - text: Exit replay
+- generic: "#29"
+- strong: Run running → succeeded
+- generic: 6:28:06 AM
+- generic: "Run: Succeeded"
+- application:
+  - generic: request
+  - generic: Succeeded
+  - generic: Text
+  - generic: Say hello.
+  - generic: text
+  - generic "Run after (order only)"
+  - generic "Order-only dependency"
+  - generic "Context"
+  - generic: agent
+  - generic: Succeeded
+  - generic: Agent · Claude Code
+  - generic: fixture-slow-1 · text
+  - generic: prompt
+  - generic: text
+  - generic "Run after (order only)"
+  - generic "Order-only dependency"
+  - generic: answer
+  - generic: Succeeded
+  - generic: Result Viewer
+  - generic: Displays the final value
+  - generic: value
+  - generic "Run after (order only)"
+  - generic "Order-only dependency"
+  - generic "Control Panel":
+    - button "Zoom In":
+    - button "Zoom Out":
+    - button "Fit View":
+  - link "React Flow attribution":
+    - /url: https://reactflow.dev/attribution
+    - text: React Flow
+- complementary:
+  - generic: Agent · agent
+  - heading "Succeeded" [level=4]:
+    - generic: Succeeded
+  - text: Outputs committed after a successful terminal event and process exit.
+  - generic: "Model: fixture-slow-1"
+  - generic "Resolved input"
+  - generic "Output · text · Text"
+  - generic: "{ \"message\": \"claude turn 1: Say hello.\" }"
+  - generic "Invocation"

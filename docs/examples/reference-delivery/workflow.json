@@ -1,0 +1,4006 @@
+{
+  "schemaVersion": 1,
+  "workflowId": "reference-delivery",
+  "capabilities": [
+    "core-v1",
+    "loops-v1",
+    "pipeline-v1",
+    "delivery-v1",
+    "revisions-v1"
+  ],
+  "settings": {
+    "nativeConfiguration": "restricted"
+  },
+  "nodes": [
+    {
+      "id": "task",
+      "type": "text",
+      "config": {
+        "value": "A client that reconnects can inspect and resume its own paused round through the public API."
+      }
+    },
+    {
+      "id": "project",
+      "type": "file-input",
+      "config": {
+        "mode": "files",
+        "paths": [
+          "src/api.mjs",
+          "fixtures/tokens.json"
+        ]
+      }
+    },
+    {
+      "id": "seed",
+      "type": "merge",
+      "config": {
+        "mode": "record",
+        "inputs": [
+          {
+            "id": "task",
+            "type": "Text"
+          },
+          {
+            "id": "base",
+            "type": "ArtifactSet"
+          }
+        ],
+        "fields": [
+          {
+            "name": "businessTask",
+            "source": {
+              "input": "task"
+            }
+          },
+          {
+            "name": "base",
+            "source": {
+              "input": "base"
+            }
+          },
+          {
+            "name": "specification",
+            "source": {
+              "literal": null
+            }
+          },
+          {
+            "name": "issues",
+            "source": {
+              "literal": []
+            }
+          },
+          {
+            "name": "documentationApproval",
+            "source": {
+              "literal": null
+            }
+          },
+          {
+            "name": "priorMapState",
+            "source": {
+              "literal": null
+            }
+          },
+          {
+            "name": "repair",
+            "source": {
+              "literal": null
+            }
+          },
+          {
+            "name": "candidate",
+            "source": {
+              "literal": null
+            }
+          },
+          {
+            "name": "finalAcceptance",
+            "source": {
+              "literal": null
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "analyst-history",
+      "type": "context",
+      "config": {
+        "provider": "codex",
+        "mode": "new"
+      }
+    },
+    {
+      "id": "final-customer-history",
+      "type": "context",
+      "config": {
+        "provider": "codex",
+        "mode": "new"
+      }
+    },
+    {
+      "id": "delivery",
+      "type": "loop",
+      "config": {
+        "valueType": "JsonValue",
+        "stateSchema": {
+          "type": "object",
+          "properties": {
+            "businessTask": {
+              "type": "string"
+            },
+            "issues": {
+              "type": "array"
+            }
+          },
+          "required": [
+            "businessTask",
+            "base",
+            "specification",
+            "issues",
+            "documentationApproval",
+            "priorMapState",
+            "repair",
+            "candidate",
+            "finalAcceptance"
+          ]
+        },
+        "fixedInputs": [],
+        "limits": {
+          "maxIterations": 3,
+          "maxActiveMinutes": 480
+        },
+        "body": {
+          "nodes": [
+            {
+              "id": "spec-of",
+              "type": "json-select",
+              "config": {
+                "pointer": "/specification",
+                "outputType": "ArtifactSet",
+                "nullAs": "empty"
+              }
+            },
+            {
+              "id": "cert-of",
+              "type": "json-select",
+              "config": {
+                "pointer": "/documentationApproval",
+                "outputType": "JsonValue"
+              }
+            },
+            {
+              "id": "verify-docs",
+              "type": "gate",
+              "config": {
+                "mode": "verify",
+                "policy": {
+                  "slots": [
+                    {
+                      "id": "customer",
+                      "role": "customer",
+                      "view": "public"
+                    },
+                    {
+                      "id": "readiness",
+                      "role": "implementation-readiness",
+                      "view": "full"
+                    },
+                    {
+                      "id": "testability",
+                      "role": "testability-reviewer",
+                      "view": "full"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "spec-route",
+              "type": "route",
+              "config": {
+                "valueType": "JsonValue",
+                "selector": "/status",
+                "cases": [
+                  {
+                    "id": "approved",
+                    "equals": "OPEN"
+                  },
+                  {
+                    "id": "revise",
+                    "equals": "REVISION_REQUIRED"
+                  }
+                ],
+                "onUnmatched": "error"
+              }
+            },
+            {
+              "id": "spec-seed",
+              "type": "merge",
+              "config": {
+                "mode": "record",
+                "inputs": [
+                  {
+                    "id": "state",
+                    "type": "JsonValue"
+                  }
+                ],
+                "fields": [
+                  {
+                    "name": "businessTask",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/businessTask"
+                    }
+                  },
+                  {
+                    "name": "base",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/base"
+                    }
+                  },
+                  {
+                    "name": "specification",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/specification"
+                    }
+                  },
+                  {
+                    "name": "issues",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/issues"
+                    }
+                  },
+                  {
+                    "name": "documentationApproval",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/documentationApproval"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "id": "specification",
+              "type": "loop",
+              "config": {
+                "valueType": "JsonValue",
+                "stateSchema": {
+                  "type": "object",
+                  "properties": {
+                    "businessTask": {
+                      "type": "string"
+                    },
+                    "issues": {
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "businessTask",
+                    "base",
+                    "specification",
+                    "issues",
+                    "documentationApproval"
+                  ]
+                },
+                "fixedInputs": [],
+                "limits": {
+                  "maxIterations": 3,
+                  "maxActiveMinutes": 240
+                },
+                "body": {
+                  "nodes": [
+                    {
+                      "id": "business",
+                      "type": "json-select",
+                      "config": {
+                        "pointer": "/businessTask",
+                        "outputType": "Text",
+                        "render": "raw-string"
+                      }
+                    },
+                    {
+                      "id": "issue-text",
+                      "type": "json-select",
+                      "config": {
+                        "pointer": "/issues",
+                        "outputType": "Text",
+                        "render": "canonical-json"
+                      }
+                    },
+                    {
+                      "id": "issue-list",
+                      "type": "json-select",
+                      "config": {
+                        "pointer": "/issues",
+                        "outputType": "JsonValue"
+                      }
+                    },
+                    {
+                      "id": "previous",
+                      "type": "json-select",
+                      "config": {
+                        "pointer": "/specification",
+                        "outputType": "ArtifactSet",
+                        "nullAs": "empty"
+                      }
+                    },
+                    {
+                      "id": "analysis-prompt",
+                      "type": "prompt-template",
+                      "config": {
+                        "template": "Business task:\n{{business}}\n\nOpen issues (JSON):\n{{issues}}\n\nWrite or revise SPEC.md, spec-index.json and implementation-map.json in the working directory. Use exact '## ID' headings for every indexed section.",
+                        "slots": [
+                          {
+                            "id": "business"
+                          },
+                          {
+                            "id": "issues"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "id": "analyst",
+                      "type": "agent",
+                      "config": {
+                        "provider": "codex",
+                        "model": "explicit-test-model",
+                        "contextId": "analyst-history",
+                        "timeoutSeconds": 600,
+                        "output": {
+                          "format": "text"
+                        },
+                        "attachFiles": true,
+                        "captures": [
+                          "SPEC.md",
+                          "spec-index.json",
+                          "implementation-map.json"
+                        ]
+                      }
+                    },
+                    {
+                      "id": "prepare",
+                      "type": "gate",
+                      "config": {
+                        "mode": "prepare",
+                        "policy": {
+                          "slots": [
+                            {
+                              "id": "customer",
+                              "role": "customer",
+                              "view": "public"
+                            },
+                            {
+                              "id": "readiness",
+                              "role": "implementation-readiness",
+                              "view": "full"
+                            },
+                            {
+                              "id": "testability",
+                              "role": "testability-reviewer",
+                              "view": "full"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "plan-text",
+                      "type": "json-select",
+                      "config": {
+                        "pointer": "",
+                        "outputType": "Text",
+                        "render": "canonical-json"
+                      }
+                    },
+                    {
+                      "id": "customer-prompt",
+                      "type": "prompt-template",
+                      "config": {
+                        "template": "Review the public business view as the Customer.\n\nReview plan (JSON):\n{{plan}}\n\nReturn a ReviewDecision for the subject in SUBJECT.json. Resolve in resolvedIssueIds every open issue listed in your slot's resolvableIssueIds that this revision fixes; never resolve another reviewer's issue.",
+                        "slots": [
+                          {
+                            "id": "plan"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "id": "customer-review",
+                      "type": "agent",
+                      "config": {
+                        "provider": "codex",
+                        "model": "explicit-test-model",
+                        "timeoutSeconds": 600,
+                        "output": {
+                          "format": "json",
+                          "schema": {
+                            "type": "object",
+                            "properties": {
+                              "schemaVersion": {
+                                "const": 1
+                              },
+                              "subjectId": {
+                                "type": "string",
+                                "pattern": "^[A-Z][A-Z0-9-]*$"
+                              },
+                              "role": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                              },
+                              "verdict": {
+                                "enum": [
+                                  "APPROVED",
+                                  "CHANGES_REQUESTED"
+                                ]
+                              },
+                              "scopeRefs": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "pattern": "^[A-Z][A-Z0-9-]*$"
+                                },
+                                "uniqueItems": true
+                              },
+                              "resolvedIssueIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "pattern": "^[A-Z][A-Z0-9-]*$"
+                                },
+                                "uniqueItems": true
+                              },
+                              "issues": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "localId": {
+                                      "type": "string",
+                                      "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+                                    },
+                                    "severity": {
+                                      "enum": [
+                                        "blocker",
+                                        "suggestion"
+                                      ]
+                                    },
+                                    "ownerRole": {
+                                      "type": "string",
+                                      "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                                    },
+                                    "requirementRefs": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "pattern": "^[A-Z][A-Z0-9-]*$"
+                                      },
+                                      "uniqueItems": true
+                                    },
+                                    "message": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "requestedChange": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  "required": [
+                                    "localId",
+                                    "severity",
+                                    "ownerRole",
+                                    "requirementRefs",
+                                    "message",
+                                    "requestedChange"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": [
+                              "schemaVersion",
+                              "subjectId",
+                              "role",
+                              "verdict",
+                              "scopeRefs",
+                              "resolvedIssueIds",
+                              "issues"
+                            ],
+                            "additionalProperties": false,
+                            "allOf": [
+                              {
+                                "if": {
+                                  "properties": {
+                                    "verdict": {
+                                      "const": "CHANGES_REQUESTED"
+                                    }
+                                  }
+                                },
+                                "then": {
+                                  "properties": {
+                                    "issues": {
+                                      "contains": {
+                                        "properties": {
+                                          "severity": {
+                                            "const": "blocker"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "if": {
+                                  "properties": {
+                                    "verdict": {
+                                      "const": "APPROVED"
+                                    }
+                                  }
+                                },
+                                "then": {
+                                  "properties": {
+                                    "issues": {
+                                      "items": {
+                                        "properties": {
+                                          "severity": {
+                                            "const": "suggestion"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        },
+                        "attachFiles": true
+                      }
+                    },
+                    {
+                      "id": "readiness-prompt",
+                      "type": "prompt-template",
+                      "config": {
+                        "template": "Review the full bundle for implementation readiness.\n\nReview plan (JSON):\n{{plan}}\n\nReturn a ReviewDecision for the subject in SUBJECT.json. Resolve in resolvedIssueIds every open issue listed in your slot's resolvableIssueIds that this revision fixes; never resolve another reviewer's issue.",
+                        "slots": [
+                          {
+                            "id": "plan"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "id": "readiness-review",
+                      "type": "agent",
+                      "config": {
+                        "provider": "claude",
+                        "model": "explicit-test-model",
+                        "timeoutSeconds": 600,
+                        "output": {
+                          "format": "json",
+                          "schema": {
+                            "type": "object",
+                            "properties": {
+                              "schemaVersion": {
+                                "const": 1
+                              },
+                              "subjectId": {
+                                "type": "string",
+                                "pattern": "^[A-Z][A-Z0-9-]*$"
+                              },
+                              "role": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                              },
+                              "verdict": {
+                                "enum": [
+                                  "APPROVED",
+                                  "CHANGES_REQUESTED"
+                                ]
+                              },
+                              "scopeRefs": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "pattern": "^[A-Z][A-Z0-9-]*$"
+                                },
+                                "uniqueItems": true
+                              },
+                              "resolvedIssueIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "pattern": "^[A-Z][A-Z0-9-]*$"
+                                },
+                                "uniqueItems": true
+                              },
+                              "issues": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "localId": {
+                                      "type": "string",
+                                      "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+                                    },
+                                    "severity": {
+                                      "enum": [
+                                        "blocker",
+                                        "suggestion"
+                                      ]
+                                    },
+                                    "ownerRole": {
+                                      "type": "string",
+                                      "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                                    },
+                                    "requirementRefs": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "pattern": "^[A-Z][A-Z0-9-]*$"
+                                      },
+                                      "uniqueItems": true
+                                    },
+                                    "message": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "requestedChange": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  "required": [
+                                    "localId",
+                                    "severity",
+                                    "ownerRole",
+                                    "requirementRefs",
+                                    "message",
+                                    "requestedChange"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": [
+                              "schemaVersion",
+                              "subjectId",
+                              "role",
+                              "verdict",
+                              "scopeRefs",
+                              "resolvedIssueIds",
+                              "issues"
+                            ],
+                            "additionalProperties": false,
+                            "allOf": [
+                              {
+                                "if": {
+                                  "properties": {
+                                    "verdict": {
+                                      "const": "CHANGES_REQUESTED"
+                                    }
+                                  }
+                                },
+                                "then": {
+                                  "properties": {
+                                    "issues": {
+                                      "contains": {
+                                        "properties": {
+                                          "severity": {
+                                            "const": "blocker"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "if": {
+                                  "properties": {
+                                    "verdict": {
+                                      "const": "APPROVED"
+                                    }
+                                  }
+                                },
+                                "then": {
+                                  "properties": {
+                                    "issues": {
+                                      "items": {
+                                        "properties": {
+                                          "severity": {
+                                            "const": "suggestion"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        },
+                        "attachFiles": true
+                      }
+                    },
+                    {
+                      "id": "testability-prompt",
+                      "type": "prompt-template",
+                      "config": {
+                        "template": "Review the full bundle for testability.\n\nReview plan (JSON):\n{{plan}}\n\nReturn a ReviewDecision for the subject in SUBJECT.json. Resolve in resolvedIssueIds every open issue listed in your slot's resolvableIssueIds that this revision fixes; never resolve another reviewer's issue.",
+                        "slots": [
+                          {
+                            "id": "plan"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "id": "testability-review",
+                      "type": "agent",
+                      "config": {
+                        "provider": "antigravity",
+                        "model": "explicit-test-model",
+                        "timeoutSeconds": 600,
+                        "output": {
+                          "format": "json",
+                          "schema": {
+                            "type": "object",
+                            "properties": {
+                              "schemaVersion": {
+                                "const": 1
+                              },
+                              "subjectId": {
+                                "type": "string",
+                                "pattern": "^[A-Z][A-Z0-9-]*$"
+                              },
+                              "role": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                              },
+                              "verdict": {
+                                "enum": [
+                                  "APPROVED",
+                                  "CHANGES_REQUESTED"
+                                ]
+                              },
+                              "scopeRefs": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "pattern": "^[A-Z][A-Z0-9-]*$"
+                                },
+                                "uniqueItems": true
+                              },
+                              "resolvedIssueIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "pattern": "^[A-Z][A-Z0-9-]*$"
+                                },
+                                "uniqueItems": true
+                              },
+                              "issues": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "localId": {
+                                      "type": "string",
+                                      "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+                                    },
+                                    "severity": {
+                                      "enum": [
+                                        "blocker",
+                                        "suggestion"
+                                      ]
+                                    },
+                                    "ownerRole": {
+                                      "type": "string",
+                                      "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                                    },
+                                    "requirementRefs": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "pattern": "^[A-Z][A-Z0-9-]*$"
+                                      },
+                                      "uniqueItems": true
+                                    },
+                                    "message": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "requestedChange": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  "required": [
+                                    "localId",
+                                    "severity",
+                                    "ownerRole",
+                                    "requirementRefs",
+                                    "message",
+                                    "requestedChange"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": [
+                              "schemaVersion",
+                              "subjectId",
+                              "role",
+                              "verdict",
+                              "scopeRefs",
+                              "resolvedIssueIds",
+                              "issues"
+                            ],
+                            "additionalProperties": false,
+                            "allOf": [
+                              {
+                                "if": {
+                                  "properties": {
+                                    "verdict": {
+                                      "const": "CHANGES_REQUESTED"
+                                    }
+                                  }
+                                },
+                                "then": {
+                                  "properties": {
+                                    "issues": {
+                                      "contains": {
+                                        "properties": {
+                                          "severity": {
+                                            "const": "blocker"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "if": {
+                                  "properties": {
+                                    "verdict": {
+                                      "const": "APPROVED"
+                                    }
+                                  }
+                                },
+                                "then": {
+                                  "properties": {
+                                    "issues": {
+                                      "items": {
+                                        "properties": {
+                                          "severity": {
+                                            "const": "suggestion"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        },
+                        "attachFiles": true
+                      }
+                    },
+                    {
+                      "id": "evaluate",
+                      "type": "gate",
+                      "config": {
+                        "mode": "evaluate",
+                        "policy": {
+                          "slots": [
+                            {
+                              "id": "customer",
+                              "role": "customer",
+                              "view": "public"
+                            },
+                            {
+                              "id": "readiness",
+                              "role": "implementation-readiness",
+                              "view": "full"
+                            },
+                            {
+                              "id": "testability",
+                              "role": "testability-reviewer",
+                              "view": "full"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "carry",
+                      "type": "merge",
+                      "config": {
+                        "mode": "record",
+                        "inputs": [
+                          {
+                            "id": "seed",
+                            "type": "JsonValue"
+                          },
+                          {
+                            "id": "subject",
+                            "type": "ArtifactSet"
+                          },
+                          {
+                            "id": "report",
+                            "type": "JsonValue"
+                          }
+                        ],
+                        "fields": [
+                          {
+                            "name": "businessTask",
+                            "source": {
+                              "input": "seed",
+                              "pointer": "/businessTask"
+                            }
+                          },
+                          {
+                            "name": "base",
+                            "source": {
+                              "input": "seed",
+                              "pointer": "/base"
+                            }
+                          },
+                          {
+                            "name": "specification",
+                            "source": {
+                              "input": "subject"
+                            }
+                          },
+                          {
+                            "name": "issues",
+                            "source": {
+                              "input": "report",
+                              "pointer": "/issues"
+                            }
+                          },
+                          {
+                            "name": "documentationApproval",
+                            "source": {
+                              "input": "report",
+                              "pointer": "/certificate"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "id": "decide",
+                      "type": "condition",
+                      "config": {
+                        "doneWhen": {
+                          "pointer": "/status",
+                          "op": "equals",
+                          "value": "OPEN"
+                        },
+                        "reason": {
+                          "pointer": "/reason"
+                        },
+                        "feedback": {
+                          "pointer": "/reason"
+                        }
+                      }
+                    }
+                  ],
+                  "edges": [
+                    {
+                      "id": "s-plan-text-value-customer-prompt-plan",
+                      "source": {
+                        "nodeId": "plan-text",
+                        "port": "value"
+                      },
+                      "target": {
+                        "nodeId": "customer-prompt",
+                        "port": "plan"
+                      }
+                    },
+                    {
+                      "id": "s-customer-prompt-text-customer-review-prompt",
+                      "source": {
+                        "nodeId": "customer-prompt",
+                        "port": "text"
+                      },
+                      "target": {
+                        "nodeId": "customer-review",
+                        "port": "prompt"
+                      }
+                    },
+                    {
+                      "id": "s-prepare-customer-customer-review-files",
+                      "source": {
+                        "nodeId": "prepare",
+                        "port": "customer"
+                      },
+                      "target": {
+                        "nodeId": "customer-review",
+                        "port": "files"
+                      }
+                    },
+                    {
+                      "id": "s-customer-review-json-evaluate-customer",
+                      "source": {
+                        "nodeId": "customer-review",
+                        "port": "json"
+                      },
+                      "target": {
+                        "nodeId": "evaluate",
+                        "port": "customer"
+                      }
+                    },
+                    {
+                      "id": "s-plan-text-value-readiness-prompt-plan",
+                      "source": {
+                        "nodeId": "plan-text",
+                        "port": "value"
+                      },
+                      "target": {
+                        "nodeId": "readiness-prompt",
+                        "port": "plan"
+                      }
+                    },
+                    {
+                      "id": "s-readiness-prompt-text-readiness-review-prompt",
+                      "source": {
+                        "nodeId": "readiness-prompt",
+                        "port": "text"
+                      },
+                      "target": {
+                        "nodeId": "readiness-review",
+                        "port": "prompt"
+                      }
+                    },
+                    {
+                      "id": "s-prepare-readiness-readiness-review-files",
+                      "source": {
+                        "nodeId": "prepare",
+                        "port": "readiness"
+                      },
+                      "target": {
+                        "nodeId": "readiness-review",
+                        "port": "files"
+                      }
+                    },
+                    {
+                      "id": "s-readiness-review-json-evaluate-readiness",
+                      "source": {
+                        "nodeId": "readiness-review",
+                        "port": "json"
+                      },
+                      "target": {
+                        "nodeId": "evaluate",
+                        "port": "readiness"
+                      }
+                    },
+                    {
+                      "id": "s-plan-text-value-testability-prompt-plan",
+                      "source": {
+                        "nodeId": "plan-text",
+                        "port": "value"
+                      },
+                      "target": {
+                        "nodeId": "testability-prompt",
+                        "port": "plan"
+                      }
+                    },
+                    {
+                      "id": "s-testability-prompt-text-testability-review-prompt",
+                      "source": {
+                        "nodeId": "testability-prompt",
+                        "port": "text"
+                      },
+                      "target": {
+                        "nodeId": "testability-review",
+                        "port": "prompt"
+                      }
+                    },
+                    {
+                      "id": "s-prepare-testability-testability-review-files",
+                      "source": {
+                        "nodeId": "prepare",
+                        "port": "testability"
+                      },
+                      "target": {
+                        "nodeId": "testability-review",
+                        "port": "files"
+                      }
+                    },
+                    {
+                      "id": "s-testability-review-json-evaluate-testability",
+                      "source": {
+                        "nodeId": "testability-review",
+                        "port": "json"
+                      },
+                      "target": {
+                        "nodeId": "evaluate",
+                        "port": "testability"
+                      }
+                    },
+                    {
+                      "id": "s-input-value-business-value",
+                      "source": {
+                        "nodeId": "$input",
+                        "port": "value"
+                      },
+                      "target": {
+                        "nodeId": "business",
+                        "port": "value"
+                      }
+                    },
+                    {
+                      "id": "s-input-value-issue-text-value",
+                      "source": {
+                        "nodeId": "$input",
+                        "port": "value"
+                      },
+                      "target": {
+                        "nodeId": "issue-text",
+                        "port": "value"
+                      }
+                    },
+                    {
+                      "id": "s-input-value-issue-list-value",
+                      "source": {
+                        "nodeId": "$input",
+                        "port": "value"
+                      },
+                      "target": {
+                        "nodeId": "issue-list",
+                        "port": "value"
+                      }
+                    },
+                    {
+                      "id": "s-input-value-previous-value",
+                      "source": {
+                        "nodeId": "$input",
+                        "port": "value"
+                      },
+                      "target": {
+                        "nodeId": "previous",
+                        "port": "value"
+                      }
+                    },
+                    {
+                      "id": "s-business-value-analysis-prompt-business",
+                      "source": {
+                        "nodeId": "business",
+                        "port": "value"
+                      },
+                      "target": {
+                        "nodeId": "analysis-prompt",
+                        "port": "business"
+                      }
+                    },
+                    {
+                      "id": "s-issue-text-value-analysis-prompt-issues",
+                      "source": {
+                        "nodeId": "issue-text",
+                        "port": "value"
+                      },
+                      "target": {
+                        "nodeId": "analysis-prompt",
+                        "port": "issues"
+                      }
+                    },
+                    {
+                      "id": "s-analysis-prompt-text-analyst-prompt",
+                      "source": {
+                        "nodeId": "analysis-prompt",
+                        "port": "text"
+                      },
+                      "target": {
+                        "nodeId": "analyst",
+                        "port": "prompt"
+                      }
+                    },
+                    {
+                      "id": "s-previous-value-analyst-files",
+                      "source": {
+                        "nodeId": "previous",
+                        "port": "value"
+                      },
+                      "target": {
+                        "nodeId": "analyst",
+                        "port": "files"
+                      }
+                    },
+                    {
+                      "id": "s-analyst-files-prepare-subject",
+                      "source": {
+                        "nodeId": "analyst",
+                        "port": "files"
+                      },
+                      "target": {
+                        "nodeId": "prepare",
+                        "port": "subject"
+                      }
+                    },
+                    {
+                      "id": "s-issue-list-value-prepare-issues",
+                      "source": {
+                        "nodeId": "issue-list",
+                        "port": "value"
+                      },
+                      "target": {
+                        "nodeId": "prepare",
+                        "port": "issues"
+                      }
+                    },
+                    {
+                      "id": "s-prepare-plan-plan-text-value",
+                      "source": {
+                        "nodeId": "prepare",
+                        "port": "plan"
+                      },
+                      "target": {
+                        "nodeId": "plan-text",
+                        "port": "value"
+                      }
+                    },
+                    {
+                      "id": "s-prepare-subject-evaluate-subject",
+                      "source": {
+                        "nodeId": "prepare",
+                        "port": "subject"
+                      },
+                      "target": {
+                        "nodeId": "evaluate",
+                        "port": "subject"
+                      }
+                    },
+                    {
+                      "id": "s-prepare-plan-evaluate-plan",
+                      "source": {
+                        "nodeId": "prepare",
+                        "port": "plan"
+                      },
+                      "target": {
+                        "nodeId": "evaluate",
+                        "port": "plan"
+                      }
+                    },
+                    {
+                      "id": "s-input-value-carry-seed",
+                      "source": {
+                        "nodeId": "$input",
+                        "port": "value"
+                      },
+                      "target": {
+                        "nodeId": "carry",
+                        "port": "seed"
+                      }
+                    },
+                    {
+                      "id": "s-prepare-subject-carry-subject",
+                      "source": {
+                        "nodeId": "prepare",
+                        "port": "subject"
+                      },
+                      "target": {
+                        "nodeId": "carry",
+                        "port": "subject"
+                      }
+                    },
+                    {
+                      "id": "s-evaluate-report-carry-report",
+                      "source": {
+                        "nodeId": "evaluate",
+                        "port": "report"
+                      },
+                      "target": {
+                        "nodeId": "carry",
+                        "port": "report"
+                      }
+                    },
+                    {
+                      "id": "s-evaluate-report-decide-value",
+                      "source": {
+                        "nodeId": "evaluate",
+                        "port": "report"
+                      },
+                      "target": {
+                        "nodeId": "decide",
+                        "port": "value"
+                      }
+                    },
+                    {
+                      "id": "s-carry-value-return-candidate",
+                      "source": {
+                        "nodeId": "carry",
+                        "port": "value"
+                      },
+                      "target": {
+                        "nodeId": "$return",
+                        "port": "candidate"
+                      }
+                    },
+                    {
+                      "id": "s-decide-decision-return-decision",
+                      "source": {
+                        "nodeId": "decide",
+                        "port": "decision"
+                      },
+                      "target": {
+                        "nodeId": "$return",
+                        "port": "decision"
+                      }
+                    }
+                  ],
+                  "after": []
+                }
+              }
+            },
+            {
+              "id": "after-spec",
+              "type": "merge",
+              "config": {
+                "mode": "record",
+                "inputs": [
+                  {
+                    "id": "seed",
+                    "type": "JsonValue"
+                  },
+                  {
+                    "id": "spec",
+                    "type": "JsonValue"
+                  }
+                ],
+                "fields": [
+                  {
+                    "name": "businessTask",
+                    "source": {
+                      "input": "seed",
+                      "pointer": "/businessTask"
+                    }
+                  },
+                  {
+                    "name": "base",
+                    "source": {
+                      "input": "seed",
+                      "pointer": "/base"
+                    }
+                  },
+                  {
+                    "name": "specification",
+                    "source": {
+                      "input": "spec",
+                      "pointer": "/specification"
+                    }
+                  },
+                  {
+                    "name": "issues",
+                    "source": {
+                      "input": "spec",
+                      "pointer": "/issues"
+                    }
+                  },
+                  {
+                    "name": "documentationApproval",
+                    "source": {
+                      "input": "spec",
+                      "pointer": "/documentationApproval"
+                    }
+                  },
+                  {
+                    "name": "priorMapState",
+                    "source": {
+                      "input": "seed",
+                      "pointer": "/priorMapState"
+                    }
+                  },
+                  {
+                    "name": "repair",
+                    "source": {
+                      "literal": null
+                    }
+                  },
+                  {
+                    "name": "candidate",
+                    "source": {
+                      "literal": null
+                    }
+                  },
+                  {
+                    "name": "finalAcceptance",
+                    "source": {
+                      "literal": null
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "id": "reviewed",
+              "type": "merge",
+              "config": {
+                "mode": "selected",
+                "valueType": "JsonValue",
+                "inputs": [
+                  {
+                    "id": "approved"
+                  },
+                  {
+                    "id": "revised"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "doc-of",
+              "type": "json-select",
+              "config": {
+                "pointer": "/specification",
+                "outputType": "ArtifactSet"
+              }
+            },
+            {
+              "id": "approval-of",
+              "type": "json-select",
+              "config": {
+                "pointer": "/documentationApproval",
+                "outputType": "JsonValue"
+              }
+            },
+            {
+              "id": "base-of",
+              "type": "json-select",
+              "config": {
+                "pointer": "/base",
+                "outputType": "ArtifactSet"
+              }
+            },
+            {
+              "id": "prior-of",
+              "type": "json-select",
+              "config": {
+                "pointer": "/priorMapState",
+                "outputType": "JsonValue"
+              }
+            },
+            {
+              "id": "repair-of",
+              "type": "json-select",
+              "config": {
+                "pointer": "/repair",
+                "outputType": "JsonValue"
+              }
+            },
+            {
+              "id": "implement",
+              "type": "map",
+              "config": {
+                "approvalPolicy": {
+                  "slots": [
+                    {
+                      "id": "customer",
+                      "role": "customer",
+                      "view": "public"
+                    },
+                    {
+                      "id": "readiness",
+                      "role": "implementation-readiness",
+                      "view": "full"
+                    },
+                    {
+                      "id": "testability",
+                      "role": "testability-reviewer",
+                      "view": "full"
+                    }
+                  ]
+                },
+                "optionalInputs": [
+                  "prior-state",
+                  "repair"
+                ],
+                "limits": {
+                  "maxFailedVerificationCycles": 3,
+                  "maxTaskAttempts": 3
+                },
+                "roles": [
+                  {
+                    "id": "implementer",
+                    "kind": "agent",
+                    "provider": "claude",
+                    "model": "explicit-test-model",
+                    "instructions": "Implement the approved task. Write only the listed outputs.",
+                    "timeoutSeconds": 600,
+                    "context": "task"
+                  },
+                  {
+                    "id": "test-author",
+                    "kind": "agent",
+                    "provider": "antigravity",
+                    "model": "explicit-test-model",
+                    "instructions": "Write the approved tests. Write only the listed outputs.",
+                    "timeoutSeconds": 600,
+                    "context": "task"
+                  },
+                  {
+                    "id": "reviewer",
+                    "kind": "agent",
+                    "provider": "codex",
+                    "model": "explicit-test-model",
+                    "instructions": "Review the supplied immutable task-result snapshot against the named criterion and its specification sections. This snapshot contains the base and declared task dependencies, not every parallel task's outputs. For a test-source review, assess required case coverage and compatibility with the documented interfaces. Candidate-sourced check commands are run by the engine verification task after assembly; do not reject an isolated test-writing result because another task's implementation modules are absent. Missing declared inputs and genuine source defects remain blockers. The complete candidate must still pass every approved verification command.",
+                    "timeoutSeconds": 600,
+                    "context": "task"
+                  },
+                  {
+                    "id": "analyst",
+                    "kind": "agent",
+                    "provider": "codex",
+                    "model": "explicit-test-model",
+                    "instructions": "Triage the failed verification from the captured evidence.",
+                    "timeoutSeconds": 600,
+                    "context": {
+                      "contextId": "analyst-history"
+                    }
+                  },
+                  {
+                    "id": "verification",
+                    "kind": "utility",
+                    "template": "verification",
+                    "embeddedRoles": {
+                      "triage": "analyst"
+                    }
+                  }
+                ],
+                "carryAcrossRevisions": true
+              }
+            },
+            {
+              "id": "map-route",
+              "type": "route",
+              "config": {
+                "valueType": "JsonValue",
+                "selector": "/outcome",
+                "cases": [
+                  {
+                    "id": "complete",
+                    "equals": "implementation_complete"
+                  },
+                  {
+                    "id": "revise",
+                    "equals": "specification_revision_required"
+                  }
+                ],
+                "onUnmatched": "error"
+              }
+            },
+            {
+              "id": "map-revision",
+              "type": "merge",
+              "config": {
+                "mode": "record",
+                "inputs": [
+                  {
+                    "id": "state",
+                    "type": "JsonValue"
+                  },
+                  {
+                    "id": "summary",
+                    "type": "JsonValue"
+                  }
+                ],
+                "fields": [
+                  {
+                    "name": "businessTask",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/businessTask"
+                    }
+                  },
+                  {
+                    "name": "base",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/base"
+                    }
+                  },
+                  {
+                    "name": "specification",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/specification"
+                    }
+                  },
+                  {
+                    "name": "issues",
+                    "source": {
+                      "input": "summary",
+                      "pointer": "/issues"
+                    }
+                  },
+                  {
+                    "name": "priorMapState",
+                    "source": {
+                      "input": "summary",
+                      "pointer": "/state"
+                    }
+                  },
+                  {
+                    "name": "documentationApproval",
+                    "source": {
+                      "literal": null
+                    }
+                  },
+                  {
+                    "name": "repair",
+                    "source": {
+                      "literal": null
+                    }
+                  },
+                  {
+                    "name": "candidate",
+                    "source": {
+                      "literal": null
+                    }
+                  },
+                  {
+                    "name": "finalAcceptance",
+                    "source": {
+                      "literal": null
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "id": "no-issues",
+              "type": "merge",
+              "config": {
+                "mode": "record",
+                "inputs": [],
+                "fields": [
+                  {
+                    "name": "issues",
+                    "source": {
+                      "literal": []
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "id": "final-issues",
+              "type": "json-select",
+              "config": {
+                "pointer": "/issues",
+                "outputType": "JsonValue"
+              }
+            },
+            {
+              "id": "final-prepare",
+              "type": "gate",
+              "config": {
+                "mode": "prepare",
+                "subject": "delivery",
+                "specificationPolicy": {
+                  "slots": [
+                    {
+                      "id": "customer",
+                      "role": "customer",
+                      "view": "public"
+                    },
+                    {
+                      "id": "readiness",
+                      "role": "implementation-readiness",
+                      "view": "full"
+                    },
+                    {
+                      "id": "testability",
+                      "role": "testability-reviewer",
+                      "view": "full"
+                    }
+                  ]
+                },
+                "policy": {
+                  "slots": [
+                    {
+                      "id": "quality",
+                      "role": "reviewer",
+                      "view": "full"
+                    },
+                    {
+                      "id": "conformance",
+                      "role": "analyst",
+                      "view": "full"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "final-plan",
+              "type": "json-select",
+              "config": {
+                "pointer": "",
+                "outputType": "Text",
+                "render": "canonical-json"
+              }
+            },
+            {
+              "id": "quality-prompt",
+              "type": "prompt-template",
+              "config": {
+                "template": "Review the delivery as the quality reviewer: code, tests and the engine check summaries.\n\nReview plan (JSON):\n{{plan}}\n\nReturn a ReviewDecision for the subject in SUBJECT.json. Resolve in resolvedIssueIds every open issue listed in your slot's resolvableIssueIds that this revision fixes; never resolve another reviewer's issue.",
+                "slots": [
+                  {
+                    "id": "plan"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "quality-review",
+              "type": "agent",
+              "config": {
+                "provider": "codex",
+                "model": "explicit-test-model",
+                "timeoutSeconds": 600,
+                "output": {
+                  "format": "json",
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "schemaVersion": {
+                        "const": 1
+                      },
+                      "subjectId": {
+                        "type": "string",
+                        "pattern": "^[A-Z][A-Z0-9-]*$"
+                      },
+                      "role": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                      },
+                      "verdict": {
+                        "enum": [
+                          "APPROVED",
+                          "CHANGES_REQUESTED"
+                        ]
+                      },
+                      "scopeRefs": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[A-Z][A-Z0-9-]*$"
+                        },
+                        "uniqueItems": true
+                      },
+                      "resolvedIssueIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[A-Z][A-Z0-9-]*$"
+                        },
+                        "uniqueItems": true
+                      },
+                      "issues": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "localId": {
+                              "type": "string",
+                              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+                            },
+                            "severity": {
+                              "enum": [
+                                "blocker",
+                                "suggestion"
+                              ]
+                            },
+                            "ownerRole": {
+                              "type": "string",
+                              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                            },
+                            "requirementRefs": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "pattern": "^[A-Z][A-Z0-9-]*$"
+                              },
+                              "uniqueItems": true
+                            },
+                            "message": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "requestedChange": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "localId",
+                            "severity",
+                            "ownerRole",
+                            "requirementRefs",
+                            "message",
+                            "requestedChange"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "schemaVersion",
+                      "subjectId",
+                      "role",
+                      "verdict",
+                      "scopeRefs",
+                      "resolvedIssueIds",
+                      "issues"
+                    ],
+                    "additionalProperties": false,
+                    "allOf": [
+                      {
+                        "if": {
+                          "properties": {
+                            "verdict": {
+                              "const": "CHANGES_REQUESTED"
+                            }
+                          }
+                        },
+                        "then": {
+                          "properties": {
+                            "issues": {
+                              "contains": {
+                                "properties": {
+                                  "severity": {
+                                    "const": "blocker"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "if": {
+                          "properties": {
+                            "verdict": {
+                              "const": "APPROVED"
+                            }
+                          }
+                        },
+                        "then": {
+                          "properties": {
+                            "issues": {
+                              "items": {
+                                "properties": {
+                                  "severity": {
+                                    "const": "suggestion"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                },
+                "attachFiles": true
+              }
+            },
+            {
+              "id": "conformance-prompt",
+              "type": "prompt-template",
+              "config": {
+                "template": "Check that the delivery conforms to the approved specification.\n\nReview plan (JSON):\n{{plan}}\n\nReturn a ReviewDecision for the subject in SUBJECT.json. Resolve in resolvedIssueIds every open issue listed in your slot's resolvableIssueIds that this revision fixes; never resolve another reviewer's issue.",
+                "slots": [
+                  {
+                    "id": "plan"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "conformance-review",
+              "type": "agent",
+              "config": {
+                "provider": "codex",
+                "model": "explicit-test-model",
+                "timeoutSeconds": 600,
+                "output": {
+                  "format": "json",
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "schemaVersion": {
+                        "const": 1
+                      },
+                      "subjectId": {
+                        "type": "string",
+                        "pattern": "^[A-Z][A-Z0-9-]*$"
+                      },
+                      "role": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                      },
+                      "verdict": {
+                        "enum": [
+                          "APPROVED",
+                          "CHANGES_REQUESTED"
+                        ]
+                      },
+                      "scopeRefs": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[A-Z][A-Z0-9-]*$"
+                        },
+                        "uniqueItems": true
+                      },
+                      "resolvedIssueIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[A-Z][A-Z0-9-]*$"
+                        },
+                        "uniqueItems": true
+                      },
+                      "issues": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "localId": {
+                              "type": "string",
+                              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+                            },
+                            "severity": {
+                              "enum": [
+                                "blocker",
+                                "suggestion"
+                              ]
+                            },
+                            "ownerRole": {
+                              "type": "string",
+                              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                            },
+                            "requirementRefs": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "pattern": "^[A-Z][A-Z0-9-]*$"
+                              },
+                              "uniqueItems": true
+                            },
+                            "message": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "requestedChange": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "localId",
+                            "severity",
+                            "ownerRole",
+                            "requirementRefs",
+                            "message",
+                            "requestedChange"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "schemaVersion",
+                      "subjectId",
+                      "role",
+                      "verdict",
+                      "scopeRefs",
+                      "resolvedIssueIds",
+                      "issues"
+                    ],
+                    "additionalProperties": false,
+                    "allOf": [
+                      {
+                        "if": {
+                          "properties": {
+                            "verdict": {
+                              "const": "CHANGES_REQUESTED"
+                            }
+                          }
+                        },
+                        "then": {
+                          "properties": {
+                            "issues": {
+                              "contains": {
+                                "properties": {
+                                  "severity": {
+                                    "const": "blocker"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "if": {
+                          "properties": {
+                            "verdict": {
+                              "const": "APPROVED"
+                            }
+                          }
+                        },
+                        "then": {
+                          "properties": {
+                            "issues": {
+                              "items": {
+                                "properties": {
+                                  "severity": {
+                                    "const": "suggestion"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                },
+                "attachFiles": true,
+                "contextId": "analyst-history"
+              }
+            },
+            {
+              "id": "technical",
+              "type": "gate",
+              "config": {
+                "mode": "evaluate",
+                "policy": {
+                  "slots": [
+                    {
+                      "id": "quality",
+                      "role": "reviewer",
+                      "view": "full"
+                    },
+                    {
+                      "id": "conformance",
+                      "role": "analyst",
+                      "view": "full"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "technical-route",
+              "type": "route",
+              "config": {
+                "valueType": "JsonValue",
+                "selector": "/status",
+                "cases": [
+                  {
+                    "id": "open",
+                    "equals": "OPEN"
+                  },
+                  {
+                    "id": "revise",
+                    "equals": "REVISION_REQUIRED"
+                  }
+                ],
+                "onUnmatched": "error"
+              }
+            },
+            {
+              "id": "technical-certificate",
+              "type": "json-select",
+              "config": {
+                "pointer": "/certificate",
+                "outputType": "JsonValue"
+              }
+            },
+            {
+              "id": "customer-prepare",
+              "type": "gate",
+              "config": {
+                "mode": "prepare",
+                "subject": "delivery",
+                "specificationPolicy": {
+                  "slots": [
+                    {
+                      "id": "customer",
+                      "role": "customer",
+                      "view": "public"
+                    },
+                    {
+                      "id": "readiness",
+                      "role": "implementation-readiness",
+                      "view": "full"
+                    },
+                    {
+                      "id": "testability",
+                      "role": "testability-reviewer",
+                      "view": "full"
+                    }
+                  ]
+                },
+                "technicalPolicy": {
+                  "slots": [
+                    {
+                      "id": "quality",
+                      "role": "reviewer",
+                      "view": "full"
+                    },
+                    {
+                      "id": "conformance",
+                      "role": "analyst",
+                      "view": "full"
+                    }
+                  ]
+                },
+                "policy": {
+                  "slots": [
+                    {
+                      "id": "customer",
+                      "role": "customer",
+                      "view": "public"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "customer-plan",
+              "type": "json-select",
+              "config": {
+                "pointer": "",
+                "outputType": "Text",
+                "render": "canonical-json"
+              }
+            },
+            {
+              "id": "final-customer-prompt",
+              "type": "prompt-template",
+              "config": {
+                "template": "Accept or reject the delivered behavior as the Customer, using the public view and the engine check summaries.\n\nReview plan (JSON):\n{{plan}}\n\nReturn a ReviewDecision for the subject in SUBJECT.json. Resolve in resolvedIssueIds every open issue listed in your slot's resolvableIssueIds that this revision fixes; never resolve another reviewer's issue.",
+                "slots": [
+                  {
+                    "id": "plan"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "final-customer",
+              "type": "agent",
+              "config": {
+                "provider": "codex",
+                "model": "explicit-test-model",
+                "timeoutSeconds": 600,
+                "output": {
+                  "format": "json",
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "schemaVersion": {
+                        "const": 1
+                      },
+                      "subjectId": {
+                        "type": "string",
+                        "pattern": "^[A-Z][A-Z0-9-]*$"
+                      },
+                      "role": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                      },
+                      "verdict": {
+                        "enum": [
+                          "APPROVED",
+                          "CHANGES_REQUESTED"
+                        ]
+                      },
+                      "scopeRefs": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[A-Z][A-Z0-9-]*$"
+                        },
+                        "uniqueItems": true
+                      },
+                      "resolvedIssueIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[A-Z][A-Z0-9-]*$"
+                        },
+                        "uniqueItems": true
+                      },
+                      "issues": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "localId": {
+                              "type": "string",
+                              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+                            },
+                            "severity": {
+                              "enum": [
+                                "blocker",
+                                "suggestion"
+                              ]
+                            },
+                            "ownerRole": {
+                              "type": "string",
+                              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                            },
+                            "requirementRefs": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "pattern": "^[A-Z][A-Z0-9-]*$"
+                              },
+                              "uniqueItems": true
+                            },
+                            "message": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "requestedChange": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "localId",
+                            "severity",
+                            "ownerRole",
+                            "requirementRefs",
+                            "message",
+                            "requestedChange"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "schemaVersion",
+                      "subjectId",
+                      "role",
+                      "verdict",
+                      "scopeRefs",
+                      "resolvedIssueIds",
+                      "issues"
+                    ],
+                    "additionalProperties": false,
+                    "allOf": [
+                      {
+                        "if": {
+                          "properties": {
+                            "verdict": {
+                              "const": "CHANGES_REQUESTED"
+                            }
+                          }
+                        },
+                        "then": {
+                          "properties": {
+                            "issues": {
+                              "contains": {
+                                "properties": {
+                                  "severity": {
+                                    "const": "blocker"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "if": {
+                          "properties": {
+                            "verdict": {
+                              "const": "APPROVED"
+                            }
+                          }
+                        },
+                        "then": {
+                          "properties": {
+                            "issues": {
+                              "items": {
+                                "properties": {
+                                  "severity": {
+                                    "const": "suggestion"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                },
+                "attachFiles": true,
+                "contextId": "final-customer-history"
+              }
+            },
+            {
+              "id": "final",
+              "type": "gate",
+              "config": {
+                "mode": "evaluate",
+                "policy": {
+                  "slots": [
+                    {
+                      "id": "customer",
+                      "role": "customer",
+                      "view": "public"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "final-route",
+              "type": "route",
+              "config": {
+                "valueType": "JsonValue",
+                "selector": "/status",
+                "cases": [
+                  {
+                    "id": "open",
+                    "equals": "OPEN"
+                  },
+                  {
+                    "id": "revise",
+                    "equals": "REVISION_REQUIRED"
+                  }
+                ],
+                "onUnmatched": "error"
+              }
+            },
+            {
+              "id": "accepted",
+              "type": "merge",
+              "config": {
+                "mode": "record",
+                "inputs": [
+                  {
+                    "id": "state",
+                    "type": "JsonValue"
+                  },
+                  {
+                    "id": "summary",
+                    "type": "JsonValue"
+                  },
+                  {
+                    "id": "report",
+                    "type": "JsonValue"
+                  }
+                ],
+                "fields": [
+                  {
+                    "name": "businessTask",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/businessTask"
+                    }
+                  },
+                  {
+                    "name": "base",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/base"
+                    }
+                  },
+                  {
+                    "name": "specification",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/specification"
+                    }
+                  },
+                  {
+                    "name": "documentationApproval",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/documentationApproval"
+                    }
+                  },
+                  {
+                    "name": "issues",
+                    "source": {
+                      "literal": []
+                    }
+                  },
+                  {
+                    "name": "priorMapState",
+                    "source": {
+                      "input": "summary",
+                      "pointer": "/state"
+                    }
+                  },
+                  {
+                    "name": "repair",
+                    "source": {
+                      "literal": null
+                    }
+                  },
+                  {
+                    "name": "candidate",
+                    "source": {
+                      "input": "summary",
+                      "pointer": "/candidate"
+                    }
+                  },
+                  {
+                    "name": "finalAcceptance",
+                    "source": {
+                      "input": "report",
+                      "pointer": "/certificate"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "id": "technical-failure",
+              "type": "merge",
+              "config": {
+                "mode": "record",
+                "inputs": [
+                  {
+                    "id": "report",
+                    "type": "JsonValue"
+                  }
+                ],
+                "fields": [
+                  {
+                    "name": "stage",
+                    "source": {
+                      "literal": "technical"
+                    }
+                  },
+                  {
+                    "name": "report",
+                    "source": {
+                      "input": "report"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "id": "customer-failure",
+              "type": "merge",
+              "config": {
+                "mode": "record",
+                "inputs": [
+                  {
+                    "id": "report",
+                    "type": "JsonValue"
+                  }
+                ],
+                "fields": [
+                  {
+                    "name": "stage",
+                    "source": {
+                      "literal": "customer"
+                    }
+                  },
+                  {
+                    "name": "report",
+                    "source": {
+                      "input": "report"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "id": "failure",
+              "type": "merge",
+              "config": {
+                "mode": "selected",
+                "valueType": "JsonValue",
+                "inputs": [
+                  {
+                    "id": "technical"
+                  },
+                  {
+                    "id": "customer"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "failure-text",
+              "type": "json-select",
+              "config": {
+                "pointer": "",
+                "outputType": "Text",
+                "render": "canonical-json"
+              }
+            },
+            {
+              "id": "triage-prompt",
+              "type": "prompt-template",
+              "config": {
+                "template": "A final review rejected the delivery. Decide whether the approved tasks need repair or the specification must change.\n\nFailure (JSON):\n{{failure}}\n\nReturn the triage JSON.",
+                "slots": [
+                  {
+                    "id": "failure"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "triage",
+              "type": "agent",
+              "config": {
+                "provider": "codex",
+                "model": "explicit-test-model",
+                "timeoutSeconds": 600,
+                "output": {
+                  "format": "json",
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "schemaVersion",
+                      "cause",
+                      "action",
+                      "affectedTaskIds",
+                      "requirementRefs",
+                      "reason"
+                    ],
+                    "properties": {
+                      "schemaVersion": {
+                        "const": 1
+                      },
+                      "cause": {
+                        "enum": [
+                          "implementation",
+                          "tests",
+                          "specification",
+                          "integration_conflict",
+                          "unknown"
+                        ]
+                      },
+                      "action": {
+                        "enum": [
+                          "repair-tasks",
+                          "revise-specification",
+                          "unknown"
+                        ]
+                      },
+                      "affectedTaskIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^TASK-[A-Z0-9-]+$"
+                        },
+                        "uniqueItems": true
+                      },
+                      "requirementRefs": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "allOf": [
+                      {
+                        "if": {
+                          "properties": {
+                            "action": {
+                              "const": "repair-tasks"
+                            }
+                          }
+                        },
+                        "then": {
+                          "properties": {
+                            "affectedTaskIds": {
+                              "minItems": 1
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                },
+                "contextId": "analyst-history"
+              }
+            },
+            {
+              "id": "triage-route",
+              "type": "route",
+              "config": {
+                "valueType": "JsonValue",
+                "selector": "/action",
+                "cases": [
+                  {
+                    "id": "specification",
+                    "equals": "revise-specification"
+                  },
+                  {
+                    "id": "repair",
+                    "equals": "repair-tasks"
+                  }
+                ],
+                "onUnmatched": "pause"
+              }
+            },
+            {
+              "id": "spec-revision",
+              "type": "merge",
+              "config": {
+                "mode": "record",
+                "inputs": [
+                  {
+                    "id": "state",
+                    "type": "JsonValue"
+                  },
+                  {
+                    "id": "failure",
+                    "type": "JsonValue"
+                  },
+                  {
+                    "id": "summary",
+                    "type": "JsonValue"
+                  }
+                ],
+                "fields": [
+                  {
+                    "name": "businessTask",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/businessTask"
+                    }
+                  },
+                  {
+                    "name": "base",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/base"
+                    }
+                  },
+                  {
+                    "name": "specification",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/specification"
+                    }
+                  },
+                  {
+                    "name": "issues",
+                    "source": {
+                      "input": "failure",
+                      "pointer": "/report/issues"
+                    }
+                  },
+                  {
+                    "name": "priorMapState",
+                    "source": {
+                      "input": "summary",
+                      "pointer": "/state"
+                    }
+                  },
+                  {
+                    "name": "documentationApproval",
+                    "source": {
+                      "literal": null
+                    }
+                  },
+                  {
+                    "name": "repair",
+                    "source": {
+                      "literal": null
+                    }
+                  },
+                  {
+                    "name": "candidate",
+                    "source": {
+                      "literal": null
+                    }
+                  },
+                  {
+                    "name": "finalAcceptance",
+                    "source": {
+                      "literal": null
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "id": "repair-request",
+              "type": "merge",
+              "config": {
+                "mode": "record",
+                "inputs": [
+                  {
+                    "id": "failure",
+                    "type": "JsonValue"
+                  },
+                  {
+                    "id": "triage",
+                    "type": "JsonValue"
+                  },
+                  {
+                    "id": "summary",
+                    "type": "JsonValue"
+                  }
+                ],
+                "fields": [
+                  {
+                    "name": "schemaVersion",
+                    "source": {
+                      "literal": 1
+                    }
+                  },
+                  {
+                    "name": "kind",
+                    "source": {
+                      "literal": "MapRepair"
+                    }
+                  },
+                  {
+                    "name": "subjectId",
+                    "source": {
+                      "input": "summary",
+                      "pointer": "/specificationId"
+                    }
+                  },
+                  {
+                    "name": "taskIds",
+                    "source": {
+                      "input": "triage",
+                      "pointer": "/affectedTaskIds"
+                    }
+                  },
+                  {
+                    "name": "issues",
+                    "source": {
+                      "input": "failure",
+                      "pointer": "/report/issues"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "id": "repair-state",
+              "type": "merge",
+              "config": {
+                "mode": "record",
+                "inputs": [
+                  {
+                    "id": "state",
+                    "type": "JsonValue"
+                  },
+                  {
+                    "id": "repair",
+                    "type": "JsonValue"
+                  },
+                  {
+                    "id": "summary",
+                    "type": "JsonValue"
+                  }
+                ],
+                "fields": [
+                  {
+                    "name": "businessTask",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/businessTask"
+                    }
+                  },
+                  {
+                    "name": "base",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/base"
+                    }
+                  },
+                  {
+                    "name": "specification",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/specification"
+                    }
+                  },
+                  {
+                    "name": "documentationApproval",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/documentationApproval"
+                    }
+                  },
+                  {
+                    "name": "issues",
+                    "source": {
+                      "literal": []
+                    }
+                  },
+                  {
+                    "name": "priorMapState",
+                    "source": {
+                      "input": "summary",
+                      "pointer": "/state"
+                    }
+                  },
+                  {
+                    "name": "repair",
+                    "source": {
+                      "input": "repair"
+                    }
+                  },
+                  {
+                    "name": "candidate",
+                    "source": {
+                      "literal": null
+                    }
+                  },
+                  {
+                    "name": "finalAcceptance",
+                    "source": {
+                      "literal": null
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "id": "next",
+              "type": "merge",
+              "config": {
+                "mode": "selected",
+                "valueType": "JsonValue",
+                "inputs": [
+                  {
+                    "id": "map-revision"
+                  },
+                  {
+                    "id": "spec-revision"
+                  },
+                  {
+                    "id": "repair"
+                  },
+                  {
+                    "id": "accepted"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "done",
+              "type": "condition",
+              "config": {
+                "doneWhen": {
+                  "pointer": "/finalAcceptance",
+                  "op": "not-equals",
+                  "value": null
+                },
+                "reason": {
+                  "literal": "Continue until final acceptance is recorded."
+                },
+                "feedback": {
+                  "literal": "Use the carried structured issue and repair records."
+                }
+              }
+            }
+          ],
+          "edges": [
+            {
+              "id": "d-input-value-spec-of-value",
+              "source": {
+                "nodeId": "$input",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "spec-of",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-input-value-cert-of-value",
+              "source": {
+                "nodeId": "$input",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "cert-of",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-spec-of-value-verify-docs-subject",
+              "source": {
+                "nodeId": "spec-of",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "verify-docs",
+                "port": "subject"
+              }
+            },
+            {
+              "id": "d-cert-of-value-verify-docs-certificate",
+              "source": {
+                "nodeId": "cert-of",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "verify-docs",
+                "port": "certificate"
+              }
+            },
+            {
+              "id": "d-verify-docs-report-spec-route-selector",
+              "source": {
+                "nodeId": "verify-docs",
+                "port": "report"
+              },
+              "target": {
+                "nodeId": "spec-route",
+                "port": "selector"
+              }
+            },
+            {
+              "id": "d-input-value-spec-route-value",
+              "source": {
+                "nodeId": "$input",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "spec-route",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-spec-route-revise-spec-seed-state",
+              "source": {
+                "nodeId": "spec-route",
+                "port": "revise"
+              },
+              "target": {
+                "nodeId": "spec-seed",
+                "port": "state"
+              }
+            },
+            {
+              "id": "d-spec-seed-value-specification-seed",
+              "source": {
+                "nodeId": "spec-seed",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "specification",
+                "port": "seed"
+              }
+            },
+            {
+              "id": "d-spec-route-revise-after-spec-seed",
+              "source": {
+                "nodeId": "spec-route",
+                "port": "revise"
+              },
+              "target": {
+                "nodeId": "after-spec",
+                "port": "seed"
+              }
+            },
+            {
+              "id": "d-specification-result-after-spec-spec",
+              "source": {
+                "nodeId": "specification",
+                "port": "result"
+              },
+              "target": {
+                "nodeId": "after-spec",
+                "port": "spec"
+              }
+            },
+            {
+              "id": "d-spec-route-approved-reviewed-approved",
+              "source": {
+                "nodeId": "spec-route",
+                "port": "approved"
+              },
+              "target": {
+                "nodeId": "reviewed",
+                "port": "approved"
+              }
+            },
+            {
+              "id": "d-after-spec-value-reviewed-revised",
+              "source": {
+                "nodeId": "after-spec",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "reviewed",
+                "port": "revised"
+              }
+            },
+            {
+              "id": "d-reviewed-value-doc-of-value",
+              "source": {
+                "nodeId": "reviewed",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "doc-of",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-reviewed-value-approval-of-value",
+              "source": {
+                "nodeId": "reviewed",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "approval-of",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-reviewed-value-base-of-value",
+              "source": {
+                "nodeId": "reviewed",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "base-of",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-reviewed-value-prior-of-value",
+              "source": {
+                "nodeId": "reviewed",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "prior-of",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-reviewed-value-repair-of-value",
+              "source": {
+                "nodeId": "reviewed",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "repair-of",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-doc-of-value-implement-documentation",
+              "source": {
+                "nodeId": "doc-of",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "implement",
+                "port": "documentation"
+              }
+            },
+            {
+              "id": "d-approval-of-value-implement-approval",
+              "source": {
+                "nodeId": "approval-of",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "implement",
+                "port": "approval"
+              }
+            },
+            {
+              "id": "d-base-of-value-implement-base",
+              "source": {
+                "nodeId": "base-of",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "implement",
+                "port": "base"
+              }
+            },
+            {
+              "id": "d-prior-of-value-implement-prior-state",
+              "source": {
+                "nodeId": "prior-of",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "implement",
+                "port": "prior-state"
+              }
+            },
+            {
+              "id": "d-repair-of-value-implement-repair",
+              "source": {
+                "nodeId": "repair-of",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "implement",
+                "port": "repair"
+              }
+            },
+            {
+              "id": "d-implement-summary-map-route-selector",
+              "source": {
+                "nodeId": "implement",
+                "port": "summary"
+              },
+              "target": {
+                "nodeId": "map-route",
+                "port": "selector"
+              }
+            },
+            {
+              "id": "d-implement-summary-map-route-value",
+              "source": {
+                "nodeId": "implement",
+                "port": "summary"
+              },
+              "target": {
+                "nodeId": "map-route",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-reviewed-value-map-revision-state",
+              "source": {
+                "nodeId": "reviewed",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "map-revision",
+                "port": "state"
+              }
+            },
+            {
+              "id": "d-map-route-revise-map-revision-summary",
+              "source": {
+                "nodeId": "map-route",
+                "port": "revise"
+              },
+              "target": {
+                "nodeId": "map-revision",
+                "port": "summary"
+              }
+            },
+            {
+              "id": "d-no-issues-value-final-issues-value",
+              "source": {
+                "nodeId": "no-issues",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "final-issues",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-doc-of-value-final-prepare-documentation",
+              "source": {
+                "nodeId": "doc-of",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "final-prepare",
+                "port": "documentation"
+              }
+            },
+            {
+              "id": "d-approval-of-value-final-prepare-approval",
+              "source": {
+                "nodeId": "approval-of",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "final-prepare",
+                "port": "approval"
+              }
+            },
+            {
+              "id": "d-map-route-complete-final-prepare-summary",
+              "source": {
+                "nodeId": "map-route",
+                "port": "complete"
+              },
+              "target": {
+                "nodeId": "final-prepare",
+                "port": "summary"
+              }
+            },
+            {
+              "id": "d-implement-result-final-prepare-candidate",
+              "source": {
+                "nodeId": "implement",
+                "port": "result"
+              },
+              "target": {
+                "nodeId": "final-prepare",
+                "port": "candidate"
+              }
+            },
+            {
+              "id": "d-final-issues-value-final-prepare-issues",
+              "source": {
+                "nodeId": "final-issues",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "final-prepare",
+                "port": "issues"
+              }
+            },
+            {
+              "id": "d-doc-of-value-customer-prepare-documentation",
+              "source": {
+                "nodeId": "doc-of",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "customer-prepare",
+                "port": "documentation"
+              }
+            },
+            {
+              "id": "d-approval-of-value-customer-prepare-approval",
+              "source": {
+                "nodeId": "approval-of",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "customer-prepare",
+                "port": "approval"
+              }
+            },
+            {
+              "id": "d-map-route-complete-customer-prepare-summary",
+              "source": {
+                "nodeId": "map-route",
+                "port": "complete"
+              },
+              "target": {
+                "nodeId": "customer-prepare",
+                "port": "summary"
+              }
+            },
+            {
+              "id": "d-implement-result-customer-prepare-candidate",
+              "source": {
+                "nodeId": "implement",
+                "port": "result"
+              },
+              "target": {
+                "nodeId": "customer-prepare",
+                "port": "candidate"
+              }
+            },
+            {
+              "id": "d-final-issues-value-customer-prepare-issues",
+              "source": {
+                "nodeId": "final-issues",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "customer-prepare",
+                "port": "issues"
+              }
+            },
+            {
+              "id": "d-final-prepare-plan-final-plan-value",
+              "source": {
+                "nodeId": "final-prepare",
+                "port": "plan"
+              },
+              "target": {
+                "nodeId": "final-plan",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-final-plan-value-quality-prompt-plan",
+              "source": {
+                "nodeId": "final-plan",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "quality-prompt",
+                "port": "plan"
+              }
+            },
+            {
+              "id": "d-quality-prompt-text-quality-review-prompt",
+              "source": {
+                "nodeId": "quality-prompt",
+                "port": "text"
+              },
+              "target": {
+                "nodeId": "quality-review",
+                "port": "prompt"
+              }
+            },
+            {
+              "id": "d-final-prepare-quality-quality-review-files",
+              "source": {
+                "nodeId": "final-prepare",
+                "port": "quality"
+              },
+              "target": {
+                "nodeId": "quality-review",
+                "port": "files"
+              }
+            },
+            {
+              "id": "d-quality-review-json-technical-quality",
+              "source": {
+                "nodeId": "quality-review",
+                "port": "json"
+              },
+              "target": {
+                "nodeId": "technical",
+                "port": "quality"
+              }
+            },
+            {
+              "id": "d-final-plan-value-conformance-prompt-plan",
+              "source": {
+                "nodeId": "final-plan",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "conformance-prompt",
+                "port": "plan"
+              }
+            },
+            {
+              "id": "d-conformance-prompt-text-conformance-review-prompt",
+              "source": {
+                "nodeId": "conformance-prompt",
+                "port": "text"
+              },
+              "target": {
+                "nodeId": "conformance-review",
+                "port": "prompt"
+              }
+            },
+            {
+              "id": "d-final-prepare-conformance-conformance-review-files",
+              "source": {
+                "nodeId": "final-prepare",
+                "port": "conformance"
+              },
+              "target": {
+                "nodeId": "conformance-review",
+                "port": "files"
+              }
+            },
+            {
+              "id": "d-conformance-review-json-technical-conformance",
+              "source": {
+                "nodeId": "conformance-review",
+                "port": "json"
+              },
+              "target": {
+                "nodeId": "technical",
+                "port": "conformance"
+              }
+            },
+            {
+              "id": "d-final-prepare-subject-technical-subject",
+              "source": {
+                "nodeId": "final-prepare",
+                "port": "subject"
+              },
+              "target": {
+                "nodeId": "technical",
+                "port": "subject"
+              }
+            },
+            {
+              "id": "d-final-prepare-plan-technical-plan",
+              "source": {
+                "nodeId": "final-prepare",
+                "port": "plan"
+              },
+              "target": {
+                "nodeId": "technical",
+                "port": "plan"
+              }
+            },
+            {
+              "id": "d-technical-report-technical-route-selector",
+              "source": {
+                "nodeId": "technical",
+                "port": "report"
+              },
+              "target": {
+                "nodeId": "technical-route",
+                "port": "selector"
+              }
+            },
+            {
+              "id": "d-technical-report-technical-route-value",
+              "source": {
+                "nodeId": "technical",
+                "port": "report"
+              },
+              "target": {
+                "nodeId": "technical-route",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-technical-route-open-technical-certificate-value",
+              "source": {
+                "nodeId": "technical-route",
+                "port": "open"
+              },
+              "target": {
+                "nodeId": "technical-certificate",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-technical-certificate-value-customer-prepare-technical",
+              "source": {
+                "nodeId": "technical-certificate",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "customer-prepare",
+                "port": "technical"
+              }
+            },
+            {
+              "id": "d-customer-prepare-plan-customer-plan-value",
+              "source": {
+                "nodeId": "customer-prepare",
+                "port": "plan"
+              },
+              "target": {
+                "nodeId": "customer-plan",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-customer-plan-value-final-customer-prompt-plan",
+              "source": {
+                "nodeId": "customer-plan",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "final-customer-prompt",
+                "port": "plan"
+              }
+            },
+            {
+              "id": "d-final-customer-prompt-text-final-customer-prompt",
+              "source": {
+                "nodeId": "final-customer-prompt",
+                "port": "text"
+              },
+              "target": {
+                "nodeId": "final-customer",
+                "port": "prompt"
+              }
+            },
+            {
+              "id": "d-customer-prepare-customer-final-customer-files",
+              "source": {
+                "nodeId": "customer-prepare",
+                "port": "customer"
+              },
+              "target": {
+                "nodeId": "final-customer",
+                "port": "files"
+              }
+            },
+            {
+              "id": "d-final-customer-json-final-customer",
+              "source": {
+                "nodeId": "final-customer",
+                "port": "json"
+              },
+              "target": {
+                "nodeId": "final",
+                "port": "customer"
+              }
+            },
+            {
+              "id": "d-customer-prepare-subject-final-subject",
+              "source": {
+                "nodeId": "customer-prepare",
+                "port": "subject"
+              },
+              "target": {
+                "nodeId": "final",
+                "port": "subject"
+              }
+            },
+            {
+              "id": "d-customer-prepare-plan-final-plan",
+              "source": {
+                "nodeId": "customer-prepare",
+                "port": "plan"
+              },
+              "target": {
+                "nodeId": "final",
+                "port": "plan"
+              }
+            },
+            {
+              "id": "d-final-report-final-route-selector",
+              "source": {
+                "nodeId": "final",
+                "port": "report"
+              },
+              "target": {
+                "nodeId": "final-route",
+                "port": "selector"
+              }
+            },
+            {
+              "id": "d-final-report-final-route-value",
+              "source": {
+                "nodeId": "final",
+                "port": "report"
+              },
+              "target": {
+                "nodeId": "final-route",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-reviewed-value-accepted-state",
+              "source": {
+                "nodeId": "reviewed",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "accepted",
+                "port": "state"
+              }
+            },
+            {
+              "id": "d-map-route-complete-accepted-summary",
+              "source": {
+                "nodeId": "map-route",
+                "port": "complete"
+              },
+              "target": {
+                "nodeId": "accepted",
+                "port": "summary"
+              }
+            },
+            {
+              "id": "d-final-route-open-accepted-report",
+              "source": {
+                "nodeId": "final-route",
+                "port": "open"
+              },
+              "target": {
+                "nodeId": "accepted",
+                "port": "report"
+              }
+            },
+            {
+              "id": "d-technical-route-revise-technical-failure-report",
+              "source": {
+                "nodeId": "technical-route",
+                "port": "revise"
+              },
+              "target": {
+                "nodeId": "technical-failure",
+                "port": "report"
+              }
+            },
+            {
+              "id": "d-final-route-revise-customer-failure-report",
+              "source": {
+                "nodeId": "final-route",
+                "port": "revise"
+              },
+              "target": {
+                "nodeId": "customer-failure",
+                "port": "report"
+              }
+            },
+            {
+              "id": "d-technical-failure-value-failure-technical",
+              "source": {
+                "nodeId": "technical-failure",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "failure",
+                "port": "technical"
+              }
+            },
+            {
+              "id": "d-customer-failure-value-failure-customer",
+              "source": {
+                "nodeId": "customer-failure",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "failure",
+                "port": "customer"
+              }
+            },
+            {
+              "id": "d-failure-value-failure-text-value",
+              "source": {
+                "nodeId": "failure",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "failure-text",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-failure-text-value-triage-prompt-failure",
+              "source": {
+                "nodeId": "failure-text",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "triage-prompt",
+                "port": "failure"
+              }
+            },
+            {
+              "id": "d-triage-prompt-text-triage-prompt",
+              "source": {
+                "nodeId": "triage-prompt",
+                "port": "text"
+              },
+              "target": {
+                "nodeId": "triage",
+                "port": "prompt"
+              }
+            },
+            {
+              "id": "d-triage-json-triage-route-selector",
+              "source": {
+                "nodeId": "triage",
+                "port": "json"
+              },
+              "target": {
+                "nodeId": "triage-route",
+                "port": "selector"
+              }
+            },
+            {
+              "id": "d-failure-value-triage-route-value",
+              "source": {
+                "nodeId": "failure",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "triage-route",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-reviewed-value-spec-revision-state",
+              "source": {
+                "nodeId": "reviewed",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "spec-revision",
+                "port": "state"
+              }
+            },
+            {
+              "id": "d-triage-route-specification-spec-revision-failure",
+              "source": {
+                "nodeId": "triage-route",
+                "port": "specification"
+              },
+              "target": {
+                "nodeId": "spec-revision",
+                "port": "failure"
+              }
+            },
+            {
+              "id": "d-implement-summary-spec-revision-summary",
+              "source": {
+                "nodeId": "implement",
+                "port": "summary"
+              },
+              "target": {
+                "nodeId": "spec-revision",
+                "port": "summary"
+              }
+            },
+            {
+              "id": "d-triage-route-repair-repair-request-failure",
+              "source": {
+                "nodeId": "triage-route",
+                "port": "repair"
+              },
+              "target": {
+                "nodeId": "repair-request",
+                "port": "failure"
+              }
+            },
+            {
+              "id": "d-triage-json-repair-request-triage",
+              "source": {
+                "nodeId": "triage",
+                "port": "json"
+              },
+              "target": {
+                "nodeId": "repair-request",
+                "port": "triage"
+              }
+            },
+            {
+              "id": "d-implement-summary-repair-request-summary",
+              "source": {
+                "nodeId": "implement",
+                "port": "summary"
+              },
+              "target": {
+                "nodeId": "repair-request",
+                "port": "summary"
+              }
+            },
+            {
+              "id": "d-reviewed-value-repair-state-state",
+              "source": {
+                "nodeId": "reviewed",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "repair-state",
+                "port": "state"
+              }
+            },
+            {
+              "id": "d-repair-request-value-repair-state-repair",
+              "source": {
+                "nodeId": "repair-request",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "repair-state",
+                "port": "repair"
+              }
+            },
+            {
+              "id": "d-implement-summary-repair-state-summary",
+              "source": {
+                "nodeId": "implement",
+                "port": "summary"
+              },
+              "target": {
+                "nodeId": "repair-state",
+                "port": "summary"
+              }
+            },
+            {
+              "id": "d-map-revision-value-next-map-revision",
+              "source": {
+                "nodeId": "map-revision",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "next",
+                "port": "map-revision"
+              }
+            },
+            {
+              "id": "d-spec-revision-value-next-spec-revision",
+              "source": {
+                "nodeId": "spec-revision",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "next",
+                "port": "spec-revision"
+              }
+            },
+            {
+              "id": "d-repair-state-value-next-repair",
+              "source": {
+                "nodeId": "repair-state",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "next",
+                "port": "repair"
+              }
+            },
+            {
+              "id": "d-accepted-value-next-accepted",
+              "source": {
+                "nodeId": "accepted",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "next",
+                "port": "accepted"
+              }
+            },
+            {
+              "id": "d-next-value-done-value",
+              "source": {
+                "nodeId": "next",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "done",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-next-value-return-candidate",
+              "source": {
+                "nodeId": "next",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "$return",
+                "port": "candidate"
+              }
+            },
+            {
+              "id": "d-done-decision-return-decision",
+              "source": {
+                "nodeId": "done",
+                "port": "decision"
+              },
+              "target": {
+                "nodeId": "$return",
+                "port": "decision"
+              }
+            }
+          ],
+          "after": []
+        }
+      }
+    },
+    {
+      "id": "acceptance",
+      "type": "json-select",
+      "config": {
+        "pointer": "/finalAcceptance",
+        "outputType": "JsonValue"
+      }
+    },
+    {
+      "id": "candidate",
+      "type": "json-select",
+      "config": {
+        "pointer": "/candidate",
+        "outputType": "JsonValue"
+      }
+    },
+    {
+      "id": "acceptance-view",
+      "type": "result-viewer",
+      "config": {}
+    },
+    {
+      "id": "candidate-view",
+      "type": "result-viewer",
+      "config": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "o-task-text-seed-task",
+      "source": {
+        "nodeId": "task",
+        "port": "text"
+      },
+      "target": {
+        "nodeId": "seed",
+        "port": "task"
+      }
+    },
+    {
+      "id": "o-project-value-seed-base",
+      "source": {
+        "nodeId": "project",
+        "port": "value"
+      },
+      "target": {
+        "nodeId": "seed",
+        "port": "base"
+      }
+    },
+    {
+      "id": "o-seed-value-delivery-seed",
+      "source": {
+        "nodeId": "seed",
+        "port": "value"
+      },
+      "target": {
+        "nodeId": "delivery",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "o-delivery-result-acceptance-value",
+      "source": {
+        "nodeId": "delivery",
+        "port": "result"
+      },
+      "target": {
+        "nodeId": "acceptance",
+        "port": "value"
+      }
+    },
+    {
+      "id": "o-delivery-result-candidate-value",
+      "source": {
+        "nodeId": "delivery",
+        "port": "result"
+      },
+      "target": {
+        "nodeId": "candidate",
+        "port": "value"
+      }
+    },
+    {
+      "id": "o-acceptance-value-acceptance-view-value",
+      "source": {
+        "nodeId": "acceptance",
+        "port": "value"
+      },
+      "target": {
+        "nodeId": "acceptance-view",
+        "port": "value"
+      }
+    },
+    {
+      "id": "o-candidate-value-candidate-view-value",
+      "source": {
+        "nodeId": "candidate",
+        "port": "value"
+      },
+      "target": {
+        "nodeId": "candidate-view",
+        "port": "value"
+      }
+    }
+  ],
+  "after": []
+}

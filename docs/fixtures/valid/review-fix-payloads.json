@@ -1,0 +1,56 @@
+{
+  "deliveryCertificate": {
+    "schemaVersion": 1,
+    "kind": "GateCertificate",
+    "recordId": "CERT-0123456789AB",
+    "subjectId": "DLV-0123456789AB",
+    "subject": {
+      "artifactId": "00000000-0000-4000-8000-000000000001",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "policyFingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "reviews": [
+      {
+        "recordId": "REV-0123456789AB",
+        "artifact": {
+          "artifactId": "00000000-0000-4000-8000-000000000002",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      }
+    ],
+    "issuedAt": "2026-10-13T12:00:00Z",
+    "runId": "00000000-0000-4000-8000-000000000003",
+    "subjectKind": "delivery",
+    "prerequisites": [
+      {
+        "recordId": "CERT-AAAAAAAAAAAA",
+        "artifact": {
+          "artifactId": "00000000-0000-4000-8000-000000000004",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      {
+        "recordId": "CERT-BBBBBBBBBBBB",
+        "artifact": {
+          "artifactId": "00000000-0000-4000-8000-000000000005",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      }
+    ]
+  },
+  "captureFailed": {
+    "schemaVersion": 2,
+    "id": "00000000-0000-4000-8000-000000000006",
+    "runId": "00000000-0000-4000-8000-000000000003",
+    "sequence": 7,
+    "timestamp": "2026-10-13T12:00:00Z",
+    "nodeInstanceId": "agent",
+    "attemptId": "00000000-0000-4000-8000-000000000007",
+    "type": "attempt.error",
+    "payload": {
+      "code": "capture_failed",
+      "message": "Capturing the CLI output failed (ENOSPC).",
+      "evidence": null
+    }
+  }
+}

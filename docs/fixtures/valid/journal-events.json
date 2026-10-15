@@ -1,0 +1,245 @@
+{
+  "run.created": {
+    "schemaVersion": 1,
+    "id": "00000000-0000-4000-8000-000000000001",
+    "runId": "00000000-0000-4000-8000-000000000001",
+    "sequence": 1,
+    "timestamp": "2026-10-13T12:00:00Z",
+    "nodeInstanceId": null,
+    "attemptId": null,
+    "type": "run.created",
+    "payload": {
+      "workflowSnapshot": {
+        "artifactId": "00000000-0000-4000-8000-000000000001",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "executionHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "settingsSnapshot": {
+        "artifactId": "00000000-0000-4000-8000-000000000001",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    }
+  },
+  "run.state_changed": {
+    "schemaVersion": 1,
+    "id": "00000000-0000-4000-8000-000000000001",
+    "runId": "00000000-0000-4000-8000-000000000001",
+    "sequence": 1,
+    "timestamp": "2026-10-13T12:00:00Z",
+    "nodeInstanceId": null,
+    "attemptId": null,
+    "type": "run.state_changed",
+    "payload": {
+      "from": "running",
+      "to": "draining",
+      "reason": "First failure"
+    }
+  },
+  "node.planned": {
+    "schemaVersion": 1,
+    "id": "00000000-0000-4000-8000-000000000001",
+    "runId": "00000000-0000-4000-8000-000000000001",
+    "sequence": 1,
+    "timestamp": "2026-10-13T12:00:00Z",
+    "nodeInstanceId": "proposal",
+    "attemptId": null,
+    "type": "node.planned",
+    "payload": {
+      "nodeId": "proposal",
+      "nodeType": "agent"
+    }
+  },
+  "attempt.state_changed": {
+    "schemaVersion": 1,
+    "id": "00000000-0000-4000-8000-000000000001",
+    "runId": "00000000-0000-4000-8000-000000000001",
+    "sequence": 1,
+    "timestamp": "2026-10-13T12:00:00Z",
+    "nodeInstanceId": "proposal",
+    "attemptId": "00000000-0000-4000-8000-000000000001",
+    "type": "attempt.state_changed",
+    "payload": {
+      "from": null,
+      "to": "scheduled",
+      "reason": "Planned",
+      "process": null
+    }
+  },
+  "attempt.inputs_committed": {
+    "schemaVersion": 1,
+    "id": "00000000-0000-4000-8000-000000000001",
+    "runId": "00000000-0000-4000-8000-000000000001",
+    "sequence": 1,
+    "timestamp": "2026-10-13T12:00:00Z",
+    "nodeInstanceId": "proposal",
+    "attemptId": "00000000-0000-4000-8000-000000000001",
+    "type": "attempt.inputs_committed",
+    "payload": {
+      "manifest": {
+        "artifactId": "00000000-0000-4000-8000-000000000001",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "prompt": {
+        "artifactId": "00000000-0000-4000-8000-000000000001",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "contextBindingId": "00000000-0000-4000-8000-000000000001"
+    }
+  },
+  "attempt.invocation_committed": {
+    "schemaVersion": 1,
+    "id": "00000000-0000-4000-8000-000000000001",
+    "runId": "00000000-0000-4000-8000-000000000001",
+    "sequence": 1,
+    "timestamp": "2026-10-13T12:00:00Z",
+    "nodeInstanceId": "proposal",
+    "attemptId": "00000000-0000-4000-8000-000000000001",
+    "type": "attempt.invocation_committed",
+    "payload": {
+      "manifest": {
+        "artifactId": "00000000-0000-4000-8000-000000000001",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    }
+  },
+  "attempt.log_chunk": {
+    "schemaVersion": 1,
+    "id": "00000000-0000-4000-8000-000000000001",
+    "runId": "00000000-0000-4000-8000-000000000001",
+    "sequence": 1,
+    "timestamp": "2026-10-13T12:00:00Z",
+    "nodeInstanceId": "proposal",
+    "attemptId": "00000000-0000-4000-8000-000000000001",
+    "type": "attempt.log_chunk",
+    "payload": {
+      "stream": "stdout",
+      "chunk": {
+        "artifactId": "00000000-0000-4000-8000-000000000001",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "chunkIndex": 0
+    }
+  },
+  "attempt.outputs_committed": {
+    "schemaVersion": 1,
+    "id": "00000000-0000-4000-8000-000000000001",
+    "runId": "00000000-0000-4000-8000-000000000001",
+    "sequence": 1,
+    "timestamp": "2026-10-13T12:00:00Z",
+    "nodeInstanceId": "proposal",
+    "attemptId": "00000000-0000-4000-8000-000000000001",
+    "type": "attempt.outputs_committed",
+    "payload": {
+      "manifest": {
+        "artifactId": "00000000-0000-4000-8000-000000000001",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    }
+  },
+  "attempt.error": {
+    "schemaVersion": 1,
+    "id": "00000000-0000-4000-8000-000000000001",
+    "runId": "00000000-0000-4000-8000-000000000001",
+    "sequence": 1,
+    "timestamp": "2026-10-13T12:00:00Z",
+    "nodeInstanceId": "proposal",
+    "attemptId": "00000000-0000-4000-8000-000000000001",
+    "type": "attempt.error",
+    "payload": {
+      "code": "output_contract",
+      "message": "Invalid output",
+      "evidence": {
+        "artifactId": "00000000-0000-4000-8000-000000000001",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    }
+  },
+  "context.state_changed": {
+    "schemaVersion": 1,
+    "id": "00000000-0000-4000-8000-000000000001",
+    "runId": "00000000-0000-4000-8000-000000000001",
+    "sequence": 1,
+    "timestamp": "2026-10-13T12:00:00Z",
+    "nodeInstanceId": null,
+    "attemptId": null,
+    "type": "context.state_changed",
+    "payload": {
+      "bindingId": "00000000-0000-4000-8000-000000000001",
+      "from": "ready",
+      "to": "writing",
+      "reason": "Dispatch"
+    }
+  },
+  "context.bound": {
+    "schemaVersion": 1,
+    "id": "00000000-0000-4000-8000-000000000001",
+    "runId": "00000000-0000-4000-8000-000000000001",
+    "sequence": 1,
+    "timestamp": "2026-10-13T12:00:00Z",
+    "nodeInstanceId": null,
+    "attemptId": null,
+    "type": "context.bound",
+    "payload": {
+      "bindingId": "00000000-0000-4000-8000-000000000001",
+      "provider": "codex",
+      "nativeSessionRef": {
+        "artifactId": "00000000-0000-4000-8000-000000000001",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "cwdIdentity": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  },
+  "run.capacity_changed": {
+    "schemaVersion": 1,
+    "id": "00000000-0000-4000-8000-000000000001",
+    "runId": "00000000-0000-4000-8000-000000000001",
+    "sequence": 1,
+    "timestamp": "2026-10-13T12:00:00Z",
+    "nodeInstanceId": null,
+    "attemptId": null,
+    "type": "run.capacity_changed",
+    "payload": {
+      "revision": 2,
+      "settings": {
+        "artifactId": "00000000-0000-4000-8000-000000000001",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    }
+  },
+  "launched": {
+    "schemaVersion": 1,
+    "id": "00000000-0000-4000-8000-000000000001",
+    "runId": "00000000-0000-4000-8000-000000000001",
+    "sequence": 1,
+    "timestamp": "2026-10-13T12:00:00Z",
+    "nodeInstanceId": "proposal",
+    "attemptId": "00000000-0000-4000-8000-000000000001",
+    "type": "attempt.state_changed",
+    "payload": {
+      "from": "waiting",
+      "to": "running",
+      "reason": "Launched",
+      "process": {
+        "pid": 1234,
+        "startIdentity": "fixture-start",
+        "supervisorGeneration": "00000000-0000-4000-8000-000000000001"
+      }
+    }
+  },
+  "blocked": {
+    "schemaVersion": 1,
+    "id": "00000000-0000-4000-8000-000000000001",
+    "runId": "00000000-0000-4000-8000-000000000001",
+    "sequence": 1,
+    "timestamp": "2026-10-13T12:00:00Z",
+    "nodeInstanceId": "proposal",
+    "attemptId": "00000000-0000-4000-8000-000000000001",
+    "type": "attempt.state_changed",
+    "payload": {
+      "from": "scheduled",
+      "to": "blocked",
+      "reason": "Run is draining",
+      "process": null
+    }
+  }
+}

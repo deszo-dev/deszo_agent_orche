@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "workflowId": "review-loop",
+  "capabilities": ["core-v1", "loops-v1"],
+  "settings": { "nativeConfiguration": "restricted" },
+  "nodes": [
+    { "id": "task", "type": "text", "config": { "value": "Write a two-sentence description of a round-recovery API for reconnecting clients." } },
+    {
+      "id": "seed", "type": "merge",
+      "config": { "mode": "record", "inputs": [], "fields": [
+        { "name": "draft", "source": { "literal": "" } },
+        { "name": "notes", "source": { "literal": "" } }
+      ] }
+    },
+    { "id": "writer-history", "type": "context", "config": { "provider": "codex", "mode": "new" } },
+    {
+      "id": "refine", "type": "loop",
+      "config": {
+        "valueType": "JsonValue",
+        "stateSchema": {
+          "type": "object",
+          "properties": { "draft": { "type": "string" }, "notes": { "type": "string" } },
+          "required": ["draft", "notes"],
+          "additionalProperties": false
+        },
+        "fixedInputs": [{ "id": "task", "type": "Text" }],
+        "limits": { "maxIterations": 3, "maxActiveMinutes": 30 },
+        "body": {
+          "nodes": [
+            { "id": "current-draft", "type": "json-select", "config": { "pointer": "/draft", "outputType": "Text", "render": "raw-string" } },
+            {
+              "id": "writer-prompt", "type": "prompt-template",
+              "config": {
+                "template": "Task:\n{{task}}\n\nCurrent draft (empty on the first iteration):\n{{draft}}\n\nReviewer feedback:\n{{feedback}}\n\nReturn only the improved draft.",
+                "slots": [{ "id": "task" }, { "id": "draft" }, { "id": "feedback" }]
+              }
+            },
+            { "id": "writer", "type": "agent", "config": { "provider": "codex", "model": "explicit-test-model", "contextId": "writer-history", "timeoutSeconds": 600, "output": { "format": "text" } } },
+            {
+              "id": "check-prompt", "type": "prompt-template",
+              "config": {
+                "template": "Task:\n{{task}}\n\nDraft:\n{{draft}}\n\nIf the draft fully satisfies the task, answer continue=false. Otherwise continue=true and give concrete feedback.",
+                "slots": [{ "id": "task" }, { "id": "draft" }]
+              }
+            },
+            {
+              "id": "checker", "type": "agent",
+              "config": {
+                "provider": "claude", "model": "explicit-test-model", "timeoutSeconds": 600,
+                "output": { "format": "json", "schema": {
+                  "type": "object",
+                  "properties": { "continue": { "type": "boolean" }, "reason": { "type": "string" }, "feedback": { "type": "string" } },
+                  "required": ["continue", "reason", "feedback"],
+                  "additionalProperties": false
+                } }
+              }
+            },
+            {
+              "id": "next-state", "type": "merge",
+              "config": { "mode": "record",
+                "inputs": [{ "id": "draft", "type": "Text" }, { "id": "verdict", "type": "JsonValue" }],
+                "fields": [
+                  { "name": "draft", "source": { "input": "draft" } },
+                  { "name": "notes", "source": { "input": "verdict", "pointer": "/feedback" } }
+                ] }
+            }
+          ],
+          "edges": [
+            { "id": "value-draft", "source": { "nodeId": "$input", "port": "value" }, "target": { "nodeId": "current-draft", "port": "value" } },
+            { "id": "task-writer", "source": { "nodeId": "$input", "port": "task" }, "target": { "nodeId": "writer-prompt", "port": "task" } },
+            { "id": "draft-writer", "source": { "nodeId": "current-draft", "port": "value" }, "target": { "nodeId": "writer-prompt", "port": "draft" } },
+            { "id": "feedback-writer", "source": { "nodeId": "$input", "port": "feedback" }, "target": { "nodeId": "writer-prompt", "port": "feedback" } },
+            { "id": "prompt-writer", "source": { "nodeId": "writer-prompt", "port": "text" }, "target": { "nodeId": "writer", "port": "prompt" } },
+            { "id": "task-check", "source": { "nodeId": "$input", "port": "task" }, "target": { "nodeId": "check-prompt", "port": "task" } },
+            { "id": "writer-check", "source": { "nodeId": "writer", "port": "text" }, "target": { "nodeId": "check-prompt", "port": "draft" } },
+            { "id": "prompt-checker", "source": { "nodeId": "check-prompt", "port": "text" }, "target": { "nodeId": "checker", "port": "prompt" } },
+            { "id": "writer-state", "source": { "nodeId": "writer", "port": "text" }, "target": { "nodeId": "next-state", "port": "draft" } },
+            { "id": "verdict-state", "source": { "nodeId": "checker", "port": "json" }, "target": { "nodeId": "next-state", "port": "verdict" } },
+            { "id": "state-return", "source": { "nodeId": "next-state", "port": "value" }, "target": { "nodeId": "$return", "port": "candidate" } },
+            { "id": "decision-return", "source": { "nodeId": "checker", "port": "json" }, "target": { "nodeId": "$return", "port": "decision" } }
+          ],
+          "after": [],
+          "view": {
+            "$input": { "x": 0, "y": 120 }, "current-draft": { "x": 260, "y": 0 }, "writer-prompt": { "x": 520, "y": 0 },
+            "writer": { "x": 780, "y": 0 }, "check-prompt": { "x": 1040, "y": 160 }, "checker": { "x": 1300, "y": 160 },
+            "next-state": { "x": 1560, "y": 0 }, "$return": { "x": 1820, "y": 120 }
+          }
+        }
+      }
+    },
+    { "id": "final-draft", "type": "json-select", "config": { "pointer": "/draft", "outputType": "Text", "render": "raw-string" } },
+    { "id": "answer", "type": "result-viewer", "config": {} }
+  ],
+  "edges": [
+    { "id": "seed-loop", "source": { "nodeId": "seed", "port": "value" }, "target": { "nodeId": "refine", "port": "seed" } },
+    { "id": "task-loop", "source": { "nodeId": "task", "port": "text" }, "target": { "nodeId": "refine", "port": "task" } },
+    { "id": "loop-final", "source": { "nodeId": "refine", "port": "result" }, "target": { "nodeId": "final-draft", "port": "value" } },
+    { "id": "final-answer", "source": { "nodeId": "final-draft", "port": "value" }, "target": { "nodeId": "answer", "port": "value" } }
+  ],
+  "after": [],
+  "view": {
+    "task": { "x": 0, "y": 0 }, "seed": { "x": 0, "y": 200 }, "writer-history": { "x": 300, "y": 360 },
+    "refine": { "x": 300, "y": 100 }, "final-draft": { "x": 600, "y": 100 }, "answer": { "x": 900, "y": 100 }
+  }
+}

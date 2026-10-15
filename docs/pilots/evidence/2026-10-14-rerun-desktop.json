@@ -1,0 +1,134 @@
+{
+  "passed": true,
+  "startedAt": "2026-10-14T05:11:10.992Z",
+  "finishedAt": "2026-10-14T05:11:57.296Z",
+  "exe": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\pilots\\after-fixes-desktop\\installed\\deszo.exe",
+  "storage": "C:\\Users\\jusse\\AppData\\Local\\local.deszo.pilot20261014fixed",
+  "productionAdapters": true,
+  "realCliInvocations": 2,
+  "integrity": "ok",
+  "phases": [
+    {
+      "phase": "installed-startup",
+      "app": {
+        "pid": 1136,
+        "path": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\pilots\\after-fixes-desktop\\installed\\deszo.exe",
+        "startedAt": "2026-10-14T05:11:11.6164203Z"
+      },
+      "runtime": {
+        "pid": 30932,
+        "path": "C:\\Program Files\\nodejs\\node.exe",
+        "startedAt": "2026-10-14T05:11:13.2223278Z"
+      },
+      "port": 57459,
+      "containment": "tauri-job"
+    },
+    {
+      "phase": "runtime-crash",
+      "runId": "7dfc882c-4e62-427f-80e6-f114d374bbaa",
+      "workspaceId": "native-runtime-crash-mv7njlaq",
+      "proof": {
+        "parent": {
+          "pid": 34360,
+          "childPid": 32380,
+          "startedAt": "2026-10-14T05:11:30.652Z"
+        },
+        "child": {
+          "pid": 32380,
+          "startedAt": "2026-10-14T05:11:30.726Z"
+        }
+      },
+      "identities": [
+        {
+          "pid": 18648,
+          "path": "C:\\Users\\jusse\\AppData\\Local\\OpenAI\\Codex\\bin\\2e5e00daee91c61d\\codex.exe",
+          "startedAt": "2026-10-14T05:11:18.0996776Z"
+        },
+        {
+          "pid": 34360,
+          "path": "C:\\Program Files\\nodejs\\node.exe",
+          "startedAt": "2026-10-14T05:11:30.5557167Z"
+        },
+        {
+          "pid": 32380,
+          "path": "C:\\Program Files\\nodejs\\node.exe",
+          "startedAt": "2026-10-14T05:11:30.6492993Z"
+        }
+      ],
+      "cliAttemptId": "445823ff-b304-404f-975f-2b31fb4dc923",
+      "oldRuntime": {
+        "pid": 30932,
+        "path": "C:\\Program Files\\nodejs\\node.exe",
+        "startedAt": "2026-10-14T05:11:13.2223278Z"
+      },
+      "replacementRuntime": {
+        "pid": 18820,
+        "path": "C:\\Program Files\\nodejs\\node.exe",
+        "startedAt": "2026-10-14T05:11:33.8508510Z"
+      },
+      "oldPort": 57459,
+      "replacementPort": 58293,
+      "recoveredState": "interrupted",
+      "reconnectionMilliseconds": 4748,
+      "childrenGone": true,
+      "bindingNeedsReview": true,
+      "reconnectTriggeredByFrontend": true
+    },
+    {
+      "phase": "app-crash",
+      "runId": "ceb6aacd-971f-4083-97ee-48b31e1f928a",
+      "workspaceId": "native-app-crash-mv7njlaq",
+      "proof": {
+        "parent": {
+          "pid": 30116,
+          "childPid": 6220,
+          "startedAt": "2026-10-14T05:11:45.680Z"
+        },
+        "child": {
+          "pid": 6220,
+          "startedAt": "2026-10-14T05:11:45.748Z"
+        }
+      },
+      "identities": [
+        {
+          "pid": 24444,
+          "path": "C:\\Users\\jusse\\AppData\\Local\\OpenAI\\Codex\\bin\\2e5e00daee91c61d\\codex.exe",
+          "startedAt": "2026-10-14T05:11:38.2014165Z"
+        },
+        {
+          "pid": 30116,
+          "path": "C:\\Program Files\\nodejs\\node.exe",
+          "startedAt": "2026-10-14T05:11:45.5884851Z"
+        },
+        {
+          "pid": 6220,
+          "path": "C:\\Program Files\\nodejs\\node.exe",
+          "startedAt": "2026-10-14T05:11:45.6769940Z"
+        }
+      ],
+      "cliAttemptId": "c4031920-a257-4039-883b-e747ffa08d9c",
+      "appBeforeCrash": {
+        "pid": 1136,
+        "path": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\pilots\\after-fixes-desktop\\installed\\deszo.exe",
+        "startedAt": "2026-10-14T05:11:11.6164203Z"
+      },
+      "runtimeBeforeAppCrash": {
+        "pid": 18820,
+        "path": "C:\\Program Files\\nodejs\\node.exe",
+        "startedAt": "2026-10-14T05:11:33.8508510Z"
+      },
+      "restartedApp": {
+        "pid": 8056,
+        "path": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\pilots\\after-fixes-desktop\\installed\\deszo.exe",
+        "startedAt": "2026-10-14T05:11:51.2966043Z"
+      },
+      "restartedRuntime": {
+        "pid": 23044,
+        "path": "C:\\Program Files\\nodejs\\node.exe",
+        "startedAt": "2026-10-14T05:11:52.6103500Z"
+      },
+      "childrenGone": true,
+      "recoveredState": "interrupted"
+    }
+  ]
+}

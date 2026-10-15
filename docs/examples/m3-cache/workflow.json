@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 1,
+  "workflowId": "cached-research",
+  "capabilities": [
+    "core-v1",
+    "cache-v1"
+  ],
+  "settings": {
+    "nativeConfiguration": "restricted"
+  },
+  "nodes": [
+    {
+      "id": "question",
+      "type": "text",
+      "config": {
+        "value": "Summarize the reconnect requirements."
+      }
+    },
+    {
+      "id": "research",
+      "type": "agent",
+      "config": {
+        "provider": "codex",
+        "model": "explicit-test-model",
+        "timeoutSeconds": 600,
+        "output": {
+          "format": "text"
+        }
+      }
+    },
+    {
+      "id": "checkpoint",
+      "type": "cache",
+      "config": {
+        "valueType": "Text",
+        "mode": "live"
+      }
+    },
+    {
+      "id": "review-prompt",
+      "type": "prompt-template",
+      "config": {
+        "template": "Review this research:\n{{research}}",
+        "slots": [
+          {
+            "id": "research"
+          }
+        ]
+      }
+    },
+    {
+      "id": "review",
+      "type": "agent",
+      "config": {
+        "provider": "claude",
+        "model": "explicit-test-model",
+        "timeoutSeconds": 600,
+        "output": {
+          "format": "text"
+        }
+      }
+    },
+    {
+      "id": "answer",
+      "type": "result-viewer",
+      "config": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "q-research",
+      "source": {
+        "nodeId": "question",
+        "port": "text"
+      },
+      "target": {
+        "nodeId": "research",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "research-cache",
+      "source": {
+        "nodeId": "research",
+        "port": "text"
+      },
+      "target": {
+        "nodeId": "checkpoint",
+        "port": "value"
+      }
+    },
+    {
+      "id": "cache-prompt",
+      "source": {
+        "nodeId": "checkpoint",
+        "port": "value"
+      },
+      "target": {
+        "nodeId": "review-prompt",
+        "port": "research"
+      }
+    },
+    {
+      "id": "prompt-review",
+      "source": {
+        "nodeId": "review-prompt",
+        "port": "text"
+      },
+      "target": {
+        "nodeId": "review",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "review-answer",
+      "source": {
+        "nodeId": "review",
+        "port": "text"
+      },
+      "target": {
+        "nodeId": "answer",
+        "port": "value"
+      }
+    }
+  ],
+  "after": []
+}

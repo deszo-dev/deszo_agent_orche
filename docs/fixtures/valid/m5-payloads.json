@@ -1,0 +1,498 @@
+{
+  "taskReturn": {
+    "schemaVersion": 1,
+    "kind": "candidate",
+    "summary": "Wrote src/auth.mjs."
+  },
+  "taskReturnRevision": {
+    "schemaVersion": 1,
+    "kind": "specification_revision_required",
+    "reason": "The boundary is undefined.",
+    "issues": [
+      {
+        "localId": "boundary",
+        "severity": "blocker",
+        "requirementRefs": [
+          "REQ-AUTH"
+        ],
+        "message": "Expiry at now is undefined.",
+        "requestedChange": "Define expiresAt <= now."
+      }
+    ]
+  },
+  "taskReview": {
+    "schemaVersion": 1,
+    "taskId": "TASK-AUTH-CODE",
+    "resultId": "RES-0123456789AB",
+    "criterionId": "AC-AUTH-CODE",
+    "verdict": "APPROVED",
+    "issues": []
+  },
+  "triage": {
+    "schemaVersion": 1,
+    "cause": "implementation",
+    "subjectId": "SPEC-0123456789AB",
+    "affectedTaskIds": [
+      "TASK-AUTH-CODE"
+    ],
+    "requirementRefs": [],
+    "reason": "The boundary uses <.",
+    "issues": [
+      {
+        "localId": "boundary",
+        "severity": "blocker",
+        "ownerRole": "implementer",
+        "requirementRefs": [
+          "REQ-AUTH"
+        ],
+        "message": "expiresAt === now is accepted.",
+        "requestedChange": "Use <=."
+      }
+    ]
+  },
+  "repair": {
+    "schemaVersion": 1,
+    "kind": "MapRepair",
+    "subjectId": "SPEC-0123456789AB",
+    "taskIds": [
+      "TASK-RESUME-CODE"
+    ],
+    "issues": [
+      {
+        "id": "ISS-MAP-0123456789",
+        "severity": "blocker",
+        "ownerRole": "implementer",
+        "requirementRefs": [
+          "REQ-AUTH"
+        ],
+        "message": "CHECK-AUTH exited 1.",
+        "requestedChange": "Treat expiresAt <= now as expired."
+      }
+    ]
+  },
+  "taskResult": {
+    "schemaVersion": 1,
+    "kind": "TaskResult",
+    "recordId": "RES-0123456789AB",
+    "mapExecutionId": "00000000-0000-4000-8000-000000000004",
+    "generation": 1,
+    "subjectId": "SPEC-0123456789AB",
+    "taskId": "TASK-AUTH-CODE",
+    "attempt": {
+      "runId": "00000000-0000-4000-8000-000000000001",
+      "nodeInstanceId": "implement/1/task-auth-code-execute",
+      "attemptId": "00000000-0000-4000-8000-000000000002",
+      "role": "implementer",
+      "requestedModel": "sonnet",
+      "observedModel": null
+    },
+    "templateRevision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "inputs": [
+      {
+        "id": "project",
+        "ref": "base:project",
+        "digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      }
+    ],
+    "operations": [
+      {
+        "op": "create",
+        "path": "src/auth.mjs",
+        "artifact": {
+          "artifactId": "00000000-0000-4000-8000-000000000005",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "byteSize": 120
+      }
+    ],
+    "outputs": {
+      "source": {
+        "type": "fileSet",
+        "manifest": {
+          "artifactId": "00000000-0000-4000-8000-000000000006",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      }
+    },
+    "taskReturn": {
+      "artifactId": "00000000-0000-4000-8000-000000000007",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  },
+  "checkReport": {
+    "schemaVersion": 1,
+    "kind": "CheckReport",
+    "recordId": "CHK-0123456789AB",
+    "mapExecutionId": "00000000-0000-4000-8000-000000000004",
+    "taskId": "TASK-VERIFY",
+    "criterionId": "AC-AUTH-CHECK",
+    "checkId": "CHECK-AUTH",
+    "subjectId": "SPEC-0123456789AB",
+    "source": {
+      "kind": "candidate",
+      "recordId": "CAND-0123456789AB"
+    },
+    "executable": "C:/Program Files/nodejs/node.exe",
+    "executableVersion": "v22.20.0",
+    "arguments": [
+      "--test",
+      "tests/auth.test.mjs"
+    ],
+    "timeoutSeconds": 120,
+    "requiredExitCode": 0,
+    "exitCode": 1,
+    "startedAt": "2026-10-13T12:00:00Z",
+    "endedAt": "2026-10-13T12:00:00Z",
+    "stdout": {
+      "artifactId": "00000000-0000-4000-8000-000000000008",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "stderr": {
+      "artifactId": "00000000-0000-4000-8000-000000000009",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "sourceIntegrity": "intact",
+    "outcome": "failed"
+  },
+  "candidate": {
+    "schemaVersion": 1,
+    "kind": "Candidate",
+    "recordId": "CAND-0123456789AB",
+    "mapExecutionId": "00000000-0000-4000-8000-000000000004",
+    "taskId": "TASK-VERIFY",
+    "base": {
+      "artifactId": "00000000-0000-4000-8000-000000000010",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "results": [
+      {
+        "recordId": "RES-0123456789AB",
+        "artifact": {
+          "artifactId": "00000000-0000-4000-8000-000000000011",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      }
+    ],
+    "manifest": {
+      "artifactId": "00000000-0000-4000-8000-000000000012",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "paths": [
+      {
+        "path": "src/auth.mjs",
+        "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "from": "RES-0123456789AB"
+      },
+      {
+        "path": "src/api.mjs",
+        "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "from": null
+      }
+    ]
+  },
+  "conflict": {
+    "schemaVersion": 1,
+    "kind": "Conflict",
+    "recordId": "CONF-0123456789AB",
+    "mapExecutionId": "00000000-0000-4000-8000-000000000004",
+    "taskId": "TASK-VERIFY",
+    "base": {
+      "artifactId": "00000000-0000-4000-8000-000000000010",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "results": [
+      {
+        "recordId": "RES-0123456789AB",
+        "artifact": {
+          "artifactId": "00000000-0000-4000-8000-000000000011",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      {
+        "recordId": "RES-0123456789AC",
+        "artifact": {
+          "artifactId": "00000000-0000-4000-8000-000000000013",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      }
+    ],
+    "conflicts": [
+      {
+        "path": "src/shared.mjs",
+        "reason": "different_content",
+        "results": [
+          "RES-0123456789AB",
+          "RES-0123456789AC"
+        ]
+      }
+    ]
+  },
+  "mapState": {
+    "schemaVersion": 1,
+    "kind": "MapState",
+    "recordId": "MST-0123456789AB",
+    "mapExecutionId": "00000000-0000-4000-8000-000000000004",
+    "generation": 1,
+    "subjectId": "SPEC-0123456789AB",
+    "templateFingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "state": "paused",
+    "failedVerificationCycles": 3,
+    "maxFailedVerificationCycles": 3,
+    "pauseReason": "verification_limit",
+    "tasks": [
+      {
+        "taskId": "TASK-AUTH-CODE",
+        "state": "accepted",
+        "selectedResult": {
+          "recordId": "RES-0123456789AB",
+          "artifact": {
+            "artifactId": "00000000-0000-4000-8000-000000000011",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "attempts": 2
+      },
+      {
+        "taskId": "TASK-VERIFY",
+        "state": "blocked",
+        "selectedResult": null,
+        "attempts": 3
+      }
+    ],
+    "issues": [
+      {
+        "id": "ISS-MAP-0123456789",
+        "severity": "blocker",
+        "ownerRole": "implementer",
+        "requirementRefs": [
+          "REQ-AUTH"
+        ],
+        "message": "CHECK-AUTH exited 1.",
+        "requestedChange": "Treat expiresAt <= now as expired."
+      }
+    ]
+  },
+  "summary": {
+    "schemaVersion": 1,
+    "kind": "MapSummary",
+    "mapExecutionId": "00000000-0000-4000-8000-000000000004",
+    "generation": 1,
+    "specificationId": "SPEC-0123456789AB",
+    "outcome": "implementation_complete",
+    "state": {
+      "recordId": "MST-0123456789AB",
+      "artifact": {
+        "artifactId": "00000000-0000-4000-8000-000000000014",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    "selectedResults": [
+      {
+        "taskId": "TASK-AUTH-CODE",
+        "result": {
+          "recordId": "RES-0123456789AB",
+          "artifact": {
+            "artifactId": "00000000-0000-4000-8000-000000000011",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        }
+      }
+    ],
+    "issues": [],
+    "candidate": {
+      "recordId": "CAND-0123456789AB",
+      "artifact": {
+        "artifactId": "00000000-0000-4000-8000-000000000015",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    "checks": [
+      {
+        "recordId": "CHK-0123456789AB",
+        "artifact": {
+          "artifactId": "00000000-0000-4000-8000-000000000016",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      }
+    ]
+  },
+  "events": [
+    {
+      "schemaVersion": 2,
+      "id": "00000000-0000-4000-8000-000000000901",
+      "runId": "00000000-0000-4000-8000-000000000001",
+      "sequence": 1,
+      "timestamp": "2026-10-13T12:00:00Z",
+      "nodeInstanceId": "implement",
+      "attemptId": "00000000-0000-4000-8000-000000000003",
+      "type": "map.expanded",
+      "payload": {
+        "mapExecutionId": "00000000-0000-4000-8000-000000000004",
+        "generation": 1,
+        "specificationId": "SPEC-0123456789AB",
+        "templateFingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "plan": {
+          "artifactId": "00000000-0000-4000-8000-000000000017",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "tasks": 5,
+        "carried": [],
+        "priorState": null
+      }
+    },
+    {
+      "schemaVersion": 2,
+      "id": "00000000-0000-4000-8000-000000000902",
+      "runId": "00000000-0000-4000-8000-000000000001",
+      "sequence": 2,
+      "timestamp": "2026-10-13T12:00:00Z",
+      "nodeInstanceId": "implement",
+      "attemptId": "00000000-0000-4000-8000-000000000003",
+      "type": "map.task_state_changed",
+      "payload": {
+        "mapExecutionId": "00000000-0000-4000-8000-000000000004",
+        "taskId": "TASK-AUTH-CODE",
+        "from": "awaiting_review",
+        "to": "accepted",
+        "reason": "Every criterion passed."
+      }
+    },
+    {
+      "schemaVersion": 2,
+      "id": "00000000-0000-4000-8000-000000000903",
+      "runId": "00000000-0000-4000-8000-000000000001",
+      "sequence": 3,
+      "timestamp": "2026-10-13T12:00:00Z",
+      "nodeInstanceId": "implement",
+      "attemptId": "00000000-0000-4000-8000-000000000003",
+      "type": "map.record_created",
+      "payload": {
+        "mapExecutionId": "00000000-0000-4000-8000-000000000004",
+        "taskId": "TASK-VERIFY",
+        "kind": "CheckReport",
+        "record": {
+          "recordId": "CHK-0123456789AB",
+          "artifact": {
+            "artifactId": "00000000-0000-4000-8000-000000000016",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "stepInstanceId": "implement/1/task-verify-check-ac-auth-check"
+      }
+    },
+    {
+      "schemaVersion": 2,
+      "id": "00000000-0000-4000-8000-000000000904",
+      "runId": "00000000-0000-4000-8000-000000000001",
+      "sequence": 4,
+      "timestamp": "2026-10-13T12:00:00Z",
+      "nodeInstanceId": "implement",
+      "attemptId": "00000000-0000-4000-8000-000000000003",
+      "type": "map.verification_cycle",
+      "payload": {
+        "mapExecutionId": "00000000-0000-4000-8000-000000000004",
+        "taskId": "TASK-VERIFY",
+        "cycle": 1,
+        "outcome": "failed",
+        "failedVerificationCycles": 1,
+        "maxFailedVerificationCycles": 3,
+        "evidence": [
+          {
+            "recordId": "CHK-0123456789AB",
+            "artifact": {
+              "artifactId": "00000000-0000-4000-8000-000000000016",
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "schemaVersion": 2,
+      "id": "00000000-0000-4000-8000-000000000905",
+      "runId": "00000000-0000-4000-8000-000000000001",
+      "sequence": 5,
+      "timestamp": "2026-10-13T12:00:00Z",
+      "nodeInstanceId": "implement",
+      "attemptId": "00000000-0000-4000-8000-000000000003",
+      "type": "map.paused",
+      "payload": {
+        "mapExecutionId": "00000000-0000-4000-8000-000000000004",
+        "reason": "verification_limit",
+        "message": "3 failed cycles reached the limit."
+      }
+    },
+    {
+      "schemaVersion": 2,
+      "id": "00000000-0000-4000-8000-000000000906",
+      "runId": "00000000-0000-4000-8000-000000000001",
+      "sequence": 6,
+      "timestamp": "2026-10-13T12:00:00Z",
+      "nodeInstanceId": "implement",
+      "attemptId": "00000000-0000-4000-8000-000000000003",
+      "type": "map.limits_changed",
+      "payload": {
+        "mapExecutionId": "00000000-0000-4000-8000-000000000004",
+        "maxFailedVerificationCycles": 5,
+        "maxTaskAttempts": 3
+      }
+    },
+    {
+      "schemaVersion": 2,
+      "id": "00000000-0000-4000-8000-000000000907",
+      "runId": "00000000-0000-4000-8000-000000000001",
+      "sequence": 7,
+      "timestamp": "2026-10-13T12:00:00Z",
+      "nodeInstanceId": "implement",
+      "attemptId": "00000000-0000-4000-8000-000000000003",
+      "type": "map.resumed",
+      "payload": {
+        "mapExecutionId": "00000000-0000-4000-8000-000000000004",
+        "reason": "Limits raised."
+      }
+    },
+    {
+      "schemaVersion": 2,
+      "id": "00000000-0000-4000-8000-000000000908",
+      "runId": "00000000-0000-4000-8000-000000000001",
+      "sequence": 8,
+      "timestamp": "2026-10-13T12:00:00Z",
+      "nodeInstanceId": "implement",
+      "attemptId": "00000000-0000-4000-8000-000000000003",
+      "type": "map.finished",
+      "payload": {
+        "mapExecutionId": "00000000-0000-4000-8000-000000000004",
+        "outcome": "implementation_complete",
+        "summary": {
+          "artifactId": "00000000-0000-4000-8000-000000000018",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "state": {
+          "recordId": "MST-0123456789AB",
+          "artifact": {
+            "artifactId": "00000000-0000-4000-8000-000000000014",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        }
+      }
+    }
+  ],
+  "raiseMapLimit": {
+    "requestId": "00000000-0000-4000-8000-000000000019",
+    "action": "raise-map-limit",
+    "nodeInstanceId": "implement",
+    "maxFailedVerificationCycles": 5,
+    "maxTaskAttempts": 4
+  },
+  "mapExecution": {
+    "mapInstanceId": "implement",
+    "mapExecutionId": "00000000-0000-4000-8000-000000000004",
+    "state": "running",
+    "generation": 1,
+    "failedVerificationCycles": 1,
+    "maxFailedVerificationCycles": 3,
+    "pauseReason": null,
+    "accepted": 4,
+    "total": 5
+  }
+}

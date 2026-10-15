@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deszo.local/documentation/loop-decision.schema.json",
+  "title": "Loop Return decision",
+  "type": "object",
+  "properties": {
+    "continue": {
+      "type": "boolean"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "feedback": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "continue",
+    "reason",
+    "feedback"
+  ],
+  "additionalProperties": false
+}

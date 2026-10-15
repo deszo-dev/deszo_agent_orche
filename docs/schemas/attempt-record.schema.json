@@ -1,0 +1,473 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deszo.local/documentation/attempt-record.schema.json",
+  "title": "Captured attempt manifests",
+  "$defs": {
+    "inputs": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "runId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "nodeId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$"
+        },
+        "values": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "additionalProperties": {
+            "$ref": "value.schema.json"
+          }
+        },
+        "contextBindingId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "prompt": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "artifactId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              },
+              "required": [
+                "artifactId",
+                "sha256"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "promptSources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "enum": [
+                  "input",
+                  "output-contract",
+                  "native-configuration",
+                  "attachments"
+                ]
+              },
+              "artifact": {
+                "type": "object",
+                "properties": {
+                  "artifactId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                },
+                "required": [
+                  "artifactId",
+                  "sha256"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "kind",
+              "artifact"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "contextBinding": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "artifactId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              },
+              "required": [
+                "artifactId",
+                "sha256"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "runId",
+        "attemptId",
+        "nodeId",
+        "values",
+        "contextBindingId",
+        "prompt",
+        "promptSources",
+        "contextBinding"
+      ],
+      "additionalProperties": false
+    },
+    "outputs": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "runId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "nodeId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$"
+        },
+        "values": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "additionalProperties": {
+            "$ref": "value.schema.json"
+          }
+        },
+        "providerResult": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "provider": {
+                  "enum": [
+                    "codex",
+                    "claude",
+                    "antigravity"
+                  ]
+                },
+                "requestedModel": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "observedModel": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "nativeSession": {
+                  "type": "object",
+                  "properties": {
+                    "artifactId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    }
+                  },
+                  "required": [
+                    "artifactId",
+                    "sha256"
+                  ],
+                  "additionalProperties": false
+                },
+                "usage": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "artifactId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "sha256": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        }
+                      },
+                      "required": [
+                        "artifactId",
+                        "sha256"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "provider",
+                "requestedModel",
+                "observedModel",
+                "nativeSession",
+                "usage"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "runId",
+        "attemptId",
+        "nodeId",
+        "values",
+        "providerResult"
+      ],
+      "additionalProperties": false
+    },
+    "invocation": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "runId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "provider": {
+          "enum": [
+            "codex",
+            "claude",
+            "antigravity"
+          ]
+        },
+        "requestedModel": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cliExecutable": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cliVersion": {
+          "type": "string"
+        },
+        "arguments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "cwd": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cwdIdentity": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "nativeConfiguration": {
+          "enum": [
+            "restricted",
+            "inherit"
+          ]
+        },
+        "configurationHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "environmentPolicy": {
+          "const": "subscription-only"
+        },
+        "managedToolIsolation": {
+          "type": "object",
+          "properties": {
+            "mechanism": {
+              "enum": ["bridge-marker-refusal", "verified-neutralizer", "fixture-cli"]
+            },
+            "runtimeInstanceId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "checkedScopes": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "uniqueItems": true
+            },
+            "bridgeEntries": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "scope": { "type": "string", "minLength": 1 },
+                  "name": { "type": "string", "minLength": 1 }
+                },
+                "required": ["scope", "name"],
+                "additionalProperties": false
+              }
+            },
+            "neutralizerId": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "mechanism",
+            "runtimeInstanceId",
+            "checkedScopes",
+            "bridgeEntries"
+          ],
+          "additionalProperties": false
+        },
+        "stdin": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "artifactId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              },
+              "required": [
+                "artifactId",
+                "sha256"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "timeoutSeconds": {
+          "type": "integer",
+          "minimum": 5
+        },
+        "nativeSessionBefore": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "artifactId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              },
+              "required": [
+                "artifactId",
+                "sha256"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "attachments": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "artifactId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              },
+              "required": [
+                "artifactId",
+                "sha256"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "runId",
+        "attemptId",
+        "provider",
+        "requestedModel",
+        "cliExecutable",
+        "cliVersion",
+        "arguments",
+        "cwd",
+        "cwdIdentity",
+        "nativeConfiguration",
+        "configurationHash",
+        "environmentPolicy",
+        "managedToolIsolation",
+        "stdin",
+        "timeoutSeconds",
+        "nativeSessionBefore"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

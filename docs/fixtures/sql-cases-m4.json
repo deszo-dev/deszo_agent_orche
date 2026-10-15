@@ -1,0 +1,63 @@
+{
+  "tables": [
+    "application_settings",
+    "artifacts",
+    "attempts",
+    "cache_pins",
+    "command_receipts",
+    "context_bindings",
+    "journal_events",
+    "loop_executions",
+    "loop_iterations",
+    "map_executions",
+    "map_tasks",
+    "node_instances",
+    "pipeline_records",
+    "resource_locks",
+    "run_context_bindings",
+    "runs",
+    "schema_migrations",
+    "workflows",
+    "workspaces"
+  ],
+  "cases": [
+    {
+      "id": "migration-4-keeps-pipeline-records",
+      "expected": "accept",
+      "sql": "SELECT COUNT(*) >= 0, (SELECT COUNT(*) FROM map_executions) FROM pipeline_records",
+      "rows": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "id": "m4-record-kind",
+      "expected": "reject",
+      "reason": "CHECK constraint failed",
+      "sql": "INSERT INTO pipeline_records(id, run_id, kind, artifact_id, created_at) SELECT 'REC-1', id, 'Opinion', workflow_snapshot_artifact_id, '2026-10-13T00:00:00Z' FROM runs LIMIT 1"
+    },
+    {
+      "id": "m4-paused-needs-reason",
+      "expected": "reject",
+      "reason": "CHECK constraint failed",
+      "sql": "INSERT INTO map_executions(id, run_id, map_instance_id, attempt_id, generation, subject_id, template_fingerprint, state, failed_cycles, max_failed_cycles, max_task_attempts, pause_reason, plan_artifact_id, created_at) VALUES ('e1', 'r', 'implement', 'a', 1, 'SPEC-1', ?, 'paused', 0, 3, 3, NULL, 'x', 't')",
+      "params": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ]
+    },
+    {
+      "id": "m4-accepted-needs-selection",
+      "expected": "reject",
+      "reason": "CHECK constraint failed",
+      "sql": "INSERT INTO map_tasks(execution_id, task_id, state, selected_result_id, attempts, data_json) VALUES ('e1', 'TASK-A', 'accepted', NULL, 1, '{}')"
+    },
+    {
+      "id": "m4-unknown-task-state",
+      "expected": "reject",
+      "reason": "CHECK constraint failed",
+      "sql": "INSERT INTO map_tasks(execution_id, task_id, state, selected_result_id, attempts, data_json) VALUES ('e1', 'TASK-A', 'done', NULL, 1, '{}')"
+    }
+  ]
+}

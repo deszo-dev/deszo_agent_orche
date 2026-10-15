@@ -1,0 +1,424 @@
+{
+  "schemaVersion": 1,
+  "mapId": "MAP-ROUND-RESUME",
+  "description": "Implement and verify round recovery after a client reconnect.",
+  "tasks": [
+    {
+      "id": "TASK-AUTH-CODE",
+      "title": "Implement token authentication",
+      "executorRole": "implementer",
+      "requirementRefs": [
+        "REQ-AUTH",
+        "CONTRACT-AUTH"
+      ],
+      "dependsOn": [],
+      "inputs": [
+        {
+          "id": "project",
+          "ref": "base:project"
+        },
+        {
+          "id": "spec-1",
+          "ref": "spec:REQ-AUTH"
+        },
+        {
+          "id": "spec-2",
+          "ref": "spec:CONTRACT-AUTH"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "source",
+          "type": "fileSet",
+          "paths": [
+            "src/auth.mjs"
+          ]
+        }
+      ],
+      "readScopes": [
+        "src/api.mjs",
+        "fixtures/tokens.json",
+        "src/auth.mjs",
+        "spec:REQ-AUTH",
+        "spec:CONTRACT-AUTH"
+      ],
+      "writeScopes": [
+        "src/auth.mjs"
+      ],
+      "acceptanceCriteria": [
+        {
+          "id": "AC-AUTH-CODE",
+          "description": "The captured implementation conforms to the referenced contracts.",
+          "method": "review",
+          "role": "reviewer"
+        }
+      ]
+    },
+    {
+      "id": "TASK-AUTH-TESTS",
+      "title": "Write authentication tests",
+      "executorRole": "test-author",
+      "requirementRefs": [
+        "REQ-AUTH",
+        "CONTRACT-AUTH"
+      ],
+      "dependsOn": [],
+      "inputs": [
+        {
+          "id": "project",
+          "ref": "base:project"
+        },
+        {
+          "id": "spec-1",
+          "ref": "spec:REQ-AUTH"
+        },
+        {
+          "id": "spec-2",
+          "ref": "spec:CONTRACT-AUTH"
+        },
+        {
+          "id": "spec-3",
+          "ref": "spec:CHECK-AUTH-SYNTAX"
+        },
+        {
+          "id": "check-auth",
+          "ref": "spec:CHECK-AUTH"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "source",
+          "type": "fileSet",
+          "paths": [
+            "tests/auth.test.mjs"
+          ]
+        }
+      ],
+      "readScopes": [
+        "src/api.mjs",
+        "fixtures/tokens.json",
+        "tests/auth.test.mjs",
+        "spec:REQ-AUTH",
+        "spec:CONTRACT-AUTH",
+        "spec:CHECK-AUTH-SYNTAX",
+        "spec:CHECK-AUTH"
+      ],
+      "writeScopes": [
+        "tests/auth.test.mjs"
+      ],
+      "acceptanceCriteria": [
+        {
+          "id": "AC-AUTH-TESTS",
+          "description": "The tests cover the referenced behavior, errors, and boundary cases.",
+          "method": "review",
+          "role": "reviewer"
+        },
+        {
+          "id": "AC-AUTH-SYNTAX",
+          "description": "The captured test module parses without executing the suite.",
+          "method": "check",
+          "checkId": "CHECK-AUTH-SYNTAX"
+        }
+      ]
+    },
+    {
+      "id": "TASK-RESUME-CODE",
+      "title": "Implement round recovery",
+      "executorRole": "implementer",
+      "requirementRefs": [
+        "REQ-AUTH",
+        "REQ-OWNERSHIP",
+        "REQ-RESUME",
+        "REQ-ERRORS",
+        "CONTRACT-RESUME",
+        "CONTRACT-AUTH"
+      ],
+      "dependsOn": [],
+      "inputs": [
+        {
+          "id": "project",
+          "ref": "base:project"
+        },
+        {
+          "id": "spec-1",
+          "ref": "spec:REQ-AUTH"
+        },
+        {
+          "id": "spec-2",
+          "ref": "spec:REQ-OWNERSHIP"
+        },
+        {
+          "id": "spec-3",
+          "ref": "spec:REQ-RESUME"
+        },
+        {
+          "id": "spec-4",
+          "ref": "spec:REQ-ERRORS"
+        },
+        {
+          "id": "spec-5",
+          "ref": "spec:CONTRACT-RESUME"
+        },
+        {
+          "id": "spec-6",
+          "ref": "spec:CONTRACT-AUTH"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "source",
+          "type": "fileSet",
+          "paths": [
+            "src/resume.mjs"
+          ]
+        }
+      ],
+      "readScopes": [
+        "src/api.mjs",
+        "fixtures/tokens.json",
+        "src/resume.mjs",
+        "spec:REQ-AUTH",
+        "spec:REQ-OWNERSHIP",
+        "spec:REQ-RESUME",
+        "spec:REQ-ERRORS",
+        "spec:CONTRACT-RESUME",
+        "spec:CONTRACT-AUTH"
+      ],
+      "writeScopes": [
+        "src/resume.mjs"
+      ],
+      "acceptanceCriteria": [
+        {
+          "id": "AC-RESUME-CODE",
+          "description": "The captured implementation conforms to the referenced contracts.",
+          "method": "review",
+          "role": "reviewer"
+        }
+      ]
+    },
+    {
+      "id": "TASK-RESUME-TESTS",
+      "title": "Write round recovery tests",
+      "executorRole": "test-author",
+      "requirementRefs": [
+        "REQ-AUTH",
+        "REQ-OWNERSHIP",
+        "REQ-RESUME",
+        "REQ-ERRORS",
+        "CONTRACT-RESUME",
+        "CONTRACT-AUTH"
+      ],
+      "dependsOn": [],
+      "inputs": [
+        {
+          "id": "project",
+          "ref": "base:project"
+        },
+        {
+          "id": "spec-1",
+          "ref": "spec:REQ-AUTH"
+        },
+        {
+          "id": "spec-2",
+          "ref": "spec:REQ-OWNERSHIP"
+        },
+        {
+          "id": "spec-3",
+          "ref": "spec:REQ-RESUME"
+        },
+        {
+          "id": "spec-4",
+          "ref": "spec:REQ-ERRORS"
+        },
+        {
+          "id": "spec-5",
+          "ref": "spec:CONTRACT-RESUME"
+        },
+        {
+          "id": "spec-6",
+          "ref": "spec:CONTRACT-AUTH"
+        },
+        {
+          "id": "spec-7",
+          "ref": "spec:CHECK-RESUME-SYNTAX"
+        },
+        {
+          "id": "check-resume",
+          "ref": "spec:CHECK-RESUME"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "source",
+          "type": "fileSet",
+          "paths": [
+            "tests/resume.test.mjs"
+          ]
+        }
+      ],
+      "readScopes": [
+        "src/api.mjs",
+        "fixtures/tokens.json",
+        "tests/resume.test.mjs",
+        "spec:REQ-AUTH",
+        "spec:REQ-OWNERSHIP",
+        "spec:REQ-RESUME",
+        "spec:REQ-ERRORS",
+        "spec:CONTRACT-RESUME",
+        "spec:CONTRACT-AUTH",
+        "spec:CHECK-RESUME-SYNTAX",
+        "spec:CHECK-RESUME"
+      ],
+      "writeScopes": [
+        "tests/resume.test.mjs"
+      ],
+      "acceptanceCriteria": [
+        {
+          "id": "AC-RESUME-TESTS",
+          "description": "The tests cover the referenced behavior, errors, and boundary cases.",
+          "method": "review",
+          "role": "reviewer"
+        },
+        {
+          "id": "AC-RESUME-SYNTAX",
+          "description": "The captured test module parses without executing the suite.",
+          "method": "check",
+          "checkId": "CHECK-RESUME-SYNTAX"
+        }
+      ]
+    },
+    {
+      "id": "TASK-VERIFY",
+      "title": "Assemble and verify the recovery service",
+      "executorRole": "verification",
+      "requirementRefs": [
+        "REQ-AUTH",
+        "REQ-OWNERSHIP",
+        "REQ-RESUME",
+        "REQ-ERRORS",
+        "CONTRACT-AUTH",
+        "CONTRACT-RESUME"
+      ],
+      "dependsOn": [
+        {
+          "taskId": "TASK-AUTH-CODE",
+          "milestone": "accepted"
+        },
+        {
+          "taskId": "TASK-AUTH-TESTS",
+          "milestone": "accepted"
+        },
+        {
+          "taskId": "TASK-RESUME-CODE",
+          "milestone": "accepted"
+        },
+        {
+          "taskId": "TASK-RESUME-TESTS",
+          "milestone": "accepted"
+        }
+      ],
+      "inputs": [
+        {
+          "id": "project",
+          "ref": "base:project"
+        },
+        {
+          "id": "source-1",
+          "ref": "task:TASK-AUTH-CODE:source"
+        },
+        {
+          "id": "source-2",
+          "ref": "task:TASK-AUTH-TESTS:source"
+        },
+        {
+          "id": "source-3",
+          "ref": "task:TASK-RESUME-CODE:source"
+        },
+        {
+          "id": "source-4",
+          "ref": "task:TASK-RESUME-TESTS:source"
+        },
+        {
+          "id": "spec-1",
+          "ref": "spec:REQ-AUTH"
+        },
+        {
+          "id": "spec-2",
+          "ref": "spec:REQ-OWNERSHIP"
+        },
+        {
+          "id": "spec-3",
+          "ref": "spec:REQ-RESUME"
+        },
+        {
+          "id": "spec-4",
+          "ref": "spec:REQ-ERRORS"
+        },
+        {
+          "id": "spec-5",
+          "ref": "spec:CONTRACT-AUTH"
+        },
+        {
+          "id": "spec-6",
+          "ref": "spec:CONTRACT-RESUME"
+        },
+        {
+          "id": "spec-7",
+          "ref": "spec:CHECK-AUTH"
+        },
+        {
+          "id": "spec-8",
+          "ref": "spec:CHECK-RESUME"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "candidate",
+          "type": "candidate",
+          "paths": [
+            "src/api.mjs",
+            "src/auth.mjs",
+            "src/resume.mjs",
+            "fixtures/tokens.json",
+            "tests/auth.test.mjs",
+            "tests/resume.test.mjs"
+          ]
+        },
+        {
+          "id": "test-report",
+          "type": "json"
+        }
+      ],
+      "readScopes": [
+        "src/**",
+        "tests/**",
+        "fixtures/**",
+        "spec:REQ-AUTH",
+        "spec:REQ-OWNERSHIP",
+        "spec:REQ-RESUME",
+        "spec:REQ-ERRORS",
+        "spec:CONTRACT-AUTH",
+        "spec:CONTRACT-RESUME",
+        "spec:CHECK-AUTH",
+        "spec:CHECK-RESUME"
+      ],
+      "writeScopes": [
+        "reports/**"
+      ],
+      "acceptanceCriteria": [
+        {
+          "id": "AC-AUTH-CHECK",
+          "description": "The authentication suite passes on the captured candidate.",
+          "method": "check",
+          "checkId": "CHECK-AUTH"
+        },
+        {
+          "id": "AC-RESUME-CHECK",
+          "description": "The recovery suite passes on the same captured candidate.",
+          "method": "check",
+          "checkId": "CHECK-RESUME"
+        }
+      ]
+    }
+  ]
+}

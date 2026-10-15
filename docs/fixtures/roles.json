@@ -1,0 +1,31 @@
+{
+  "implementer": {
+    "kind": "agent",
+    "engineOutputs": [],
+    "embeddedRoles": []
+  },
+  "test-author": {
+    "kind": "agent",
+    "engineOutputs": [],
+    "embeddedRoles": []
+  },
+  "reviewer": {
+    "kind": "agent",
+    "engineOutputs": [],
+    "embeddedRoles": []
+  },
+  "analyst": {
+    "kind": "agent",
+    "engineOutputs": [],
+    "embeddedRoles": []
+  },
+  "verification": {
+    "kind": "utility",
+    "engineOutputs": [
+      "candidate"
+    ],
+    "embeddedRoles": [
+      "analyst"
+    ]
+  }
+}

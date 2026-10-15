@@ -1,0 +1,221 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deszo.local/documentation/spec-section-index.schema.json",
+  "title": "Specification section index",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "document": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sections": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9-]*$"
+          },
+          "kind": {
+            "enum": [
+              "business",
+              "requirement",
+              "contract",
+              "check",
+              "acceptance",
+              "map",
+              "informative"
+            ]
+          },
+          "normative": {
+            "type": "boolean"
+          },
+          "visibility": {
+            "enum": [
+              "public",
+              "internal"
+            ]
+          },
+          "dependsOn": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9-]*$"
+            },
+            "uniqueItems": true
+          },
+          "command": {
+            "type": "object",
+            "properties": {
+              "program": {
+                "type": "string",
+                "minLength": 1
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "timeoutSeconds": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 600
+              },
+              "requiredExitCode": {
+                "type": "integer"
+              },
+              "source": {
+                "enum": [
+                  "candidate",
+                  "task-result"
+                ]
+              }
+            },
+            "required": [
+              "program",
+              "args",
+              "timeoutSeconds",
+              "requiredExitCode",
+              "source"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "normative",
+          "visibility",
+          "dependsOn"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "requirement"
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^REQ-[A-Z0-9-]+$"
+                },
+                "normative": {
+                  "const": true
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "contract"
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^CONTRACT-[A-Z0-9-]+$"
+                },
+                "normative": {
+                  "const": true
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "check"
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^CHECK-[A-Z0-9-]+$"
+                },
+                "normative": {
+                  "const": true
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "informative"
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "normative": {
+                  "const": false
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "check"
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "required": [
+                "command"
+              ]
+            },
+            "else": {
+              "not": {
+                "required": [
+                  "command"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "document",
+    "sections"
+  ],
+  "additionalProperties": false
+}

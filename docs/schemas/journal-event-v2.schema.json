@@ -1,0 +1,1929 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deszo.local/documentation/journal-event-v2.schema.json",
+  "title": "Durable run event (journal v2, additive through M6)",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "const": 2
+    },
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "runId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "nodeInstanceId": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "attemptId": {
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "uuid"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "type": {
+      "type": "string"
+    },
+    "payload": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "id",
+    "runId",
+    "sequence",
+    "timestamp",
+    "nodeInstanceId",
+    "attemptId",
+    "type",
+    "payload"
+  ],
+  "additionalProperties": false,
+  "oneOf": [
+    {
+      "properties": {
+        "type": {
+          "const": "run.created"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "workflowSnapshot": {
+              "$ref": "#/$defs/ref"
+            },
+            "executionHash": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "settingsSnapshot": {
+              "$ref": "#/$defs/ref"
+            }
+          },
+          "required": [
+            "workflowSnapshot",
+            "executionHash",
+            "settingsSnapshot"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "null"
+        },
+        "attemptId": {
+          "type": "null"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "run.state_changed"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "from": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "queued",
+                    "running",
+                    "draining",
+                    "waiting_for_user",
+                    "stopping",
+                    "succeeded",
+                    "failed",
+                    "canceled",
+                    "interrupted"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "to": {
+              "enum": [
+                "queued",
+                "running",
+                "draining",
+                "waiting_for_user",
+                "stopping",
+                "succeeded",
+                "failed",
+                "canceled",
+                "interrupted"
+              ]
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "from",
+            "to",
+            "reason"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "null"
+        },
+        "attemptId": {
+          "type": "null"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "run.capacity_changed"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "revision": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "settings": {
+              "$ref": "#/$defs/ref"
+            }
+          },
+          "required": [
+            "revision",
+            "settings"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "null"
+        },
+        "attemptId": {
+          "type": "null"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "run.recovery_requested"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "enum": [
+                "retry",
+                "raise-limit",
+                "restart-iteration",
+                "close",
+                "raise-map-limit"
+              ]
+            },
+            "target": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "requestId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "options": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "action",
+            "target",
+            "requestId",
+            "options"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "null"
+        },
+        "attemptId": {
+          "type": "null"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "node.planned"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "nodeId": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+            },
+            "nodeType": {
+              "type": "string"
+            },
+            "scope": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "loopNodeId": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+                    },
+                    "iteration": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  },
+                  "required": [
+                    "loopNodeId",
+                    "iteration"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "nodeId",
+            "nodeType"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+        },
+        "attemptId": {
+          "type": "null"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "attempt.state_changed"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "from": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "scheduled",
+                    "waiting",
+                    "running",
+                    "succeeded",
+                    "failed",
+                    "canceled",
+                    "blocked",
+                    "interrupted",
+                    "reused",
+                    "skipped"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "to": {
+              "enum": [
+                "scheduled",
+                "waiting",
+                "running",
+                "succeeded",
+                "failed",
+                "canceled",
+                "blocked",
+                "interrupted",
+                "reused",
+                "skipped"
+              ]
+            },
+            "reason": {
+              "type": "string"
+            },
+            "process": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "pid": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "startIdentity": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "supervisorGeneration": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "pid",
+                    "startIdentity",
+                    "supervisorGeneration"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "ordinal": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "required": [
+            "from",
+            "to",
+            "reason",
+            "process"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "attempt.inputs_committed"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "manifest": {
+              "$ref": "#/$defs/ref"
+            },
+            "prompt": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ref"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "contextBindingId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "manifest",
+            "prompt",
+            "contextBindingId"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "attempt.invocation_committed"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "manifest": {
+              "$ref": "#/$defs/ref"
+            }
+          },
+          "required": [
+            "manifest"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "attempt.log_chunk"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "stream": {
+              "enum": [
+                "stdout",
+                "stderr",
+                "normalized"
+              ]
+            },
+            "chunk": {
+              "$ref": "#/$defs/ref"
+            },
+            "chunkIndex": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "stream",
+            "chunk",
+            "chunkIndex"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "attempt.outputs_committed"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "manifest": {
+              "$ref": "#/$defs/ref"
+            }
+          },
+          "required": [
+            "manifest"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "attempt.error"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "enum": [
+                "authentication",
+                "quota",
+                "billing_policy",
+                "provider_unavailable",
+                "permission",
+                "timeout",
+                "process",
+                "output_contract",
+                "context_unavailable",
+                "corruption",
+                "interrupted",
+                "input_unavailable",
+                "route_unmatched",
+                "context_prerequisite",
+                "capture_failed",
+                "managed_tool_isolation_unavailable"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "evidence": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ref"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "code",
+            "message",
+            "evidence"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "context.state_changed"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "bindingId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "from": {
+              "enum": [
+                "unbound",
+                "ready",
+                "writing",
+                "needs_review",
+                "unavailable"
+              ]
+            },
+            "to": {
+              "enum": [
+                "unbound",
+                "ready",
+                "writing",
+                "needs_review",
+                "unavailable"
+              ]
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "bindingId",
+            "from",
+            "to",
+            "reason"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "context.bound"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "bindingId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "provider": {
+              "enum": [
+                "codex",
+                "claude",
+                "antigravity"
+              ]
+            },
+            "nativeSessionRef": {
+              "$ref": "#/$defs/ref"
+            },
+            "cwdIdentity": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "required": [
+            "bindingId",
+            "provider",
+            "nativeSessionRef",
+            "cwdIdentity"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "context.remapped"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "contextNodeId": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+            },
+            "fromBindingId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "toBindingId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "contextNodeId",
+            "fromBindingId",
+            "toBindingId",
+            "reason"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "null"
+        },
+        "attemptId": {
+          "type": "null"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "loop.started"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "loopNodeId": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+            },
+            "maxIterations": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            },
+            "maxActiveMinutes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1440
+            },
+            "seed": {
+              "$ref": "value.schema.json"
+            }
+          },
+          "required": [
+            "loopNodeId",
+            "maxIterations",
+            "maxActiveMinutes",
+            "seed"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "loop.iteration_started"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "loopNodeId": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+            },
+            "iteration": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "value": {
+              "$ref": "value.schema.json"
+            },
+            "feedback": {
+              "$ref": "value.schema.json"
+            },
+            "restart": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "loopNodeId",
+            "iteration",
+            "value",
+            "feedback"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "loop.iteration_returned"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "loopNodeId": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+            },
+            "iteration": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "candidate": {
+              "$ref": "value.schema.json"
+            },
+            "decision": {
+              "$ref": "value.schema.json"
+            },
+            "continue": {
+              "type": "boolean"
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "loopNodeId",
+            "iteration",
+            "candidate",
+            "decision",
+            "continue",
+            "reason"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "loop.paused"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "loopNodeId": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+            },
+            "iteration": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "reason": {
+              "enum": [
+                "iteration_limit",
+                "time_limit",
+                "body_failure",
+                "stopped"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "activeMs": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "loopNodeId",
+            "iteration",
+            "reason",
+            "message",
+            "activeMs"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "loop.resumed"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "loopNodeId": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+            },
+            "iteration": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "loopNodeId",
+            "iteration",
+            "reason"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "loop.limits_changed"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "loopNodeId": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+            },
+            "maxIterations": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            },
+            "maxActiveMinutes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1440
+            }
+          },
+          "required": [
+            "loopNodeId",
+            "maxIterations",
+            "maxActiveMinutes"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "loop.finished"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "loopNodeId": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+            },
+            "iterations": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "result": {
+              "$ref": "value.schema.json"
+            },
+            "activeMs": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "loopNodeId",
+            "iterations",
+            "result",
+            "activeMs"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "attempt.reused"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "sourceRunId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "sourceAttemptId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "outputs": {
+              "$ref": "#/$defs/ref"
+            }
+          },
+          "required": [
+            "sourceRunId",
+            "sourceAttemptId",
+            "outputs"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "cache.reused"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "nodeId": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+            },
+            "pin": {
+              "$ref": "value.schema.json"
+            },
+            "sourceRunId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "sourceAttemptId": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "nodeId",
+            "pin",
+            "sourceRunId",
+            "sourceAttemptId"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "cache.pinned"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "nodeId": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+            },
+            "pin": {
+              "$ref": "value.schema.json"
+            },
+            "sourceRunId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "sourceAttemptId": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "nodeId",
+            "pin",
+            "sourceRunId",
+            "sourceAttemptId"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "route.selected"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "caseId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "selector": {
+              "$ref": "value.schema.json"
+            }
+          },
+          "required": [
+            "caseId",
+            "selector"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "gate.evaluated"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "enum": [
+                "prepare",
+                "evaluate",
+                "verify"
+              ]
+            },
+            "subjectId": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9-]*$"
+            },
+            "status": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "OPEN",
+                    "REVISION_REQUIRED"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "recordId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9-]*$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "mode",
+            "subjectId",
+            "status",
+            "recordId"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "run.planned"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "plan": {
+              "$ref": "#/$defs/ref"
+            },
+            "mode": {
+              "enum": [
+                "workflow",
+                "branch",
+                "node"
+              ]
+            },
+            "targets": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,63}$"
+              }
+            }
+          },
+          "required": [
+            "plan",
+            "mode",
+            "targets"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "null"
+        },
+        "attemptId": {
+          "type": "null"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "map.expanded"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "mapExecutionId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "generation": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "specificationId": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9-]*$"
+            },
+            "templateFingerprint": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "plan": {
+              "$ref": "#/$defs/ref"
+            },
+            "tasks": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "carried": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Z0-9-]*$"
+              },
+              "uniqueItems": true
+            },
+            "priorState": {
+              "anyOf": [
+                {
+                  "$ref": "map.schema.json#/$defs/recordRef"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "mapExecutionId",
+            "generation",
+            "specificationId",
+            "templateFingerprint",
+            "plan",
+            "tasks",
+            "carried",
+            "priorState"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "map.task_state_changed"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "mapExecutionId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "taskId": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9-]*$"
+            },
+            "from": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "waiting",
+                    "ready",
+                    "running",
+                    "awaiting_review",
+                    "accepted",
+                    "needs_changes",
+                    "stale",
+                    "blocked",
+                    "canceled"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "to": {
+              "enum": [
+                "waiting",
+                "ready",
+                "running",
+                "awaiting_review",
+                "accepted",
+                "needs_changes",
+                "stale",
+                "blocked",
+                "canceled"
+              ]
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "mapExecutionId",
+            "taskId",
+            "from",
+            "to",
+            "reason"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "map.record_created"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "mapExecutionId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "taskId": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9-]*$"
+            },
+            "kind": {
+              "enum": [
+                "TaskResult",
+                "TaskReview",
+                "CheckReport",
+                "Candidate",
+                "Conflict",
+                "Triage",
+                "MapState",
+                "TaskCarry"
+              ]
+            },
+            "record": {
+              "$ref": "map.schema.json#/$defs/recordRef"
+            },
+            "stepInstanceId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "mapExecutionId",
+            "taskId",
+            "kind",
+            "record",
+            "stepInstanceId"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "map.verification_cycle"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "mapExecutionId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "taskId": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9-]*$"
+            },
+            "cycle": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "outcome": {
+              "enum": [
+                "passed",
+                "failed",
+                "conflict"
+              ]
+            },
+            "failedVerificationCycles": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "maxFailedVerificationCycles": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "evidence": {
+              "type": "array",
+              "items": {
+                "$ref": "map.schema.json#/$defs/recordRef"
+              }
+            }
+          },
+          "required": [
+            "mapExecutionId",
+            "taskId",
+            "cycle",
+            "outcome",
+            "failedVerificationCycles",
+            "maxFailedVerificationCycles",
+            "evidence"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "map.paused"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "mapExecutionId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "reason": {
+              "enum": [
+                "verification_limit",
+                "task_attempt_limit",
+                "triage_unknown"
+              ]
+            },
+            "message": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "mapExecutionId",
+            "reason",
+            "message"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "map.resumed"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "mapExecutionId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "mapExecutionId",
+            "reason"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "map.limits_changed"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "mapExecutionId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxFailedVerificationCycles": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "maxTaskAttempts": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "required": [
+            "mapExecutionId",
+            "maxFailedVerificationCycles",
+            "maxTaskAttempts"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "map.finished"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "mapExecutionId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "outcome": {
+              "enum": [
+                "implementation_complete",
+                "specification_revision_required"
+              ]
+            },
+            "summary": {
+              "$ref": "#/$defs/ref"
+            },
+            "state": {
+              "$ref": "map.schema.json#/$defs/recordRef"
+            }
+          },
+          "required": [
+            "mapExecutionId",
+            "outcome",
+            "summary",
+            "state"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "gate.review_carried"
+        },
+        "nodeInstanceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "slot": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+            },
+            "subjectId": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9-]*$"
+            },
+            "priorSubjectId": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9-]*$"
+            },
+            "record": {
+              "$ref": "gate.schema.json#/$defs/recordRef"
+            },
+            "priorReview": {
+              "$ref": "gate.schema.json#/$defs/recordRef"
+            }
+          },
+          "required": [
+            "slot",
+            "subjectId",
+            "priorSubjectId",
+            "record",
+            "priorReview"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    }
+  ],
+  "$defs": {
+    "ref": {
+      "type": "object",
+      "properties": {
+        "artifactId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "artifactId",
+        "sha256"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

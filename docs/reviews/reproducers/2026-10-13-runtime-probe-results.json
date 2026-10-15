@@ -1,0 +1,81 @@
+{
+  "timestamp": "2026-10-13T13:22:10.826Z",
+  "results": [
+    {
+      "probe": "migration-commit-before-version",
+      "root": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\migration-cut-p9T5nr",
+      "restartFails": true,
+      "error": "table loop_executions already exists"
+    },
+    {
+      "probe": "split-utf8",
+      "expected": "Hello, 🌍",
+      "actual": "Hello, ����",
+      "corrupted": true,
+      "runId": "a743f66a-624b-407e-bedc-23a349faec85",
+      "root": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\root-SGQ16C"
+    },
+    {
+      "probe": "antigravity-text-prefers-old-structured-output",
+      "expected": "ORBIT\n",
+      "actual": "{\"message\":\"STALE FROM PREVIOUS TURN\"}",
+      "staleOutputCommitted": true,
+      "runId": "c713089a-0871-4bcc-a877-fbf39da9cef8",
+      "root": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\root-g6NM5I"
+    },
+    {
+      "probe": "changed-upstream-instructions",
+      "agents": [
+        {
+          "node": "customer-review",
+          "state": "skipped"
+        },
+        {
+          "node": "readiness-review",
+          "state": "skipped"
+        }
+      ],
+      "carriedWithoutReview": true,
+      "certificate": {
+        "artifact": {
+          "artifactId": "19f6dca1-10fb-40de-a70d-d3d8c58b3486",
+          "sha256": "c84fc5b0598f7e316177b2f556b2804dd3438013375783310edb8ef1eb7cedf4"
+        },
+        "recordId": "CERT-A4FD8FD5BACE"
+      },
+      "runId": "ffe83b66-470c-46c5-be27-32a578af9cc4",
+      "root": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\root-js9KWW"
+    },
+    {
+      "probe": "changed-native-profile",
+      "agents": [
+        {
+          "node": "customer-review",
+          "state": "skipped"
+        },
+        {
+          "node": "readiness-review",
+          "state": "skipped"
+        }
+      ],
+      "carriedWithoutReview": true,
+      "certificate": {
+        "artifact": {
+          "artifactId": "19f6dca1-10fb-40de-a70d-d3d8c58b3486",
+          "sha256": "c84fc5b0598f7e316177b2f556b2804dd3438013375783310edb8ef1eb7cedf4"
+        },
+        "recordId": "CERT-A4FD8FD5BACE"
+      },
+      "runId": "712e4eb3-2fb8-4437-ac2b-2373bf05f0e0",
+      "root": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\root-js9KWW"
+    },
+    {
+      "probe": "capture-write-failure",
+      "code": 1,
+      "signal": null,
+      "stdout": "{\"root\":\"C:\\\\my\\\\2026\\\\deszo_agent_orche\\\\.deszo\\\\tests\\\\root-IfcRGH\",\"runId\":\"96b2508a-fefc-429b-b4dc-c5151b3533b2\"}\n",
+      "stderr": "file:///C:/my/2026/deszo_agent_orche/runtime/core/store.mjs:83\r\n      throw error;\r\n      ^\r\n\r\nError: Audit-injected ENOSPC while capturing CLI output\r\n    at api.runner.engine.store.putBytes (file:///C:/my/2026/deszo_agent_orche/docs/reviews/reproducers/2026-10-13-runtime-probes.mjs:30:21)\r\n    at file:///C:/my/2026/deszo_agent_orche/runtime/core/engine.mjs:1668:30\r\n    at Store.transaction (file:///C:/my/2026/deszo_agent_orche/runtime/core/store.mjs:75:22)\r\n    at LogBatch.flush (file:///C:/my/2026/deszo_agent_orche/runtime/core/engine.mjs:1667:11)\r\n    at LogBatch.add (file:///C:/my/2026/deszo_agent_orche/runtime/core/engine.mjs:1658:46)\r\n    at Socket.<anonymous> (file:///C:/my/2026/deszo_agent_orche/runtime/core/engine.mjs:1449:24)\r\n    at Socket.emit (node:events:519:28)\r\n    at addChunk (node:internal/streams/readable:561:12)\r\n    at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)\r\n    at Readable.push (node:internal/streams/readable:392:5) {\r\n  code: 'ENOSPC'\r\n}\r\n\r\nNode.js v22.20.0\r\n",
+      "crashed": true
+    }
+  ]
+}

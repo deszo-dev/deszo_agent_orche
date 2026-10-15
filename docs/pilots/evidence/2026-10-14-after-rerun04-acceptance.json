@@ -1,0 +1,91 @@
+{
+  "candidate": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\pilots\\after-rerun04-recovery-fix\\evidence\\accepted-delivery\\candidate",
+  "passed": true,
+  "checks": 21,
+  "results": [
+    {
+      "name": "Reject invalid authentication: null",
+      "passed": true
+    },
+    {
+      "name": "Reject invalid authentication: ",
+      "passed": true
+    },
+    {
+      "name": "Reject invalid authentication: alice-token",
+      "passed": true
+    },
+    {
+      "name": "Reject invalid authentication: Bearer unknown",
+      "passed": true
+    },
+    {
+      "name": "Reject invalid authentication: Bearer alice-token extra",
+      "passed": true
+    },
+    {
+      "name": "Expiration boundary 999",
+      "passed": true
+    },
+    {
+      "name": "Expiration boundary 1000",
+      "passed": true
+    },
+    {
+      "name": "Expiration boundary 1001",
+      "passed": true
+    },
+    {
+      "name": "Inspect owned paused round",
+      "passed": true
+    },
+    {
+      "name": "Wrong owner GET",
+      "passed": true
+    },
+    {
+      "name": "Wrong owner POST",
+      "passed": true
+    },
+    {
+      "name": "Unknown round GET",
+      "passed": true
+    },
+    {
+      "name": "Unknown round POST",
+      "passed": true
+    },
+    {
+      "name": "Inspect owned completed round",
+      "passed": true
+    },
+    {
+      "name": "Cannot resume completed round",
+      "passed": true
+    },
+    {
+      "name": "Inspect owned expired round",
+      "passed": true
+    },
+    {
+      "name": "Cannot resume expired round",
+      "passed": true
+    },
+    {
+      "name": "Authentication precedes round lookup",
+      "passed": true
+    },
+    {
+      "name": "Ownership precedes recovery state",
+      "passed": true
+    },
+    {
+      "name": "Sequential recovery keeps one token and one round",
+      "passed": true
+    },
+    {
+      "name": "Concurrent recovery keeps one token",
+      "passed": true
+    }
+  ]
+}

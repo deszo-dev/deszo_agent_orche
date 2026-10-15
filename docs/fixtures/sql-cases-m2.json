@@ -1,0 +1,298 @@
+{
+  "tables": [
+    "schema_migrations",
+    "artifacts",
+    "application_settings",
+    "workspaces",
+    "workflows",
+    "runs",
+    "node_instances",
+    "context_bindings",
+    "run_context_bindings",
+    "attempts",
+    "journal_events",
+    "command_receipts",
+    "resource_locks",
+    "loop_executions",
+    "loop_iterations"
+  ],
+  "cases": [
+    {
+      "id": "migration-preserves-runs",
+      "expected": "accept",
+      "sql": "SELECT id,state,journal_version FROM runs ORDER BY id",
+      "rows": [
+        [
+          "r1",
+          "succeeded",
+          1
+        ],
+        [
+          "r2",
+          "failed",
+          1
+        ],
+        [
+          "r3",
+          "draining",
+          1
+        ],
+        [
+          "r4",
+          "queued",
+          1
+        ],
+        [
+          "r5",
+          "queued",
+          1
+        ]
+      ]
+    },
+    {
+      "id": "foreign-keys-still-resolve",
+      "expected": "accept",
+      "sql": "SELECT COUNT(*) FROM journal_events JOIN runs ON runs.id = journal_events.run_id",
+      "rows": [
+        [
+          1
+        ]
+      ]
+    },
+    {
+      "id": "scoped-instances-repeat-node-id",
+      "expected": "accept",
+      "sql": "INSERT INTO node_instances VALUES (?,?,?,?,?)",
+      "params": [
+        "r1",
+        "refine/2/proposal",
+        "proposal",
+        "agent",
+        "scheduled"
+      ]
+    },
+    {
+      "id": "instance-identity-still-unique",
+      "expected": "reject",
+      "reason": "UNIQUE constraint failed",
+      "sql": "INSERT INTO node_instances VALUES (?,?,?,?,?)",
+      "params": [
+        "r1",
+        "proposal",
+        "proposal",
+        "agent",
+        "scheduled"
+      ]
+    },
+    {
+      "id": "journal-event-needs-run",
+      "expected": "reject",
+      "reason": "FOREIGN KEY constraint failed",
+      "sql": "INSERT INTO journal_events VALUES (?,?,?,?,?,?,?,?,?,?)",
+      "params": [
+        "missing",
+        1,
+        "e9",
+        "run.created",
+        null,
+        null,
+        "{}",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        2,
+        "2026-10-13T12:00:00Z"
+      ]
+    },
+    {
+      "id": "waiting-state-accepted",
+      "expected": "accept",
+      "sql": "UPDATE runs SET state='waiting_for_user' WHERE id='r3'"
+    },
+    {
+      "id": "waiting-run-holds-workspace",
+      "expected": "reject",
+      "reason": "UNIQUE constraint failed",
+      "sql": "INSERT INTO runs(id,workflow_id,workspace_id,workflow_snapshot_artifact_id,settings_artifact_id,execution_hash,state,last_sequence,created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+      "params": [
+        "r6",
+        "wf",
+        "w1",
+        "artifact",
+        "artifact",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "queued",
+        0,
+        "2026-10-13T16:00:00Z"
+      ]
+    },
+    {
+      "id": "new-run-defaults-to-journal-v2",
+      "expected": "accept",
+      "sql": "INSERT INTO runs(id,workflow_id,workspace_id,workflow_snapshot_artifact_id,settings_artifact_id,execution_hash,state,last_sequence,created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+      "params": [
+        "r6",
+        "wf",
+        "w3",
+        "artifact",
+        "artifact",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "queued",
+        0,
+        "2026-10-13T16:00:00Z"
+      ]
+    },
+    {
+      "id": "journal-version-projection",
+      "expected": "accept",
+      "sql": "SELECT journal_version FROM runs WHERE id='r6'",
+      "rows": [
+        [
+          2
+        ]
+      ]
+    },
+    {
+      "id": "invalid-journal-version",
+      "expected": "reject",
+      "reason": "CHECK constraint failed",
+      "sql": "UPDATE runs SET journal_version=3 WHERE id='r6'"
+    },
+    {
+      "id": "loop-execution-accepted",
+      "expected": "accept",
+      "sql": "INSERT INTO loop_executions VALUES (?,?,?,?,?,?,?,?,?)",
+      "params": [
+        "r1",
+        "refine",
+        "a1",
+        "running",
+        1,
+        3,
+        30,
+        0,
+        null
+      ]
+    },
+    {
+      "id": "paused-loop-needs-reason",
+      "expected": "reject",
+      "reason": "CHECK constraint failed",
+      "sql": "INSERT INTO loop_executions VALUES (?,?,?,?,?,?,?,?,?)",
+      "params": [
+        "r1",
+        "other",
+        "a1",
+        "paused",
+        1,
+        3,
+        30,
+        0,
+        null
+      ]
+    },
+    {
+      "id": "running-loop-has-no-reason",
+      "expected": "reject",
+      "reason": "CHECK constraint failed",
+      "sql": "INSERT INTO loop_executions VALUES (?,?,?,?,?,?,?,?,?)",
+      "params": [
+        "r1",
+        "other",
+        "a1",
+        "running",
+        1,
+        3,
+        30,
+        0,
+        "stopped"
+      ]
+    },
+    {
+      "id": "loop-attempt-from-another-run",
+      "expected": "reject",
+      "reason": "FOREIGN KEY constraint failed",
+      "sql": "INSERT INTO loop_executions VALUES (?,?,?,?,?,?,?,?,?)",
+      "params": [
+        "r2",
+        "refine",
+        "a1",
+        "running",
+        1,
+        3,
+        30,
+        0,
+        null
+      ]
+    },
+    {
+      "id": "loop-iteration-accepted",
+      "expected": "accept",
+      "sql": "INSERT INTO loop_iterations VALUES (?,?,?,?,?,?,?,?,?,?)",
+      "params": [
+        "r1",
+        "refine",
+        1,
+        "{}",
+        "{}",
+        null,
+        null,
+        "running",
+        "2026-10-13T12:00:00Z",
+        null
+      ]
+    },
+    {
+      "id": "iteration-needs-execution",
+      "expected": "reject",
+      "reason": "FOREIGN KEY constraint failed",
+      "sql": "INSERT INTO loop_iterations VALUES (?,?,?,?,?,?,?,?,?,?)",
+      "params": [
+        "r1",
+        "missing",
+        1,
+        "{}",
+        "{}",
+        null,
+        null,
+        "running",
+        "2026-10-13T12:00:00Z",
+        null
+      ]
+    },
+    {
+      "id": "iteration-outcome-checked",
+      "expected": "reject",
+      "reason": "CHECK constraint failed",
+      "sql": "INSERT INTO loop_iterations VALUES (?,?,?,?,?,?,?,?,?,?)",
+      "params": [
+        "r1",
+        "refine",
+        2,
+        "{}",
+        "{}",
+        null,
+        null,
+        "approved",
+        "2026-10-13T12:00:00Z",
+        null
+      ]
+    },
+    {
+      "id": "iteration-numbers-start-at-one",
+      "expected": "reject",
+      "reason": "CHECK constraint failed",
+      "sql": "INSERT INTO loop_iterations VALUES (?,?,?,?,?,?,?,?,?,?)",
+      "params": [
+        "r1",
+        "refine",
+        0,
+        "{}",
+        "{}",
+        null,
+        null,
+        "running",
+        "2026-10-13T12:00:00Z",
+        null
+      ]
+    }
+  ]
+}

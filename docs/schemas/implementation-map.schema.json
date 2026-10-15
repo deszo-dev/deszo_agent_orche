@@ -1,0 +1,288 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deszo.local/documentation/implementation-map.schema.json",
+  "title": "Implementation Map",
+  "description": "Documentation-owned M5 task plan. candidate outputs are derived engine snapshots, not task-directory writes. M5 dependencies require accepted; early result consumption is deferred.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "mapId",
+    "tasks"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "mapId": {
+      "$ref": "#/$defs/id"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tasks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/task"
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9-]*$"
+    },
+    "outputId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "refs": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^(REQ|CONTRACT)-[A-Z0-9-]+$"
+      }
+    },
+    "paths": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "dependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "taskId",
+        "milestone"
+      ],
+      "properties": {
+        "taskId": {
+          "$ref": "#/$defs/id"
+        },
+        "milestone": {
+          "const": "accepted"
+        }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "ref"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/outputId"
+        },
+        "ref": {
+          "type": "string",
+          "pattern": "^(spec:[A-Z][A-Z0-9-]*|base:project|task:[A-Z][A-Z0-9-]*:[a-z][a-z0-9-]*)$"
+        }
+      }
+    },
+    "output": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "type",
+            "paths"
+          ],
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/outputId"
+            },
+            "type": {
+              "const": "fileSet"
+            },
+            "paths": {
+              "$ref": "#/$defs/paths"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "type"
+          ],
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/outputId"
+            },
+            "type": {
+              "enum": [
+                "json",
+                "text"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/outputId"
+            },
+            "type": {
+              "const": "candidate"
+            },
+            "paths": {
+              "$ref": "#/$defs/paths"
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "paths"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "criterion": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "description",
+            "method",
+            "role"
+          ],
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/id"
+            },
+            "description": {
+              "type": "string",
+              "minLength": 1
+            },
+            "method": {
+              "const": "review"
+            },
+            "role": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]*$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "description",
+            "method",
+            "checkId"
+          ],
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/id"
+            },
+            "description": {
+              "type": "string",
+              "minLength": 1
+            },
+            "method": {
+              "const": "check"
+            },
+            "checkId": {
+              "type": "string",
+              "pattern": "^CHECK-[A-Z0-9-]+$"
+            }
+          }
+        }
+      ]
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "executorRole",
+        "requirementRefs",
+        "dependsOn",
+        "inputs",
+        "outputs",
+        "readScopes",
+        "writeScopes",
+        "acceptanceCriteria"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "executorRole": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "requirementRefs": {
+          "$ref": "#/$defs/refs"
+        },
+        "dependsOn": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/dependency"
+          }
+        },
+        "inputs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/input"
+          }
+        },
+        "outputs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/output"
+          }
+        },
+        "readScopes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "writeScopes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "acceptanceCriteria": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/criterion"
+          }
+        }
+      }
+    }
+  }
+}

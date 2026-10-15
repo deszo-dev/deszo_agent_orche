@@ -1,0 +1,182 @@
+{
+  "schemaVersion": 1,
+  "document": "SPEC.md",
+  "sections": [
+    {
+      "id": "BUSINESS-TASK",
+      "kind": "business",
+      "normative": true,
+      "visibility": "public",
+      "dependsOn": []
+    },
+    {
+      "id": "REQ-AUTH",
+      "kind": "requirement",
+      "normative": true,
+      "visibility": "public",
+      "dependsOn": []
+    },
+    {
+      "id": "REQ-OWNERSHIP",
+      "kind": "requirement",
+      "normative": true,
+      "visibility": "public",
+      "dependsOn": [
+        "REQ-AUTH"
+      ]
+    },
+    {
+      "id": "REQ-RESUME",
+      "kind": "requirement",
+      "normative": true,
+      "visibility": "public",
+      "dependsOn": [
+        "REQ-OWNERSHIP",
+        "REQ-ERRORS"
+      ]
+    },
+    {
+      "id": "REQ-ERRORS",
+      "kind": "requirement",
+      "normative": true,
+      "visibility": "public",
+      "dependsOn": [
+        "REQ-AUTH",
+        "REQ-OWNERSHIP"
+      ]
+    },
+    {
+      "id": "CONTRACT-AUTH",
+      "kind": "contract",
+      "normative": true,
+      "visibility": "internal",
+      "dependsOn": [
+        "REQ-AUTH"
+      ]
+    },
+    {
+      "id": "CONTRACT-RESUME",
+      "kind": "contract",
+      "normative": true,
+      "visibility": "internal",
+      "dependsOn": [
+        "REQ-RESUME",
+        "REQ-ERRORS",
+        "CONTRACT-AUTH"
+      ]
+    },
+    {
+      "id": "CHECK-AUTH-SYNTAX",
+      "kind": "check",
+      "normative": true,
+      "visibility": "internal",
+      "dependsOn": [
+        "CONTRACT-AUTH"
+      ],
+      "command": {
+        "program": "node",
+        "args": [
+          "--check",
+          "tests/auth.test.mjs"
+        ],
+        "timeoutSeconds": 30,
+        "requiredExitCode": 0,
+        "source": "task-result"
+      }
+    },
+    {
+      "id": "CHECK-RESUME-SYNTAX",
+      "kind": "check",
+      "normative": true,
+      "visibility": "internal",
+      "dependsOn": [
+        "CONTRACT-RESUME"
+      ],
+      "command": {
+        "program": "node",
+        "args": [
+          "--check",
+          "tests/resume.test.mjs"
+        ],
+        "timeoutSeconds": 30,
+        "requiredExitCode": 0,
+        "source": "task-result"
+      }
+    },
+    {
+      "id": "CHECK-AUTH",
+      "kind": "check",
+      "normative": true,
+      "visibility": "internal",
+      "dependsOn": [
+        "REQ-AUTH",
+        "CONTRACT-AUTH"
+      ],
+      "command": {
+        "program": "node",
+        "args": [
+          "--test",
+          "tests/auth.test.mjs"
+        ],
+        "timeoutSeconds": 120,
+        "requiredExitCode": 0,
+        "source": "candidate"
+      }
+    },
+    {
+      "id": "CHECK-RESUME",
+      "kind": "check",
+      "normative": true,
+      "visibility": "internal",
+      "dependsOn": [
+        "REQ-RESUME",
+        "REQ-ERRORS",
+        "CONTRACT-RESUME"
+      ],
+      "command": {
+        "program": "node",
+        "args": [
+          "--test",
+          "tests/resume.test.mjs"
+        ],
+        "timeoutSeconds": 120,
+        "requiredExitCode": 0,
+        "source": "candidate"
+      }
+    },
+    {
+      "id": "ACCEPTANCE-SCENARIOS",
+      "kind": "acceptance",
+      "normative": true,
+      "visibility": "public",
+      "dependsOn": [
+        "BUSINESS-TASK",
+        "REQ-AUTH",
+        "REQ-OWNERSHIP",
+        "REQ-RESUME",
+        "REQ-ERRORS"
+      ]
+    },
+    {
+      "id": "IMPLEMENTATION-MAP",
+      "kind": "map",
+      "normative": true,
+      "visibility": "internal",
+      "dependsOn": [
+        "CONTRACT-AUTH",
+        "CONTRACT-RESUME",
+        "CHECK-AUTH-SYNTAX",
+        "CHECK-RESUME-SYNTAX",
+        "CHECK-AUTH",
+        "CHECK-RESUME"
+      ]
+    },
+    {
+      "id": "EXAMPLE-REVISION-3",
+      "kind": "informative",
+      "normative": false,
+      "visibility": "internal",
+      "dependsOn": []
+    }
+  ]
+}

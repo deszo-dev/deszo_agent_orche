@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "globalLimit": 3,
+  "providerLimits": {
+    "codex": 1,
+    "claude": 1,
+    "antigravity": 1
+  }
+}

@@ -1,0 +1,1385 @@
+{
+  "schemaVersion": 1,
+  "valid": [
+    {
+      "id": "context-chain",
+      "source": {
+        "file": "docs/examples/m1-context-chain/workflow.json",
+        "pointer": ""
+      },
+      "schema": "workflow.schema.json",
+      "expected": "valid",
+      "semantic": "workflow"
+    },
+    {
+      "id": "claude-bracket-alias",
+      "source": {
+        "file": "docs/fixtures/valid/workflow-claude-alias.json",
+        "pointer": ""
+      },
+      "schema": "workflow.schema.json",
+      "expected": "valid",
+      "semantic": "workflow"
+    },
+    {
+      "id": "continue-uuid",
+      "source": {
+        "file": "docs/fixtures/valid/workflow-continue.json",
+        "pointer": ""
+      },
+      "schema": "workflow.schema.json",
+      "expected": "valid",
+      "semantic": "workflow"
+    },
+    {
+      "id": "application-limits",
+      "source": {
+        "file": "docs/fixtures/valid/application-settings.json",
+        "pointer": ""
+      },
+      "schema": "application-settings.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "round-map",
+      "source": {
+        "file": "docs/examples/round-recovery/implementation-map.json",
+        "pointer": ""
+      },
+      "schema": "implementation-map.schema.json",
+      "expected": "valid",
+      "semantic": "map"
+    },
+    {
+      "id": "section-index",
+      "source": {
+        "file": "docs/examples/round-recovery/spec-index.json",
+        "pointer": ""
+      },
+      "schema": "spec-section-index.schema.json",
+      "expected": "valid",
+      "semantic": "sections"
+    },
+    {
+      "id": "api-problem",
+      "source": {
+        "file": "docs/fixtures/valid/api-payloads.json",
+        "pointer": "/problem"
+      },
+      "schema": "runtime-api.schema.json",
+      "definition": "problem",
+      "expected": "valid"
+    },
+    {
+      "id": "api-run",
+      "source": {
+        "file": "docs/fixtures/valid/api-payloads.json",
+        "pointer": "/run"
+      },
+      "schema": "runtime-api.schema.json",
+      "definition": "run",
+      "expected": "valid"
+    },
+    {
+      "id": "api-createRun",
+      "source": {
+        "file": "docs/fixtures/valid/api-payloads.json",
+        "pointer": "/createRun"
+      },
+      "schema": "runtime-api.schema.json",
+      "definition": "createRun",
+      "expected": "valid"
+    },
+    {
+      "id": "api-acceptRun",
+      "source": {
+        "file": "docs/fixtures/valid/api-payloads.json",
+        "pointer": "/acceptRun"
+      },
+      "schema": "runtime-api.schema.json",
+      "definition": "acceptRun",
+      "expected": "valid"
+    },
+    {
+      "id": "api-validation",
+      "source": {
+        "file": "docs/fixtures/valid/api-payloads.json",
+        "pointer": "/validation"
+      },
+      "schema": "runtime-api.schema.json",
+      "definition": "validation",
+      "expected": "valid"
+    },
+    {
+      "id": "api-savedWorkflow",
+      "source": {
+        "file": "docs/fixtures/valid/api-payloads.json",
+        "pointer": "/savedWorkflow"
+      },
+      "schema": "runtime-api.schema.json",
+      "definition": "savedWorkflow",
+      "expected": "valid"
+    },
+    {
+      "id": "api-stopRequest",
+      "source": {
+        "file": "docs/fixtures/valid/api-payloads.json",
+        "pointer": "/stopRequest"
+      },
+      "schema": "runtime-api.schema.json",
+      "definition": "stopRequest",
+      "expected": "valid"
+    },
+    {
+      "id": "api-stopResponse",
+      "source": {
+        "file": "docs/fixtures/valid/api-payloads.json",
+        "pointer": "/stopResponse"
+      },
+      "schema": "runtime-api.schema.json",
+      "definition": "stopResponse",
+      "expected": "valid"
+    },
+    {
+      "id": "api-runSnapshot",
+      "source": {
+        "file": "docs/fixtures/valid/api-payloads.json",
+        "pointer": "/runSnapshot"
+      },
+      "schema": "runtime-api.schema.json",
+      "definition": "runSnapshot",
+      "expected": "valid"
+    },
+    {
+      "id": "api-capabilities",
+      "source": {
+        "file": "docs/fixtures/valid/api-payloads.json",
+        "pointer": "/capabilities"
+      },
+      "schema": "runtime-api.schema.json",
+      "definition": "capabilities",
+      "expected": "valid",
+      "semantic": "capabilities"
+    },
+    {
+      "id": "api-workspaceRequest",
+      "source": {
+        "file": "docs/fixtures/valid/api-payloads.json",
+        "pointer": "/workspaceRequest"
+      },
+      "schema": "runtime-api.schema.json",
+      "definition": "workspaceRequest",
+      "expected": "valid"
+    },
+    {
+      "id": "api-workspace",
+      "source": {
+        "file": "docs/fixtures/valid/api-payloads.json",
+        "pointer": "/workspace"
+      },
+      "schema": "runtime-api.schema.json",
+      "definition": "workspace",
+      "expected": "valid"
+    },
+    {
+      "id": "api-contextBinding",
+      "source": {
+        "file": "docs/fixtures/valid/api-payloads.json",
+        "pointer": "/contextBinding"
+      },
+      "schema": "runtime-api.schema.json",
+      "definition": "contextBinding",
+      "expected": "valid"
+    },
+    {
+      "id": "api-contextBindings",
+      "source": {
+        "file": "docs/fixtures/valid/api-payloads.json",
+        "pointer": "/contextBindings"
+      },
+      "schema": "runtime-api.schema.json",
+      "definition": "contextBindings",
+      "expected": "valid"
+    },
+    {
+      "id": "api-acknowledgeContext",
+      "source": {
+        "file": "docs/fixtures/valid/api-payloads.json",
+        "pointer": "/acknowledgeContext"
+      },
+      "schema": "runtime-api.schema.json",
+      "definition": "acknowledgeContext",
+      "expected": "valid"
+    },
+    {
+      "id": "api-runContextBinding",
+      "source": {
+        "file": "docs/fixtures/valid/api-payloads.json",
+        "pointer": "/runContextBinding"
+      },
+      "schema": "runtime-api.schema.json",
+      "definition": "runContextBinding",
+      "expected": "valid"
+    },
+    {
+      "id": "api-applicationSettings",
+      "source": {
+        "file": "docs/fixtures/valid/api-payloads.json",
+        "pointer": "/applicationSettings"
+      },
+      "schema": "runtime-api.schema.json",
+      "definition": "applicationSettings",
+      "expected": "valid"
+    },
+    {
+      "id": "api-updateApplicationSettings",
+      "source": {
+        "file": "docs/fixtures/valid/api-payloads.json",
+        "pointer": "/updateApplicationSettings"
+      },
+      "schema": "runtime-api.schema.json",
+      "definition": "updateApplicationSettings",
+      "expected": "valid"
+    },
+    {
+      "id": "api-listQuery",
+      "source": {
+        "file": "docs/fixtures/valid/api-payloads.json",
+        "pointer": "/listQuery"
+      },
+      "schema": "runtime-api.schema.json",
+      "definition": "listQuery",
+      "expected": "valid"
+    },
+    {
+      "id": "api-runListQuery",
+      "source": {
+        "file": "docs/fixtures/valid/api-payloads.json",
+        "pointer": "/runListQuery"
+      },
+      "schema": "runtime-api.schema.json",
+      "definition": "runListQuery",
+      "expected": "valid"
+    },
+    {
+      "id": "api-workflowSummary",
+      "source": {
+        "file": "docs/fixtures/valid/api-payloads.json",
+        "pointer": "/workflowSummary"
+      },
+      "schema": "runtime-api.schema.json",
+      "definition": "workflowSummary",
+      "expected": "valid"
+    },
+    {
+      "id": "api-runs",
+      "source": {
+        "file": "docs/fixtures/valid/api-payloads.json",
+        "pointer": "/runs"
+      },
+      "schema": "runtime-api.schema.json",
+      "definition": "runs",
+      "expected": "valid"
+    },
+    {
+      "id": "api-workflows",
+      "source": {
+        "file": "docs/fixtures/valid/api-payloads.json",
+        "pointer": "/workflows"
+      },
+      "schema": "runtime-api.schema.json",
+      "definition": "workflows",
+      "expected": "valid"
+    },
+    {
+      "id": "api-workspaces",
+      "source": {
+        "file": "docs/fixtures/valid/api-payloads.json",
+        "pointer": "/workspaces"
+      },
+      "schema": "runtime-api.schema.json",
+      "definition": "workspaces",
+      "expected": "valid"
+    },
+    {
+      "id": "api-runSettings",
+      "source": {
+        "file": "docs/fixtures/valid/api-payloads.json",
+        "pointer": "/runSettings"
+      },
+      "schema": "runtime-api.schema.json",
+      "definition": "runSettings",
+      "expected": "valid"
+    },
+    {
+      "id": "manifest-inputs",
+      "source": {
+        "file": "docs/fixtures/valid/attempt-manifests.json",
+        "pointer": "/inputs"
+      },
+      "schema": "attempt-record.schema.json",
+      "definition": "inputs",
+      "expected": "valid"
+    },
+    {
+      "id": "manifest-outputs",
+      "source": {
+        "file": "docs/fixtures/valid/attempt-manifests.json",
+        "pointer": "/outputs"
+      },
+      "schema": "attempt-record.schema.json",
+      "definition": "outputs",
+      "expected": "valid"
+    },
+    {
+      "id": "manifest-invocation",
+      "source": {
+        "file": "docs/fixtures/valid/attempt-manifests.json",
+        "pointer": "/invocation"
+      },
+      "schema": "attempt-record.schema.json",
+      "definition": "invocation",
+      "expected": "valid"
+    },
+    {
+      "id": "event-run.created",
+      "source": {
+        "file": "docs/fixtures/valid/journal-events.json",
+        "pointer": "/run.created"
+      },
+      "schema": "journal-event.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "event-run.state_changed",
+      "source": {
+        "file": "docs/fixtures/valid/journal-events.json",
+        "pointer": "/run.state_changed"
+      },
+      "schema": "journal-event.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "event-node.planned",
+      "source": {
+        "file": "docs/fixtures/valid/journal-events.json",
+        "pointer": "/node.planned"
+      },
+      "schema": "journal-event.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "event-attempt.state_changed",
+      "source": {
+        "file": "docs/fixtures/valid/journal-events.json",
+        "pointer": "/attempt.state_changed"
+      },
+      "schema": "journal-event.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "event-attempt.inputs_committed",
+      "source": {
+        "file": "docs/fixtures/valid/journal-events.json",
+        "pointer": "/attempt.inputs_committed"
+      },
+      "schema": "journal-event.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "event-attempt.invocation_committed",
+      "source": {
+        "file": "docs/fixtures/valid/journal-events.json",
+        "pointer": "/attempt.invocation_committed"
+      },
+      "schema": "journal-event.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "event-attempt.log_chunk",
+      "source": {
+        "file": "docs/fixtures/valid/journal-events.json",
+        "pointer": "/attempt.log_chunk"
+      },
+      "schema": "journal-event.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "event-attempt.outputs_committed",
+      "source": {
+        "file": "docs/fixtures/valid/journal-events.json",
+        "pointer": "/attempt.outputs_committed"
+      },
+      "schema": "journal-event.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "event-attempt.error",
+      "source": {
+        "file": "docs/fixtures/valid/journal-events.json",
+        "pointer": "/attempt.error"
+      },
+      "schema": "journal-event.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "event-context.state_changed",
+      "source": {
+        "file": "docs/fixtures/valid/journal-events.json",
+        "pointer": "/context.state_changed"
+      },
+      "schema": "journal-event.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "event-context.bound",
+      "source": {
+        "file": "docs/fixtures/valid/journal-events.json",
+        "pointer": "/context.bound"
+      },
+      "schema": "journal-event.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "event-run.capacity_changed",
+      "source": {
+        "file": "docs/fixtures/valid/journal-events.json",
+        "pointer": "/run.capacity_changed"
+      },
+      "schema": "journal-event.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "event-launched",
+      "source": {
+        "file": "docs/fixtures/valid/journal-events.json",
+        "pointer": "/launched"
+      },
+      "schema": "journal-event.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "event-blocked",
+      "source": {
+        "file": "docs/fixtures/valid/journal-events.json",
+        "pointer": "/blocked"
+      },
+      "schema": "journal-event.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "value-text",
+      "source": {
+        "file": "docs/fixtures/valid/values.json",
+        "pointer": "/text"
+      },
+      "schema": "value.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "value-json",
+      "source": {
+        "file": "docs/fixtures/valid/values.json",
+        "pointer": "/json"
+      },
+      "schema": "value.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "loop-finish",
+      "source": {
+        "file": "docs/fixtures/valid/loop-decisions.json",
+        "pointer": "/finish"
+      },
+      "schema": "loop-decision.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "loop-repeat",
+      "source": {
+        "file": "docs/fixtures/valid/loop-decisions.json",
+        "pointer": "/repeat"
+      },
+      "schema": "loop-decision.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "carry-deliveryState",
+      "source": {
+        "file": "docs/fixtures/valid/pipeline-states.json",
+        "pointer": "/deliveryState"
+      },
+      "schema": "pipeline-state.schema.json",
+      "definition": "deliveryState",
+      "expected": "valid"
+    },
+    {
+      "id": "carry-specificationState",
+      "source": {
+        "file": "docs/fixtures/valid/pipeline-states.json",
+        "pointer": "/specificationState"
+      },
+      "schema": "pipeline-state.schema.json",
+      "definition": "specificationState",
+      "expected": "valid"
+    },
+    {
+      "id": "carry-withIssue",
+      "source": {
+        "file": "docs/fixtures/valid/pipeline-states.json",
+        "pointer": "/withIssue"
+      },
+      "schema": "pipeline-state.schema.json",
+      "definition": "deliveryState",
+      "expected": "valid"
+    },
+    {
+      "id": "extended-timeout-capability",
+      "source": {
+        "file": "docs/fixtures/valid/api-payloads.json",
+        "pointer": "/capabilities"
+      },
+      "schema": "runtime-api.schema.json",
+      "definition": "capabilities",
+      "expected": "valid",
+      "semantic": "capabilities",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/maximumAgentTimeoutSeconds",
+          "value": 3600
+        }
+      ]
+    },
+    {
+      "id": "extended-timeout-workflow",
+      "source": {
+        "file": "docs/examples/m1-context-chain/workflow.json",
+        "pointer": ""
+      },
+      "schema": "workflow.schema.json",
+      "expected": "valid",
+      "semantic": "workflow",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/nodes/3/config/timeoutSeconds",
+          "value": 1200
+        }
+      ],
+      "maximumAgentTimeoutSeconds": 3600
+    },
+    {
+      "id": "context-review-state-remains-valid",
+      "source": {
+        "file": "docs/fixtures/valid/api-payloads.json",
+        "pointer": "/contextBinding"
+      },
+      "schema": "runtime-api.schema.json",
+      "definition": "contextBinding",
+      "expected": "valid",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/state",
+          "value": "needs_review"
+        }
+      ]
+    },
+    {
+      "id": "m2-review-loop",
+      "source": {
+        "file": "docs/examples/m2-review-loop/workflow.json",
+        "pointer": ""
+      },
+      "schema": "workflow.schema.json",
+      "expected": "valid",
+      "semantic": "workflow"
+    },
+    {
+      "id": "m2-artifact-set-value",
+      "source": {
+        "file": "docs/fixtures/valid/m2-payloads.json",
+        "pointer": "/artifactSetValue"
+      },
+      "schema": "value.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "m2-artifact-set-manifest",
+      "source": {
+        "file": "docs/fixtures/valid/m2-payloads.json",
+        "pointer": "/artifactSetManifest"
+      },
+      "schema": "value.schema.json",
+      "definition": "artifactSetManifest",
+      "expected": "valid"
+    },
+    {
+      "id": "m2-event-0",
+      "source": {
+        "file": "docs/fixtures/valid/m2-payloads.json",
+        "pointer": "/events/0"
+      },
+      "schema": "journal-event-v2.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "m2-event-1",
+      "source": {
+        "file": "docs/fixtures/valid/m2-payloads.json",
+        "pointer": "/events/1"
+      },
+      "schema": "journal-event-v2.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "m2-event-2",
+      "source": {
+        "file": "docs/fixtures/valid/m2-payloads.json",
+        "pointer": "/events/2"
+      },
+      "schema": "journal-event-v2.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "m2-event-3",
+      "source": {
+        "file": "docs/fixtures/valid/m2-payloads.json",
+        "pointer": "/events/3"
+      },
+      "schema": "journal-event-v2.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "m2-event-4",
+      "source": {
+        "file": "docs/fixtures/valid/m2-payloads.json",
+        "pointer": "/events/4"
+      },
+      "schema": "journal-event-v2.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "m2-event-5",
+      "source": {
+        "file": "docs/fixtures/valid/m2-payloads.json",
+        "pointer": "/events/5"
+      },
+      "schema": "journal-event-v2.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "m2-event-6",
+      "source": {
+        "file": "docs/fixtures/valid/m2-payloads.json",
+        "pointer": "/events/6"
+      },
+      "schema": "journal-event-v2.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "m2-event-7",
+      "source": {
+        "file": "docs/fixtures/valid/m2-payloads.json",
+        "pointer": "/events/7"
+      },
+      "schema": "journal-event-v2.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "m2-event-8",
+      "source": {
+        "file": "docs/fixtures/valid/m2-payloads.json",
+        "pointer": "/events/8"
+      },
+      "schema": "journal-event-v2.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "m2-event-9",
+      "source": {
+        "file": "docs/fixtures/valid/m2-payloads.json",
+        "pointer": "/events/9"
+      },
+      "schema": "journal-event-v2.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "m2-event-10",
+      "source": {
+        "file": "docs/fixtures/valid/m2-payloads.json",
+        "pointer": "/events/10"
+      },
+      "schema": "journal-event-v2.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "m2-event-11",
+      "source": {
+        "file": "docs/fixtures/valid/m2-payloads.json",
+        "pointer": "/events/11"
+      },
+      "schema": "journal-event-v2.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "m2-event-12",
+      "source": {
+        "file": "docs/fixtures/valid/m2-payloads.json",
+        "pointer": "/events/12"
+      },
+      "schema": "journal-event-v2.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "m2-api-run",
+      "source": {
+        "file": "docs/fixtures/valid/m2-payloads.json",
+        "pointer": "/run"
+      },
+      "schema": "runtime-api-v2.schema.json",
+      "definition": "run",
+      "expected": "valid"
+    },
+    {
+      "id": "m2-api-runSnapshot",
+      "source": {
+        "file": "docs/fixtures/valid/m2-payloads.json",
+        "pointer": "/runSnapshot"
+      },
+      "schema": "runtime-api-v2.schema.json",
+      "definition": "runSnapshot",
+      "expected": "valid"
+    },
+    {
+      "id": "m2-api-retry",
+      "source": {
+        "file": "docs/fixtures/valid/m2-payloads.json",
+        "pointer": "/retry"
+      },
+      "schema": "runtime-api-v2.schema.json",
+      "definition": "recoveryRequest",
+      "expected": "valid"
+    },
+    {
+      "id": "m2-api-raiseLimit",
+      "source": {
+        "file": "docs/fixtures/valid/m2-payloads.json",
+        "pointer": "/raiseLimit"
+      },
+      "schema": "runtime-api-v2.schema.json",
+      "definition": "recoveryRequest",
+      "expected": "valid"
+    },
+    {
+      "id": "m2-api-restartIteration",
+      "source": {
+        "file": "docs/fixtures/valid/m2-payloads.json",
+        "pointer": "/restartIteration"
+      },
+      "schema": "runtime-api-v2.schema.json",
+      "definition": "recoveryRequest",
+      "expected": "valid"
+    },
+    {
+      "id": "m2-api-close",
+      "source": {
+        "file": "docs/fixtures/valid/m2-payloads.json",
+        "pointer": "/close"
+      },
+      "schema": "runtime-api-v2.schema.json",
+      "definition": "recoveryRequest",
+      "expected": "valid"
+    },
+    {
+      "id": "m2-api-commandResponse",
+      "source": {
+        "file": "docs/fixtures/valid/m2-payloads.json",
+        "pointer": "/commandResponse"
+      },
+      "schema": "runtime-api-v2.schema.json",
+      "definition": "commandResponse",
+      "expected": "valid"
+    },
+    {
+      "id": "m2-api-runFilter",
+      "source": {
+        "file": "docs/fixtures/valid/m2-payloads.json",
+        "pointer": "/runFilter"
+      },
+      "schema": "runtime-api-v2.schema.json",
+      "definition": "runListQuery",
+      "expected": "valid"
+    },
+    {
+      "id": "m34-specification-loop",
+      "source": {
+        "file": "docs/examples/m4-specification-loop/workflow.json",
+        "pointer": ""
+      },
+      "schema": "workflow.schema.json",
+      "expected": "valid",
+      "semantic": "workflow"
+    },
+    {
+      "id": "m34-cache-example",
+      "source": {
+        "file": "docs/examples/m3-cache/workflow.json",
+        "pointer": ""
+      },
+      "schema": "workflow.schema.json",
+      "expected": "valid",
+      "semantic": "workflow"
+    },
+    {
+      "id": "m34-reviewApproved",
+      "source": {
+        "file": "docs/fixtures/valid/m34-payloads.json",
+        "pointer": "/reviewApproved"
+      },
+      "schema": "review-decision.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "m34-reviewRejected",
+      "source": {
+        "file": "docs/fixtures/valid/m34-payloads.json",
+        "pointer": "/reviewRejected"
+      },
+      "schema": "review-decision.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "m34-plan",
+      "source": {
+        "file": "docs/fixtures/valid/m34-payloads.json",
+        "pointer": "/plan"
+      },
+      "schema": "gate.schema.json",
+      "definition": "reviewPlan",
+      "expected": "valid"
+    },
+    {
+      "id": "m34-reportOpen",
+      "source": {
+        "file": "docs/fixtures/valid/m34-payloads.json",
+        "pointer": "/reportOpen"
+      },
+      "schema": "gate.schema.json",
+      "definition": "report",
+      "expected": "valid"
+    },
+    {
+      "id": "m34-reportRevision",
+      "source": {
+        "file": "docs/fixtures/valid/m34-payloads.json",
+        "pointer": "/reportRevision"
+      },
+      "schema": "gate.schema.json",
+      "definition": "report",
+      "expected": "valid"
+    },
+    {
+      "id": "m34-certificate",
+      "source": {
+        "file": "docs/fixtures/valid/m34-payloads.json",
+        "pointer": "/certificate"
+      },
+      "schema": "gate.schema.json",
+      "definition": "certificate",
+      "expected": "valid"
+    },
+    {
+      "id": "m34-reviewRecord",
+      "source": {
+        "file": "docs/fixtures/valid/m34-payloads.json",
+        "pointer": "/reviewRecord"
+      },
+      "schema": "gate.schema.json",
+      "definition": "reviewRecord",
+      "expected": "valid"
+    },
+    {
+      "id": "m34-subjectView",
+      "source": {
+        "file": "docs/fixtures/valid/m34-payloads.json",
+        "pointer": "/subjectView"
+      },
+      "schema": "gate.schema.json",
+      "definition": "subjectView",
+      "expected": "valid"
+    },
+    {
+      "id": "m34-event-0",
+      "source": {
+        "file": "docs/fixtures/valid/m34-payloads.json",
+        "pointer": "/events/0"
+      },
+      "schema": "journal-event-v2.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "m34-event-1",
+      "source": {
+        "file": "docs/fixtures/valid/m34-payloads.json",
+        "pointer": "/events/1"
+      },
+      "schema": "journal-event-v2.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "m34-event-2",
+      "source": {
+        "file": "docs/fixtures/valid/m34-payloads.json",
+        "pointer": "/events/2"
+      },
+      "schema": "journal-event-v2.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "m34-event-3",
+      "source": {
+        "file": "docs/fixtures/valid/m34-payloads.json",
+        "pointer": "/events/3"
+      },
+      "schema": "journal-event-v2.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "m34-event-4",
+      "source": {
+        "file": "docs/fixtures/valid/m34-payloads.json",
+        "pointer": "/events/4"
+      },
+      "schema": "journal-event-v2.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "m34-event-5",
+      "source": {
+        "file": "docs/fixtures/valid/m34-payloads.json",
+        "pointer": "/events/5"
+      },
+      "schema": "journal-event-v2.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "m34-event-6",
+      "source": {
+        "file": "docs/fixtures/valid/m34-payloads.json",
+        "pointer": "/events/6"
+      },
+      "schema": "journal-event-v2.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "m34-event-7",
+      "source": {
+        "file": "docs/fixtures/valid/m34-payloads.json",
+        "pointer": "/events/7"
+      },
+      "schema": "journal-event-v2.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "m34-event-8",
+      "source": {
+        "file": "docs/fixtures/valid/m34-payloads.json",
+        "pointer": "/events/8"
+      },
+      "schema": "journal-event-v2.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "m34-api-createBranch",
+      "source": {
+        "file": "docs/fixtures/valid/m34-payloads.json",
+        "pointer": "/createBranch"
+      },
+      "schema": "runtime-api-v2.schema.json",
+      "definition": "createRun",
+      "expected": "valid"
+    },
+    {
+      "id": "m34-api-createNode",
+      "source": {
+        "file": "docs/fixtures/valid/m34-payloads.json",
+        "pointer": "/createNode"
+      },
+      "schema": "runtime-api-v2.schema.json",
+      "definition": "createRun",
+      "expected": "valid"
+    },
+    {
+      "id": "m34-api-cachePins",
+      "source": {
+        "file": "docs/fixtures/valid/m34-payloads.json",
+        "pointer": "/cachePins"
+      },
+      "schema": "runtime-api-v2.schema.json",
+      "definition": "cachePins",
+      "expected": "valid"
+    },
+    {
+      "id": "m34-api-freeze",
+      "source": {
+        "file": "docs/fixtures/valid/m34-payloads.json",
+        "pointer": "/freeze"
+      },
+      "schema": "runtime-api-v2.schema.json",
+      "definition": "freezeCacheRequest",
+      "expected": "valid"
+    },
+    {
+      "id": "m34-api-chat",
+      "source": {
+        "file": "docs/fixtures/valid/m34-payloads.json",
+        "pointer": "/chat"
+      },
+      "schema": "runtime-api-v2.schema.json",
+      "definition": "chatRequest",
+      "expected": "valid"
+    },
+    {
+      "id": "m34-api-chatRunFilter",
+      "source": {
+        "file": "docs/fixtures/valid/m34-payloads.json",
+        "pointer": "/chatRunFilter"
+      },
+      "schema": "runtime-api-v2.schema.json",
+      "definition": "runListQuery",
+      "expected": "valid"
+    },
+    {
+      "id": "m5-delivery-example",
+      "source": {
+        "file": "docs/examples/m5-delivery/workflow.json",
+        "pointer": ""
+      },
+      "schema": "workflow.schema.json",
+      "expected": "valid",
+      "semantic": "workflow"
+    },
+    {
+      "id": "m5-taskReturn",
+      "source": {
+        "file": "docs/fixtures/valid/m5-payloads.json",
+        "pointer": "/taskReturn"
+      },
+      "schema": "map.schema.json",
+      "definition": "taskReturn",
+      "expected": "valid"
+    },
+    {
+      "id": "m5-taskReturnRevision",
+      "source": {
+        "file": "docs/fixtures/valid/m5-payloads.json",
+        "pointer": "/taskReturnRevision"
+      },
+      "schema": "map.schema.json",
+      "definition": "taskReturn",
+      "expected": "valid"
+    },
+    {
+      "id": "m5-taskReview",
+      "source": {
+        "file": "docs/fixtures/valid/m5-payloads.json",
+        "pointer": "/taskReview"
+      },
+      "schema": "map.schema.json",
+      "definition": "taskReview",
+      "expected": "valid"
+    },
+    {
+      "id": "m5-triage",
+      "source": {
+        "file": "docs/fixtures/valid/m5-payloads.json",
+        "pointer": "/triage"
+      },
+      "schema": "map.schema.json",
+      "definition": "triageDecision",
+      "expected": "valid"
+    },
+    {
+      "id": "m5-repair",
+      "source": {
+        "file": "docs/fixtures/valid/m5-payloads.json",
+        "pointer": "/repair"
+      },
+      "schema": "map.schema.json",
+      "definition": "mapRepair",
+      "expected": "valid"
+    },
+    {
+      "id": "m5-taskResult",
+      "source": {
+        "file": "docs/fixtures/valid/m5-payloads.json",
+        "pointer": "/taskResult"
+      },
+      "schema": "map.schema.json",
+      "definition": "taskResult",
+      "expected": "valid"
+    },
+    {
+      "id": "m5-checkReport",
+      "source": {
+        "file": "docs/fixtures/valid/m5-payloads.json",
+        "pointer": "/checkReport"
+      },
+      "schema": "map.schema.json",
+      "definition": "checkReport",
+      "expected": "valid"
+    },
+    {
+      "id": "m5-candidate",
+      "source": {
+        "file": "docs/fixtures/valid/m5-payloads.json",
+        "pointer": "/candidate"
+      },
+      "schema": "map.schema.json",
+      "definition": "candidate",
+      "expected": "valid"
+    },
+    {
+      "id": "m5-conflict",
+      "source": {
+        "file": "docs/fixtures/valid/m5-payloads.json",
+        "pointer": "/conflict"
+      },
+      "schema": "map.schema.json",
+      "definition": "conflict",
+      "expected": "valid"
+    },
+    {
+      "id": "m5-mapState",
+      "source": {
+        "file": "docs/fixtures/valid/m5-payloads.json",
+        "pointer": "/mapState"
+      },
+      "schema": "map.schema.json",
+      "definition": "mapState",
+      "expected": "valid"
+    },
+    {
+      "id": "m5-summary",
+      "source": {
+        "file": "docs/fixtures/valid/m5-payloads.json",
+        "pointer": "/summary"
+      },
+      "schema": "map.schema.json",
+      "definition": "summary",
+      "expected": "valid"
+    },
+    {
+      "id": "m5-event-0",
+      "source": {
+        "file": "docs/fixtures/valid/m5-payloads.json",
+        "pointer": "/events/0"
+      },
+      "schema": "journal-event-v2.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "m5-event-1",
+      "source": {
+        "file": "docs/fixtures/valid/m5-payloads.json",
+        "pointer": "/events/1"
+      },
+      "schema": "journal-event-v2.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "m5-event-2",
+      "source": {
+        "file": "docs/fixtures/valid/m5-payloads.json",
+        "pointer": "/events/2"
+      },
+      "schema": "journal-event-v2.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "m5-event-3",
+      "source": {
+        "file": "docs/fixtures/valid/m5-payloads.json",
+        "pointer": "/events/3"
+      },
+      "schema": "journal-event-v2.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "m5-event-4",
+      "source": {
+        "file": "docs/fixtures/valid/m5-payloads.json",
+        "pointer": "/events/4"
+      },
+      "schema": "journal-event-v2.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "m5-event-5",
+      "source": {
+        "file": "docs/fixtures/valid/m5-payloads.json",
+        "pointer": "/events/5"
+      },
+      "schema": "journal-event-v2.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "m5-event-6",
+      "source": {
+        "file": "docs/fixtures/valid/m5-payloads.json",
+        "pointer": "/events/6"
+      },
+      "schema": "journal-event-v2.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "m5-event-7",
+      "source": {
+        "file": "docs/fixtures/valid/m5-payloads.json",
+        "pointer": "/events/7"
+      },
+      "schema": "journal-event-v2.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "m5-api-raise-map-limit",
+      "source": {
+        "file": "docs/fixtures/valid/m5-payloads.json",
+        "pointer": "/raiseMapLimit"
+      },
+      "schema": "runtime-api-v2.schema.json",
+      "definition": "recoveryRequest",
+      "expected": "valid"
+    },
+    {
+      "id": "m5-api-map-execution",
+      "source": {
+        "file": "docs/fixtures/valid/m5-payloads.json",
+        "pointer": "/mapExecution"
+      },
+      "schema": "runtime-api-v2.schema.json",
+      "definition": "mapExecution",
+      "expected": "valid"
+    },
+    {
+      "id": "m6-selective-example",
+      "source": {
+        "file": "docs/examples/m6-selective-delivery/workflow.json",
+        "pointer": ""
+      },
+      "schema": "workflow.schema.json",
+      "expected": "valid",
+      "semantic": "workflow"
+    },
+    {
+      "id": "m6-needCarried",
+      "source": {
+        "file": "docs/fixtures/valid/m6-payloads.json",
+        "pointer": "/needCarried"
+      },
+      "schema": "gate.schema.json",
+      "definition": "reviewNeed",
+      "expected": "valid"
+    },
+    {
+      "id": "m6-needStale",
+      "source": {
+        "file": "docs/fixtures/valid/m6-payloads.json",
+        "pointer": "/needStale"
+      },
+      "schema": "gate.schema.json",
+      "definition": "reviewNeed",
+      "expected": "valid"
+    },
+    {
+      "id": "m6-carryRequest",
+      "source": {
+        "file": "docs/fixtures/valid/m6-payloads.json",
+        "pointer": "/carryRequest"
+      },
+      "schema": "gate.schema.json",
+      "definition": "reviewCarryRequest",
+      "expected": "valid"
+    },
+    {
+      "id": "m6-reviewCarry",
+      "source": {
+        "file": "docs/fixtures/valid/m6-payloads.json",
+        "pointer": "/reviewCarry"
+      },
+      "schema": "gate.schema.json",
+      "definition": "reviewCarry",
+      "expected": "valid"
+    },
+    {
+      "id": "m6-taskCarry",
+      "source": {
+        "file": "docs/fixtures/valid/m6-payloads.json",
+        "pointer": "/taskCarry"
+      },
+      "schema": "map.schema.json",
+      "definition": "taskCarry",
+      "expected": "valid"
+    },
+    {
+      "id": "m6-history",
+      "source": {
+        "file": "docs/fixtures/valid/m6-payloads.json",
+        "pointer": "/history"
+      },
+      "schema": "map.schema.json",
+      "definition": "history",
+      "expected": "valid"
+    },
+    {
+      "id": "m6-event-0",
+      "source": {
+        "file": "docs/fixtures/valid/m6-payloads.json",
+        "pointer": "/events/0"
+      },
+      "schema": "journal-event-v2.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "m6-event-1",
+      "source": {
+        "file": "docs/fixtures/valid/m6-payloads.json",
+        "pointer": "/events/1"
+      },
+      "schema": "journal-event-v2.schema.json",
+      "expected": "valid"
+    },
+    {
+      "id": "rf-reference-delivery",
+      "source": {
+        "file": "docs/examples/reference-delivery/workflow.json",
+        "pointer": ""
+      },
+      "schema": "workflow.schema.json",
+      "expected": "valid",
+      "semantic": "workflow"
+    },
+    {
+      "id": "rf-delivery-certificate",
+      "source": {
+        "file": "docs/fixtures/valid/review-fix-payloads.json",
+        "pointer": "/deliveryCertificate"
+      },
+      "schema": "gate.schema.json",
+      "definition": "certificate",
+      "expected": "valid"
+    },
+    {
+      "id": "rf-capture-failed",
+      "source": {
+        "file": "docs/fixtures/valid/review-fix-payloads.json",
+        "pointer": "/captureFailed"
+      },
+      "schema": "journal-event-v2.schema.json",
+      "expected": "valid"
+    }
+  ],
+  "invalidFixture": "docs/fixtures/invalid/cases.json"
+}

@@ -1,0 +1,1804 @@
+{
+  "date": "2026-10-15",
+  "platform": "win32-x64",
+  "records": [
+    {
+      "provider": "codex",
+      "cliVersion": "codex-cli 0.162.0-alpha.17.2",
+      "requestedModel": "gpt-6-luna",
+      "mechanism": "codex-explicit-mcp-marker",
+      "scopes": [
+        "user",
+        "project"
+      ],
+      "verdict": "passed",
+      "privateEvidenceRoot": ".deszo/acceptance/adr0001-20261015-01/native-71ef8c5d",
+      "phases": [
+        {
+          "phase": "authoring",
+          "exitCode": 0,
+          "terminal": true,
+          "observedModel": null,
+          "sessionId": "01a13ef6-a70f-7290-bdea-d760f4ded9bc",
+          "observations": [
+            {
+              "at": "2026-10-15T09:48:34.788Z",
+              "pid": 29584,
+              "event": "started",
+              "markerPresent": false
+            },
+            {
+              "at": "2026-10-15T09:48:34.788Z",
+              "pid": 21924,
+              "event": "started",
+              "markerPresent": false
+            },
+            {
+              "at": "2026-10-15T09:48:34.801Z",
+              "pid": 29584,
+              "event": "request",
+              "id": 0,
+              "method": "initialize"
+            },
+            {
+              "at": "2026-10-15T09:48:34.801Z",
+              "pid": 21924,
+              "event": "request",
+              "id": 0,
+              "method": "initialize"
+            },
+            {
+              "at": "2026-10-15T09:48:35.120Z",
+              "pid": 29584,
+              "event": "response",
+              "id": 0,
+              "method": "initialize",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:48:35.121Z",
+              "pid": 29584,
+              "event": "request",
+              "method": "notifications/initialized"
+            },
+            {
+              "at": "2026-10-15T09:48:35.122Z",
+              "pid": 29584,
+              "event": "request",
+              "id": 1,
+              "method": "tools/list"
+            },
+            {
+              "at": "2026-10-15T09:48:35.123Z",
+              "pid": 21924,
+              "event": "response",
+              "id": 0,
+              "method": "initialize",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:48:35.125Z",
+              "pid": 21924,
+              "event": "request",
+              "method": "notifications/initialized"
+            },
+            {
+              "at": "2026-10-15T09:48:35.126Z",
+              "pid": 21924,
+              "event": "request",
+              "id": 1,
+              "method": "tools/list"
+            },
+            {
+              "at": "2026-10-15T09:48:35.138Z",
+              "pid": 29584,
+              "event": "response",
+              "id": 1,
+              "method": "tools/list",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:48:35.141Z",
+              "pid": 21924,
+              "event": "response",
+              "id": 1,
+              "method": "tools/list",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:48:47.786Z",
+              "pid": 21924,
+              "event": "request",
+              "id": 2,
+              "method": "tools/call",
+              "tool": "get_authoring_contract"
+            },
+            {
+              "at": "2026-10-15T09:48:47.786Z",
+              "pid": 29584,
+              "event": "request",
+              "id": 2,
+              "method": "tools/call",
+              "tool": "get_authoring_contract"
+            },
+            {
+              "at": "2026-10-15T09:48:47.801Z",
+              "pid": 21924,
+              "event": "response",
+              "id": 2,
+              "method": "tools/call",
+              "tool": "get_authoring_contract",
+              "isError": false,
+              "status": "ok"
+            },
+            {
+              "at": "2026-10-15T09:48:47.805Z",
+              "pid": 29584,
+              "event": "response",
+              "id": 2,
+              "method": "tools/call",
+              "tool": "get_authoring_contract",
+              "isError": false,
+              "status": "ok"
+            }
+          ]
+        },
+        {
+          "phase": "managed",
+          "exitCode": 0,
+          "terminal": true,
+          "observedModel": null,
+          "sessionId": "01a13ef7-017e-71d2-882f-ff3b434477fa",
+          "observations": [
+            {
+              "at": "2026-10-15T09:48:57.971Z",
+              "pid": 27816,
+              "event": "started",
+              "markerPresent": true
+            },
+            {
+              "at": "2026-10-15T09:48:57.974Z",
+              "pid": 25084,
+              "event": "started",
+              "markerPresent": true
+            },
+            {
+              "at": "2026-10-15T09:48:57.988Z",
+              "pid": 25084,
+              "event": "request",
+              "id": 0,
+              "method": "initialize"
+            },
+            {
+              "at": "2026-10-15T09:48:57.989Z",
+              "pid": 27816,
+              "event": "request",
+              "id": 0,
+              "method": "initialize"
+            },
+            {
+              "at": "2026-10-15T09:48:58.242Z",
+              "pid": 25084,
+              "event": "response",
+              "id": 0,
+              "method": "initialize",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:48:58.242Z",
+              "pid": 25084,
+              "event": "request",
+              "method": "notifications/initialized"
+            },
+            {
+              "at": "2026-10-15T09:48:58.243Z",
+              "pid": 25084,
+              "event": "request",
+              "id": 1,
+              "method": "tools/list"
+            },
+            {
+              "at": "2026-10-15T09:48:58.252Z",
+              "pid": 27816,
+              "event": "response",
+              "id": 0,
+              "method": "initialize",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:48:58.253Z",
+              "pid": 27816,
+              "event": "request",
+              "method": "notifications/initialized"
+            },
+            {
+              "at": "2026-10-15T09:48:58.253Z",
+              "pid": 27816,
+              "event": "request",
+              "id": 1,
+              "method": "tools/list"
+            },
+            {
+              "at": "2026-10-15T09:48:58.256Z",
+              "pid": 25084,
+              "event": "response",
+              "id": 1,
+              "method": "tools/list",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:48:58.266Z",
+              "pid": 27816,
+              "event": "response",
+              "id": 1,
+              "method": "tools/list",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:49:07.757Z",
+              "pid": 27816,
+              "event": "request",
+              "id": 2,
+              "method": "tools/call",
+              "tool": "get_authoring_contract"
+            },
+            {
+              "at": "2026-10-15T09:49:07.758Z",
+              "pid": 25084,
+              "event": "request",
+              "id": 2,
+              "method": "tools/call",
+              "tool": "get_authoring_contract"
+            },
+            {
+              "at": "2026-10-15T09:49:07.762Z",
+              "pid": 27816,
+              "event": "response",
+              "id": 2,
+              "method": "tools/call",
+              "tool": "get_authoring_contract",
+              "isError": true,
+              "status": "error",
+              "code": "managed_invocation_denied"
+            },
+            {
+              "at": "2026-10-15T09:49:07.762Z",
+              "pid": 25084,
+              "event": "response",
+              "id": 2,
+              "method": "tools/call",
+              "tool": "get_authoring_contract",
+              "isError": true,
+              "status": "error",
+              "code": "managed_invocation_denied"
+            }
+          ]
+        },
+        {
+          "phase": "continued",
+          "exitCode": 0,
+          "terminal": true,
+          "observedModel": null,
+          "sessionId": "01a13ef7-017e-71d2-882f-ff3b434477fa",
+          "observations": [
+            {
+              "at": "2026-10-15T09:49:17.458Z",
+              "pid": 20592,
+              "event": "started",
+              "markerPresent": true
+            },
+            {
+              "at": "2026-10-15T09:49:17.463Z",
+              "pid": 26848,
+              "event": "started",
+              "markerPresent": true
+            },
+            {
+              "at": "2026-10-15T09:49:17.472Z",
+              "pid": 20592,
+              "event": "request",
+              "id": 0,
+              "method": "initialize"
+            },
+            {
+              "at": "2026-10-15T09:49:17.478Z",
+              "pid": 26848,
+              "event": "request",
+              "id": 0,
+              "method": "initialize"
+            },
+            {
+              "at": "2026-10-15T09:49:17.738Z",
+              "pid": 20592,
+              "event": "response",
+              "id": 0,
+              "method": "initialize",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:49:17.738Z",
+              "pid": 20592,
+              "event": "request",
+              "method": "notifications/initialized"
+            },
+            {
+              "at": "2026-10-15T09:49:17.739Z",
+              "pid": 20592,
+              "event": "request",
+              "id": 1,
+              "method": "tools/list"
+            },
+            {
+              "at": "2026-10-15T09:49:17.743Z",
+              "pid": 26848,
+              "event": "response",
+              "id": 0,
+              "method": "initialize",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:49:17.744Z",
+              "pid": 26848,
+              "event": "request",
+              "method": "notifications/initialized"
+            },
+            {
+              "at": "2026-10-15T09:49:17.744Z",
+              "pid": 26848,
+              "event": "request",
+              "id": 1,
+              "method": "tools/list"
+            },
+            {
+              "at": "2026-10-15T09:49:17.752Z",
+              "pid": 20592,
+              "event": "response",
+              "id": 1,
+              "method": "tools/list",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:49:17.756Z",
+              "pid": 26848,
+              "event": "response",
+              "id": 1,
+              "method": "tools/list",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:49:27.768Z",
+              "pid": 26848,
+              "event": "request",
+              "id": 2,
+              "method": "tools/call",
+              "tool": "get_authoring_contract"
+            },
+            {
+              "at": "2026-10-15T09:49:27.768Z",
+              "pid": 20592,
+              "event": "request",
+              "id": 2,
+              "method": "tools/call",
+              "tool": "get_authoring_contract"
+            },
+            {
+              "at": "2026-10-15T09:49:27.774Z",
+              "pid": 20592,
+              "event": "response",
+              "id": 2,
+              "method": "tools/call",
+              "tool": "get_authoring_contract",
+              "isError": true,
+              "status": "error",
+              "code": "managed_invocation_denied"
+            },
+            {
+              "at": "2026-10-15T09:49:27.774Z",
+              "pid": 26848,
+              "event": "response",
+              "id": 2,
+              "method": "tools/call",
+              "tool": "get_authoring_contract",
+              "isError": true,
+              "status": "error",
+              "code": "managed_invocation_denied"
+            }
+          ]
+        }
+      ],
+      "sourceEvidenceSha256": "a5d0613276a7e851709b6d9136992aa0569deacfed472076267cae00eec9ae32",
+      "restricted": {
+        "privateEvidenceRoot": ".deszo/acceptance/adr0001-20261015-01/native-5a9ca669",
+        "mechanism": "exec --ignore-user-config omits the observed user/project MCP registrations without env-only overrides",
+        "phases": [
+          {
+            "phase": "authoring",
+            "exitCode": 0,
+            "terminal": true,
+            "observations": [
+              {
+                "at": "2026-10-15T09:57:59.475Z",
+                "pid": 20388,
+                "event": "started",
+                "markerPresent": false
+              },
+              {
+                "at": "2026-10-15T09:57:59.475Z",
+                "pid": 29568,
+                "event": "started",
+                "markerPresent": false
+              },
+              {
+                "at": "2026-10-15T09:57:59.493Z",
+                "pid": 29568,
+                "event": "request",
+                "id": 0,
+                "method": "initialize"
+              },
+              {
+                "at": "2026-10-15T09:57:59.499Z",
+                "pid": 20388,
+                "event": "request",
+                "id": 0,
+                "method": "initialize"
+              },
+              {
+                "at": "2026-10-15T09:57:59.892Z",
+                "pid": 29568,
+                "event": "response",
+                "id": 0,
+                "method": "initialize",
+                "isError": false
+              },
+              {
+                "at": "2026-10-15T09:57:59.893Z",
+                "pid": 29568,
+                "event": "request",
+                "method": "notifications/initialized"
+              },
+              {
+                "at": "2026-10-15T09:57:59.894Z",
+                "pid": 29568,
+                "event": "request",
+                "id": 1,
+                "method": "tools/list"
+              },
+              {
+                "at": "2026-10-15T09:57:59.900Z",
+                "pid": 20388,
+                "event": "response",
+                "id": 0,
+                "method": "initialize",
+                "isError": false
+              },
+              {
+                "at": "2026-10-15T09:57:59.901Z",
+                "pid": 20388,
+                "event": "request",
+                "method": "notifications/initialized"
+              },
+              {
+                "at": "2026-10-15T09:57:59.902Z",
+                "pid": 20388,
+                "event": "request",
+                "id": 1,
+                "method": "tools/list"
+              },
+              {
+                "at": "2026-10-15T09:57:59.908Z",
+                "pid": 29568,
+                "event": "response",
+                "id": 1,
+                "method": "tools/list",
+                "isError": false
+              },
+              {
+                "at": "2026-10-15T09:57:59.916Z",
+                "pid": 20388,
+                "event": "response",
+                "id": 1,
+                "method": "tools/list",
+                "isError": false
+              },
+              {
+                "at": "2026-10-15T09:58:09.927Z",
+                "pid": 20388,
+                "event": "request",
+                "id": 2,
+                "method": "tools/call",
+                "tool": "get_authoring_contract"
+              },
+              {
+                "at": "2026-10-15T09:58:09.927Z",
+                "pid": 29568,
+                "event": "request",
+                "id": 2,
+                "method": "tools/call",
+                "tool": "get_authoring_contract"
+              },
+              {
+                "at": "2026-10-15T09:58:09.940Z",
+                "pid": 20388,
+                "event": "response",
+                "id": 2,
+                "method": "tools/call",
+                "tool": "get_authoring_contract",
+                "isError": false,
+                "status": "ok"
+              },
+              {
+                "at": "2026-10-15T09:58:09.945Z",
+                "pid": 29568,
+                "event": "response",
+                "id": 2,
+                "method": "tools/call",
+                "tool": "get_authoring_contract",
+                "isError": false,
+                "status": "ok"
+              }
+            ],
+            "arguments": [
+              "-c",
+              "projects.\"C:\\\\my\\\\2026\\\\deszo_agent_orche\\\\.deszo\\\\acceptance\\\\adr0001-20261015-01\\\\native-5a9ca669\\\\codex\\\\authoring\".trust_level=\"trusted\"",
+              "-C",
+              "C:\\my\\2026\\deszo_agent_orche\\.deszo\\acceptance\\adr0001-20261015-01\\native-5a9ca669\\codex\\authoring",
+              "exec",
+              "--json",
+              "--skip-git-repo-check",
+              "-c",
+              "forced_login_method=\"chatgpt\"",
+              "-c",
+              "model_provider=\"openai\"",
+              "--model",
+              "gpt-6-luna",
+              "--dangerously-bypass-approvals-and-sandbox",
+              "-"
+            ]
+          },
+          {
+            "phase": "managed",
+            "exitCode": 0,
+            "terminal": true,
+            "observations": [],
+            "arguments": [
+              "-c",
+              "projects.\"C:\\\\my\\\\2026\\\\deszo_agent_orche\\\\.deszo\\\\acceptance\\\\adr0001-20261015-01\\\\native-5a9ca669\\\\codex\\\\authoring\".trust_level=\"trusted\"",
+              "-C",
+              "C:\\my\\2026\\deszo_agent_orche\\.deszo\\acceptance\\adr0001-20261015-01\\native-5a9ca669\\codex\\authoring",
+              "exec",
+              "--json",
+              "--skip-git-repo-check",
+              "--ignore-user-config",
+              "--ignore-rules",
+              "-c",
+              "forced_login_method=\"chatgpt\"",
+              "-c",
+              "model_provider=\"openai\"",
+              "--model",
+              "gpt-6-luna",
+              "--dangerously-bypass-approvals-and-sandbox",
+              "-"
+            ]
+          },
+          {
+            "phase": "continued",
+            "exitCode": 0,
+            "terminal": true,
+            "observations": [],
+            "arguments": [
+              "-c",
+              "projects.\"C:\\\\my\\\\2026\\\\deszo_agent_orche\\\\.deszo\\\\acceptance\\\\adr0001-20261015-01\\\\native-5a9ca669\\\\codex\\\\authoring\".trust_level=\"trusted\"",
+              "-C",
+              "C:\\my\\2026\\deszo_agent_orche\\.deszo\\acceptance\\adr0001-20261015-01\\native-5a9ca669\\codex\\authoring",
+              "exec",
+              "resume",
+              "01a13eff-99ad-7f01-a716-45da17b1779e",
+              "--json",
+              "--skip-git-repo-check",
+              "--ignore-user-config",
+              "--ignore-rules",
+              "-c",
+              "forced_login_method=\"chatgpt\"",
+              "-c",
+              "model_provider=\"openai\"",
+              "--model",
+              "gpt-6-luna",
+              "--dangerously-bypass-approvals-and-sandbox",
+              "-"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "provider": "claude",
+      "cliVersion": "2.1.292 (Claude Code)",
+      "requestedModel": "haiku",
+      "mechanism": "marker-propagation",
+      "scopes": [
+        "user",
+        "project"
+      ],
+      "verdict": "passed",
+      "privateEvidenceRoot": ".deszo/acceptance/adr0001-20261015-01/native-59924dfc",
+      "phases": [
+        {
+          "phase": "authoring",
+          "exitCode": 0,
+          "terminal": true,
+          "observedModel": "claude-haiku-4-5-20251001",
+          "sessionId": "2c694482-28cf-4f87-bab6-86c5ba24f164",
+          "observations": [
+            {
+              "at": "2026-10-15T09:49:08.840Z",
+              "pid": 12372,
+              "event": "started",
+              "markerPresent": false
+            },
+            {
+              "at": "2026-10-15T09:49:08.843Z",
+              "pid": 2164,
+              "event": "started",
+              "markerPresent": false
+            },
+            {
+              "at": "2026-10-15T09:49:08.857Z",
+              "pid": 12372,
+              "event": "request",
+              "id": "server-discover-probe-1",
+              "method": "server/discover"
+            },
+            {
+              "at": "2026-10-15T09:49:08.859Z",
+              "pid": 2164,
+              "event": "request",
+              "id": "server-discover-probe-1",
+              "method": "server/discover"
+            },
+            {
+              "at": "2026-10-15T09:49:09.152Z",
+              "pid": 2164,
+              "event": "response",
+              "id": "server-discover-probe-1",
+              "method": "server/discover",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:49:09.160Z",
+              "pid": 12372,
+              "event": "response",
+              "id": "server-discover-probe-1",
+              "method": "server/discover",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:49:09.171Z",
+              "pid": 2164,
+              "event": "request",
+              "id": "listen:0",
+              "method": "subscriptions/listen"
+            },
+            {
+              "at": "2026-10-15T09:49:09.172Z",
+              "pid": 12372,
+              "event": "request",
+              "id": "listen:0",
+              "method": "subscriptions/listen"
+            },
+            {
+              "at": "2026-10-15T09:49:09.179Z",
+              "pid": 2164,
+              "event": "request",
+              "id": 0,
+              "method": "server/discover"
+            },
+            {
+              "at": "2026-10-15T09:49:09.180Z",
+              "pid": 12372,
+              "event": "request",
+              "id": 0,
+              "method": "server/discover"
+            },
+            {
+              "at": "2026-10-15T09:49:09.183Z",
+              "pid": 2164,
+              "event": "response",
+              "id": 0,
+              "method": "server/discover",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:49:09.183Z",
+              "pid": 12372,
+              "event": "response",
+              "id": 0,
+              "method": "server/discover",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:49:09.190Z",
+              "pid": 12372,
+              "event": "request",
+              "id": 1,
+              "method": "tools/list"
+            },
+            {
+              "at": "2026-10-15T09:49:09.196Z",
+              "pid": 2164,
+              "event": "request",
+              "id": 1,
+              "method": "tools/list"
+            },
+            {
+              "at": "2026-10-15T09:49:09.207Z",
+              "pid": 12372,
+              "event": "response",
+              "id": 1,
+              "method": "tools/list",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:49:09.211Z",
+              "pid": 2164,
+              "event": "response",
+              "id": 1,
+              "method": "tools/list",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:49:16.244Z",
+              "pid": 12372,
+              "event": "request",
+              "id": 2,
+              "method": "tools/call",
+              "tool": "get_authoring_contract"
+            },
+            {
+              "at": "2026-10-15T09:49:16.256Z",
+              "pid": 12372,
+              "event": "response",
+              "id": 2,
+              "method": "tools/call",
+              "tool": "get_authoring_contract",
+              "isError": false,
+              "status": "ok"
+            },
+            {
+              "at": "2026-10-15T09:49:16.289Z",
+              "pid": 2164,
+              "event": "request",
+              "id": 2,
+              "method": "tools/call",
+              "tool": "get_authoring_contract"
+            },
+            {
+              "at": "2026-10-15T09:49:16.299Z",
+              "pid": 2164,
+              "event": "response",
+              "id": 2,
+              "method": "tools/call",
+              "tool": "get_authoring_contract",
+              "isError": false,
+              "status": "ok"
+            },
+            {
+              "at": "2026-10-15T09:49:19.177Z",
+              "pid": 2164,
+              "event": "closed",
+              "code": 0
+            },
+            {
+              "at": "2026-10-15T09:49:19.181Z",
+              "pid": 12372,
+              "event": "closed",
+              "code": 0
+            }
+          ]
+        },
+        {
+          "phase": "managed",
+          "exitCode": 0,
+          "terminal": true,
+          "observedModel": "claude-haiku-4-5-20251001",
+          "sessionId": "f43bab06-8d10-43fc-9032-d73991cf810b",
+          "observations": [
+            {
+              "at": "2026-10-15T09:49:20.719Z",
+              "pid": 20504,
+              "event": "started",
+              "markerPresent": true
+            },
+            {
+              "at": "2026-10-15T09:49:20.733Z",
+              "pid": 20504,
+              "event": "request",
+              "id": "server-discover-probe-1",
+              "method": "server/discover"
+            },
+            {
+              "at": "2026-10-15T09:49:20.735Z",
+              "pid": 27308,
+              "event": "started",
+              "markerPresent": true
+            },
+            {
+              "at": "2026-10-15T09:49:20.748Z",
+              "pid": 27308,
+              "event": "request",
+              "id": "server-discover-probe-1",
+              "method": "server/discover"
+            },
+            {
+              "at": "2026-10-15T09:49:21.055Z",
+              "pid": 20504,
+              "event": "response",
+              "id": "server-discover-probe-1",
+              "method": "server/discover",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:49:21.067Z",
+              "pid": 27308,
+              "event": "response",
+              "id": "server-discover-probe-1",
+              "method": "server/discover",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:49:21.069Z",
+              "pid": 20504,
+              "event": "request",
+              "id": "listen:0",
+              "method": "subscriptions/listen"
+            },
+            {
+              "at": "2026-10-15T09:49:21.070Z",
+              "pid": 27308,
+              "event": "request",
+              "id": "listen:0",
+              "method": "subscriptions/listen"
+            },
+            {
+              "at": "2026-10-15T09:49:21.074Z",
+              "pid": 20504,
+              "event": "request",
+              "id": 0,
+              "method": "server/discover"
+            },
+            {
+              "at": "2026-10-15T09:49:21.075Z",
+              "pid": 27308,
+              "event": "request",
+              "id": 0,
+              "method": "server/discover"
+            },
+            {
+              "at": "2026-10-15T09:49:21.077Z",
+              "pid": 20504,
+              "event": "response",
+              "id": 0,
+              "method": "server/discover",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:49:21.078Z",
+              "pid": 27308,
+              "event": "response",
+              "id": 0,
+              "method": "server/discover",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:49:21.082Z",
+              "pid": 20504,
+              "event": "request",
+              "id": 1,
+              "method": "tools/list"
+            },
+            {
+              "at": "2026-10-15T09:49:21.087Z",
+              "pid": 27308,
+              "event": "request",
+              "id": 1,
+              "method": "tools/list"
+            },
+            {
+              "at": "2026-10-15T09:49:21.095Z",
+              "pid": 20504,
+              "event": "response",
+              "id": 1,
+              "method": "tools/list",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:49:21.098Z",
+              "pid": 27308,
+              "event": "response",
+              "id": 1,
+              "method": "tools/list",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:49:27.683Z",
+              "pid": 20504,
+              "event": "request",
+              "id": 2,
+              "method": "tools/call",
+              "tool": "get_authoring_contract"
+            },
+            {
+              "at": "2026-10-15T09:49:27.693Z",
+              "pid": 20504,
+              "event": "response",
+              "id": 2,
+              "method": "tools/call",
+              "tool": "get_authoring_contract",
+              "isError": true,
+              "status": "error",
+              "code": "managed_invocation_denied"
+            },
+            {
+              "at": "2026-10-15T09:49:27.717Z",
+              "pid": 27308,
+              "event": "request",
+              "id": 2,
+              "method": "tools/call",
+              "tool": "get_authoring_contract"
+            },
+            {
+              "at": "2026-10-15T09:49:27.725Z",
+              "pid": 27308,
+              "event": "response",
+              "id": 2,
+              "method": "tools/call",
+              "tool": "get_authoring_contract",
+              "isError": true,
+              "status": "error",
+              "code": "managed_invocation_denied"
+            },
+            {
+              "at": "2026-10-15T09:49:30.718Z",
+              "pid": 27308,
+              "event": "closed",
+              "code": 0
+            },
+            {
+              "at": "2026-10-15T09:49:30.757Z",
+              "pid": 20504,
+              "event": "closed",
+              "code": 0
+            }
+          ]
+        },
+        {
+          "phase": "continued",
+          "exitCode": 0,
+          "terminal": true,
+          "observedModel": "claude-haiku-4-5-20251001",
+          "sessionId": "f43bab06-8d10-43fc-9032-d73991cf810b",
+          "observations": [
+            {
+              "at": "2026-10-15T09:49:32.355Z",
+              "pid": 26284,
+              "event": "started",
+              "markerPresent": true
+            },
+            {
+              "at": "2026-10-15T09:49:32.359Z",
+              "pid": 18860,
+              "event": "started",
+              "markerPresent": true
+            },
+            {
+              "at": "2026-10-15T09:49:32.368Z",
+              "pid": 26284,
+              "event": "request",
+              "id": "server-discover-probe-1",
+              "method": "server/discover"
+            },
+            {
+              "at": "2026-10-15T09:49:32.372Z",
+              "pid": 18860,
+              "event": "request",
+              "id": "server-discover-probe-1",
+              "method": "server/discover"
+            },
+            {
+              "at": "2026-10-15T09:49:32.613Z",
+              "pid": 18860,
+              "event": "response",
+              "id": "server-discover-probe-1",
+              "method": "server/discover",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:49:32.613Z",
+              "pid": 26284,
+              "event": "response",
+              "id": "server-discover-probe-1",
+              "method": "server/discover",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:49:32.627Z",
+              "pid": 18860,
+              "event": "request",
+              "id": "listen:0",
+              "method": "subscriptions/listen"
+            },
+            {
+              "at": "2026-10-15T09:49:32.628Z",
+              "pid": 26284,
+              "event": "request",
+              "id": "listen:0",
+              "method": "subscriptions/listen"
+            },
+            {
+              "at": "2026-10-15T09:49:32.635Z",
+              "pid": 18860,
+              "event": "request",
+              "id": 0,
+              "method": "server/discover"
+            },
+            {
+              "at": "2026-10-15T09:49:32.635Z",
+              "pid": 26284,
+              "event": "request",
+              "id": 0,
+              "method": "server/discover"
+            },
+            {
+              "at": "2026-10-15T09:49:32.637Z",
+              "pid": 18860,
+              "event": "response",
+              "id": 0,
+              "method": "server/discover",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:49:32.637Z",
+              "pid": 26284,
+              "event": "response",
+              "id": 0,
+              "method": "server/discover",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:49:32.641Z",
+              "pid": 18860,
+              "event": "request",
+              "id": 1,
+              "method": "tools/list"
+            },
+            {
+              "at": "2026-10-15T09:49:32.645Z",
+              "pid": 26284,
+              "event": "request",
+              "id": 1,
+              "method": "tools/list"
+            },
+            {
+              "at": "2026-10-15T09:49:32.651Z",
+              "pid": 18860,
+              "event": "response",
+              "id": 1,
+              "method": "tools/list",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:49:32.654Z",
+              "pid": 26284,
+              "event": "response",
+              "id": 1,
+              "method": "tools/list",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:49:35.828Z",
+              "pid": 26284,
+              "event": "request",
+              "id": 2,
+              "method": "tools/call",
+              "tool": "get_authoring_contract"
+            },
+            {
+              "at": "2026-10-15T09:49:35.834Z",
+              "pid": 26284,
+              "event": "response",
+              "id": 2,
+              "method": "tools/call",
+              "tool": "get_authoring_contract",
+              "isError": true,
+              "status": "error",
+              "code": "managed_invocation_denied"
+            },
+            {
+              "at": "2026-10-15T09:49:35.862Z",
+              "pid": 18860,
+              "event": "request",
+              "id": 2,
+              "method": "tools/call",
+              "tool": "get_authoring_contract"
+            },
+            {
+              "at": "2026-10-15T09:49:35.869Z",
+              "pid": 18860,
+              "event": "response",
+              "id": 2,
+              "method": "tools/call",
+              "tool": "get_authoring_contract",
+              "isError": true,
+              "status": "error",
+              "code": "managed_invocation_denied"
+            },
+            {
+              "at": "2026-10-15T09:49:37.361Z",
+              "pid": 26284,
+              "event": "closed",
+              "code": 0
+            },
+            {
+              "at": "2026-10-15T09:49:37.361Z",
+              "pid": 18860,
+              "event": "closed",
+              "code": 0
+            }
+          ]
+        }
+      ],
+      "sourceEvidenceSha256": "55e35544b4b16fd5ccf08cb8cce52d8a45d1b779c13614e4bbd6b709fcdd0eb9"
+    },
+    {
+      "provider": "antigravity",
+      "cliVersion": "1.3.5",
+      "requestedModel": "gemini-3.8-flash-low",
+      "mechanism": "marker-propagation",
+      "scopes": [
+        "user",
+        "project"
+      ],
+      "verdict": "passed",
+      "privateEvidenceRoot": ".deszo/acceptance/adr0001-20261015-01/native-59924dfc",
+      "phases": [
+        {
+          "phase": "authoring",
+          "exitCode": 0,
+          "terminal": true,
+          "observedModel": "gemini-3.8-flash-low",
+          "sessionId": "1c55ce56-14d4-49e8-bf55-481218d52cd7",
+          "observations": [
+            {
+              "at": "2026-10-15T09:49:39.508Z",
+              "pid": 24968,
+              "event": "started",
+              "markerPresent": false
+            },
+            {
+              "at": "2026-10-15T09:49:39.518Z",
+              "pid": 24968,
+              "event": "request",
+              "id": 1,
+              "method": "server/discover"
+            },
+            {
+              "at": "2026-10-15T09:49:39.518Z",
+              "pid": 24968,
+              "event": "request",
+              "method": "notifications/roots/list_changed"
+            },
+            {
+              "at": "2026-10-15T09:49:39.833Z",
+              "pid": 24968,
+              "event": "response",
+              "id": 1,
+              "method": "server/discover",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:49:39.834Z",
+              "pid": 24968,
+              "event": "request",
+              "id": 2,
+              "method": "subscriptions/listen"
+            },
+            {
+              "at": "2026-10-15T09:49:39.835Z",
+              "pid": 24968,
+              "event": "request",
+              "id": 3,
+              "method": "tools/list"
+            },
+            {
+              "at": "2026-10-15T09:49:39.837Z",
+              "pid": 24968,
+              "event": "response",
+              "id": 2,
+              "method": "subscriptions/listen",
+              "isError": true
+            },
+            {
+              "at": "2026-10-15T09:49:39.846Z",
+              "pid": 24968,
+              "event": "response",
+              "id": 3,
+              "method": "tools/list",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:49:43.160Z",
+              "pid": 24968,
+              "event": "request",
+              "method": "notifications/roots/list_changed"
+            },
+            {
+              "at": "2026-10-15T09:49:43.223Z",
+              "pid": 28308,
+              "event": "started",
+              "markerPresent": false
+            },
+            {
+              "at": "2026-10-15T09:49:43.232Z",
+              "pid": 28308,
+              "event": "request",
+              "id": 1,
+              "method": "server/discover"
+            },
+            {
+              "at": "2026-10-15T09:49:43.524Z",
+              "pid": 28308,
+              "event": "response",
+              "id": 1,
+              "method": "server/discover",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:49:43.525Z",
+              "pid": 28308,
+              "event": "request",
+              "id": 2,
+              "method": "subscriptions/listen"
+            },
+            {
+              "at": "2026-10-15T09:49:43.526Z",
+              "pid": 28308,
+              "event": "request",
+              "id": 3,
+              "method": "tools/list"
+            },
+            {
+              "at": "2026-10-15T09:49:43.541Z",
+              "pid": 28308,
+              "event": "response",
+              "id": 3,
+              "method": "tools/list",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:49:49.134Z",
+              "pid": 28308,
+              "event": "request",
+              "id": 4,
+              "method": "tools/call",
+              "tool": "get_authoring_contract"
+            },
+            {
+              "at": "2026-10-15T09:49:49.148Z",
+              "pid": 28308,
+              "event": "response",
+              "id": 4,
+              "method": "tools/call",
+              "tool": "get_authoring_contract",
+              "isError": false,
+              "status": "ok"
+            },
+            {
+              "at": "2026-10-15T09:49:49.158Z",
+              "pid": 24968,
+              "event": "request",
+              "id": 4,
+              "method": "tools/call",
+              "tool": "get_authoring_contract"
+            },
+            {
+              "at": "2026-10-15T09:49:49.169Z",
+              "pid": 24968,
+              "event": "response",
+              "id": 4,
+              "method": "tools/call",
+              "tool": "get_authoring_contract",
+              "isError": false,
+              "status": "ok"
+            },
+            {
+              "at": "2026-10-15T09:49:52.048Z",
+              "pid": 28308,
+              "event": "request",
+              "method": "notifications/cancelled"
+            },
+            {
+              "at": "2026-10-15T09:49:52.063Z",
+              "pid": 24968,
+              "event": "closed",
+              "code": 0
+            },
+            {
+              "at": "2026-10-15T09:49:52.068Z",
+              "pid": 28308,
+              "event": "closed",
+              "code": 0
+            }
+          ]
+        },
+        {
+          "phase": "managed",
+          "exitCode": 0,
+          "terminal": true,
+          "observedModel": "gemini-3.8-flash-low",
+          "sessionId": "4e2a0c14-737d-4678-be31-d6f6c148f39e",
+          "observations": [
+            {
+              "at": "2026-10-15T09:49:53.730Z",
+              "pid": 27864,
+              "event": "started",
+              "markerPresent": true
+            },
+            {
+              "at": "2026-10-15T09:49:53.740Z",
+              "pid": 27864,
+              "event": "request",
+              "id": 1,
+              "method": "server/discover"
+            },
+            {
+              "at": "2026-10-15T09:49:53.740Z",
+              "pid": 27864,
+              "event": "request",
+              "method": "notifications/roots/list_changed"
+            },
+            {
+              "at": "2026-10-15T09:49:53.981Z",
+              "pid": 27864,
+              "event": "response",
+              "id": 1,
+              "method": "server/discover",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:49:53.983Z",
+              "pid": 27864,
+              "event": "request",
+              "id": 2,
+              "method": "subscriptions/listen"
+            },
+            {
+              "at": "2026-10-15T09:49:53.984Z",
+              "pid": 27864,
+              "event": "request",
+              "id": 3,
+              "method": "tools/list"
+            },
+            {
+              "at": "2026-10-15T09:49:53.986Z",
+              "pid": 27864,
+              "event": "response",
+              "id": 2,
+              "method": "subscriptions/listen",
+              "isError": true
+            },
+            {
+              "at": "2026-10-15T09:49:53.994Z",
+              "pid": 27864,
+              "event": "response",
+              "id": 3,
+              "method": "tools/list",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:49:56.976Z",
+              "pid": 27864,
+              "event": "request",
+              "method": "notifications/roots/list_changed"
+            },
+            {
+              "at": "2026-10-15T09:49:57.040Z",
+              "pid": 13320,
+              "event": "started",
+              "markerPresent": true
+            },
+            {
+              "at": "2026-10-15T09:49:57.050Z",
+              "pid": 13320,
+              "event": "request",
+              "id": 1,
+              "method": "server/discover"
+            },
+            {
+              "at": "2026-10-15T09:49:57.285Z",
+              "pid": 13320,
+              "event": "response",
+              "id": 1,
+              "method": "server/discover",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:49:57.286Z",
+              "pid": 13320,
+              "event": "request",
+              "id": 2,
+              "method": "subscriptions/listen"
+            },
+            {
+              "at": "2026-10-15T09:49:57.287Z",
+              "pid": 13320,
+              "event": "request",
+              "id": 3,
+              "method": "tools/list"
+            },
+            {
+              "at": "2026-10-15T09:49:57.297Z",
+              "pid": 13320,
+              "event": "response",
+              "id": 3,
+              "method": "tools/list",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:50:02.311Z",
+              "pid": 13320,
+              "event": "request",
+              "id": 4,
+              "method": "tools/call",
+              "tool": "get_authoring_contract"
+            },
+            {
+              "at": "2026-10-15T09:50:02.318Z",
+              "pid": 13320,
+              "event": "response",
+              "id": 4,
+              "method": "tools/call",
+              "tool": "get_authoring_contract",
+              "isError": true,
+              "status": "error",
+              "code": "managed_invocation_denied"
+            },
+            {
+              "at": "2026-10-15T09:50:06.140Z",
+              "pid": 27864,
+              "event": "request",
+              "id": 4,
+              "method": "tools/call",
+              "tool": "get_authoring_contract"
+            },
+            {
+              "at": "2026-10-15T09:50:06.150Z",
+              "pid": 27864,
+              "event": "response",
+              "id": 4,
+              "method": "tools/call",
+              "tool": "get_authoring_contract",
+              "isError": true,
+              "status": "error",
+              "code": "managed_invocation_denied"
+            },
+            {
+              "at": "2026-10-15T09:50:10.171Z",
+              "pid": 13320,
+              "event": "request",
+              "method": "notifications/cancelled"
+            },
+            {
+              "at": "2026-10-15T09:50:10.184Z",
+              "pid": 27864,
+              "event": "closed",
+              "code": 0
+            },
+            {
+              "at": "2026-10-15T09:50:10.185Z",
+              "pid": 13320,
+              "event": "closed",
+              "code": 0
+            }
+          ]
+        },
+        {
+          "phase": "continued",
+          "exitCode": 0,
+          "terminal": true,
+          "observedModel": "gemini-3.8-flash-low",
+          "sessionId": "4e2a0c14-737d-4678-be31-d6f6c148f39e",
+          "observations": [
+            {
+              "at": "2026-10-15T09:50:12.462Z",
+              "pid": 17176,
+              "event": "started",
+              "markerPresent": true
+            },
+            {
+              "at": "2026-10-15T09:50:12.471Z",
+              "pid": 17176,
+              "event": "request",
+              "id": 1,
+              "method": "server/discover"
+            },
+            {
+              "at": "2026-10-15T09:50:12.472Z",
+              "pid": 17176,
+              "event": "request",
+              "method": "notifications/roots/list_changed"
+            },
+            {
+              "at": "2026-10-15T09:50:12.719Z",
+              "pid": 17176,
+              "event": "response",
+              "id": 1,
+              "method": "server/discover",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:50:12.720Z",
+              "pid": 17176,
+              "event": "request",
+              "id": 2,
+              "method": "subscriptions/listen"
+            },
+            {
+              "at": "2026-10-15T09:50:12.721Z",
+              "pid": 17176,
+              "event": "request",
+              "id": 3,
+              "method": "tools/list"
+            },
+            {
+              "at": "2026-10-15T09:50:12.723Z",
+              "pid": 17176,
+              "event": "response",
+              "id": 2,
+              "method": "subscriptions/listen",
+              "isError": true
+            },
+            {
+              "at": "2026-10-15T09:50:12.734Z",
+              "pid": 17176,
+              "event": "response",
+              "id": 3,
+              "method": "tools/list",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:50:16.417Z",
+              "pid": 17176,
+              "event": "request",
+              "method": "notifications/roots/list_changed"
+            },
+            {
+              "at": "2026-10-15T09:50:16.481Z",
+              "pid": 18080,
+              "event": "started",
+              "markerPresent": true
+            },
+            {
+              "at": "2026-10-15T09:50:16.492Z",
+              "pid": 18080,
+              "event": "request",
+              "id": 1,
+              "method": "server/discover"
+            },
+            {
+              "at": "2026-10-15T09:50:16.724Z",
+              "pid": 18080,
+              "event": "response",
+              "id": 1,
+              "method": "server/discover",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:50:16.725Z",
+              "pid": 18080,
+              "event": "request",
+              "id": 2,
+              "method": "subscriptions/listen"
+            },
+            {
+              "at": "2026-10-15T09:50:16.725Z",
+              "pid": 18080,
+              "event": "request",
+              "id": 3,
+              "method": "tools/list"
+            },
+            {
+              "at": "2026-10-15T09:50:16.736Z",
+              "pid": 18080,
+              "event": "response",
+              "id": 3,
+              "method": "tools/list",
+              "isError": false
+            },
+            {
+              "at": "2026-10-15T09:50:19.437Z",
+              "pid": 18080,
+              "event": "request",
+              "id": 4,
+              "method": "tools/call",
+              "tool": "get_authoring_contract"
+            },
+            {
+              "at": "2026-10-15T09:50:19.450Z",
+              "pid": 18080,
+              "event": "response",
+              "id": 4,
+              "method": "tools/call",
+              "tool": "get_authoring_contract",
+              "isError": true,
+              "status": "error",
+              "code": "managed_invocation_denied"
+            },
+            {
+              "at": "2026-10-15T09:50:22.131Z",
+              "pid": 17176,
+              "event": "request",
+              "id": 4,
+              "method": "tools/call",
+              "tool": "get_authoring_contract"
+            },
+            {
+              "at": "2026-10-15T09:50:22.136Z",
+              "pid": 17176,
+              "event": "response",
+              "id": 4,
+              "method": "tools/call",
+              "tool": "get_authoring_contract",
+              "isError": true,
+              "status": "error",
+              "code": "managed_invocation_denied"
+            },
+            {
+              "at": "2026-10-15T09:50:25.402Z",
+              "pid": 18080,
+              "event": "request",
+              "method": "notifications/cancelled"
+            },
+            {
+              "at": "2026-10-15T09:50:25.415Z",
+              "pid": 17176,
+              "event": "closed",
+              "code": 0
+            },
+            {
+              "at": "2026-10-15T09:50:25.415Z",
+              "pid": 18080,
+              "event": "closed",
+              "code": 0
+            }
+          ]
+        }
+      ],
+      "sourceEvidenceSha256": "55e35544b4b16fd5ccf08cb8cce52d8a45d1b779c13614e4bbd6b709fcdd0eb9"
+    }
+  ],
+  "limitations": [
+    "Enterprise-managed/system MCP entries and server names requiring quoted Codex dotted keys are not verified and remain blocked.",
+    "Codex parent-environment propagation failed; the tested workaround injects the marker explicitly after exec.",
+    "Default confirmation and v2 retirement are not changed by compatibility verification."
+  ],
+  "finalBundledReruns": [
+    {
+      "privateEvidenceRoot": ".deszo/acceptance/adr0001-20261015-01/native-a7b04444",
+      "phases": [
+        {
+          "provider": "codex",
+          "phase": "authoring",
+          "cliVersion": "codex-cli 0.162.0-alpha.17.2",
+          "nativeConfiguration": "inherit",
+          "passed": true,
+          "mcpStarts": 2,
+          "calls": 2
+        },
+        {
+          "provider": "codex",
+          "phase": "managed",
+          "cliVersion": "codex-cli 0.162.0-alpha.17.2",
+          "nativeConfiguration": "inherit",
+          "passed": true,
+          "mcpStarts": 2,
+          "calls": 2
+        },
+        {
+          "provider": "codex",
+          "phase": "continued",
+          "cliVersion": "codex-cli 0.162.0-alpha.17.2",
+          "nativeConfiguration": "inherit",
+          "passed": true,
+          "mcpStarts": 2,
+          "calls": 2
+        },
+        {
+          "provider": "claude",
+          "phase": "authoring",
+          "cliVersion": "2.1.292 (Claude Code)",
+          "nativeConfiguration": "inherit",
+          "passed": true,
+          "mcpStarts": 2,
+          "calls": 2
+        },
+        {
+          "provider": "claude",
+          "phase": "managed",
+          "cliVersion": "2.1.292 (Claude Code)",
+          "nativeConfiguration": "inherit",
+          "passed": true,
+          "mcpStarts": 2,
+          "calls": 2
+        },
+        {
+          "provider": "claude",
+          "phase": "continued",
+          "cliVersion": "2.1.292 (Claude Code)",
+          "nativeConfiguration": "inherit",
+          "passed": true,
+          "mcpStarts": 2,
+          "calls": 2
+        },
+        {
+          "provider": "antigravity",
+          "phase": "authoring",
+          "cliVersion": "1.3.5",
+          "nativeConfiguration": "inherit",
+          "passed": true,
+          "mcpStarts": 2,
+          "calls": 2
+        },
+        {
+          "provider": "antigravity",
+          "phase": "managed",
+          "cliVersion": "1.3.5",
+          "nativeConfiguration": "inherit",
+          "passed": true,
+          "mcpStarts": 2,
+          "calls": 2
+        },
+        {
+          "provider": "antigravity",
+          "phase": "continued",
+          "cliVersion": "1.3.5",
+          "nativeConfiguration": "inherit",
+          "passed": true,
+          "mcpStarts": 2,
+          "calls": 2
+        }
+      ]
+    },
+    {
+      "privateEvidenceRoot": ".deszo/acceptance/adr0001-20261015-01/native-fdd93156",
+      "phases": [
+        {
+          "provider": "codex",
+          "phase": "authoring",
+          "cliVersion": "codex-cli 0.162.0-alpha.17.2",
+          "nativeConfiguration": "inherit",
+          "passed": true,
+          "mcpStarts": 2,
+          "calls": 2
+        },
+        {
+          "provider": "codex",
+          "phase": "managed",
+          "cliVersion": "codex-cli 0.162.0-alpha.17.2",
+          "nativeConfiguration": "restricted",
+          "passed": true,
+          "mcpStarts": 0,
+          "calls": 0
+        },
+        {
+          "provider": "codex",
+          "phase": "continued",
+          "cliVersion": "codex-cli 0.162.0-alpha.17.2",
+          "nativeConfiguration": "restricted",
+          "passed": true,
+          "mcpStarts": 0,
+          "calls": 0
+        }
+      ]
+    }
+  ],
+  "finalBridgeSha256": "80eb927e741d05d5aea5ad9979a888d95f86966faafb12e07cf59264bf650815"
+}

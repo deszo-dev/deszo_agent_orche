@@ -1,0 +1,28 @@
+{
+  "runId": "84ad4815-6772-4e22-9ca6-519a08ce1b6f",
+  "passed": true,
+  "acceptance": "CERT-52DB265D719B",
+  "specification": {
+    "subjectId": "SPEC-8D71A9ED325A",
+    "certificate": "CERT-3CD0542ED71D"
+  },
+  "technical": {
+    "subjectId": "DLV-4CC8D0437B2A",
+    "certificate": "CERT-C2C16C52348C"
+  },
+  "delivery": {
+    "subjectId": "DLV-4CC8D0437B2A",
+    "sha256": "4cc8d0437b2a137f2bdeef45c33c3bdf23eea4d76df5b3d4f39986864189c166"
+  },
+  "mapState": "MST-8E5851DD0B53",
+  "candidate": "CAND-B3F9524F841C",
+  "acceptedTasks": 5,
+  "checks": [
+    "CHK-1D993E3DB2B9",
+    "CHK-A7332330B682",
+    "CHK-0939D3B504C6",
+    "CHK-10F40EDB25B7"
+  ],
+  "exportedEntriesVerified": 14,
+  "integrity": "ok"
+}

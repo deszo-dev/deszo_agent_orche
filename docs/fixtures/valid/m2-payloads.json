@@ -1,0 +1,375 @@
+{
+  "artifactSetValue": {
+    "type": "ArtifactSet",
+    "artifact": {
+      "artifactId": "00000000-0000-4000-8000-000000000003",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  },
+  "artifactSetManifest": {
+    "schemaVersion": 1,
+    "kind": "ArtifactSet",
+    "entries": [
+      {
+        "path": "src/a.mjs",
+        "artifact": {
+          "artifactId": "00000000-0000-4000-8000-000000000004",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "byteSize": 12,
+        "mediaType": "application/octet-stream"
+      }
+    ],
+    "sources": [
+      {
+        "input": "left",
+        "manifest": {
+          "artifactId": "00000000-0000-4000-8000-000000000005",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      }
+    ]
+  },
+  "events": [
+    {
+      "schemaVersion": 2,
+      "id": "00000000-0000-4000-8000-000000000901",
+      "runId": "00000000-0000-4000-8000-000000000001",
+      "sequence": 1,
+      "timestamp": "2026-10-13T12:00:00Z",
+      "nodeInstanceId": null,
+      "attemptId": null,
+      "type": "run.state_changed",
+      "payload": {
+        "from": "draining",
+        "to": "waiting_for_user",
+        "reason": "Running attempts finished; recovery is needed."
+      }
+    },
+    {
+      "schemaVersion": 2,
+      "id": "00000000-0000-4000-8000-000000000902",
+      "runId": "00000000-0000-4000-8000-000000000001",
+      "sequence": 2,
+      "timestamp": "2026-10-13T12:00:00Z",
+      "nodeInstanceId": "refine",
+      "attemptId": "00000000-0000-4000-8000-000000000007",
+      "type": "loop.started",
+      "payload": {
+        "loopNodeId": "refine",
+        "maxIterations": 3,
+        "maxActiveMinutes": 30,
+        "seed": {
+          "type": "JsonValue",
+          "artifact": {
+            "artifactId": "00000000-0000-4000-8000-000000000006",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        }
+      }
+    },
+    {
+      "schemaVersion": 2,
+      "id": "00000000-0000-4000-8000-000000000903",
+      "runId": "00000000-0000-4000-8000-000000000001",
+      "sequence": 3,
+      "timestamp": "2026-10-13T12:00:00Z",
+      "nodeInstanceId": "refine",
+      "attemptId": "00000000-0000-4000-8000-000000000007",
+      "type": "loop.iteration_started",
+      "payload": {
+        "loopNodeId": "refine",
+        "iteration": 1,
+        "value": {
+          "type": "JsonValue",
+          "artifact": {
+            "artifactId": "00000000-0000-4000-8000-000000000006",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "feedback": {
+          "type": "Text",
+          "artifact": {
+            "artifactId": "00000000-0000-4000-8000-000000000008",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "encoding": "utf-8"
+        }
+      }
+    },
+    {
+      "schemaVersion": 2,
+      "id": "00000000-0000-4000-8000-000000000904",
+      "runId": "00000000-0000-4000-8000-000000000001",
+      "sequence": 4,
+      "timestamp": "2026-10-13T12:00:00Z",
+      "nodeInstanceId": "refine/1/writer",
+      "attemptId": null,
+      "type": "node.planned",
+      "payload": {
+        "nodeId": "writer",
+        "nodeType": "agent",
+        "scope": {
+          "loopNodeId": "refine",
+          "iteration": 1
+        }
+      }
+    },
+    {
+      "schemaVersion": 2,
+      "id": "00000000-0000-4000-8000-000000000905",
+      "runId": "00000000-0000-4000-8000-000000000001",
+      "sequence": 5,
+      "timestamp": "2026-10-13T12:00:00Z",
+      "nodeInstanceId": "refine/1/writer",
+      "attemptId": "00000000-0000-4000-8000-000000000009",
+      "type": "attempt.state_changed",
+      "payload": {
+        "from": null,
+        "to": "scheduled",
+        "reason": "Planned.",
+        "process": null,
+        "ordinal": 1
+      }
+    },
+    {
+      "schemaVersion": 2,
+      "id": "00000000-0000-4000-8000-000000000906",
+      "runId": "00000000-0000-4000-8000-000000000001",
+      "sequence": 6,
+      "timestamp": "2026-10-13T12:00:00Z",
+      "nodeInstanceId": "refine",
+      "attemptId": "00000000-0000-4000-8000-000000000007",
+      "type": "loop.iteration_returned",
+      "payload": {
+        "loopNodeId": "refine",
+        "iteration": 1,
+        "candidate": {
+          "type": "JsonValue",
+          "artifact": {
+            "artifactId": "00000000-0000-4000-8000-000000000010",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "decision": {
+          "type": "JsonValue",
+          "artifact": {
+            "artifactId": "00000000-0000-4000-8000-000000000011",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "continue": true,
+        "reason": "Needs work."
+      }
+    },
+    {
+      "schemaVersion": 2,
+      "id": "00000000-0000-4000-8000-000000000907",
+      "runId": "00000000-0000-4000-8000-000000000001",
+      "sequence": 7,
+      "timestamp": "2026-10-13T12:00:00Z",
+      "nodeInstanceId": "refine",
+      "attemptId": "00000000-0000-4000-8000-000000000007",
+      "type": "loop.paused",
+      "payload": {
+        "loopNodeId": "refine",
+        "iteration": 3,
+        "reason": "iteration_limit",
+        "message": "Limit of 3 iterations reached.",
+        "activeMs": 1200
+      }
+    },
+    {
+      "schemaVersion": 2,
+      "id": "00000000-0000-4000-8000-000000000908",
+      "runId": "00000000-0000-4000-8000-000000000001",
+      "sequence": 8,
+      "timestamp": "2026-10-13T12:00:00Z",
+      "nodeInstanceId": null,
+      "attemptId": null,
+      "type": "run.recovery_requested",
+      "payload": {
+        "action": "raise-limit",
+        "target": "refine",
+        "requestId": "00000000-0000-4000-8000-000000000012",
+        "options": {
+          "maxIterations": 5,
+          "maxActiveMinutes": 30
+        }
+      }
+    },
+    {
+      "schemaVersion": 2,
+      "id": "00000000-0000-4000-8000-000000000909",
+      "runId": "00000000-0000-4000-8000-000000000001",
+      "sequence": 9,
+      "timestamp": "2026-10-13T12:00:00Z",
+      "nodeInstanceId": "refine",
+      "attemptId": "00000000-0000-4000-8000-000000000007",
+      "type": "loop.limits_changed",
+      "payload": {
+        "loopNodeId": "refine",
+        "maxIterations": 5,
+        "maxActiveMinutes": 30
+      }
+    },
+    {
+      "schemaVersion": 2,
+      "id": "00000000-0000-4000-8000-000000000910",
+      "runId": "00000000-0000-4000-8000-000000000001",
+      "sequence": 10,
+      "timestamp": "2026-10-13T12:00:00Z",
+      "nodeInstanceId": "refine",
+      "attemptId": "00000000-0000-4000-8000-000000000007",
+      "type": "loop.resumed",
+      "payload": {
+        "loopNodeId": "refine",
+        "iteration": 4,
+        "reason": "Limit raised."
+      }
+    },
+    {
+      "schemaVersion": 2,
+      "id": "00000000-0000-4000-8000-000000000911",
+      "runId": "00000000-0000-4000-8000-000000000001",
+      "sequence": 11,
+      "timestamp": "2026-10-13T12:00:00Z",
+      "nodeInstanceId": "refine/2/notes",
+      "attemptId": "00000000-0000-4000-8000-000000000013",
+      "type": "attempt.error",
+      "payload": {
+        "code": "input_unavailable",
+        "message": "File notes.md is missing.",
+        "evidence": null
+      }
+    },
+    {
+      "schemaVersion": 2,
+      "id": "00000000-0000-4000-8000-000000000912",
+      "runId": "00000000-0000-4000-8000-000000000001",
+      "sequence": 12,
+      "timestamp": "2026-10-13T12:00:00Z",
+      "nodeInstanceId": "refine",
+      "attemptId": "00000000-0000-4000-8000-000000000007",
+      "type": "loop.finished",
+      "payload": {
+        "loopNodeId": "refine",
+        "iterations": 4,
+        "result": {
+          "type": "JsonValue",
+          "artifact": {
+            "artifactId": "00000000-0000-4000-8000-000000000014",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "activeMs": 5300
+      }
+    },
+    {
+      "schemaVersion": 2,
+      "id": "00000000-0000-4000-8000-000000000913",
+      "runId": "00000000-0000-4000-8000-000000000001",
+      "sequence": 13,
+      "timestamp": "2026-10-13T12:00:00Z",
+      "nodeInstanceId": null,
+      "attemptId": null,
+      "type": "context.remapped",
+      "payload": {
+        "contextNodeId": "writer-history",
+        "fromBindingId": "00000000-0000-4000-8000-000000000015",
+        "toBindingId": "00000000-0000-4000-8000-000000000016",
+        "reason": "Fresh binding for retry."
+      }
+    }
+  ],
+  "run": {
+    "runId": "00000000-0000-4000-8000-000000000001",
+    "workflowId": "review-loop",
+    "workflowSnapshot": {
+      "artifactId": "00000000-0000-4000-8000-000000000002",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "executionHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "state": "waiting_for_user",
+    "lastSequence": 40,
+    "createdAt": "2026-10-13T12:00:00Z",
+    "workspaceId": "main",
+    "kind": "workflow"
+  },
+  "runSnapshot": {
+    "run": {
+      "runId": "00000000-0000-4000-8000-000000000001",
+      "workflowId": "review-loop",
+      "workflowSnapshot": {
+        "artifactId": "00000000-0000-4000-8000-000000000002",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "executionHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "state": "waiting_for_user",
+      "lastSequence": 40,
+      "createdAt": "2026-10-13T12:00:00Z",
+      "workspaceId": "main",
+      "kind": "workflow"
+    },
+    "instances": [
+      {
+        "nodeInstanceId": "refine/2/writer",
+        "nodeId": "writer",
+        "state": "failed",
+        "attemptId": "00000000-0000-4000-8000-000000000017",
+        "ordinal": 1,
+        "outputs": null
+      }
+    ],
+    "contexts": [
+      {
+        "contextNodeId": "writer-history",
+        "mode": "new",
+        "bindingId": "00000000-0000-4000-8000-000000000015"
+      }
+    ],
+    "loops": [
+      {
+        "loopNodeId": "refine",
+        "state": "paused",
+        "iteration": 2,
+        "maxIterations": 3,
+        "maxActiveMinutes": 30,
+        "activeMs": 800,
+        "pauseReason": "body_failure"
+      }
+    ]
+  },
+  "retry": {
+    "requestId": "00000000-0000-4000-8000-000000000018",
+    "action": "retry",
+    "nodeInstanceId": "refine/2/writer",
+    "binding": "acknowledge"
+  },
+  "raiseLimit": {
+    "requestId": "00000000-0000-4000-8000-000000000019",
+    "action": "raise-limit",
+    "loopNodeId": "refine",
+    "maxIterations": 5,
+    "maxActiveMinutes": 60
+  },
+  "restartIteration": {
+    "requestId": "00000000-0000-4000-8000-000000000020",
+    "action": "restart-iteration",
+    "loopNodeId": "refine"
+  },
+  "close": {
+    "requestId": "00000000-0000-4000-8000-000000000021",
+    "action": "close"
+  },
+  "commandResponse": {
+    "runId": "00000000-0000-4000-8000-000000000001",
+    "state": "running",
+    "requestId": "00000000-0000-4000-8000-000000000018"
+  },
+  "runFilter": {
+    "state": "waiting_for_user",
+    "workspaceId": "main",
+    "limit": 20
+  }
+}

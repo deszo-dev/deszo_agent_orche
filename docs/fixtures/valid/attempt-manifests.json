@@ -1,0 +1,88 @@
+{
+  "inputs": {
+    "schemaVersion": 1,
+    "runId": "00000000-0000-4000-8000-000000000001",
+    "attemptId": "00000000-0000-4000-8000-000000000001",
+    "nodeId": "proposal",
+    "values": {
+      "prompt": {
+        "type": "Text",
+        "artifact": {
+          "artifactId": "00000000-0000-4000-8000-000000000001",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "encoding": "utf-8"
+      }
+    },
+    "contextBindingId": "00000000-0000-4000-8000-000000000001",
+    "contextBinding": {
+      "artifactId": "00000000-0000-4000-8000-000000000001",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "prompt": {
+      "artifactId": "00000000-0000-4000-8000-000000000001",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "promptSources": [
+      {
+        "kind": "input",
+        "artifact": {
+          "artifactId": "00000000-0000-4000-8000-000000000001",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      }
+    ]
+  },
+  "outputs": {
+    "schemaVersion": 1,
+    "runId": "00000000-0000-4000-8000-000000000001",
+    "attemptId": "00000000-0000-4000-8000-000000000001",
+    "nodeId": "proposal",
+    "values": {
+      "json": {
+        "type": "JsonValue",
+        "artifact": {
+          "artifactId": "00000000-0000-4000-8000-000000000001",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      }
+    },
+    "providerResult": {
+      "provider": "codex",
+      "requestedModel": "explicit-test-model",
+      "observedModel": null,
+      "nativeSession": {
+        "artifactId": "00000000-0000-4000-8000-000000000001",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "usage": null
+    }
+  },
+  "invocation": {
+    "schemaVersion": 1,
+    "runId": "00000000-0000-4000-8000-000000000001",
+    "attemptId": "00000000-0000-4000-8000-000000000001",
+    "provider": "codex",
+    "requestedModel": "explicit-test-model",
+    "cliExecutable": "C:\\fixture.exe",
+    "cliVersion": "fixture",
+    "arguments": [],
+    "cwd": "C:\\fixture-project",
+    "cwdIdentity": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "nativeConfiguration": "restricted",
+    "configurationHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "environmentPolicy": "subscription-only",
+    "managedToolIsolation": {
+      "mechanism": "bridge-marker-refusal",
+      "runtimeInstanceId": "00000000-0000-4000-8000-000000000002",
+      "checkedScopes": ["user", "project"],
+      "bridgeEntries": []
+    },
+    "stdin": {
+      "artifactId": "00000000-0000-4000-8000-000000000001",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "timeoutSeconds": 600,
+    "nativeSessionBefore": null
+  }
+}

@@ -1,0 +1,1108 @@
+{
+  "schemaVersion": 1,
+  "workflowId": "round-recovery-delivery",
+  "capabilities": [
+    "core-v1",
+    "loops-v1",
+    "pipeline-v1",
+    "delivery-v1"
+  ],
+  "settings": {
+    "nativeConfiguration": "restricted"
+  },
+  "nodes": [
+    {
+      "id": "documentation",
+      "type": "file-input",
+      "config": {
+        "mode": "files",
+        "paths": [
+          "SPEC.md",
+          "spec-index.json",
+          "implementation-map.json"
+        ]
+      }
+    },
+    {
+      "id": "project",
+      "type": "file-input",
+      "config": {
+        "mode": "files",
+        "paths": [
+          "src/api.mjs",
+          "fixtures/tokens.json"
+        ]
+      }
+    },
+    {
+      "id": "no-issues",
+      "type": "merge",
+      "config": {
+        "mode": "record",
+        "inputs": [],
+        "fields": [
+          {
+            "name": "issues",
+            "source": {
+              "literal": []
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "issue-list",
+      "type": "json-select",
+      "config": {
+        "pointer": "/issues",
+        "outputType": "JsonValue"
+      }
+    },
+    {
+      "id": "prepare",
+      "type": "gate",
+      "config": {
+        "mode": "prepare",
+        "policy": {
+          "slots": [
+            {
+              "id": "customer",
+              "role": "customer",
+              "view": "public"
+            },
+            {
+              "id": "readiness",
+              "role": "implementation-readiness",
+              "view": "full"
+            },
+            {
+              "id": "testability",
+              "role": "testability-reviewer",
+              "view": "full"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "plan-text",
+      "type": "json-select",
+      "config": {
+        "pointer": "",
+        "outputType": "Text",
+        "render": "canonical-json"
+      }
+    },
+    {
+      "id": "customer-prompt",
+      "type": "prompt-template",
+      "config": {
+        "template": "Review the public business view as the Customer.\n\nReview plan (JSON):\n{{plan}}\n\nReturn a ReviewDecision for the subject in SUBJECT.json. Resolve in resolvedIssueIds every open issue listed in your slot's resolvableIssueIds that this revision fixes; never resolve another reviewer's issue.",
+        "slots": [
+          {
+            "id": "plan"
+          }
+        ]
+      }
+    },
+    {
+      "id": "customer-review",
+      "type": "agent",
+      "config": {
+        "provider": "codex",
+        "model": "explicit-test-model",
+        "timeoutSeconds": 600,
+        "output": {
+          "format": "json",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "const": 1
+              },
+              "subjectId": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Z0-9-]*$"
+              },
+              "role": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,63}$"
+              },
+              "verdict": {
+                "enum": [
+                  "APPROVED",
+                  "CHANGES_REQUESTED"
+                ]
+              },
+              "scopeRefs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9-]*$"
+                },
+                "uniqueItems": true
+              },
+              "resolvedIssueIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9-]*$"
+                },
+                "uniqueItems": true
+              },
+              "issues": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "localId": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+                    },
+                    "severity": {
+                      "enum": [
+                        "blocker",
+                        "suggestion"
+                      ]
+                    },
+                    "ownerRole": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                    },
+                    "requirementRefs": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[A-Z][A-Z0-9-]*$"
+                      },
+                      "uniqueItems": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "requestedChange": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "localId",
+                    "severity",
+                    "ownerRole",
+                    "requirementRefs",
+                    "message",
+                    "requestedChange"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "subjectId",
+              "role",
+              "verdict",
+              "scopeRefs",
+              "resolvedIssueIds",
+              "issues"
+            ],
+            "additionalProperties": false,
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "verdict": {
+                      "const": "CHANGES_REQUESTED"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "issues": {
+                      "contains": {
+                        "properties": {
+                          "severity": {
+                            "const": "blocker"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "verdict": {
+                      "const": "APPROVED"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "issues": {
+                      "items": {
+                        "properties": {
+                          "severity": {
+                            "const": "suggestion"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "attachFiles": true
+      }
+    },
+    {
+      "id": "readiness-prompt",
+      "type": "prompt-template",
+      "config": {
+        "template": "Review the full bundle for implementation readiness.\n\nReview plan (JSON):\n{{plan}}\n\nReturn a ReviewDecision for the subject in SUBJECT.json. Resolve in resolvedIssueIds every open issue listed in your slot's resolvableIssueIds that this revision fixes; never resolve another reviewer's issue.",
+        "slots": [
+          {
+            "id": "plan"
+          }
+        ]
+      }
+    },
+    {
+      "id": "readiness-review",
+      "type": "agent",
+      "config": {
+        "provider": "claude",
+        "model": "explicit-test-model",
+        "timeoutSeconds": 600,
+        "output": {
+          "format": "json",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "const": 1
+              },
+              "subjectId": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Z0-9-]*$"
+              },
+              "role": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,63}$"
+              },
+              "verdict": {
+                "enum": [
+                  "APPROVED",
+                  "CHANGES_REQUESTED"
+                ]
+              },
+              "scopeRefs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9-]*$"
+                },
+                "uniqueItems": true
+              },
+              "resolvedIssueIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9-]*$"
+                },
+                "uniqueItems": true
+              },
+              "issues": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "localId": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+                    },
+                    "severity": {
+                      "enum": [
+                        "blocker",
+                        "suggestion"
+                      ]
+                    },
+                    "ownerRole": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                    },
+                    "requirementRefs": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[A-Z][A-Z0-9-]*$"
+                      },
+                      "uniqueItems": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "requestedChange": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "localId",
+                    "severity",
+                    "ownerRole",
+                    "requirementRefs",
+                    "message",
+                    "requestedChange"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "subjectId",
+              "role",
+              "verdict",
+              "scopeRefs",
+              "resolvedIssueIds",
+              "issues"
+            ],
+            "additionalProperties": false,
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "verdict": {
+                      "const": "CHANGES_REQUESTED"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "issues": {
+                      "contains": {
+                        "properties": {
+                          "severity": {
+                            "const": "blocker"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "verdict": {
+                      "const": "APPROVED"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "issues": {
+                      "items": {
+                        "properties": {
+                          "severity": {
+                            "const": "suggestion"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "attachFiles": true
+      }
+    },
+    {
+      "id": "testability-prompt",
+      "type": "prompt-template",
+      "config": {
+        "template": "Review the full bundle for testability.\n\nReview plan (JSON):\n{{plan}}\n\nReturn a ReviewDecision for the subject in SUBJECT.json. Resolve in resolvedIssueIds every open issue listed in your slot's resolvableIssueIds that this revision fixes; never resolve another reviewer's issue.",
+        "slots": [
+          {
+            "id": "plan"
+          }
+        ]
+      }
+    },
+    {
+      "id": "testability-review",
+      "type": "agent",
+      "config": {
+        "provider": "antigravity",
+        "model": "explicit-test-model",
+        "timeoutSeconds": 600,
+        "output": {
+          "format": "json",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "const": 1
+              },
+              "subjectId": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Z0-9-]*$"
+              },
+              "role": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,63}$"
+              },
+              "verdict": {
+                "enum": [
+                  "APPROVED",
+                  "CHANGES_REQUESTED"
+                ]
+              },
+              "scopeRefs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9-]*$"
+                },
+                "uniqueItems": true
+              },
+              "resolvedIssueIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9-]*$"
+                },
+                "uniqueItems": true
+              },
+              "issues": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "localId": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+                    },
+                    "severity": {
+                      "enum": [
+                        "blocker",
+                        "suggestion"
+                      ]
+                    },
+                    "ownerRole": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                    },
+                    "requirementRefs": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[A-Z][A-Z0-9-]*$"
+                      },
+                      "uniqueItems": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "requestedChange": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "localId",
+                    "severity",
+                    "ownerRole",
+                    "requirementRefs",
+                    "message",
+                    "requestedChange"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "subjectId",
+              "role",
+              "verdict",
+              "scopeRefs",
+              "resolvedIssueIds",
+              "issues"
+            ],
+            "additionalProperties": false,
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "verdict": {
+                      "const": "CHANGES_REQUESTED"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "issues": {
+                      "contains": {
+                        "properties": {
+                          "severity": {
+                            "const": "blocker"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "verdict": {
+                      "const": "APPROVED"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "issues": {
+                      "items": {
+                        "properties": {
+                          "severity": {
+                            "const": "suggestion"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "attachFiles": true
+      }
+    },
+    {
+      "id": "evaluate",
+      "type": "gate",
+      "config": {
+        "mode": "evaluate",
+        "policy": {
+          "slots": [
+            {
+              "id": "customer",
+              "role": "customer",
+              "view": "public"
+            },
+            {
+              "id": "readiness",
+              "role": "implementation-readiness",
+              "view": "full"
+            },
+            {
+              "id": "testability",
+              "role": "testability-reviewer",
+              "view": "full"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "analyst-history",
+      "type": "context",
+      "config": {
+        "provider": "codex",
+        "mode": "new"
+      }
+    },
+    {
+      "id": "implement",
+      "type": "map",
+      "config": {
+        "approvalPolicy": {
+          "slots": [
+            {
+              "id": "customer",
+              "role": "customer",
+              "view": "public"
+            },
+            {
+              "id": "readiness",
+              "role": "implementation-readiness",
+              "view": "full"
+            },
+            {
+              "id": "testability",
+              "role": "testability-reviewer",
+              "view": "full"
+            }
+          ]
+        },
+        "optionalInputs": [],
+        "limits": {
+          "maxFailedVerificationCycles": 3,
+          "maxTaskAttempts": 3
+        },
+        "roles": [
+          {
+            "id": "implementer",
+            "kind": "agent",
+            "provider": "claude",
+            "model": "explicit-test-model",
+            "instructions": "Implement the approved task. Write only the listed outputs.",
+            "timeoutSeconds": 600,
+            "context": "task"
+          },
+          {
+            "id": "test-author",
+            "kind": "agent",
+            "provider": "antigravity",
+            "model": "explicit-test-model",
+            "instructions": "Write the approved tests. Write only the listed outputs.",
+            "timeoutSeconds": 600,
+            "context": "task"
+          },
+          {
+            "id": "reviewer",
+            "kind": "agent",
+            "provider": "codex",
+            "model": "explicit-test-model",
+            "instructions": "Review the supplied immutable task-result snapshot against the named criterion and its specification sections. This snapshot contains the base and declared task dependencies, not every parallel task's outputs. For a test-source review, assess required case coverage and compatibility with the documented interfaces. Candidate-sourced check commands are run by the engine verification task after assembly; do not reject an isolated test-writing result because another task's implementation modules are absent. Missing declared inputs and genuine source defects remain blockers. The complete candidate must still pass every approved verification command.",
+            "timeoutSeconds": 600,
+            "context": "task"
+          },
+          {
+            "id": "analyst",
+            "kind": "agent",
+            "provider": "codex",
+            "model": "explicit-test-model",
+            "instructions": "Triage the failed verification from the captured evidence.",
+            "timeoutSeconds": 600,
+            "context": {
+              "contextId": "analyst-history"
+            }
+          },
+          {
+            "id": "verification",
+            "kind": "utility",
+            "template": "verification",
+            "embeddedRoles": {
+              "triage": "analyst"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "outcome",
+      "type": "route",
+      "config": {
+        "valueType": "ArtifactSet",
+        "selector": "/outcome",
+        "cases": [
+          {
+            "id": "complete",
+            "equals": "implementation_complete"
+          },
+          {
+            "id": "revise",
+            "equals": "specification_revision_required"
+          }
+        ],
+        "onUnmatched": "error"
+      }
+    },
+    {
+      "id": "candidate-view",
+      "type": "result-viewer",
+      "config": {}
+    },
+    {
+      "id": "revision-view",
+      "type": "result-viewer",
+      "config": {}
+    },
+    {
+      "id": "summary-view",
+      "type": "result-viewer",
+      "config": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "no-issues-value-issue-list-value",
+      "source": {
+        "nodeId": "no-issues",
+        "port": "value"
+      },
+      "target": {
+        "nodeId": "issue-list",
+        "port": "value"
+      }
+    },
+    {
+      "id": "documentation-value-prepare-subject",
+      "source": {
+        "nodeId": "documentation",
+        "port": "value"
+      },
+      "target": {
+        "nodeId": "prepare",
+        "port": "subject"
+      }
+    },
+    {
+      "id": "issue-list-value-prepare-issues",
+      "source": {
+        "nodeId": "issue-list",
+        "port": "value"
+      },
+      "target": {
+        "nodeId": "prepare",
+        "port": "issues"
+      }
+    },
+    {
+      "id": "prepare-plan-plan-text-value",
+      "source": {
+        "nodeId": "prepare",
+        "port": "plan"
+      },
+      "target": {
+        "nodeId": "plan-text",
+        "port": "value"
+      }
+    },
+    {
+      "id": "plan-text-value-customer-prompt-plan",
+      "source": {
+        "nodeId": "plan-text",
+        "port": "value"
+      },
+      "target": {
+        "nodeId": "customer-prompt",
+        "port": "plan"
+      }
+    },
+    {
+      "id": "customer-prompt-text-customer-review-prompt",
+      "source": {
+        "nodeId": "customer-prompt",
+        "port": "text"
+      },
+      "target": {
+        "nodeId": "customer-review",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "prepare-customer-customer-review-files",
+      "source": {
+        "nodeId": "prepare",
+        "port": "customer"
+      },
+      "target": {
+        "nodeId": "customer-review",
+        "port": "files"
+      }
+    },
+    {
+      "id": "customer-review-json-evaluate-customer",
+      "source": {
+        "nodeId": "customer-review",
+        "port": "json"
+      },
+      "target": {
+        "nodeId": "evaluate",
+        "port": "customer"
+      }
+    },
+    {
+      "id": "plan-text-value-readiness-prompt-plan",
+      "source": {
+        "nodeId": "plan-text",
+        "port": "value"
+      },
+      "target": {
+        "nodeId": "readiness-prompt",
+        "port": "plan"
+      }
+    },
+    {
+      "id": "readiness-prompt-text-readiness-review-prompt",
+      "source": {
+        "nodeId": "readiness-prompt",
+        "port": "text"
+      },
+      "target": {
+        "nodeId": "readiness-review",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "prepare-readiness-readiness-review-files",
+      "source": {
+        "nodeId": "prepare",
+        "port": "readiness"
+      },
+      "target": {
+        "nodeId": "readiness-review",
+        "port": "files"
+      }
+    },
+    {
+      "id": "readiness-review-json-evaluate-readiness",
+      "source": {
+        "nodeId": "readiness-review",
+        "port": "json"
+      },
+      "target": {
+        "nodeId": "evaluate",
+        "port": "readiness"
+      }
+    },
+    {
+      "id": "plan-text-value-testability-prompt-plan",
+      "source": {
+        "nodeId": "plan-text",
+        "port": "value"
+      },
+      "target": {
+        "nodeId": "testability-prompt",
+        "port": "plan"
+      }
+    },
+    {
+      "id": "testability-prompt-text-testability-review-prompt",
+      "source": {
+        "nodeId": "testability-prompt",
+        "port": "text"
+      },
+      "target": {
+        "nodeId": "testability-review",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "prepare-testability-testability-review-files",
+      "source": {
+        "nodeId": "prepare",
+        "port": "testability"
+      },
+      "target": {
+        "nodeId": "testability-review",
+        "port": "files"
+      }
+    },
+    {
+      "id": "testability-review-json-evaluate-testability",
+      "source": {
+        "nodeId": "testability-review",
+        "port": "json"
+      },
+      "target": {
+        "nodeId": "evaluate",
+        "port": "testability"
+      }
+    },
+    {
+      "id": "prepare-subject-evaluate-subject",
+      "source": {
+        "nodeId": "prepare",
+        "port": "subject"
+      },
+      "target": {
+        "nodeId": "evaluate",
+        "port": "subject"
+      }
+    },
+    {
+      "id": "prepare-plan-evaluate-plan",
+      "source": {
+        "nodeId": "prepare",
+        "port": "plan"
+      },
+      "target": {
+        "nodeId": "evaluate",
+        "port": "plan"
+      }
+    },
+    {
+      "id": "prepare-subject-implement-documentation",
+      "source": {
+        "nodeId": "prepare",
+        "port": "subject"
+      },
+      "target": {
+        "nodeId": "implement",
+        "port": "documentation"
+      }
+    },
+    {
+      "id": "evaluate-certificate-implement-approval",
+      "source": {
+        "nodeId": "evaluate",
+        "port": "certificate"
+      },
+      "target": {
+        "nodeId": "implement",
+        "port": "approval"
+      }
+    },
+    {
+      "id": "project-value-implement-base",
+      "source": {
+        "nodeId": "project",
+        "port": "value"
+      },
+      "target": {
+        "nodeId": "implement",
+        "port": "base"
+      }
+    },
+    {
+      "id": "implement-summary-outcome-selector",
+      "source": {
+        "nodeId": "implement",
+        "port": "summary"
+      },
+      "target": {
+        "nodeId": "outcome",
+        "port": "selector"
+      }
+    },
+    {
+      "id": "implement-result-outcome-value",
+      "source": {
+        "nodeId": "implement",
+        "port": "result"
+      },
+      "target": {
+        "nodeId": "outcome",
+        "port": "value"
+      }
+    },
+    {
+      "id": "outcome-complete-candidate-view-value",
+      "source": {
+        "nodeId": "outcome",
+        "port": "complete"
+      },
+      "target": {
+        "nodeId": "candidate-view",
+        "port": "value"
+      }
+    },
+    {
+      "id": "outcome-revise-revision-view-value",
+      "source": {
+        "nodeId": "outcome",
+        "port": "revise"
+      },
+      "target": {
+        "nodeId": "revision-view",
+        "port": "value"
+      }
+    },
+    {
+      "id": "implement-summary-summary-view-value",
+      "source": {
+        "nodeId": "implement",
+        "port": "summary"
+      },
+      "target": {
+        "nodeId": "summary-view",
+        "port": "value"
+      }
+    }
+  ],
+  "after": [],
+  "view": {
+    "documentation": {
+      "x": 60,
+      "y": 60
+    },
+    "project": {
+      "x": 320,
+      "y": 60
+    },
+    "no-issues": {
+      "x": 580,
+      "y": 60
+    },
+    "issue-list": {
+      "x": 840,
+      "y": 60
+    },
+    "prepare": {
+      "x": 1100,
+      "y": 60
+    },
+    "plan-text": {
+      "x": 1360,
+      "y": 60
+    },
+    "customer-prompt": {
+      "x": 60,
+      "y": 280
+    },
+    "customer-review": {
+      "x": 320,
+      "y": 280
+    },
+    "readiness-prompt": {
+      "x": 580,
+      "y": 280
+    },
+    "readiness-review": {
+      "x": 840,
+      "y": 280
+    },
+    "testability-prompt": {
+      "x": 1100,
+      "y": 280
+    },
+    "testability-review": {
+      "x": 1360,
+      "y": 280
+    },
+    "evaluate": {
+      "x": 60,
+      "y": 500
+    },
+    "analyst-history": {
+      "x": 320,
+      "y": 500
+    },
+    "implement": {
+      "x": 580,
+      "y": 500
+    },
+    "outcome": {
+      "x": 840,
+      "y": 500
+    },
+    "candidate-view": {
+      "x": 1100,
+      "y": 500
+    },
+    "revision-view": {
+      "x": 1360,
+      "y": 500
+    },
+    "summary-view": {
+      "x": 60,
+      "y": 720
+    }
+  }
+}

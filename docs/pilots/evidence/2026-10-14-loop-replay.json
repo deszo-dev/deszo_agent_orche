@@ -1,0 +1,152 @@
+{
+  "runId": "0eafbb01-d127-4bcc-afa3-0fbb94d31b1f",
+  "databaseLoops": [
+    {
+      "loop_node_id": "delivery",
+      "state": "canceled",
+      "pause_reason": null
+    },
+    {
+      "loop_node_id": "delivery/1/specification",
+      "state": "canceled",
+      "pause_reason": null
+    }
+  ],
+  "databaseIterations": [
+    {
+      "loop_node_id": "delivery",
+      "iteration": 1,
+      "outcome": "canceled",
+      "ended_at": "2026-10-14T03:42:19.546Z"
+    },
+    {
+      "loop_node_id": "delivery/1/specification",
+      "iteration": 1,
+      "outcome": "continued",
+      "ended_at": "2026-10-14T03:33:53.778Z"
+    },
+    {
+      "loop_node_id": "delivery/1/specification",
+      "iteration": 2,
+      "outcome": "canceled",
+      "ended_at": "2026-10-14T03:42:19.546Z"
+    }
+  ],
+  "replayRun": "failed",
+  "replayLoops": [
+    {
+      "loopNodeId": "delivery",
+      "state": "running",
+      "iteration": 1,
+      "pauseReason": null,
+      "maxIterations": 3,
+      "maxActiveMinutes": 60,
+      "iterations": [
+        {
+          "iteration": 1,
+          "value": {
+            "artifact": {
+              "artifactId": "89d404a6-2299-4ac6-9020-8b8bc7293797",
+              "sha256": "49abb9cfa637b9961893c7696888db0ee6cd6accef7a1bcdcfd186ae6ccd5f90"
+            },
+            "type": "JsonValue"
+          },
+          "feedback": {
+            "artifact": {
+              "artifactId": "cbe0a17a-639d-4999-9c4a-fbfa2fbf30c4",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "encoding": "utf-8",
+            "type": "Text"
+          },
+          "candidate": null,
+          "decision": null,
+          "continue": null,
+          "reason": null,
+          "restart": false
+        }
+      ]
+    },
+    {
+      "loopNodeId": "delivery/1/specification",
+      "state": "paused",
+      "iteration": 2,
+      "pauseReason": "body_failure",
+      "maxIterations": 3,
+      "maxActiveMinutes": 60,
+      "iterations": [
+        {
+          "iteration": 1,
+          "value": {
+            "artifact": {
+              "artifactId": "08481c3d-48bf-498b-b01f-3b14214da0a2",
+              "sha256": "fd4dfbb4539c8c6216be65caba78222414c7ff7508a6bbc2fef59b9ec17fbba9"
+            },
+            "type": "JsonValue"
+          },
+          "feedback": {
+            "artifact": {
+              "artifactId": "cbe0a17a-639d-4999-9c4a-fbfa2fbf30c4",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "encoding": "utf-8",
+            "type": "Text"
+          },
+          "candidate": {
+            "artifact": {
+              "artifactId": "63c99032-27ab-4d3e-abb2-672b8c127359",
+              "sha256": "e01046f8ca15350f5456cf772eea4313f06942bf64304057c18ade6e13a2defd"
+            },
+            "type": "JsonValue"
+          },
+          "decision": {
+            "artifact": {
+              "artifactId": "ffcfc8e4-13e5-4dfc-a78a-2035d41f180d",
+              "sha256": "182402a630cc99de41695cc3dd02bfe79d4c6cf91d89f05511bd120a5dc10aa5"
+            },
+            "type": "JsonValue"
+          },
+          "continue": true,
+          "reason": "1 review(s) requested changes; 5 open blocker(s) remain.",
+          "restart": false
+        },
+        {
+          "iteration": 2,
+          "value": {
+            "artifact": {
+              "artifactId": "63c99032-27ab-4d3e-abb2-672b8c127359",
+              "sha256": "e01046f8ca15350f5456cf772eea4313f06942bf64304057c18ade6e13a2defd"
+            },
+            "type": "JsonValue"
+          },
+          "feedback": {
+            "artifact": {
+              "artifactId": "3309f604-feae-4f0d-be81-a63fd1475e9b",
+              "sha256": "59df68848695e2a8088cc8dec94461eea71d36fd10e4c39b104aad876abc0761"
+            },
+            "encoding": "utf-8",
+            "type": "Text"
+          },
+          "candidate": null,
+          "decision": null,
+          "continue": null,
+          "reason": null,
+          "restart": false
+        }
+      ],
+      "message": "Body node delivery/1/specification/2/readiness-review failed: The final answer is not valid JSON: Invalid number at position 0"
+    }
+  ],
+  "mismatches": [
+    {
+      "loopNodeId": "delivery",
+      "database": "canceled",
+      "replay": "running"
+    },
+    {
+      "loopNodeId": "delivery/1/specification",
+      "database": "canceled",
+      "replay": "paused"
+    }
+  ]
+}

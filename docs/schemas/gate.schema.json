@@ -1,0 +1,785 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deszo.local/documentation/gate.schema.json",
+  "title": "Gate plans, reports and engine-owned records (through M6)",
+  "$defs": {
+    "ref": {
+      "type": "object",
+      "properties": {
+        "artifactId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "artifactId",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "recordRef": {
+      "type": "object",
+      "properties": {
+        "recordId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "artifact": {
+          "type": "object",
+          "properties": {
+            "artifactId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "required": [
+            "artifactId",
+            "sha256"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "recordId",
+        "artifact"
+      ],
+      "additionalProperties": false
+    },
+    "subjectView": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "subjectId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "slot": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$"
+        },
+        "role": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$"
+        },
+        "view": {
+          "enum": [
+            "full",
+            "public"
+          ]
+        },
+        "policyFingerprint": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "subjectId",
+        "slot",
+        "role",
+        "view",
+        "policyFingerprint"
+      ],
+      "additionalProperties": false
+    },
+    "reviewPlan": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "kind": {
+          "const": "ReviewPlan"
+        },
+        "subjectId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "subject": {
+          "type": "object",
+          "properties": {
+            "artifactId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "required": [
+            "artifactId",
+            "sha256"
+          ],
+          "additionalProperties": false
+        },
+        "policyFingerprint": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "slots": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,63}$"
+              },
+              "role": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,63}$"
+              },
+              "view": {
+                "enum": [
+                  "full",
+                  "public"
+                ]
+              },
+              "viewManifest": {
+                "type": "object",
+                "properties": {
+                  "artifactId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                },
+                "required": [
+                  "artifactId",
+                  "sha256"
+                ],
+                "additionalProperties": false
+              },
+              "scopeHash": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "status": {
+                "enum": [
+                  "missing",
+                  "stale",
+                  "current",
+                  "carried"
+                ]
+              },
+              "needsReview": {
+                "type": "boolean"
+              },
+              "priorReview": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/recordRef"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "reviewerFingerprint": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "resolvableIssueIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9-]*$"
+                },
+                "uniqueItems": true
+              }
+            },
+            "required": [
+              "id",
+              "role",
+              "view",
+              "viewManifest"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "openIssues": {
+          "type": "array",
+          "items": {
+            "$ref": "pipeline-state.schema.json#/$defs/issue"
+          }
+        },
+        "priorCertificate": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "recordId": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9-]*$"
+                },
+                "subjectId": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9-]*$"
+                }
+              },
+              "required": [
+                "recordId",
+                "subjectId"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "subjectKind": {
+          "enum": [
+            "specification",
+            "delivery"
+          ]
+        },
+        "prerequisites": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/recordRef"
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "subjectId",
+        "subject",
+        "policyFingerprint",
+        "slots",
+        "openIssues"
+      ],
+      "additionalProperties": false
+    },
+    "report": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "kind": {
+          "const": "GateReport"
+        },
+        "status": {
+          "enum": [
+            "OPEN",
+            "REVISION_REQUIRED"
+          ]
+        },
+        "subjectId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "$ref": "pipeline-state.schema.json#/$defs/issue"
+          }
+        },
+        "certificate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/recordRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "status",
+        "subjectId",
+        "reason",
+        "issues",
+        "certificate"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "OPEN"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "certificate": {
+                "$ref": "#/$defs/recordRef"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "certificate": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "reviewRecord": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "kind": {
+          "const": "ReviewRecord"
+        },
+        "recordId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "subjectId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "slot": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$"
+        },
+        "role": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$"
+        },
+        "verdict": {
+          "enum": [
+            "APPROVED",
+            "CHANGES_REQUESTED"
+          ]
+        },
+        "decision": {
+          "type": "object",
+          "properties": {
+            "artifactId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "required": [
+            "artifactId",
+            "sha256"
+          ],
+          "additionalProperties": false
+        },
+        "reviewer": {
+          "type": "object",
+          "properties": {
+            "runId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "nodeInstanceId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "attemptId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "requestedModel": {
+              "type": "string",
+              "minLength": 1
+            },
+            "observedModel": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "runId",
+            "nodeInstanceId",
+            "attemptId",
+            "requestedModel",
+            "observedModel"
+          ],
+          "additionalProperties": false
+        },
+        "newIssueIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9-]*$"
+          }
+        },
+        "resolvedIssueIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9-]*$"
+          }
+        },
+        "scopeHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "policyFingerprint": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "reviewerFingerprint": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "recordId",
+        "subjectId",
+        "slot",
+        "role",
+        "verdict",
+        "decision",
+        "reviewer",
+        "newIssueIds",
+        "resolvedIssueIds"
+      ],
+      "additionalProperties": false
+    },
+    "certificate": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "kind": {
+          "const": "GateCertificate"
+        },
+        "recordId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "subjectId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "subject": {
+          "type": "object",
+          "properties": {
+            "artifactId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "required": [
+            "artifactId",
+            "sha256"
+          ],
+          "additionalProperties": false
+        },
+        "policyFingerprint": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "reviews": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/recordRef"
+          }
+        },
+        "issuedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "runId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "subjectKind": {
+          "const": "delivery"
+        },
+        "prerequisites": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/recordRef"
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "recordId",
+        "subjectId",
+        "subject",
+        "policyFingerprint",
+        "reviews",
+        "issuedAt",
+        "runId"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "subjectKind"
+            ]
+          },
+          "then": {
+            "required": [
+              "prerequisites"
+            ]
+          }
+        }
+      ]
+    },
+    "reviewCarryRequest": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "kind": {
+          "const": "ReviewCarryRequest"
+        },
+        "slot": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$"
+        },
+        "subjectId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "priorReview": {
+          "$ref": "#/$defs/recordRef"
+        },
+        "scopeHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "slot",
+        "subjectId",
+        "priorReview",
+        "scopeHash"
+      ],
+      "additionalProperties": false
+    },
+    "reviewNeed": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "kind": {
+          "const": "ReviewNeed"
+        },
+        "slot": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$"
+        },
+        "subjectId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "status": {
+          "enum": [
+            "missing",
+            "stale",
+            "current",
+            "carried"
+          ]
+        },
+        "needsReview": {
+          "type": "boolean"
+        },
+        "scopeHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "carry": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/reviewCarryRequest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "slot",
+        "subjectId",
+        "status",
+        "needsReview",
+        "scopeHash",
+        "carry"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "needsReview": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "carry": {
+                "type": "null"
+              },
+              "status": {
+                "enum": [
+                  "missing",
+                  "stale"
+                ]
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "carry": {
+                "$ref": "#/$defs/reviewCarryRequest"
+              },
+              "status": {
+                "enum": [
+                  "current",
+                  "carried"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "reviewCarry": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "kind": {
+          "const": "ReviewCarry"
+        },
+        "recordId": {
+          "type": "string",
+          "pattern": "^RCAR-[A-F0-9]{12}$"
+        },
+        "subjectId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "priorSubjectId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "slot": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$"
+        },
+        "role": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$"
+        },
+        "verdict": {
+          "const": "APPROVED"
+        },
+        "priorReview": {
+          "$ref": "#/$defs/recordRef"
+        },
+        "scopeHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "policyFingerprint": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "reviewerFingerprint": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "runId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "verifiedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "recordId",
+        "subjectId",
+        "priorSubjectId",
+        "slot",
+        "role",
+        "verdict",
+        "priorReview",
+        "scopeHash",
+        "policyFingerprint",
+        "reviewerFingerprint",
+        "runId",
+        "verifiedAt"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

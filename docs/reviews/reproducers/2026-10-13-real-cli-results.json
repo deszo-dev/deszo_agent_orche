@@ -1,0 +1,70 @@
+{
+  "timestamp": "2026-10-13T13:19:19.621Z",
+  "root": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\real-cli-AAgmCk",
+  "results": [
+    {
+      "provider": "claude",
+      "model": "haiku",
+      "mode": "new",
+      "runId": "2d447118-319a-4ef8-a3b2-8dfe024a374c",
+      "state": "succeeded",
+      "answer": {
+        "message": "ORBIT"
+      },
+      "remembersControlWord": true,
+      "failures": [],
+      "bindingId": "9ca6b055-1159-4437-8725-ec3c90354010"
+    },
+    {
+      "provider": "claude",
+      "model": "haiku",
+      "mode": "continue",
+      "runId": "403ba0f4-4f27-4d81-a344-c4cb4ffa351f",
+      "state": "succeeded",
+      "answer": {
+        "message": "ORBIT"
+      },
+      "remembersControlWord": true,
+      "failures": [],
+      "bindingId": "9ca6b055-1159-4437-8725-ec3c90354010"
+    },
+    {
+      "provider": "antigravity",
+      "model": "gemini-3.8-flash-low",
+      "mode": "new",
+      "runId": "1c434ad8-e1da-4baa-b403-6e5d4e214b05",
+      "state": "succeeded",
+      "answer": {
+        "message": "{\"message\":\"ORBIT\"}"
+      },
+      "remembersControlWord": false,
+      "failures": [],
+      "bindingId": "4743aca4-78ce-40d7-bd3f-a53b6014dd3e"
+    },
+    {
+      "provider": "antigravity",
+      "model": "gemini-3.8-flash-low",
+      "mode": "continue",
+      "runId": "47b61ce0-f79a-486d-82dd-3616873a526a",
+      "state": "succeeded",
+      "answer": {
+        "message": "{\"message\":\"ORBIT\"}"
+      },
+      "remembersControlWord": false,
+      "failures": [],
+      "bindingId": "4743aca4-78ce-40d7-bd3f-a53b6014dd3e"
+    },
+    {
+      "provider": "antigravity",
+      "model": "gemini-3.8-flash-low",
+      "mode": "continue",
+      "format": "text",
+      "runId": "ef2f7486-c654-44c0-a720-1d394a9f4a8a",
+      "state": "succeeded",
+      "answer": "{\"message\":\"{\\\"message\\\":\\\"ORBIT\\\"}\"}",
+      "remembersControlWord": false,
+      "failures": [],
+      "bindingId": "4743aca4-78ce-40d7-bd3f-a53b6014dd3e"
+    }
+  ]
+}

@@ -1,0 +1,471 @@
+{
+  "selectedMerge": [
+    {
+      "id": "all-inactive",
+      "inputs": [
+        "inactive",
+        "inactive"
+      ],
+      "expected": "inactive"
+    },
+    {
+      "id": "accepted-delivery",
+      "inputs": [
+        "inactive",
+        "inactive",
+        "inactive",
+        "succeeded"
+      ],
+      "expected": "commit"
+    },
+    {
+      "id": "successful-verify-evidence",
+      "inputs": [
+        "inactive",
+        "inactive"
+      ],
+      "expected": "inactive"
+    },
+    {
+      "id": "pending-route",
+      "inputs": [
+        "inactive",
+        "pending"
+      ],
+      "expected": "wait"
+    },
+    {
+      "id": "pending-alternative",
+      "inputs": [
+        "succeeded",
+        "pending"
+      ],
+      "expected": "wait"
+    },
+    {
+      "id": "running-selected",
+      "inputs": [
+        "running",
+        "inactive"
+      ],
+      "expected": "wait"
+    },
+    {
+      "id": "two-active",
+      "inputs": [
+        "succeeded",
+        "running"
+      ],
+      "expected": "contract_error"
+    },
+    {
+      "id": "failed-active",
+      "inputs": [
+        "failed",
+        "inactive"
+      ],
+      "expected": "recovery"
+    }
+  ],
+  "verificationCycles": [
+    {
+      "id": "first-failure",
+      "before": 0,
+      "limit": 3,
+      "outcome": "failed",
+      "target": "TASK-AUTH-CODE",
+      "expected": {
+        "count": 1,
+        "state": "repair_allowed"
+      }
+    },
+    {
+      "id": "second-different-target",
+      "before": 1,
+      "limit": 3,
+      "outcome": "failed",
+      "target": "TASK-RESUME-TESTS",
+      "expected": {
+        "count": 2,
+        "state": "repair_allowed"
+      }
+    },
+    {
+      "id": "third-different-target",
+      "before": 2,
+      "limit": 3,
+      "outcome": "failed",
+      "target": "TASK-RESUME-CODE",
+      "expected": {
+        "count": 3,
+        "state": "paused_limit"
+      }
+    },
+    {
+      "id": "operational-failure",
+      "before": 2,
+      "limit": 3,
+      "outcome": "operational_failure",
+      "expected": {
+        "count": 2,
+        "state": "paused_recovery"
+      }
+    },
+    {
+      "id": "passing-does-not-reset",
+      "before": 2,
+      "limit": 3,
+      "outcome": "passed",
+      "expected": {
+        "count": 2,
+        "state": "passed"
+      }
+    }
+  ],
+  "capacity": [
+    {
+      "id": "one-provider-across-workspaces",
+      "globalLimit": 3,
+      "providerLimit": 1,
+      "provider": "codex",
+      "running": [
+        {
+          "workspaceId": "a",
+          "provider": "codex"
+        }
+      ],
+      "expected": false
+    },
+    {
+      "id": "global-cap-across-workspaces",
+      "globalLimit": 3,
+      "providerLimit": 2,
+      "provider": "claude",
+      "running": [
+        {
+          "workspaceId": "a",
+          "provider": "codex"
+        },
+        {
+          "workspaceId": "b",
+          "provider": "claude"
+        },
+        {
+          "workspaceId": "c",
+          "provider": "antigravity"
+        }
+      ],
+      "expected": false
+    },
+    {
+      "id": "free-other-provider",
+      "globalLimit": 3,
+      "providerLimit": 1,
+      "provider": "claude",
+      "running": [
+        {
+          "workspaceId": "a",
+          "provider": "codex"
+        }
+      ],
+      "expected": true
+    },
+    {
+      "id": "lowered-below-occupancy",
+      "globalLimit": 1,
+      "providerLimit": 1,
+      "provider": "antigravity",
+      "running": [
+        {
+          "workspaceId": "a",
+          "provider": "codex"
+        },
+        {
+          "workspaceId": "b",
+          "provider": "claude"
+        }
+      ],
+      "expected": false
+    }
+  ],
+  "failurePolicy": [
+    {
+      "id": "first-failure",
+      "state": "running",
+      "action": "attempt_failed",
+      "runningSiblings": 1,
+      "expected": {
+        "state": "draining",
+        "dispatch": false,
+        "cancelSiblings": false
+      }
+    },
+    {
+      "id": "later-failure",
+      "state": "draining",
+      "action": "attempt_failed",
+      "runningSiblings": 1,
+      "expected": {
+        "state": "draining",
+        "dispatch": false,
+        "cancelSiblings": false
+      }
+    },
+    {
+      "id": "drain-complete",
+      "state": "draining",
+      "action": "siblings_finished",
+      "runningSiblings": 0,
+      "expected": {
+        "state": "failed",
+        "dispatch": false,
+        "cancelSiblings": false
+      }
+    },
+    {
+      "id": "explicit-stop-draining",
+      "state": "draining",
+      "action": "root_stop",
+      "runningSiblings": 1,
+      "expected": {
+        "state": "stopping",
+        "dispatch": false,
+        "cancelSiblings": true
+      }
+    },
+    {
+      "id": "failure-and-context-review",
+      "state": "running",
+      "action": "attempt_failed",
+      "runningSiblings": 1,
+      "bindingState": "writing",
+      "nativeMayHaveAdvanced": true,
+      "expected": {
+        "state": "draining",
+        "dispatch": false,
+        "cancelSiblings": false,
+        "bindingState": "needs_review"
+      }
+    }
+  ],
+  "contextAvailability": [
+    {
+      "id": "reject-reviewed-context-at-creation",
+      "stage": "create_continue",
+      "bindingState": "needs_review",
+      "expected": {
+        "runState": null,
+        "attemptState": null,
+        "bindingState": "needs_review",
+        "error": "context_unavailable"
+      }
+    },
+    {
+      "id": "ready-context-can-create-run",
+      "stage": "create_continue",
+      "bindingState": "ready",
+      "expected": {
+        "runState": "queued",
+        "attemptState": null,
+        "bindingState": "ready",
+        "error": null
+      }
+    },
+    {
+      "id": "review-found-before-dispatch",
+      "stage": "dispatch",
+      "bindingState": "needs_review",
+      "expected": {
+        "runState": "draining",
+        "attemptState": "failed",
+        "bindingState": "needs_review",
+        "error": "context_unavailable"
+      }
+    }
+  ],
+  "m2Lifecycle": [
+    {
+      "id": "failure-drains",
+      "state": "running",
+      "event": "attempt_failed",
+      "expected": "draining"
+    },
+    {
+      "id": "drain-waits-for-user",
+      "state": "draining",
+      "event": "running_finished",
+      "expected": "waiting_for_user"
+    },
+    {
+      "id": "held-work-waits",
+      "state": "running",
+      "event": "idle_with_held_work",
+      "expected": "waiting_for_user"
+    },
+    {
+      "id": "all-succeeded",
+      "state": "running",
+      "event": "all_succeeded",
+      "expected": "succeeded"
+    },
+    {
+      "id": "retry-resumes",
+      "state": "waiting_for_user",
+      "event": "retry",
+      "expected": "running"
+    },
+    {
+      "id": "raise-limit-resumes",
+      "state": "waiting_for_user",
+      "event": "raise_limit",
+      "expected": "running"
+    },
+    {
+      "id": "restart-iteration-resumes",
+      "state": "waiting_for_user",
+      "event": "restart_iteration",
+      "expected": "running"
+    },
+    {
+      "id": "close-fails",
+      "state": "waiting_for_user",
+      "event": "close",
+      "expected": "failed"
+    },
+    {
+      "id": "stop-from-wait",
+      "state": "waiting_for_user",
+      "event": "root_stop",
+      "expected": "stopping"
+    },
+    {
+      "id": "stop-wins-over-drain",
+      "state": "draining",
+      "event": "root_stop",
+      "expected": "stopping"
+    },
+    {
+      "id": "no-retry-while-draining",
+      "state": "draining",
+      "event": "retry",
+      "expected": "rejected"
+    },
+    {
+      "id": "no-retry-while-stopping",
+      "state": "stopping",
+      "event": "retry",
+      "expected": "rejected"
+    },
+    {
+      "id": "restart-interrupts-wait",
+      "state": "waiting_for_user",
+      "event": "runtime_restart",
+      "expected": "interrupted"
+    },
+    {
+      "id": "terminal-is-final",
+      "state": "failed",
+      "event": "retry",
+      "expected": "rejected"
+    }
+  ],
+  "loopIteration": [
+    {
+      "id": "finish-early",
+      "iteration": 1,
+      "maxIterations": 3,
+      "continue": false,
+      "expected": "finish"
+    },
+    {
+      "id": "next-iteration",
+      "iteration": 2,
+      "maxIterations": 3,
+      "continue": true,
+      "expected": "next"
+    },
+    {
+      "id": "finish-on-last",
+      "iteration": 3,
+      "maxIterations": 3,
+      "continue": false,
+      "expected": "finish"
+    },
+    {
+      "id": "pause-at-limit",
+      "iteration": 3,
+      "maxIterations": 3,
+      "continue": true,
+      "expected": "pause_iteration_limit"
+    }
+  ],
+  "gateStatus": [
+    {
+      "id": "all-approved",
+      "verdicts": [
+        "APPROVED",
+        "APPROVED",
+        "APPROVED"
+      ],
+      "openBlockers": 0,
+      "expected": "OPEN"
+    },
+    {
+      "id": "one-rejection",
+      "verdicts": [
+        "APPROVED",
+        "CHANGES_REQUESTED",
+        "APPROVED"
+      ],
+      "openBlockers": 1,
+      "expected": "REVISION_REQUIRED"
+    },
+    {
+      "id": "approved-but-old-blocker-open",
+      "verdicts": [
+        "APPROVED",
+        "APPROVED",
+        "APPROVED"
+      ],
+      "openBlockers": 1,
+      "expected": "REVISION_REQUIRED"
+    }
+  ],
+  "routeSelection": [
+    {
+      "id": "one-match",
+      "selector": "OPEN",
+      "cases": [
+        "OPEN",
+        "REVISION_REQUIRED"
+      ],
+      "expected": "OPEN"
+    },
+    {
+      "id": "no-match",
+      "selector": "PENDING",
+      "cases": [
+        "OPEN",
+        "REVISION_REQUIRED"
+      ],
+      "expected": "unmatched"
+    },
+    {
+      "id": "two-matches",
+      "selector": "OPEN",
+      "cases": [
+        "OPEN",
+        "OPEN"
+      ],
+      "expected": "contract_error"
+    },
+    {
+      "id": "no-coercion",
+      "selector": "true",
+      "cases": [
+        true
+      ],
+      "expected": "unmatched"
+    }
+  ]
+}

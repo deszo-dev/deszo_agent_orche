@@ -1,0 +1,150 @@
+{
+  "createdAt": "2026-10-14T09:00:31.212Z",
+  "tests": {
+    "tests": 342,
+    "pass": 342,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0
+  },
+  "testSeconds": 255.1690074,
+  "docs": {
+    "schemas": 15,
+    "positiveSchemaCases": 141,
+    "negativeSchemaCases": 82,
+    "negativeSemanticCases": 42,
+    "markdownFiles": 38,
+    "localLinks": 471,
+    "mermaidDiagrams": 4,
+    "jsonFences": 2,
+    "sections": 14,
+    "tasks": 5,
+    "decisionCases": 50,
+    "sqlTables": 13,
+    "sqlCases": 67,
+    "sqlTablesAfterMigration2": 15,
+    "sqlTablesAfterMigration3": 17,
+    "sqlTablesAfterMigration4": 19,
+    "sqlTablesAfterMigration5": 19,
+    "strictJsonRejections": 2,
+    "errors": []
+  },
+  "rust": {
+    "passed": 4,
+    "failed": 0,
+    "nativeSourceUnchanged": true
+  },
+  "changedBaselineFiles": [
+    "runtime\\core\\adapters.mjs",
+    "runtime\\core\\transport.mjs",
+    "runtime\\tests\\pilot.test.mjs"
+  ],
+  "sourceHashes": {
+    "runtime\\core\\adapters.mjs": "1ddd33b2b8c71bd7c3210bd2a5b5cf146006aaee7aa7a30ca4a8a1cf3dd6c320",
+    "runtime\\core\\canonical.mjs": "30f2a1de3ea130f38e694382c66747d8c97adcd304672b3b3049264d9e5e331a",
+    "runtime\\core\\engine.mjs": "83b4fb8b673677a9caa0a6bedfd11a31400735b82873c3ad28fb603029825a43",
+    "runtime\\core\\gate.mjs": "8e20da987b4e82aba981fa0cda54fd5f524cbef5eb9abe737881e14c91e39ec5",
+    "runtime\\core\\map.mjs": "20d02ddde58b4b0d914034b0e677e91da71d75c5cee48f5e2c0c7a55bf128ba5",
+    "runtime\\core\\mapRuntime.mjs": "b9dfbde91933298e5287f69a45348a8609adf967f46f85f90cf8fbf1953c1473",
+    "runtime\\core\\planning.mjs": "a98879fe370f7384cef4e7090164955db9548fdc92521aaa9ee99207d5f1ee25",
+    "runtime\\core\\processes.mjs": "664f04975420b97e6f174fe502fb3ca95776e3d43f67a3d7262554bdfd86e86a",
+    "runtime\\core\\schemas.mjs": "c9fad7fe0fca7c4a915b89c2872099a34a872614c235d92aa22a847b6aa1f541",
+    "runtime\\core\\store.mjs": "cddd6f42230062d947d84f14e870e2c53dccc309d0915cbfc368346f68afc173",
+    "runtime\\core\\transport.mjs": "ebcbe0e2cab6415ef19bbfc5585b8d5133732587b47b0cdcb6518c4cf88c9077",
+    "runtime\\core\\utilities.mjs": "a09134d1551626f89396ddf789327edf74536241c38112c3e593e6efae3f27e4",
+    "runtime\\core\\validate.mjs": "00ea4adfe7c2f047db62abd9d4b44692c341893c81e9c04993334540c2ca9512",
+    "runtime\\lock.mjs": "c7381388aaab02c1681faaa04fb0cc72859ec87600fb141aa6be86534057ccee",
+    "runtime\\runner.mjs": "ed9b8c075cde503bcc8e41db3fd1d19269dc10372e66d53f17bdfb5d7a525b52",
+    "runtime\\tests\\code-variant-preload.mjs": "f3f14b6947b3d09b0ac37c72af94b16529f8aff9ee7f38bc7b316dc5e7b6382d",
+    "runtime\\tests\\contracts.test.mjs": "cd327c4dfe2c101501e69e2d27dc93fc882866d0438072d179fb14be35d68fd9",
+    "runtime\\tests\\engine.test.mjs": "add52661e1f1082f615f778e7a1c3613f6d1998f991ed800d8d3a93ffd22a390",
+    "runtime\\tests\\fixture-cli.mjs": "d2eb242f85f73f6c9f6f649072f8228dc7006213982f4e80dca85ed1ee832fb8",
+    "runtime\\tests\\followup.test.mjs": "bcb15d4b4b0c1d14410567644574a3453c672fc6867b4a89423a1973cd6d18d3",
+    "runtime\\tests\\helpers.mjs": "abc8c74f31024e18f2f32c0ec9a7004a2c70fd01c767429ad02311771cc634a2",
+    "runtime\\tests\\integrity.test.mjs": "c58275c3e1569dee162140cb002bd102ca3b8819b06c17120654e733541ca964",
+    "runtime\\tests\\loops.test.mjs": "bd5473d67c636dfa15b9bad073ef2a3ded399ffff2e7ac590603262c16f9aed2",
+    "runtime\\tests\\map.test.mjs": "12ba2f9b72ea21c5d37b0c3a32e3a4dee8aa0d0d086ae41e68316ca66b5dcd12",
+    "runtime\\tests\\pilot.test.mjs": "ac4d070bc14d115ac5bde6e3c0910c5f3b561474e8c86f563c4e24b7ca7c69a8",
+    "runtime\\tests\\pipeline.test.mjs": "5bfb316ec7e8b82b61e0f938fae5bbb34054dacd877f56b90af53174cc39b075",
+    "runtime\\tests\\reference.test.mjs": "682a41d53806fa0e2f379b659c46652c6a09aeceda3c5db25b6a43db886cd178",
+    "runtime\\tests\\revisions.test.mjs": "dd2d8530a8d628a8ac81d512d81398dc7fa572340b85bf07f3d3f9f4e0318f9c",
+    "runtime\\tests\\stream-fixture.mjs": "765e5722b4e1a4defd75d3877d070a266f82a34f7246473005d9afb13dc7b793",
+    "runtime\\tests\\toy\\auth-buggy.mjs": "3784869c3ac45a55092f5c914cb50227f2f9fe5fe9924994b2057452d0b1ae96",
+    "runtime\\tests\\toy\\auth.mjs": "bbc145c687c19f6ea685b554c9a725cd484f1badf99be114baad7e50cee1ab37",
+    "runtime\\tests\\toy\\auth.test.mjs": "5a90dc2bf5a3eedd3a2c6bd1000f828a01caa0a37e4a1d67c3556d360298c706",
+    "runtime\\tests\\toy\\resume.mjs": "62db12d1cc77240d7111f4961c8f6e9ba90a410379aaacf5f3d79775f36dc636",
+    "runtime\\tests\\toy\\resume.test.mjs": "da4e94336f59abc3ccfea5b3c06308448c2e73aaf34116115717cacc75614f9d",
+    "shared\\replay.d.mts": "82620bf8e7eab0deb4a4bb5a69734400fff7a7210e2f5e587bf4b0a7df590ebf",
+    "shared\\replay.mjs": "c92e2a4f7ac3a8bc2364737abb4a0e9fd1a0cde10e4fe225373336a62da55f7f",
+    "src\\App.tsx": "4b0de2227e9c80b42c613bb5f513f1336dc0b4b45437025045ab7d7e92536fae",
+    "src\\Inspector.tsx": "ec4bc78cd5bf4e1bfec7670ac2b030da6db687c7880c6683e8d1132f773a23c7",
+    "src\\main.tsx": "fd62060a0b767fdacaaaa47c1ba4c94346308f53a683c24183b746970aef0e08",
+    "src\\model.ts": "3ca22833e782bcaff4fed01d2419d9cd8f26f52a6bb458864ba1c3821573d59f",
+    "src\\nodes.tsx": "1ebea25179934b5b22220ac82b3dfc368846e807d0ab916c889a47d34b5639a1",
+    "src\\Replay.tsx": "13a5b3b4f65b523b0d0637df2a61f996ad3683c7fad62e35fe1d475f23566be6",
+    "src\\styles.css": "42ea5d0cb87a388fe302b37e2fd7561866c3b8b3f6f381e3de84b7078610bbc0",
+    "src\\templates.ts": "a3b0bab02ed26bf95f1388a1fdbcce994a86fdef00a830520a865292fc5c09b1",
+    "src\\transport.ts": "3afad5be0e052a4e223b3832dc7fe5fe0c0d4af72beeff6f146a526a428b2e7a",
+    "src\\types.ts": "6a9e81b7c047498eb0f471991c562e1c06a54fe7c32a94f2c49fb93904a01214",
+    "src-tauri\\src\\main.rs": "58f0090d0e8b1947ba3fccab128c6bbc81832323049a499cc64f7617100dec52",
+    "docs\\schemas\\application-settings.schema.json": "f4746c50eed5898230596014778a1bdda1efcac47662cf0421992e98f0aa3b9f",
+    "docs\\schemas\\attempt-record.schema.json": "33d98c51533e0884652541fb00b09a66b517ddc95a2902c0d67594cecff6d51a",
+    "docs\\schemas\\gate.schema.json": "2b0cb942c2a411776a99fdb4f301c1491f7e77a15079db5fc3bf6186298bc9b5",
+    "docs\\schemas\\implementation-map.schema.json": "9da1cefc528ed11d0f2bbfce218d53c0756ed4ef9dde0a2bac204b47260808fe",
+    "docs\\schemas\\journal-event-v2.schema.json": "a1665077c9d6b16a27f00dde238097d054f19861d2304677a1a9a14cd320e8f6",
+    "docs\\schemas\\journal-event.schema.json": "4177ce8f224e61e80b0a7c07ea58a670284bb803e44ed653f8f0c6992ee2aac3",
+    "docs\\schemas\\loop-decision.schema.json": "930be663aee4ccd94a350e170320553ed5813536578206b49012ea63cfb7e8ae",
+    "docs\\schemas\\map.schema.json": "9d4227fa43d466713eaffb0522a85f4adbebebc838e5def5d2ba6a7cdbba9db3",
+    "docs\\schemas\\pipeline-state.schema.json": "72fbe1f73aba59478cd5af8471f0b127acb08dc245abc0524d67459d5810ac0e",
+    "docs\\schemas\\review-decision.schema.json": "3a717690a1528687aeac8ea8ae260090d1186972e5470216d61f0f431b414866",
+    "docs\\schemas\\runtime-api-v2.schema.json": "a178ac860ab09e4ae199cf091b07e34ba90f06e0c7ff70000103250507582379",
+    "docs\\schemas\\runtime-api.schema.json": "74c547c8b99847672e4e615fdd2cd22c960c1709aeb5ad5d4322f9dabf980adf",
+    "docs\\schemas\\spec-section-index.schema.json": "0d7fd7f5b0c4121886dc518da0264c990d01ad66dc305be1d08481397309cf77",
+    "docs\\schemas\\value.schema.json": "e01fd6a6e096f65b20ea51526086e14d9a6dae6395ddac8abf05efabfdfc5a7f",
+    "docs\\schemas\\workflow.schema.json": "8884a959aea7c719c68b06ae39560da07622ea4a916cb1c212cab3c9229f29d8",
+    "docs\\storage\\m1.sql": "31380786a58380a5b397ed9089bcdf051d9dd2a39f664a67b83ba1dee62a2197",
+    "docs\\storage\\m2.sql": "88fc4ad1976d2153eea77ce177e138c1b7c74eea5bba9dbccc5a27bcbaef3c9b",
+    "docs\\storage\\m3.sql": "054cdc35a3f9eba36329552367b6d09016a8ee41695d649633e699bcd5342245",
+    "docs\\storage\\m4.sql": "d7fa40960652d2426c16a36b6eaa88a1b5f3ceb10015ea8497dbd209545a94c2",
+    "docs\\storage\\m5.sql": "e5ed02f8a75106a061655965392d312f090f2f02ba6b8ec7928a22ac619ac231"
+  },
+  "logs": [
+    {
+      "path": ".deszo/pilots/after-fixes-checks/tests-encoding.log",
+      "bytes": 54883,
+      "sha256": "a7b6fee512a881cef3c5aa2b1e957f6f8b7c14c2a24d6953d75a0a6247971c24"
+    },
+    {
+      "path": ".deszo/pilots/after-fixes-checks/cargo-tests.log",
+      "bytes": 615,
+      "sha256": "698cbc6941d41f700eaefd0ee8417ccfbbdd8343ef66d27e4f428cf2ef5e4717"
+    },
+    {
+      "path": ".deszo/pilots/after-fixes-checks/docs-final.log",
+      "bytes": 558,
+      "sha256": "63d28c5dc3ec11682e7d344a486cfa9502db74810fdecfaf88a2c6ff455ad5f8"
+    },
+    {
+      "path": ".deszo/pilots/after-fixes-checks/desktop-encoding-build.log",
+      "bytes": 1765,
+      "sha256": "9bb3ad11eee9414eef595a54589444c0a72a0726d94759859daf10e468248e36"
+    },
+    {
+      "path": ".deszo/pilots/after-fixes-checks/desktop-production-build.log",
+      "bytes": 1633,
+      "sha256": "72dd2f2ad09c0a35b29fef4a6bd04d2927ce6162a4ce55e1784462bfaf3cde63"
+    }
+  ],
+  "bundle": {
+    "path": "dist-runtime/runner.mjs",
+    "bytes": 924343,
+    "sha256": "9556328c48a2ae5a149b30cfdf531a772c7317167043d9daac47d71ed4b2ad7b"
+  },
+  "defaultRelease": {
+    "path": "src-tauri/target/release/deszo.exe",
+    "bytes": 6656512,
+    "sha256": "74d2935da18dbe006878b4e94b8ff5c6e07ebd600acdb5c5fd31a22c703695ab"
+  },
+  "fullDeliveryAccepted": false,
+  "blockingFinding": "RERUN-04"
+}

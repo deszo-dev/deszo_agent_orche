@@ -1,0 +1,161 @@
+{
+  "date": "2026-10-15",
+  "runId": "55bbb7de-6652-47eb-a696-c0e99136fa45",
+  "state": "succeeded",
+  "elapsedSeconds": 549.052,
+  "finalSequence": 1388,
+  "providers": {
+    "codex": 11,
+    "claude": 6,
+    "antigravity": 3
+  },
+  "exportedEntries": 14,
+  "acceptance": "CERT-5866E749D822",
+  "deliverySubject": "d6f4de3277dd604f266db65dcd20535e3dc501c4d1da00a85c10ecf7053ce3c4",
+  "independentChecks": 21,
+  "exportedTests": 26,
+  "controllerActions": [
+    {
+      "at": "2026-10-15T10:06:08.469Z",
+      "action": "recovery",
+      "body": {
+        "action": "retry",
+        "nodeInstanceId": "delivery/1/implement/1/task-resume-code-execute",
+        "binding": "acknowledge",
+        "requestId": "2ae77225-d55c-417e-8b5d-97646e3a8151"
+      },
+      "result": {
+        "runId": "55bbb7de-6652-47eb-a696-c0e99136fa45",
+        "state": "running",
+        "requestId": "2ae77225-d55c-417e-8b5d-97646e3a8151"
+      }
+    }
+  ],
+  "mechanisms": [
+    {
+      "provider": "codex",
+      "node": "delivery/1/specification/1/analyst",
+      "mechanism": "verified-neutralizer",
+      "neutralizerId": "codex-0.162-alpha17-explicit-child-marker"
+    },
+    {
+      "provider": "claude",
+      "node": "delivery/1/implement/1/task-resume-code-execute",
+      "mechanism": "verified-neutralizer",
+      "neutralizerId": "claude-2.1.292-marker-propagation"
+    },
+    {
+      "provider": "codex",
+      "node": "delivery/1/implement/1/task-resume-code-review-ac-resume-code",
+      "mechanism": "verified-neutralizer",
+      "neutralizerId": "codex-0.162-alpha17-explicit-child-marker"
+    },
+    {
+      "provider": "codex",
+      "node": "delivery/1/implement/1/task-auth-code-review-ac-auth-code",
+      "mechanism": "verified-neutralizer",
+      "neutralizerId": "codex-0.162-alpha17-explicit-child-marker"
+    },
+    {
+      "provider": "codex",
+      "node": "delivery/1/final-customer",
+      "mechanism": "verified-neutralizer",
+      "neutralizerId": "codex-0.162-alpha17-explicit-child-marker"
+    },
+    {
+      "provider": "codex",
+      "node": "delivery/1/implement/1/task-auth-code-review-ac-auth-code",
+      "mechanism": "verified-neutralizer",
+      "neutralizerId": "codex-0.162-alpha17-explicit-child-marker"
+    },
+    {
+      "provider": "antigravity",
+      "node": "delivery/1/implement/1/task-auth-tests-execute",
+      "mechanism": "verified-neutralizer",
+      "neutralizerId": "antigravity-1.3.5-marker-propagation"
+    },
+    {
+      "provider": "antigravity",
+      "node": "delivery/1/specification/1/testability-review",
+      "mechanism": "verified-neutralizer",
+      "neutralizerId": "antigravity-1.3.5-marker-propagation"
+    },
+    {
+      "provider": "claude",
+      "node": "delivery/1/specification/1/readiness-review",
+      "mechanism": "verified-neutralizer",
+      "neutralizerId": "claude-2.1.292-marker-propagation"
+    },
+    {
+      "provider": "claude",
+      "node": "delivery/1/implement/1/task-resume-code-execute",
+      "mechanism": "verified-neutralizer",
+      "neutralizerId": "claude-2.1.292-marker-propagation"
+    },
+    {
+      "provider": "claude",
+      "node": "delivery/1/implement/1/task-auth-code-execute",
+      "mechanism": "verified-neutralizer",
+      "neutralizerId": "claude-2.1.292-marker-propagation"
+    },
+    {
+      "provider": "codex",
+      "node": "delivery/1/conformance-review",
+      "mechanism": "verified-neutralizer",
+      "neutralizerId": "codex-0.162-alpha17-explicit-child-marker"
+    },
+    {
+      "provider": "codex",
+      "node": "delivery/1/implement/1/task-auth-tests-review-ac-auth-tests",
+      "mechanism": "verified-neutralizer",
+      "neutralizerId": "codex-0.162-alpha17-explicit-child-marker"
+    },
+    {
+      "provider": "codex",
+      "node": "delivery/1/quality-review",
+      "mechanism": "verified-neutralizer",
+      "neutralizerId": "codex-0.162-alpha17-explicit-child-marker"
+    },
+    {
+      "provider": "codex",
+      "node": "delivery/1/specification/1/customer-review",
+      "mechanism": "verified-neutralizer",
+      "neutralizerId": "codex-0.162-alpha17-explicit-child-marker"
+    },
+    {
+      "provider": "codex",
+      "node": "delivery/1/implement/1/task-resume-tests-review-ac-resume-tests",
+      "mechanism": "verified-neutralizer",
+      "neutralizerId": "codex-0.162-alpha17-explicit-child-marker"
+    },
+    {
+      "provider": "claude",
+      "node": "delivery/1/implement/1/task-resume-code-execute",
+      "mechanism": "verified-neutralizer",
+      "neutralizerId": "claude-2.1.292-marker-propagation"
+    },
+    {
+      "provider": "antigravity",
+      "node": "delivery/1/implement/1/task-resume-tests-execute",
+      "mechanism": "verified-neutralizer",
+      "neutralizerId": "antigravity-1.3.5-marker-propagation"
+    },
+    {
+      "provider": "claude",
+      "node": "delivery/1/implement/1/task-auth-code-execute",
+      "mechanism": "verified-neutralizer",
+      "neutralizerId": "claude-2.1.292-marker-propagation"
+    },
+    {
+      "provider": "codex",
+      "node": "delivery/1/implement/1/task-resume-code-review-ac-resume-code",
+      "mechanism": "verified-neutralizer",
+      "neutralizerId": "codex-0.162-alpha17-explicit-child-marker"
+    }
+  ],
+  "sourceFilesUnchangedDuringPilot": true,
+  "integrity": "ok",
+  "ownedProviderProcessesRemaining": [],
+  "verdict": "passed_with_controller_recovery",
+  "privateRoot": ".deszo/acceptance/adr0001-20261015-01/pilot-02"
+}

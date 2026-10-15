@@ -1,0 +1,66 @@
+{
+  "deliveryState": {
+    "schemaVersion": 1,
+    "businessTask": "Let a reconnecting client inspect and resume its paused round.",
+    "base": {
+      "kind": "ArtifactSet",
+      "subjectId": "BASE-ROUND-1",
+      "manifest": {
+        "artifactId": "00000000-0000-4000-8000-000000000001",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    "specification": null,
+    "issues": [],
+    "documentationApproval": null,
+    "priorMapState": null,
+    "repair": null,
+    "candidate": null,
+    "finalAcceptance": null
+  },
+  "specificationState": {
+    "schemaVersion": 1,
+    "businessTask": "Let a reconnecting client inspect and resume its paused round.",
+    "base": {
+      "kind": "ArtifactSet",
+      "subjectId": "BASE-ROUND-1",
+      "manifest": {
+        "artifactId": "00000000-0000-4000-8000-000000000001",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    "specification": null,
+    "issues": [],
+    "documentationApproval": null
+  },
+  "withIssue": {
+    "schemaVersion": 1,
+    "businessTask": "Let a reconnecting client inspect and resume its paused round.",
+    "base": {
+      "kind": "ArtifactSet",
+      "subjectId": "BASE-ROUND-1",
+      "manifest": {
+        "artifactId": "00000000-0000-4000-8000-000000000001",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    "specification": null,
+    "issues": [
+      {
+        "id": "ISSUE-AUTH-1",
+        "severity": "blocker",
+        "ownerRole": "analyst",
+        "requirementRefs": [
+          "REQ-AUTH"
+        ],
+        "message": "Expiration boundary is ambiguous.",
+        "requestedChange": "Define expiration at now."
+      }
+    ],
+    "documentationApproval": null,
+    "priorMapState": null,
+    "repair": null,
+    "candidate": null,
+    "finalAcceptance": null
+  }
+}

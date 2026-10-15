@@ -1,0 +1,85 @@
+{
+  "createdAt": "2026-10-14T08:48:23.280Z",
+  "root": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\pilots\\after-fixes-encoding",
+  "prefix": "delivery/2/specification/1",
+  "runId": "8a34d37b-e278-4b46-a30e-83914da73f79",
+  "subjectId": "SPEC-6063DE4E60CA",
+  "expected": "An authorized review path can resolve an addressed Map-issued blocker.",
+  "blocked": true,
+  "issue": {
+    "id": "ISS-MAP-E52E72D8BB",
+    "message": "The specification requires CHECK-AUTH (`node --test tests/auth.test.mjs`) on the selected candidate, but the tests import `src/api.mjs` which depends on `src/auth.mjs`. Because `src/auth.mjs` is not part of the base snapshot or dependencies for TASK-AUTH-TESTS and is outside the allowed write scopes (tests/auth.test.mjs only), tests cannot execute against the candidate implementation without the auth module dependency or mock adapter.",
+    "ownerRole": "analyst",
+    "requestedChange": "Provide `src/auth.mjs` as a prerequisite dependency in the task workspace or adjust the map/task dependencies so TASK-AUTH runs after TASK-AUTH-IMPL, or permit writing a mock/stub.",
+    "requirementRefs": [
+      "CONTRACT-AUTH"
+    ],
+    "severity": "blocker"
+  },
+  "slots": [
+    {
+      "id": "customer",
+      "role": "customer"
+    },
+    {
+      "id": "readiness",
+      "role": "implementation-readiness"
+    },
+    {
+      "id": "testability",
+      "role": "testability-reviewer"
+    }
+  ],
+  "recordedVerdicts": {
+    "customer": "APPROVED",
+    "readiness": "CHANGES_REQUESTED",
+    "testability": "APPROVED"
+  },
+  "recorded": {
+    "error": {
+      "code": "output_contract",
+      "message": "Slot testability: ISS-MAP-E52E72D8BB was raised by another reviewer and can only be resolved there."
+    }
+  },
+  "allApprovedWithoutResolution": {
+    "status": "REVISION_REQUIRED",
+    "reason": "0 review(s) requested changes; 1 open blocker(s) remain.",
+    "issues": [
+      {
+        "id": "ISS-MAP-E52E72D8BB",
+        "message": "The specification requires CHECK-AUTH (`node --test tests/auth.test.mjs`) on the selected candidate, but the tests import `src/api.mjs` which depends on `src/auth.mjs`. Because `src/auth.mjs` is not part of the base snapshot or dependencies for TASK-AUTH-TESTS and is outside the allowed write scopes (tests/auth.test.mjs only), tests cannot execute against the candidate implementation without the auth module dependency or mock adapter.",
+        "ownerRole": "analyst",
+        "requestedChange": "Provide `src/auth.mjs` as a prerequisite dependency in the task workspace or adjust the map/task dependencies so TASK-AUTH runs after TASK-AUTH-IMPL, or permit writing a mock/stub.",
+        "requirementRefs": [
+          "CONTRACT-AUTH"
+        ],
+        "severity": "blocker"
+      }
+    ]
+  },
+  "eachSlotClaimsResolution": [
+    {
+      "slot": "customer",
+      "error": {
+        "code": "output_contract",
+        "message": "Slot customer: ISS-MAP-E52E72D8BB was raised by another reviewer and can only be resolved there."
+      }
+    },
+    {
+      "slot": "readiness",
+      "error": {
+        "code": "output_contract",
+        "message": "Slot readiness: ISS-MAP-E52E72D8BB was raised by another reviewer and can only be resolved there."
+      }
+    },
+    {
+      "slot": "testability",
+      "error": {
+        "code": "output_contract",
+        "message": "Slot testability: ISS-MAP-E52E72D8BB was raised by another reviewer and can only be resolved there."
+      }
+    }
+  ],
+  "sourceStoreReadOnly": true,
+  "syntheticDecisionsOnlyInMemory": true
+}

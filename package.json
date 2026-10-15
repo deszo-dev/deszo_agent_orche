@@ -1,0 +1,43 @@
+{
+  "name": "deszo",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 1420 --strictPort",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 1421",
+    "tauri": "tauri",
+    "desktop": "tauri dev",
+    "desktop:build": "npm run runtime:bundle && tauri build --no-bundle",
+    "runner": "node --disable-warning=ExperimentalWarning runtime/runner.mjs",
+    "mcp:bridge": "node --disable-warning=ExperimentalWarning mcp/bridge.mjs",
+    "test": "node --disable-warning=ExperimentalWarning --test --test-concurrency=1 runtime/tests/*.test.mjs",
+    "smoke": "node --disable-warning=ExperimentalWarning scripts/smoke.mjs",
+    "docs:check": "node docs/tools/validate-docs.mjs",
+    "runtime:bundle": "node scripts/bundle-runtime.mjs",
+    "mcp:bundle": "node scripts/bundle-runtime.mjs",
+    "runner:fixtures": "node --disable-warning=ExperimentalWarning scripts/fixture-runner.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "2.3.1",
+    "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/plugin-dialog": "^2.8.2",
+    "@xyflow/react": "^12.0.0",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
+    "lucide-react": "^0.468.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0"
+  }
+}

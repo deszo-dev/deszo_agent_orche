@@ -1,0 +1,41 @@
+{
+  "tables": [
+    "application_settings",
+    "artifacts",
+    "attempts",
+    "cache_pins",
+    "command_receipts",
+    "context_bindings",
+    "journal_events",
+    "loop_executions",
+    "loop_iterations",
+    "map_executions",
+    "map_tasks",
+    "node_instances",
+    "pipeline_records",
+    "resource_locks",
+    "run_context_bindings",
+    "runs",
+    "schema_migrations",
+    "workflows",
+    "workspaces"
+  ],
+  "cases": [
+    {
+      "id": "m5-accepts-carry-kinds",
+      "expected": "accept",
+      "sql": "SELECT COUNT(*) >= 0 FROM pipeline_records WHERE kind IN ('ReviewCarry','TaskCarry')",
+      "rows": [
+        [
+          1
+        ]
+      ]
+    },
+    {
+      "id": "m5-rejects-unknown-kind",
+      "expected": "reject",
+      "reason": "CHECK constraint failed",
+      "sql": "INSERT INTO pipeline_records(id, run_id, kind, artifact_id, created_at) SELECT 'REC-9', id, 'Carry', workflow_snapshot_artifact_id, 't' FROM runs LIMIT 1"
+    }
+  ]
+}

@@ -1,0 +1,2813 @@
+[
+  {
+    "id": "future-capability",
+    "source": {
+      "file": "docs/examples/m1-context-chain/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "semantic": "workflow",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/capabilities",
+        "value": [
+          "loops-v1"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unknown-node-config",
+    "source": {
+      "file": "docs/examples/m1-context-chain/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "semantic": "workflow",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "add",
+        "path": "/nodes/0/config/hiddenPrompt",
+        "value": "extra"
+      }
+    ]
+  },
+  {
+    "id": "flag-model",
+    "source": {
+      "file": "docs/examples/m1-context-chain/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "semantic": "workflow",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/nodes/3/config/model",
+        "value": "--provider"
+      }
+    ]
+  },
+  {
+    "id": "binding-not-uuid",
+    "source": {
+      "file": "docs/fixtures/valid/workflow-continue.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "semantic": "workflow",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/nodes/1/config/bindingId",
+        "value": "native-session-text"
+      }
+    ]
+  },
+  {
+    "id": "too-short-timeout",
+    "source": {
+      "file": "docs/examples/m1-context-chain/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "semantic": "workflow",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/nodes/3/config/timeoutSeconds",
+        "value": 4
+      }
+    ]
+  },
+  {
+    "id": "workflow-capacity-forbidden",
+    "source": {
+      "file": "docs/examples/m1-context-chain/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "semantic": "workflow",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "add",
+        "path": "/settings/globalLimit",
+        "value": 3
+      }
+    ]
+  },
+  {
+    "id": "no-provider-records",
+    "source": {
+      "file": "docs/fixtures/valid/api-payloads.json",
+      "pointer": "/capabilities"
+    },
+    "schema": "runtime-api.schema.json",
+    "definition": "capabilities",
+    "expected": "invalid",
+    "semantic": "capabilities",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/providers",
+        "value": []
+      }
+    ]
+  },
+  {
+    "id": "zero-advertised-timeout",
+    "source": {
+      "file": "docs/fixtures/valid/api-payloads.json",
+      "pointer": "/capabilities"
+    },
+    "schema": "runtime-api.schema.json",
+    "definition": "capabilities",
+    "expected": "invalid",
+    "semantic": "capabilities",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/maximumAgentTimeoutSeconds",
+        "value": 0
+      }
+    ]
+  },
+  {
+    "id": "loop-string-boolean",
+    "source": {
+      "file": "docs/fixtures/valid/loop-decisions.json",
+      "pointer": "/finish"
+    },
+    "schema": "loop-decision.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/continue",
+        "value": "false"
+      }
+    ]
+  },
+  {
+    "id": "loop-array-feedback",
+    "source": {
+      "file": "docs/fixtures/valid/loop-decisions.json",
+      "pointer": "/repeat"
+    },
+    "schema": "loop-decision.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/feedback",
+        "value": []
+      }
+    ]
+  },
+  {
+    "id": "invalid-run-state",
+    "source": {
+      "file": "docs/fixtures/valid/journal-events.json",
+      "pointer": "/run.state_changed"
+    },
+    "schema": "journal-event.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/payload/to",
+        "value": "approved"
+      }
+    ]
+  },
+  {
+    "id": "future-event",
+    "source": {
+      "file": "docs/fixtures/valid/journal-events.json",
+      "pointer": "/run.created"
+    },
+    "schema": "journal-event.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/type",
+        "value": "loop.finished"
+      },
+      {
+        "op": "replace",
+        "path": "/payload",
+        "value": {}
+      }
+    ]
+  },
+  {
+    "id": "missing-attempt-scope",
+    "source": {
+      "file": "docs/fixtures/valid/journal-events.json",
+      "pointer": "/attempt.outputs_committed"
+    },
+    "schema": "journal-event.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/nodeInstanceId",
+        "value": null
+      },
+      {
+        "op": "replace",
+        "path": "/attemptId",
+        "value": null
+      }
+    ]
+  },
+  {
+    "id": "zero-pid",
+    "source": {
+      "file": "docs/fixtures/valid/journal-events.json",
+      "pointer": "/launched"
+    },
+    "schema": "journal-event.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/payload/process/pid",
+        "value": 0
+      }
+    ]
+  },
+  {
+    "id": "unsupported-text-encoding",
+    "source": {
+      "file": "docs/fixtures/valid/values.json",
+      "pointer": "/text"
+    },
+    "schema": "value.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/encoding",
+        "value": "utf-16"
+      }
+    ]
+  },
+  {
+    "id": "unknown-task-output",
+    "source": {
+      "file": "docs/examples/round-recovery/implementation-map.json",
+      "pointer": ""
+    },
+    "schema": "implementation-map.schema.json",
+    "expected": "invalid",
+    "semantic": "map",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/tasks/4/outputs/0/type",
+        "value": "engine-guessed"
+      }
+    ]
+  },
+  {
+    "id": "early-dependency",
+    "source": {
+      "file": "docs/examples/round-recovery/implementation-map.json",
+      "pointer": ""
+    },
+    "schema": "implementation-map.schema.json",
+    "expected": "invalid",
+    "semantic": "map",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/tasks/4/dependsOn/0/milestone",
+        "value": "result_available"
+      }
+    ]
+  },
+  {
+    "id": "invalid-section-kind",
+    "source": {
+      "file": "docs/examples/round-recovery/spec-index.json",
+      "pointer": ""
+    },
+    "schema": "spec-section-index.schema.json",
+    "expected": "invalid",
+    "semantic": "sections",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/sections/1/kind",
+        "value": "check"
+      }
+    ]
+  },
+  {
+    "id": "lost-issue-id",
+    "source": {
+      "file": "docs/fixtures/valid/pipeline-states.json",
+      "pointer": "/withIssue"
+    },
+    "schema": "pipeline-state.schema.json",
+    "definition": "deliveryState",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "remove",
+        "path": "/issues/0/id"
+      }
+    ]
+  },
+  {
+    "id": "wrong-workflow-hash-name",
+    "source": {
+      "file": "docs/fixtures/valid/api-payloads.json",
+      "pointer": "/createRun"
+    },
+    "schema": "runtime-api.schema.json",
+    "definition": "createRun",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "remove",
+        "path": "/workflowSnapshotSha256"
+      },
+      {
+        "op": "add",
+        "path": "/workflowSha256",
+        "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ]
+  },
+  {
+    "id": "missing-run-workspace",
+    "source": {
+      "file": "docs/fixtures/valid/api-payloads.json",
+      "pointer": "/run"
+    },
+    "schema": "runtime-api.schema.json",
+    "definition": "run",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "remove",
+        "path": "/workspaceId"
+      }
+    ]
+  },
+  {
+    "id": "oversized-list",
+    "source": {
+      "file": "docs/fixtures/valid/api-payloads.json",
+      "pointer": "/listQuery"
+    },
+    "schema": "runtime-api.schema.json",
+    "definition": "listQuery",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/limit",
+        "value": 201
+      }
+    ]
+  },
+  {
+    "id": "missing-binding-digest-in-list",
+    "source": {
+      "file": "docs/fixtures/valid/api-payloads.json",
+      "pointer": "/contextBindings"
+    },
+    "schema": "runtime-api.schema.json",
+    "definition": "contextBindings",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "remove",
+        "path": "/bindings/0/bindingSha256"
+      }
+    ]
+  },
+  {
+    "id": "nullable-planned-attempt",
+    "source": {
+      "file": "docs/fixtures/valid/api-payloads.json",
+      "pointer": "/runSnapshot"
+    },
+    "schema": "runtime-api.schema.json",
+    "definition": "runSnapshot",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/instances/0/attemptId",
+        "value": null
+      }
+    ]
+  },
+  {
+    "id": "duplicate-slot-id",
+    "source": {
+      "file": "docs/examples/m1-context-chain/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "semantic": "workflow",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "add",
+        "path": "/nodes/4/config/slots/-",
+        "value": {
+          "id": "proposal",
+          "description": "Same ID, different object"
+        }
+      }
+    ],
+    "code": "slots.unique"
+  },
+  {
+    "id": "over-M1-timeout",
+    "source": {
+      "file": "docs/examples/m1-context-chain/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "semantic": "workflow",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/nodes/3/config/timeoutSeconds",
+        "value": 601
+      }
+    ],
+    "code": "timeout.capability"
+  },
+  {
+    "id": "dependency-cycle",
+    "source": {
+      "file": "docs/examples/m1-context-chain/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "semantic": "workflow",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "add",
+        "path": "/after/-",
+        "value": {
+          "before": "revise",
+          "after": "proposal"
+        }
+      }
+    ],
+    "code": "graph.cycle"
+  },
+  {
+    "id": "implicit-json-to-text",
+    "source": {
+      "file": "docs/examples/m1-context-chain/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "semantic": "workflow",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/edges/1/source/port",
+        "value": "json"
+      }
+    ],
+    "code": "port.type"
+  },
+  {
+    "id": "wrong-provider-context",
+    "source": {
+      "file": "docs/examples/m1-context-chain/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "semantic": "workflow",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/nodes/3/config/contextId",
+        "value": "claude-history"
+      }
+    ],
+    "code": "context.provider"
+  },
+  {
+    "id": "missing-prompt-input",
+    "source": {
+      "file": "docs/examples/m1-context-chain/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "semantic": "workflow",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "remove",
+        "path": "/edges/0"
+      }
+    ],
+    "code": "input.required"
+  },
+  {
+    "id": "unordered-context",
+    "source": {
+      "file": "docs/examples/m1-context-chain/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "semantic": "workflow",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "add",
+        "path": "/nodes/-",
+        "value": {
+          "id": "parallel",
+          "type": "agent",
+          "config": {
+            "provider": "codex",
+            "model": "explicit-test-model",
+            "contextId": "codex-history",
+            "timeoutSeconds": 600,
+            "output": {
+              "format": "json",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "message"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      },
+      {
+        "op": "add",
+        "path": "/nodes/-",
+        "value": {
+          "id": "parallel-answer",
+          "type": "result-viewer",
+          "config": {}
+        }
+      },
+      {
+        "op": "add",
+        "path": "/edges/-",
+        "value": {
+          "id": "parallel-in",
+          "source": {
+            "nodeId": "request",
+            "port": "text"
+          },
+          "target": {
+            "nodeId": "parallel",
+            "port": "prompt"
+          }
+        }
+      },
+      {
+        "op": "add",
+        "path": "/edges/-",
+        "value": {
+          "id": "parallel-out",
+          "source": {
+            "nodeId": "parallel",
+            "port": "json"
+          },
+          "target": {
+            "nodeId": "parallel-answer",
+            "port": "value"
+          }
+        }
+      }
+    ],
+    "code": "context.unordered"
+  },
+  {
+    "id": "duplicate-provider-id",
+    "source": {
+      "file": "docs/fixtures/valid/api-payloads.json",
+      "pointer": "/capabilities"
+    },
+    "schema": "runtime-api.schema.json",
+    "definition": "capabilities",
+    "expected": "invalid",
+    "semantic": "capabilities",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/providers/1/provider",
+        "value": "codex"
+      },
+      {
+        "op": "replace",
+        "path": "/providers/1/available",
+        "value": false
+      }
+    ],
+    "code": "providers.unique"
+  },
+  {
+    "id": "missing-test-cases-check-auth",
+    "source": {
+      "file": "docs/examples/round-recovery/implementation-map.json",
+      "pointer": ""
+    },
+    "schema": "implementation-map.schema.json",
+    "expected": "invalid",
+    "semantic": "map",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "remove",
+        "path": "/tasks/1/inputs/4"
+      },
+      {
+        "op": "remove",
+        "path": "/tasks/1/readScopes/6"
+      }
+    ],
+    "code": "task.check_input"
+  },
+  {
+    "id": "missing-test-cases-check-resume",
+    "source": {
+      "file": "docs/examples/round-recovery/implementation-map.json",
+      "pointer": ""
+    },
+    "schema": "implementation-map.schema.json",
+    "expected": "invalid",
+    "semantic": "map",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "remove",
+        "path": "/tasks/3/inputs/8"
+      },
+      {
+        "op": "remove",
+        "path": "/tasks/3/readScopes/10"
+      }
+    ],
+    "code": "task.check_input"
+  },
+  {
+    "id": "candidate-with-agent",
+    "source": {
+      "file": "docs/examples/round-recovery/implementation-map.json",
+      "pointer": ""
+    },
+    "schema": "implementation-map.schema.json",
+    "expected": "invalid",
+    "semantic": "map",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/tasks/4/executorRole",
+        "value": "implementer"
+      }
+    ],
+    "code": "role.candidate"
+  },
+  {
+    "id": "cyclic-task-deps",
+    "source": {
+      "file": "docs/examples/round-recovery/implementation-map.json",
+      "pointer": ""
+    },
+    "schema": "implementation-map.schema.json",
+    "expected": "invalid",
+    "semantic": "map",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "add",
+        "path": "/tasks/0/dependsOn/-",
+        "value": {
+          "taskId": "TASK-VERIFY",
+          "milestone": "accepted"
+        }
+      }
+    ],
+    "code": "task.cycle"
+  },
+  {
+    "id": "missing-section-reference",
+    "source": {
+      "file": "docs/examples/round-recovery/spec-index.json",
+      "pointer": ""
+    },
+    "schema": "spec-section-index.schema.json",
+    "expected": "invalid",
+    "semantic": "sections",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "add",
+        "path": "/sections/1/dependsOn/-",
+        "value": "REQ-MISSING"
+      }
+    ],
+    "code": "section.reference"
+  },
+  {
+    "id": "section-cycle",
+    "source": {
+      "file": "docs/examples/round-recovery/spec-index.json",
+      "pointer": ""
+    },
+    "schema": "spec-section-index.schema.json",
+    "expected": "invalid",
+    "semantic": "sections",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "add",
+        "path": "/sections/1/dependsOn/-",
+        "value": "CONTRACT-AUTH"
+      }
+    ],
+    "code": "section.cycle"
+  },
+  {
+    "id": "malformed-created-time",
+    "source": {
+      "file": "docs/fixtures/valid/api-payloads.json",
+      "pointer": "/run"
+    },
+    "schema": "runtime-api.schema.json",
+    "definition": "run",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/createdAt",
+        "value": "tomorrow"
+      }
+    ]
+  },
+  {
+    "id": "reserved-wait-in-run",
+    "source": {
+      "file": "docs/fixtures/valid/api-payloads.json",
+      "pointer": "/run"
+    },
+    "schema": "runtime-api.schema.json",
+    "definition": "run",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/state",
+        "value": "waiting_for_user"
+      }
+    ]
+  },
+  {
+    "id": "reserved-wait-in-stop-response",
+    "source": {
+      "file": "docs/fixtures/valid/api-payloads.json",
+      "pointer": "/stopResponse"
+    },
+    "schema": "runtime-api.schema.json",
+    "definition": "stopResponse",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/state",
+        "value": "waiting_for_user"
+      }
+    ]
+  },
+  {
+    "id": "reserved-wait-in-history-filter",
+    "source": {
+      "file": "docs/fixtures/valid/api-payloads.json",
+      "pointer": "/runListQuery"
+    },
+    "schema": "runtime-api.schema.json",
+    "definition": "runListQuery",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/state",
+        "value": "waiting_for_user"
+      }
+    ]
+  },
+  {
+    "id": "reserved-wait-as-next-event-state",
+    "source": {
+      "file": "docs/fixtures/valid/journal-events.json",
+      "pointer": "/run.state_changed"
+    },
+    "schema": "journal-event.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/payload/to",
+        "value": "waiting_for_user"
+      }
+    ]
+  },
+  {
+    "id": "reserved-wait-as-previous-event-state",
+    "source": {
+      "file": "docs/fixtures/valid/journal-events.json",
+      "pointer": "/run.state_changed"
+    },
+    "schema": "journal-event.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/payload/from",
+        "value": "waiting_for_user"
+      }
+    ]
+  },
+  {
+    "id": "m2-loop-needs-capability",
+    "source": {
+      "file": "docs/examples/m2-review-loop/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/capabilities",
+        "value": [
+          "core-v1"
+        ]
+      }
+    ],
+    "semantic": "workflow"
+  },
+  {
+    "id": "m2-nested-loop",
+    "source": {
+      "file": "docs/examples/m2-review-loop/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "add",
+        "path": "/nodes/3/config/body/nodes/-",
+        "value": {
+          "id": "inner",
+          "type": "loop",
+          "config": {
+            "valueType": "Text",
+            "fixedInputs": [],
+            "limits": {
+              "maxIterations": 2,
+              "maxActiveMinutes": 5
+            },
+            "body": {
+              "nodes": [
+                {
+                  "id": "x",
+                  "type": "text",
+                  "config": {
+                    "value": ""
+                  }
+                }
+              ],
+              "edges": [],
+              "after": []
+            }
+          }
+        }
+      }
+    ],
+    "semantic": "workflow"
+  },
+  {
+    "id": "m2-json-state-without-schema",
+    "source": {
+      "file": "docs/examples/m2-review-loop/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "remove",
+        "path": "/nodes/3/config/stateSchema"
+      }
+    ],
+    "semantic": "workflow"
+  },
+  {
+    "id": "m2-text-select-without-render",
+    "source": {
+      "file": "docs/examples/m2-review-loop/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "remove",
+        "path": "/nodes/3/config/body/nodes/0/config/render"
+      }
+    ],
+    "semantic": "workflow"
+  },
+  {
+    "id": "m2-too-many-iterations",
+    "source": {
+      "file": "docs/examples/m2-review-loop/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/nodes/3/config/limits/maxIterations",
+        "value": 51
+      }
+    ],
+    "semantic": "workflow"
+  },
+  {
+    "id": "m2-loop-event-in-v1-journal",
+    "source": {
+      "file": "docs/fixtures/valid/m2-payloads.json",
+      "pointer": "/events/1"
+    },
+    "schema": "journal-event.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/schemaVersion",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "id": "m2-v2-event-unknown-pause-reason",
+    "source": {
+      "file": "docs/fixtures/valid/m2-payloads.json",
+      "pointer": "/events/6"
+    },
+    "schema": "journal-event-v2.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/payload/reason",
+        "value": "tired"
+      }
+    ]
+  },
+  {
+    "id": "m2-retry-without-target",
+    "source": {
+      "file": "docs/fixtures/valid/m2-payloads.json",
+      "pointer": "/retry"
+    },
+    "schema": "runtime-api-v2.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "remove",
+        "path": "/nodeInstanceId"
+      }
+    ],
+    "definition": "recoveryRequest"
+  },
+  {
+    "id": "m2-close-with-target",
+    "source": {
+      "file": "docs/fixtures/valid/m2-payloads.json",
+      "pointer": "/close"
+    },
+    "schema": "runtime-api-v2.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "add",
+        "path": "/loopNodeId",
+        "value": "refine"
+      }
+    ],
+    "definition": "recoveryRequest"
+  },
+  {
+    "id": "m2-manifest-extra-field",
+    "source": {
+      "file": "docs/fixtures/valid/m2-payloads.json",
+      "pointer": "/artifactSetManifest"
+    },
+    "schema": "value.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "add",
+        "path": "/latest",
+        "value": true
+      }
+    ],
+    "definition": "artifactSetManifest"
+  },
+  {
+    "id": "m2-missing-return-decision",
+    "source": {
+      "file": "docs/examples/m2-review-loop/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "remove",
+        "path": "/nodes/3/config/body/edges/11"
+      }
+    ],
+    "semantic": "workflow",
+    "code": "loop.return"
+  },
+  {
+    "id": "m2-unknown-boundary-port",
+    "source": {
+      "file": "docs/examples/m2-review-loop/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/nodes/3/config/body/edges/0/source/port",
+        "value": "state"
+      }
+    ],
+    "semantic": "workflow",
+    "code": "loop.boundary"
+  },
+  {
+    "id": "m2-body-sink",
+    "source": {
+      "file": "docs/examples/m2-review-loop/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "add",
+        "path": "/nodes/3/config/body/nodes/-",
+        "value": {
+          "id": "stray",
+          "type": "text",
+          "config": {
+            "value": "unused"
+          }
+        }
+      }
+    ],
+    "semantic": "workflow",
+    "code": "node.sink"
+  },
+  {
+    "id": "m2-body-cycle",
+    "source": {
+      "file": "docs/examples/m2-review-loop/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "add",
+        "path": "/nodes/3/config/body/after/-",
+        "value": {
+          "before": "next-state",
+          "after": "current-draft"
+        }
+      }
+    ],
+    "semantic": "workflow",
+    "code": "graph.cycle"
+  },
+  {
+    "id": "m2-iteration-context-outside-body",
+    "source": {
+      "file": "docs/examples/m2-review-loop/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "add",
+        "path": "/nodes/2/config/lifetime",
+        "value": "iteration"
+      }
+    ],
+    "semantic": "workflow",
+    "code": "context.lifetime"
+  },
+  {
+    "id": "m2-record-undeclared-input",
+    "source": {
+      "file": "docs/examples/m2-review-loop/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/nodes/3/config/body/nodes/5/config/fields/0/source/input",
+        "value": "missing"
+      }
+    ],
+    "semantic": "workflow",
+    "code": "merge.field"
+  },
+  {
+    "id": "m2-record-pointer-on-text",
+    "source": {
+      "file": "docs/examples/m2-review-loop/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "add",
+        "path": "/nodes/3/config/body/nodes/5/config/fields/0/source/pointer",
+        "value": "/x"
+      }
+    ],
+    "semantic": "workflow",
+    "code": "merge.pointer"
+  },
+  {
+    "id": "m2-duplicate-body-id",
+    "source": {
+      "file": "docs/examples/m2-review-loop/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/nodes/3/config/body/nodes/0/id",
+        "value": "task"
+      }
+    ],
+    "semantic": "workflow",
+    "code": "nodes.unique"
+  },
+  {
+    "id": "m2-loops-field-in-core",
+    "source": {
+      "file": "docs/examples/m1-context-chain/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "add",
+        "path": "/nodes/3/config/attachFiles",
+        "value": false
+      }
+    ],
+    "semantic": "workflow",
+    "code": "capability.loops"
+  },
+  {
+    "id": "m2-file-path-escape",
+    "source": {
+      "file": "docs/examples/m2-review-loop/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "add",
+        "path": "/nodes/-",
+        "value": {
+          "id": "notes",
+          "type": "file-input",
+          "config": {
+            "mode": "files",
+            "paths": [
+              "../secrets.txt"
+            ]
+          }
+        }
+      },
+      {
+        "op": "add",
+        "path": "/nodes/-",
+        "value": {
+          "id": "notes-view",
+          "type": "result-viewer",
+          "config": {}
+        }
+      },
+      {
+        "op": "add",
+        "path": "/edges/-",
+        "value": {
+          "id": "notes-viewer",
+          "source": {
+            "nodeId": "notes",
+            "port": "value"
+          },
+          "target": {
+            "nodeId": "notes-view",
+            "port": "value"
+          }
+        }
+      }
+    ],
+    "semantic": "workflow",
+    "code": "file.path"
+  },
+  {
+    "id": "m2-unordered-outer-context",
+    "source": {
+      "file": "docs/examples/m2-review-loop/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "add",
+        "path": "/nodes/-",
+        "value": {
+          "id": "probe",
+          "type": "agent",
+          "config": {
+            "provider": "codex",
+            "model": "explicit-test-model",
+            "contextId": "writer-history",
+            "timeoutSeconds": 60,
+            "output": {
+              "format": "text"
+            }
+          }
+        }
+      },
+      {
+        "op": "add",
+        "path": "/nodes/-",
+        "value": {
+          "id": "probe-view",
+          "type": "result-viewer",
+          "config": {}
+        }
+      },
+      {
+        "op": "add",
+        "path": "/edges/-",
+        "value": {
+          "id": "task-probe",
+          "source": {
+            "nodeId": "task",
+            "port": "text"
+          },
+          "target": {
+            "nodeId": "probe",
+            "port": "prompt"
+          }
+        }
+      },
+      {
+        "op": "add",
+        "path": "/edges/-",
+        "value": {
+          "id": "probe-viewer",
+          "source": {
+            "nodeId": "probe",
+            "port": "text"
+          },
+          "target": {
+            "nodeId": "probe-view",
+            "port": "value"
+          }
+        }
+      }
+    ],
+    "semantic": "workflow",
+    "code": "context.unordered"
+  },
+  {
+    "id": "m2-boundary-in-outer-graph",
+    "source": {
+      "file": "docs/examples/m2-review-loop/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "add",
+        "path": "/edges/-",
+        "value": {
+          "id": "outer-return",
+          "source": {
+            "nodeId": "task",
+            "port": "text"
+          },
+          "target": {
+            "nodeId": "answer",
+            "port": "value"
+          }
+        }
+      }
+    ],
+    "semantic": "workflow",
+    "code": "input.required"
+  },
+  {
+    "id": "m34-cache-needs-capability",
+    "source": {
+      "file": "docs/examples/m3-cache/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/capabilities",
+        "value": [
+          "core-v1"
+        ]
+      }
+    ],
+    "semantic": "workflow"
+  },
+  {
+    "id": "m34-gate-needs-pipeline",
+    "source": {
+      "file": "docs/examples/m4-specification-loop/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/capabilities",
+        "value": [
+          "core-v1",
+          "loops-v1"
+        ]
+      }
+    ],
+    "semantic": "workflow"
+  },
+  {
+    "id": "m34-pipeline-needs-loops",
+    "source": {
+      "file": "docs/examples/m3-cache/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/capabilities",
+        "value": [
+          "core-v1",
+          "cache-v1",
+          "pipeline-v1"
+        ]
+      }
+    ],
+    "semantic": "workflow"
+  },
+  {
+    "id": "m34-duplicate-capability",
+    "source": {
+      "file": "docs/examples/m3-cache/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/capabilities",
+        "value": [
+          "core-v1",
+          "cache-v1",
+          "cache-v1"
+        ]
+      }
+    ],
+    "semantic": "workflow"
+  },
+  {
+    "id": "m34-route-without-cases",
+    "source": {
+      "file": "docs/examples/m4-specification-loop/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/nodes/2/config/body/nodes/3/config/cases",
+        "value": []
+      }
+    ],
+    "semantic": "workflow"
+  },
+  {
+    "id": "m34-unknown-gate-mode",
+    "source": {
+      "file": "docs/examples/m4-specification-loop/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/nodes/2/config/body/nodes/2/config/mode",
+        "value": "approve"
+      }
+    ],
+    "semantic": "workflow"
+  },
+  {
+    "id": "m34-selected-merge-one-input",
+    "source": {
+      "file": "docs/examples/m4-specification-loop/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/nodes/2/config/body/nodes/5/config/inputs",
+        "value": [
+          {
+            "id": "approved"
+          }
+        ]
+      }
+    ],
+    "semantic": "workflow"
+  },
+  {
+    "id": "m34-approved-with-blocker",
+    "source": {
+      "file": "docs/fixtures/valid/m34-payloads.json",
+      "pointer": "/reviewApproved"
+    },
+    "schema": "review-decision.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/issues/0/severity",
+        "value": "blocker"
+      }
+    ]
+  },
+  {
+    "id": "m34-rejected-without-blocker",
+    "source": {
+      "file": "docs/fixtures/valid/m34-payloads.json",
+      "pointer": "/reviewRejected"
+    },
+    "schema": "review-decision.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/issues/0/severity",
+        "value": "suggestion"
+      }
+    ]
+  },
+  {
+    "id": "m34-review-extra-field",
+    "source": {
+      "file": "docs/fixtures/valid/m34-payloads.json",
+      "pointer": "/reviewApproved"
+    },
+    "schema": "review-decision.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "add",
+        "path": "/approvedBy",
+        "value": "me"
+      }
+    ]
+  },
+  {
+    "id": "m34-open-report-without-certificate",
+    "source": {
+      "file": "docs/fixtures/valid/m34-payloads.json",
+      "pointer": "/reportOpen"
+    },
+    "schema": "gate.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/certificate",
+        "value": null
+      }
+    ],
+    "definition": "report"
+  },
+  {
+    "id": "m34-revision-report-with-certificate",
+    "source": {
+      "file": "docs/fixtures/valid/m34-payloads.json",
+      "pointer": "/reportRevision"
+    },
+    "schema": "gate.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/certificate",
+        "value": {
+          "recordId": "CERT-0123456789AB",
+          "artifact": {
+            "artifactId": "00000000-0000-4000-8000-000000000030",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        }
+      }
+    ],
+    "definition": "report"
+  },
+  {
+    "id": "m34-node-mode-two-targets",
+    "source": {
+      "file": "docs/fixtures/valid/m34-payloads.json",
+      "pointer": "/createNode"
+    },
+    "schema": "runtime-api-v2.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/targets",
+        "value": [
+          "review",
+          "research"
+        ]
+      }
+    ],
+    "definition": "createRun"
+  },
+  {
+    "id": "m34-workflow-mode-with-targets",
+    "source": {
+      "file": "docs/fixtures/valid/m34-payloads.json",
+      "pointer": "/createBranch"
+    },
+    "schema": "runtime-api-v2.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "remove",
+        "path": "/mode"
+      }
+    ],
+    "definition": "createRun"
+  },
+  {
+    "id": "m34-unknown-attempt-state",
+    "source": {
+      "file": "docs/fixtures/valid/m34-payloads.json",
+      "pointer": "/events/6"
+    },
+    "schema": "journal-event-v2.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/payload/to",
+        "value": "approved"
+      }
+    ]
+  },
+  {
+    "id": "m34-nested-cache-without-capability",
+    "source": {
+      "file": "docs/examples/m2-review-loop/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "add",
+        "path": "/nodes/3/config/body/nodes/-",
+        "value": {
+          "id": "memo",
+          "type": "cache",
+          "config": {
+            "valueType": "Text",
+            "mode": "live"
+          }
+        }
+      }
+    ],
+    "semantic": "workflow",
+    "code": "capability.cache"
+  },
+  {
+    "id": "m34-review-from-template",
+    "source": {
+      "file": "docs/examples/m4-specification-loop/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/nodes/2/config/body/nodes/4/config/body/edges/14/source",
+        "value": {
+          "nodeId": "plan-text",
+          "port": "value"
+        }
+      }
+    ],
+    "semantic": "workflow",
+    "code": "gate.review-source"
+  },
+  {
+    "id": "m34-reserved-slot",
+    "source": {
+      "file": "docs/examples/m4-specification-loop/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/nodes/2/config/body/nodes/4/config/body/nodes/7/config/policy/slots/0/id",
+        "value": "plan"
+      }
+    ],
+    "semantic": "workflow",
+    "code": "gate.slot"
+  },
+  {
+    "id": "m34-duplicate-route-case",
+    "source": {
+      "file": "docs/examples/m4-specification-loop/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/nodes/2/config/body/nodes/3/config/cases/1/id",
+        "value": "approved"
+      }
+    ],
+    "semantic": "workflow",
+    "code": "route.cases"
+  },
+  {
+    "id": "m34-frozen-cache-decides",
+    "source": {
+      "file": "docs/examples/m2-review-loop/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/capabilities",
+        "value": [
+          "core-v1",
+          "loops-v1",
+          "cache-v1"
+        ]
+      },
+      {
+        "op": "add",
+        "path": "/nodes/3/config/body/nodes/-",
+        "value": {
+          "id": "memo",
+          "type": "cache",
+          "config": {
+            "valueType": "JsonValue",
+            "mode": "frozen"
+          }
+        }
+      },
+      {
+        "op": "replace",
+        "path": "/nodes/3/config/body/edges/11/source",
+        "value": {
+          "nodeId": "memo",
+          "port": "value"
+        }
+      },
+      {
+        "op": "add",
+        "path": "/nodes/3/config/body/edges/-",
+        "value": {
+          "id": "checker-memo",
+          "source": {
+            "nodeId": "checker",
+            "port": "json"
+          },
+          "target": {
+            "nodeId": "memo",
+            "port": "value"
+          }
+        }
+      }
+    ],
+    "semantic": "workflow",
+    "code": "cache.decision"
+  },
+  {
+    "id": "m34-loop-too-deep",
+    "source": {
+      "file": "docs/examples/m4-specification-loop/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "add",
+        "path": "/nodes/2/config/body/nodes/4/config/body/nodes/-",
+        "value": {
+          "id": "level-3",
+          "type": "loop",
+          "config": {
+            "valueType": "Text",
+            "fixedInputs": [],
+            "limits": {
+              "maxIterations": 2,
+              "maxActiveMinutes": 5
+            },
+            "body": {
+              "nodes": [
+                {
+                  "id": "level-4",
+                  "type": "loop",
+                  "config": {
+                    "valueType": "Text",
+                    "fixedInputs": [],
+                    "limits": {
+                      "maxIterations": 2,
+                      "maxActiveMinutes": 5
+                    },
+                    "body": {
+                      "nodes": [
+                        {
+                          "id": "stop-4",
+                          "type": "condition",
+                          "config": {
+                            "doneWhen": {
+                              "pointer": "",
+                              "op": "equals",
+                              "value": 1
+                            },
+                            "reason": {
+                              "literal": "done"
+                            },
+                            "feedback": {
+                              "literal": ""
+                            }
+                          }
+                        }
+                      ],
+                      "edges": [
+                        {
+                          "id": "d4-it",
+                          "source": {
+                            "nodeId": "$input",
+                            "port": "iteration"
+                          },
+                          "target": {
+                            "nodeId": "stop-4",
+                            "port": "value"
+                          }
+                        },
+                        {
+                          "id": "d4-c",
+                          "source": {
+                            "nodeId": "$input",
+                            "port": "value"
+                          },
+                          "target": {
+                            "nodeId": "$return",
+                            "port": "candidate"
+                          }
+                        },
+                        {
+                          "id": "d4-d",
+                          "source": {
+                            "nodeId": "stop-4",
+                            "port": "decision"
+                          },
+                          "target": {
+                            "nodeId": "$return",
+                            "port": "decision"
+                          }
+                        }
+                      ],
+                      "after": []
+                    }
+                  }
+                },
+                {
+                  "id": "stop-3",
+                  "type": "condition",
+                  "config": {
+                    "doneWhen": {
+                      "pointer": "",
+                      "op": "equals",
+                      "value": 1
+                    },
+                    "reason": {
+                      "literal": "done"
+                    },
+                    "feedback": {
+                      "literal": ""
+                    }
+                  }
+                }
+              ],
+              "edges": [
+                {
+                  "id": "d3-seed",
+                  "source": {
+                    "nodeId": "$input",
+                    "port": "value"
+                  },
+                  "target": {
+                    "nodeId": "level-4",
+                    "port": "seed"
+                  }
+                },
+                {
+                  "id": "d3-it",
+                  "source": {
+                    "nodeId": "$input",
+                    "port": "iteration"
+                  },
+                  "target": {
+                    "nodeId": "stop-3",
+                    "port": "value"
+                  }
+                },
+                {
+                  "id": "d3-c",
+                  "source": {
+                    "nodeId": "level-4",
+                    "port": "result"
+                  },
+                  "target": {
+                    "nodeId": "$return",
+                    "port": "candidate"
+                  }
+                },
+                {
+                  "id": "d3-d",
+                  "source": {
+                    "nodeId": "stop-3",
+                    "port": "decision"
+                  },
+                  "target": {
+                    "nodeId": "$return",
+                    "port": "decision"
+                  }
+                }
+              ],
+              "after": []
+            }
+          }
+        }
+      },
+      {
+        "op": "add",
+        "path": "/nodes/2/config/body/nodes/4/config/body/nodes/-",
+        "value": {
+          "id": "deep-text",
+          "type": "text",
+          "config": {
+            "value": "x"
+          }
+        }
+      },
+      {
+        "op": "add",
+        "path": "/nodes/2/config/body/nodes/4/config/body/nodes/-",
+        "value": {
+          "id": "deep-join",
+          "type": "merge",
+          "config": {
+            "mode": "text",
+            "inputs": [
+              {
+                "id": "a"
+              }
+            ],
+            "separator": ""
+          }
+        }
+      },
+      {
+        "op": "add",
+        "path": "/nodes/2/config/body/nodes/4/config/body/edges/-",
+        "value": {
+          "id": "deep-seed",
+          "source": {
+            "nodeId": "deep-text",
+            "port": "text"
+          },
+          "target": {
+            "nodeId": "level-3",
+            "port": "seed"
+          }
+        }
+      },
+      {
+        "op": "add",
+        "path": "/nodes/2/config/body/nodes/4/config/body/after/-",
+        "value": {
+          "before": "level-3",
+          "after": "carry"
+        }
+      }
+    ],
+    "semantic": "workflow",
+    "code": "loop.depth"
+  },
+  {
+    "id": "m5-map-needs-delivery",
+    "source": {
+      "file": "docs/examples/m5-delivery/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/capabilities",
+        "value": [
+          "core-v1",
+          "loops-v1",
+          "pipeline-v1"
+        ]
+      }
+    ],
+    "semantic": "workflow"
+  },
+  {
+    "id": "m5-delivery-needs-pipeline",
+    "source": {
+      "file": "docs/examples/m5-delivery/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/capabilities",
+        "value": [
+          "core-v1",
+          "loops-v1",
+          "delivery-v1"
+        ]
+      }
+    ],
+    "semantic": "workflow"
+  },
+  {
+    "id": "m5-unknown-optional-input",
+    "source": {
+      "file": "docs/examples/m5-delivery/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/nodes/14/config/optionalInputs",
+        "value": [
+          "priorState"
+        ]
+      }
+    ],
+    "semantic": "workflow"
+  },
+  {
+    "id": "m5-utility-with-model",
+    "source": {
+      "file": "docs/examples/m5-delivery/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "add",
+        "path": "/nodes/14/config/roles/4/model",
+        "value": "sonnet"
+      }
+    ],
+    "semantic": "workflow"
+  },
+  {
+    "id": "m5-limit-zero",
+    "source": {
+      "file": "docs/examples/m5-delivery/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/nodes/14/config/limits/maxFailedVerificationCycles",
+        "value": 0
+      }
+    ],
+    "semantic": "workflow"
+  },
+  {
+    "id": "m5-triage-not-agent",
+    "source": {
+      "file": "docs/examples/m5-delivery/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/nodes/14/config/roles/4/embeddedRoles/triage",
+        "value": "verification"
+      }
+    ],
+    "semantic": "workflow",
+    "code": "map.roles"
+  },
+  {
+    "id": "m5-duplicate-role",
+    "source": {
+      "file": "docs/examples/m5-delivery/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/nodes/14/config/roles/1/id",
+        "value": "implementer"
+      }
+    ],
+    "semantic": "workflow",
+    "code": "map.roles"
+  },
+  {
+    "id": "m5-role-context-missing",
+    "source": {
+      "file": "docs/examples/m5-delivery/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/nodes/14/config/roles/3/context",
+        "value": {
+          "contextId": "nowhere"
+        }
+      }
+    ],
+    "semantic": "workflow",
+    "code": "map.context"
+  },
+  {
+    "id": "m5-role-context-provider",
+    "source": {
+      "file": "docs/examples/m5-delivery/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/nodes/14/config/roles/3/provider",
+        "value": "claude"
+      }
+    ],
+    "semantic": "workflow",
+    "code": "map.context"
+  },
+  {
+    "id": "m5-review-blocker-approved",
+    "source": {
+      "file": "docs/fixtures/valid/m5-payloads.json",
+      "pointer": "/taskReview"
+    },
+    "schema": "map.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "add",
+        "path": "/issues/-",
+        "value": {
+          "localId": "x",
+          "severity": "blocker",
+          "requirementRefs": [],
+          "message": "m",
+          "requestedChange": "c"
+        }
+      }
+    ],
+    "definition": "taskReview"
+  },
+  {
+    "id": "m5-triage-without-target",
+    "source": {
+      "file": "docs/fixtures/valid/m5-payloads.json",
+      "pointer": "/triage"
+    },
+    "schema": "map.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/affectedTaskIds",
+        "value": []
+      }
+    ],
+    "definition": "triageDecision"
+  },
+  {
+    "id": "m5-spec-triage-without-refs",
+    "source": {
+      "file": "docs/fixtures/valid/m5-payloads.json",
+      "pointer": "/triage"
+    },
+    "schema": "map.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/cause",
+        "value": "specification"
+      }
+    ],
+    "definition": "triageDecision"
+  },
+  {
+    "id": "m5-check-modified-source",
+    "source": {
+      "file": "docs/fixtures/valid/m5-payloads.json",
+      "pointer": "/checkReport"
+    },
+    "schema": "map.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/sourceIntegrity",
+        "value": "modified"
+      }
+    ],
+    "definition": "checkReport"
+  },
+  {
+    "id": "m5-delete-operation",
+    "source": {
+      "file": "docs/fixtures/valid/m5-payloads.json",
+      "pointer": "/taskResult"
+    },
+    "schema": "map.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/operations/0",
+        "value": {
+          "op": "delete",
+          "path": "src/auth.mjs",
+          "preimage": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        }
+      }
+    ],
+    "definition": "taskResult"
+  },
+  {
+    "id": "m5-complete-with-issues",
+    "source": {
+      "file": "docs/fixtures/valid/m5-payloads.json",
+      "pointer": "/summary"
+    },
+    "schema": "map.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/issues",
+        "value": [
+          {
+            "id": "ISS-MAP-0123456789",
+            "severity": "blocker",
+            "ownerRole": "implementer",
+            "requirementRefs": [
+              "REQ-AUTH"
+            ],
+            "message": "CHECK-AUTH exited 1.",
+            "requestedChange": "Treat expiresAt <= now as expired."
+          }
+        ]
+      }
+    ],
+    "definition": "summary"
+  },
+  {
+    "id": "m5-revision-without-issues",
+    "source": {
+      "file": "docs/fixtures/valid/m5-payloads.json",
+      "pointer": "/summary"
+    },
+    "schema": "map.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/outcome",
+        "value": "specification_revision_required"
+      }
+    ],
+    "definition": "summary"
+  },
+  {
+    "id": "m5-raise-map-limit-without-limits",
+    "source": {
+      "file": "docs/fixtures/valid/m5-payloads.json",
+      "pointer": "/raiseMapLimit"
+    },
+    "schema": "runtime-api-v2.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "remove",
+        "path": "/maxTaskAttempts"
+      }
+    ],
+    "definition": "recoveryRequest"
+  },
+  {
+    "id": "m5-unknown-map-pause",
+    "source": {
+      "file": "docs/fixtures/valid/m5-payloads.json",
+      "pointer": "/events/4"
+    },
+    "schema": "journal-event-v2.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/payload/reason",
+        "value": "tired"
+      }
+    ]
+  },
+  {
+    "id": "m6-revisions-needs-delivery",
+    "source": {
+      "file": "docs/examples/m6-selective-delivery/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/capabilities",
+        "value": [
+          "core-v1",
+          "loops-v1",
+          "pipeline-v1",
+          "revisions-v1"
+        ]
+      }
+    ],
+    "semantic": "workflow"
+  },
+  {
+    "id": "m6-carry-on-evaluate",
+    "source": {
+      "file": "docs/examples/m6-selective-delivery/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "add",
+        "path": "/nodes/8/config/carry",
+        "value": true
+      }
+    ],
+    "semantic": "workflow"
+  },
+  {
+    "id": "m6-empty-scope-refs",
+    "source": {
+      "file": "docs/examples/m6-selective-delivery/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "add",
+        "path": "/nodes/6/config/policy/slots/0/scopeRefs",
+        "value": []
+      }
+    ],
+    "semantic": "workflow"
+  },
+  {
+    "id": "m6-carry-needs-capability",
+    "source": {
+      "file": "docs/examples/m6-selective-delivery/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/capabilities",
+        "value": [
+          "core-v1",
+          "loops-v1",
+          "pipeline-v1",
+          "delivery-v1"
+        ]
+      }
+    ],
+    "semantic": "workflow",
+    "code": "capability.revisions"
+  },
+  {
+    "id": "m6-joined-review-two-agents",
+    "source": {
+      "file": "docs/examples/m6-selective-delivery/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/edges/16/source",
+        "value": {
+          "nodeId": "readiness-review",
+          "port": "json"
+        }
+      }
+    ],
+    "semantic": "workflow",
+    "code": "gate.review-source"
+  },
+  {
+    "id": "m6-need-live-with-carry",
+    "source": {
+      "file": "docs/fixtures/valid/m6-payloads.json",
+      "pointer": "/needCarried"
+    },
+    "schema": "gate.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/needsReview",
+        "value": true
+      }
+    ],
+    "definition": "reviewNeed"
+  },
+  {
+    "id": "m6-need-carried-without-request",
+    "source": {
+      "file": "docs/fixtures/valid/m6-payloads.json",
+      "pointer": "/needCarried"
+    },
+    "schema": "gate.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/carry",
+        "value": null
+      }
+    ],
+    "definition": "reviewNeed"
+  },
+  {
+    "id": "m6-carry-rejected-verdict",
+    "source": {
+      "file": "docs/fixtures/valid/m6-payloads.json",
+      "pointer": "/reviewCarry"
+    },
+    "schema": "gate.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/verdict",
+        "value": "CHANGES_REQUESTED"
+      }
+    ],
+    "definition": "reviewCarry"
+  },
+  {
+    "id": "m6-task-carry-without-fingerprint",
+    "source": {
+      "file": "docs/fixtures/valid/m6-payloads.json",
+      "pointer": "/taskCarry"
+    },
+    "schema": "map.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "remove",
+        "path": "/fingerprint"
+      }
+    ],
+    "definition": "taskCarry"
+  },
+  {
+    "id": "m6-unknown-record-kind",
+    "source": {
+      "file": "docs/fixtures/valid/m6-payloads.json",
+      "pointer": "/events/1"
+    },
+    "schema": "journal-event-v2.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/payload/kind",
+        "value": "Opinion"
+      }
+    ]
+  },
+  {
+    "id": "rf-delivery-without-spec-policy",
+    "source": {
+      "file": "docs/examples/reference-delivery/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "remove",
+        "path": "/nodes/5/config/body/nodes/18/config/specificationPolicy"
+      }
+    ],
+    "semantic": "workflow"
+  },
+  {
+    "id": "rf-delivery-with-carry",
+    "source": {
+      "file": "docs/examples/reference-delivery/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "add",
+        "path": "/nodes/5/config/body/nodes/18/config/carry",
+        "value": true
+      }
+    ],
+    "semantic": "workflow"
+  },
+  {
+    "id": "rf-delivery-on-evaluate",
+    "source": {
+      "file": "docs/examples/reference-delivery/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/nodes/5/config/body/nodes/18/config/mode",
+        "value": "evaluate"
+      }
+    ],
+    "semantic": "workflow"
+  },
+  {
+    "id": "rf-spec-policy-without-delivery",
+    "source": {
+      "file": "docs/examples/reference-delivery/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "remove",
+        "path": "/nodes/5/config/body/nodes/18/config/subject"
+      }
+    ],
+    "semantic": "workflow"
+  },
+  {
+    "id": "rf-reserved-delivery-slot",
+    "source": {
+      "file": "docs/examples/reference-delivery/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "expected": "invalid",
+    "phase": "semantic",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/nodes/5/config/body/nodes/18/config/policy/slots/0/id",
+        "value": "candidate"
+      }
+    ],
+    "semantic": "workflow",
+    "code": "gate.slot"
+  },
+  {
+    "id": "rf-delivery-certificate-without-prerequisites",
+    "source": {
+      "file": "docs/fixtures/valid/review-fix-payloads.json",
+      "pointer": "/deliveryCertificate"
+    },
+    "schema": "gate.schema.json",
+    "expected": "invalid",
+    "phase": "schema",
+    "mutations": [
+      {
+        "op": "remove",
+        "path": "/prerequisites"
+      }
+    ],
+    "definition": "certificate"
+  },
+  {
+    "id": "pilot-free-form-output",
+    "source": {
+      "file": "docs/examples/m2-review-loop/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "semantic": "workflow",
+    "expected": "invalid",
+    "phase": "semantic",
+    "code": "output.transport",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/nodes/3/config/body/nodes/4/config/output/schema",
+        "value": {
+          "type": "object"
+        }
+      }
+    ]
+  },
+  {
+    "id": "pilot-open-map-output",
+    "source": {
+      "file": "docs/examples/m2-review-loop/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "semantic": "workflow",
+    "expected": "invalid",
+    "phase": "semantic",
+    "code": "output.transport",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/nodes/3/config/body/nodes/4/config/output/schema",
+        "value": {
+          "type": "object",
+          "properties": {
+            "a": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "id": "pilot-array-root-output",
+    "source": {
+      "file": "docs/examples/m2-review-loop/workflow.json",
+      "pointer": ""
+    },
+    "schema": "workflow.schema.json",
+    "semantic": "workflow",
+    "expected": "invalid",
+    "phase": "semantic",
+    "code": "output.transport",
+    "mutations": [
+      {
+        "op": "replace",
+        "path": "/nodes/3/config/body/nodes/4/config/output/schema",
+        "value": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    ]
+  }
+]

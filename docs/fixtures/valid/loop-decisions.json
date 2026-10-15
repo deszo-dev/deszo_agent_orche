@@ -1,0 +1,12 @@
+{
+  "finish": {
+    "continue": false,
+    "reason": "Done",
+    "feedback": ""
+  },
+  "repeat": {
+    "continue": true,
+    "reason": "Needs revision",
+    "feedback": "Resolve the carried issues"
+  }
+}

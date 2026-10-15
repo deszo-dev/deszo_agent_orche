@@ -1,0 +1,27 @@
+{
+  "passed": true,
+  "startedAt": "2026-10-14T08:41:29.463Z",
+  "finishedAt": "2026-10-14T08:41:32.160Z",
+  "exe": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\pilots\\after-fixes-desktop\\installed\\deszo.exe",
+  "storage": "C:\\Users\\jusse\\AppData\\Local\\local.deszo.pilot20261014fixed",
+  "productionAdapters": true,
+  "realCliInvocations": 0,
+  "integrity": "ok",
+  "phases": [
+    {
+      "phase": "installed-startup",
+      "app": {
+        "pid": 22252,
+        "path": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\pilots\\after-fixes-desktop\\installed\\deszo.exe",
+        "startedAt": "2026-10-14T08:41:29.7645322Z"
+      },
+      "runtime": {
+        "pid": 23308,
+        "path": "C:\\Program Files\\nodejs\\node.exe",
+        "startedAt": "2026-10-14T08:41:30.8318806Z"
+      },
+      "port": 65467,
+      "containment": "tauri-job"
+    }
+  ]
+}

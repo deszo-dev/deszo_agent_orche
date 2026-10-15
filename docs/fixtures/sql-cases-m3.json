@@ -1,0 +1,131 @@
+{
+  "tables": [
+    "schema_migrations",
+    "artifacts",
+    "application_settings",
+    "workspaces",
+    "workflows",
+    "runs",
+    "node_instances",
+    "context_bindings",
+    "run_context_bindings",
+    "attempts",
+    "journal_events",
+    "command_receipts",
+    "resource_locks",
+    "loop_executions",
+    "loop_iterations",
+    "cache_pins",
+    "pipeline_records"
+  ],
+  "cases": [
+    {
+      "id": "migration-3-keeps-attempts",
+      "expected": "accept",
+      "sql": "SELECT id, state FROM attempts WHERE id='a1'",
+      "rows": [
+        [
+          "a1",
+          "blocked"
+        ]
+      ]
+    },
+    {
+      "id": "reused-attempt-state",
+      "expected": "accept",
+      "sql": "INSERT INTO attempts(id,run_id,node_instance_id,ordinal,state) VALUES ('a9','r1','proposal',2,'reused')"
+    },
+    {
+      "id": "skipped-instance-state",
+      "expected": "accept",
+      "sql": "UPDATE node_instances SET state='skipped' WHERE run_id='r1' AND id='refine/2/proposal'"
+    },
+    {
+      "id": "unknown-attempt-state",
+      "expected": "reject",
+      "reason": "CHECK constraint failed",
+      "sql": "UPDATE attempts SET state='approved' WHERE id='a9'"
+    },
+    {
+      "id": "loop-execution-still-references-attempt",
+      "expected": "accept",
+      "sql": "SELECT COUNT(*) FROM loop_executions JOIN attempts ON attempts.id = loop_executions.attempt_id",
+      "rows": [
+        [
+          1
+        ]
+      ]
+    },
+    {
+      "id": "runs-default-to-workflow-kind",
+      "expected": "accept",
+      "sql": "SELECT DISTINCT kind FROM runs",
+      "rows": [
+        [
+          "workflow"
+        ]
+      ]
+    },
+    {
+      "id": "unknown-run-kind",
+      "expected": "reject",
+      "reason": "CHECK constraint failed",
+      "sql": "UPDATE runs SET kind='batch' WHERE id='r1'"
+    },
+    {
+      "id": "system-workflow-kind",
+      "expected": "accept",
+      "sql": "INSERT INTO workflows(id,snapshot_artifact_id,created_at,updated_at,kind) VALUES ('context-chat','artifact',?,?,'system')",
+      "params": [
+        "2026-10-13T12:00:00Z",
+        "2026-10-13T12:00:00Z"
+      ]
+    },
+    {
+      "id": "cache-pin-accepted",
+      "expected": "accept",
+      "sql": "INSERT INTO cache_pins VALUES ('wf','checkpoint','{}','r1','a1',?,?)",
+      "params": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "2026-10-13T12:00:00Z"
+      ]
+    },
+    {
+      "id": "cache-pin-needs-source-attempt",
+      "expected": "reject",
+      "reason": "FOREIGN KEY constraint failed",
+      "sql": "INSERT INTO cache_pins VALUES ('wf','other','{}','r2','a1',?,?)",
+      "params": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "2026-10-13T12:00:00Z"
+      ]
+    },
+    {
+      "id": "one-pin-per-node",
+      "expected": "reject",
+      "reason": "UNIQUE constraint failed",
+      "sql": "INSERT INTO cache_pins VALUES ('wf','checkpoint','{}','r1','a1',?,?)",
+      "params": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "2026-10-13T12:00:00Z"
+      ]
+    },
+    {
+      "id": "pipeline-record-accepted",
+      "expected": "accept",
+      "sql": "INSERT INTO pipeline_records VALUES ('CERT-1','r1','GateCertificate','artifact',?)",
+      "params": [
+        "2026-10-13T12:00:00Z"
+      ]
+    },
+    {
+      "id": "pipeline-record-kind-checked",
+      "expected": "reject",
+      "reason": "CHECK constraint failed",
+      "sql": "INSERT INTO pipeline_records VALUES ('APPROVAL-1','r1','Approval','artifact',?)",
+      "params": [
+        "2026-10-13T12:00:00Z"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "status": "verified-for-listed-versions-and-scopes",
+  "updatedAt": "2026-10-15",
+  "entries": [
+    {
+      "provider": "codex",
+      "testedVersion": "codex-cli 0.162.0-alpha.17.2",
+      "status": "verified",
+      "neutralizer": {
+        "id": "codex-0.162-alpha17-explicit-child-marker",
+        "kind": "codex-explicit-mcp-marker",
+        "scopes": [
+          "user",
+          "project"
+        ]
+      },
+      "evidence": "../pilots/evidence/2026-10-15-authoring-compatibility.json",
+      "notes": "Exact version only: Restricted exec --ignore-user-config omits observed user/project MCP transports; Inherit needs exec-level explicit child markers for each simple named server. Injecting env-only overrides into omitted transports fails config parsing. New and Continue are verified for both profiles."
+    },
+    {
+      "provider": "claude",
+      "testedVersion": "2.1.292 (Claude Code)",
+      "status": "verified",
+      "neutralizer": {
+        "id": "claude-2.1.292-marker-propagation",
+        "kind": "marker-propagation",
+        "scopes": [
+          "user",
+          "project"
+        ]
+      },
+      "evidence": "../pilots/evidence/2026-10-15-authoring-compatibility.json",
+      "notes": "Native New and Continue calls returned managed_invocation_denied from user and project MCP registrations. Untested scopes fail closed."
+    },
+    {
+      "provider": "antigravity",
+      "testedVersion": "1.3.5",
+      "status": "verified",
+      "neutralizer": {
+        "id": "antigravity-1.3.5-marker-propagation",
+        "kind": "marker-propagation",
+        "scopes": [
+          "user",
+          "project"
+        ]
+      },
+      "evidence": "../pilots/evidence/2026-10-15-authoring-compatibility.json",
+      "notes": "Native New and Continue calls returned managed_invocation_denied from user and project MCP registrations. Untested scopes fail closed."
+    }
+  ]
+}

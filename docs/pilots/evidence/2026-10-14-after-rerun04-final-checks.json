@@ -1,0 +1,35 @@
+{
+  "productionSourceChangedDuringSuccessfulRun": [],
+  "testChangesAfterSnapshot": [
+    "runtime\\tests\\pilot.test.mjs"
+  ],
+  "databases": [
+    {
+      "name": "after-rerun04",
+      "integrity": "ok",
+      "replayMismatches": 0
+    },
+    {
+      "name": "after-rerun04-stage",
+      "integrity": "ok",
+      "replayMismatches": 0
+    },
+    {
+      "name": "after-rerun04-quota-reset",
+      "integrity": "ok",
+      "replayMismatches": 0
+    },
+    {
+      "name": "after-rerun04-recovery-fix",
+      "integrity": "ok",
+      "replayMismatches": 0
+    }
+  ],
+  "liveCliCounts": {
+    "codex": 11,
+    "claude": 3,
+    "antigravity": 4
+  },
+  "lastState": "succeeded",
+  "activeProviderAttempts": 0
+}

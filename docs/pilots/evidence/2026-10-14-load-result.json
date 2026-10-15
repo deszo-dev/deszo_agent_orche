@@ -1,0 +1,2088 @@
+{
+  "passed": true,
+  "fixtureOnly": true,
+  "runs": 180,
+  "workspaces": 6,
+  "elapsedSeconds": 100.19,
+  "peak": 3,
+  "providerPeaks": {
+    "codex": 1,
+    "claude": 1,
+    "antigravity": 1
+  },
+  "journalCount": 5175,
+  "artifactCount": 2021,
+  "sqliteBytes": 5722112,
+  "rssMinimum": 112828416,
+  "rssMaximum": 138444800,
+  "integrity": "ok",
+  "restartHistory": "all runs and journal counts preserved",
+  "evidence": [
+    {
+      "runId": "d5c3f9c8-8c0d-4572-ad85-1ad451593a78",
+      "provider": "codex",
+      "journalEvents": 28,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180157,
+      "replayFrom": 14
+    },
+    {
+      "runId": "24b74699-ca01-4652-a7a6-7ccfc7014201",
+      "provider": "claude",
+      "journalEvents": 28,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180158,
+      "replayFrom": 14
+    },
+    {
+      "runId": "96f66421-cb6c-4c38-8f22-3da55c5fb7db",
+      "provider": "antigravity",
+      "journalEvents": 28,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180163,
+      "replayFrom": 14
+    },
+    {
+      "runId": "65999620-3e8b-48b6-b0de-d9dfd65560bc",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180157,
+      "replayFrom": 14
+    },
+    {
+      "runId": "e7a6485c-c1f5-47fc-b4b2-29a2e49c7b53",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180158,
+      "replayFrom": 14
+    },
+    {
+      "runId": "d7ab9d0e-596a-4ba7-99ee-1c58919bec34",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180163,
+      "replayFrom": 14
+    },
+    {
+      "runId": "259ab1dc-967a-4101-9343-deabafec427d",
+      "provider": "claude",
+      "journalEvents": 28,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "fa351422-4376-4339-b54b-0fb91d60ee30",
+      "provider": "codex",
+      "journalEvents": 28,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "3057390c-6601-456b-b429-80e6e9027c12",
+      "provider": "antigravity",
+      "journalEvents": 28,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "150ef2a6-3e6e-4de9-87f2-3a8e4bcffd2c",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "cc20f97f-b496-4138-bcab-b7f174b2b506",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "84581cce-358b-4cc0-b99e-c38c255d2bb5",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "f57ff8d2-85ae-4199-825c-562a30a8cec3",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "bd839dcd-157a-445c-a89e-54e3d78f072a",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "02f1196b-83f4-4f33-a97c-e082723a892b",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "29f87b3d-2abd-4e89-af75-c470f29b1506",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "da8adc40-455d-44c2-9585-8c80f8df7a0e",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "1f79afd4-5e7e-4c9d-8446-3198717df232",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "3e9243b2-ef5b-4b56-8801-1389a5af00f3",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180158,
+      "replayFrom": 14
+    },
+    {
+      "runId": "4bb78bc8-a4c6-4b31-b5e1-b9dd1d0305c1",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180157,
+      "replayFrom": 14
+    },
+    {
+      "runId": "03a8fce0-7939-4795-90ec-29b612f44274",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180163,
+      "replayFrom": 14
+    },
+    {
+      "runId": "3e892143-e093-416e-9282-5044ffefd52a",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180163,
+      "replayFrom": 14
+    },
+    {
+      "runId": "cde03fca-32b2-4057-803a-9a81cf3cab5f",
+      "provider": "claude",
+      "journalEvents": 28,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180158,
+      "replayFrom": 14
+    },
+    {
+      "runId": "9f75c312-9d1f-4a60-985b-ec713c91d125",
+      "provider": "codex",
+      "journalEvents": 28,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180157,
+      "replayFrom": 14
+    },
+    {
+      "runId": "4257f4e8-513e-430f-b918-1df3c1f022c3",
+      "provider": "antigravity",
+      "journalEvents": 28,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "9315d182-67e3-4059-9df6-8edcfa1aaa3a",
+      "provider": "claude",
+      "journalEvents": 28,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "16fabeb4-7ed7-4c82-b99b-7628c81ffb14",
+      "provider": "codex",
+      "journalEvents": 28,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "5e712bb6-1c88-419e-b722-d3d94a00aaf3",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "407b4c96-1253-4b76-a3ec-c678a925ea4f",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "83204595-c73a-4f91-a0c5-4ab31adefe69",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "56a4cc3e-3721-49c7-a131-1489123af970",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "3ee59b77-60b7-452f-ab30-2cc1f78b264a",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "546b1698-44d4-4843-873d-72e298890e3e",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "c1250a2d-45ef-47cd-91a5-935a1558c9ed",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "66ed560e-961a-4245-8d8c-1465a11165d8",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180163,
+      "replayFrom": 14
+    },
+    {
+      "runId": "93e2bd22-aef5-40c7-a7ab-e4787bc7f757",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "9bb3c886-72bd-4172-ae49-8e0c20f9623c",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "bb2f361e-24f9-4998-8d8b-cad7989bad98",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180157,
+      "replayFrom": 14
+    },
+    {
+      "runId": "a740b23e-57c9-486c-a757-49456972f7fc",
+      "provider": "antigravity",
+      "journalEvents": 28,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180163,
+      "replayFrom": 14
+    },
+    {
+      "runId": "f60aefcb-ee24-4c1d-861d-8fa894011bb2",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180158,
+      "replayFrom": 14
+    },
+    {
+      "runId": "b188a8e6-f64d-405c-b8fb-6317d455f0da",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180157,
+      "replayFrom": 14
+    },
+    {
+      "runId": "26f398c5-dec8-453e-95f2-cace325c0820",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180158,
+      "replayFrom": 14
+    },
+    {
+      "runId": "5409ba91-6e15-448c-b5a4-27af45a7cf58",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "40ce180b-6c76-4bc9-a471-dfe536159f2a",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "f65f1091-00d0-4a8e-a773-837f3b641907",
+      "provider": "antigravity",
+      "journalEvents": 28,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "e18e6450-ae44-4f96-9579-fc7da25bb778",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "63d87fef-0ef4-4afd-9189-eec78e6dfae8",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "365294b5-1c68-4070-8e98-8195ba38f321",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "c1dc1fd3-0041-4993-bd05-ae82744cd899",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "760e245e-cf98-44ba-940a-52ce0f7a3ad1",
+      "provider": "antigravity",
+      "journalEvents": 27,
+      "stdoutBatches": 1,
+      "stdoutBytes": 273,
+      "replayFrom": 13
+    },
+    {
+      "runId": "a06183ad-cc16-4263-a4ad-68cbb73bfbf3",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "2df42dba-1238-480b-a12c-ed11d42fb186",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "8ffad4a9-13f7-4a46-914d-30a1b21c9cbf",
+      "provider": "antigravity",
+      "journalEvents": 28,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180163,
+      "replayFrom": 14
+    },
+    {
+      "runId": "55e4ff52-8b9a-46f0-b1f7-1f3bea5e8b61",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "7efa370e-b94a-4dd5-9143-017f59bf7e61",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "af3e44af-927d-4208-a023-13af391011ec",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180157,
+      "replayFrom": 14
+    },
+    {
+      "runId": "81e6a2f2-dfb2-45f1-9a31-d7f61604f17e",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180158,
+      "replayFrom": 14
+    },
+    {
+      "runId": "71fad9bd-adfc-487c-9b2a-6ea52ecb53f2",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180157,
+      "replayFrom": 14
+    },
+    {
+      "runId": "98e2791e-1e36-4cce-8edd-eab55908d162",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180158,
+      "replayFrom": 14
+    },
+    {
+      "runId": "34b26f29-bfa6-4614-ac2e-3f3b710fe39c",
+      "provider": "antigravity",
+      "journalEvents": 28,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180163,
+      "replayFrom": 14
+    },
+    {
+      "runId": "169c8469-c1bd-4ca0-b3ce-6360e5e9e939",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "2ee7c81f-70cd-4c49-863a-2e6b5e3cf7d9",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "af70fc23-fc1a-403f-a665-f064960df88c",
+      "provider": "antigravity",
+      "journalEvents": 28,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "5f60272d-c68f-440a-beac-f397887f0278",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "5d527d4a-71f4-46e9-8efd-ac43564bee1f",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "73535af0-df1a-4318-9e8c-9e4e7ee670da",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "c4df26c2-ff20-4f3f-b703-d357671bcc25",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "4b6107f4-081c-4cbe-a6d3-db67fb3c8c44",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "995923c6-f1ef-45c6-9076-5d5d50f54ac6",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "b63313ba-8c26-4ba0-8525-eeb3d685a8de",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "0d11d640-c7eb-43bd-8e92-f04a2730fd07",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "0d9f67f9-f83c-4d6c-ae5b-911fbb490e36",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "1a9e102f-67d7-4752-ae93-b929f7bbc5fc",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180158,
+      "replayFrom": 14
+    },
+    {
+      "runId": "3a43a5d2-4ecf-4519-b412-9d5e717761a0",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180157,
+      "replayFrom": 14
+    },
+    {
+      "runId": "8ce18385-378f-4417-990a-f1aa2598ccee",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180163,
+      "replayFrom": 14
+    },
+    {
+      "runId": "a912ebc4-06c1-44d9-9249-a7c8c8b98122",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180158,
+      "replayFrom": 14
+    },
+    {
+      "runId": "95869419-be3f-48be-85b0-fc02419b8241",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180163,
+      "replayFrom": 14
+    },
+    {
+      "runId": "4f4753af-e12a-40c4-a70d-7885a4c05b1e",
+      "provider": "codex",
+      "journalEvents": 28,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180157,
+      "replayFrom": 14
+    },
+    {
+      "runId": "2a23f61d-b570-4875-8524-cb76a17479d1",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "07ef9ec8-a9fb-42af-bbae-303d38690159",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "7deac7a9-9b46-404b-a759-e731ba624405",
+      "provider": "claude",
+      "journalEvents": 28,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "19e36b8d-d7c4-4dd0-ac5f-e98dfa072be5",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "0e472442-0adf-4c55-a068-7763ca75d378",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "6f618dc5-400f-4b64-9ec4-5ed999e9d6b3",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "169c34a3-0252-415e-80ae-5a23343e9c72",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "e7a0c669-c747-4922-a401-59d14dcb35bf",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "b268294c-92a2-4d9f-b4d0-49c9775f7d1c",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "9eda69e5-41e5-43d2-be72-85f19fa547b3",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "17d48cb6-e979-4f79-8c85-4e3c0d998d69",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "f450e6c4-7c29-4ac9-867c-faa72e4725df",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "a3d70bda-b062-499d-b1d2-f61ab8e191e8",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180163,
+      "replayFrom": 14
+    },
+    {
+      "runId": "3d2463ea-5129-4f5b-a1e3-0aaf4dffee6d",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180157,
+      "replayFrom": 14
+    },
+    {
+      "runId": "ed043e14-707e-4932-9d84-8cfa08cd40c9",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180158,
+      "replayFrom": 14
+    },
+    {
+      "runId": "57f3132e-6054-4702-898a-b1eaef2c8ce2",
+      "provider": "codex",
+      "journalEvents": 28,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180157,
+      "replayFrom": 14
+    },
+    {
+      "runId": "0a78cb21-93f7-41e3-a51d-4c8fd995c0e9",
+      "provider": "claude",
+      "journalEvents": 28,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180158,
+      "replayFrom": 14
+    },
+    {
+      "runId": "defaad31-dd47-4308-8734-d85f1b51f765",
+      "provider": "antigravity",
+      "journalEvents": 28,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180163,
+      "replayFrom": 14
+    },
+    {
+      "runId": "04494864-aedd-48a9-9b76-149bc23d578e",
+      "provider": "codex",
+      "journalEvents": 28,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "7a8fb447-e39e-4691-a465-47644aa10c33",
+      "provider": "claude",
+      "journalEvents": 28,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "16a2ff43-fb04-40b5-ad3a-fea046b7a925",
+      "provider": "antigravity",
+      "journalEvents": 28,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "c659b03e-859f-45bd-b2db-f3ee8c601d36",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "87cb7f69-929c-4e7c-b060-083f4b83092b",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "c5359501-9ca0-408d-a03f-aba8ef4599cd",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "f04532ce-ca48-4dbf-b03f-99e9b6107143",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "23bd290d-4118-4dd1-8ca0-2128d7496257",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "a3905756-b388-4c03-abac-84758db3b379",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "7ca9a66f-487c-4949-9abc-05b2e267e347",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "1aaf6350-7f5c-479f-a8ad-bfe65e98a24b",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180157,
+      "replayFrom": 14
+    },
+    {
+      "runId": "d7aa9483-a0a6-4c79-8f30-ddb578c9cc5f",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "54efe193-2e94-4629-ac17-c8c90c65bf35",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "b80a2d95-64af-4a82-b15e-72b61ed44e11",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180158,
+      "replayFrom": 14
+    },
+    {
+      "runId": "26d79b08-9e8d-40f6-9b0b-e3fa8c24fa8b",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180158,
+      "replayFrom": 14
+    },
+    {
+      "runId": "9748a190-c44b-463f-9cff-56a03070f4cf",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180163,
+      "replayFrom": 14
+    },
+    {
+      "runId": "e220c4fe-f9f5-4961-ac42-43c9b16bc238",
+      "provider": "codex",
+      "journalEvents": 28,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180157,
+      "replayFrom": 14
+    },
+    {
+      "runId": "801312fc-945a-495f-8359-4366ff528318",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180163,
+      "replayFrom": 14
+    },
+    {
+      "runId": "cdb55a86-87b3-4d8b-aba6-b688e5f02c50",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "47e68871-cb09-4ae6-ba0c-3366c5128640",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "14d89410-62ec-4cbb-a585-187e8e2540f9",
+      "provider": "codex",
+      "journalEvents": 28,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "2af99760-beff-4e50-b1f3-364dc61c378f",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "19708305-5c4c-4197-9c18-750f013b39ea",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "855fcbff-c59d-4af6-a3fc-2bf1dc4f9aae",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "a1dbc967-d4f4-4f8d-8d9d-777fc4bcb51a",
+      "provider": "claude",
+      "journalEvents": 28,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "b6d3bf88-c8ff-4c7a-89cf-a7926f1ffe4e",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "2e20c270-7359-4188-a234-4f4cbf0d3af1",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "806ff049-feee-44da-846a-a3164302955d",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "9e8108a4-2eb6-4fba-aeee-2283beb80272",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180158,
+      "replayFrom": 14
+    },
+    {
+      "runId": "b0c22ac2-510d-4d50-84d6-dd171a6a7197",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "3e1788e9-43ea-4ada-b996-bc3195273426",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180157,
+      "replayFrom": 14
+    },
+    {
+      "runId": "24c7826d-1229-4e00-b127-0686f6631453",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "0bb22057-ab33-43ad-a557-abf90ee1001a",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180163,
+      "replayFrom": 14
+    },
+    {
+      "runId": "3f1980b6-03cf-4632-99b3-f71528163a5e",
+      "provider": "claude",
+      "journalEvents": 28,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180158,
+      "replayFrom": 14
+    },
+    {
+      "runId": "d9f22b3d-f4af-4c47-ad38-236acf45be1b",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180163,
+      "replayFrom": 14
+    },
+    {
+      "runId": "8c8dbbfc-0907-4a20-af6c-4d414093bbe6",
+      "provider": "codex",
+      "journalEvents": 28,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180157,
+      "replayFrom": 14
+    },
+    {
+      "runId": "f6f5ff36-b971-4b11-8012-92db716e7832",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "00f99f4a-8a40-4d67-b923-a46789f6d41c",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "cd9c6661-2ca8-47e8-b1fa-abcee8e4252e",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "949fc224-839b-40a3-b656-39f7ece88011",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "1e733874-63de-48a6-8004-8357bc63ae26",
+      "provider": "claude",
+      "journalEvents": 28,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "63a37932-f4c6-40ac-8691-e1ae4685adb8",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "1293f06a-f634-49c4-af06-7acfd043343b",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "5d1d115e-3a9f-4838-b410-c09682d8998d",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "03abc694-b405-4fcf-aa36-c31390533e08",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "43dc5f61-4f72-45da-b8d4-f30918250bae",
+      "provider": "codex",
+      "journalEvents": 27,
+      "stdoutBatches": 1,
+      "stdoutBytes": 267,
+      "replayFrom": 13
+    },
+    {
+      "runId": "94465d55-ca06-4de9-a1f5-a06daa47f795",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "87b0c5f8-2cd5-42a9-afe7-7b9ba3969364",
+      "provider": "claude",
+      "journalEvents": 28,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "4b6586a1-f41b-47cb-909d-8dadd5a7ed9f",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180158,
+      "replayFrom": 14
+    },
+    {
+      "runId": "98737e4d-eb80-4d29-8ad8-de5fd2f7af66",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180163,
+      "replayFrom": 14
+    },
+    {
+      "runId": "3a24a0f7-92b3-495a-951d-b12110b833d6",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180157,
+      "replayFrom": 14
+    },
+    {
+      "runId": "78cb4875-b124-47bc-bd4d-743e2b9b86b9",
+      "provider": "claude",
+      "journalEvents": 28,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180158,
+      "replayFrom": 14
+    },
+    {
+      "runId": "9dacaa89-dfb8-4891-b152-124651ad0314",
+      "provider": "codex",
+      "journalEvents": 28,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180157,
+      "replayFrom": 14
+    },
+    {
+      "runId": "baa1f8c8-bdd0-4ecc-a11e-500ad11af442",
+      "provider": "antigravity",
+      "journalEvents": 28,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180163,
+      "replayFrom": 14
+    },
+    {
+      "runId": "4319f37b-4e4c-446c-bb04-552990f26dde",
+      "provider": "codex",
+      "journalEvents": 28,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "63bfb06c-a03b-4b29-9742-6ea8c3fe04c1",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "ff1cd654-3503-497e-8e57-83fe4a465371",
+      "provider": "claude",
+      "journalEvents": 28,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "4ba8dfe1-e003-43e1-b7f3-7ba560c95588",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "f810b7ae-7426-43af-a580-3e4e20cb581b",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "25babcb3-7770-407b-9467-7d2406c2b61c",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "2027da15-bac9-4483-a1c4-984f88834137",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "006750b3-83fd-4dd8-a2a8-3a80510eca72",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "dd6c6894-b5e3-4506-80fa-246cf12c9a83",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "bb368a05-0d65-4a90-acad-fc7543fb85bd",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "52447082-c95a-40f3-bec9-a3dc64b7ed8f",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "b5a91263-62eb-4e7a-ad15-91355fef33b4",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "aba38f01-9950-4a3a-b4cf-3b411e3e9a1f",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180157,
+      "replayFrom": 14
+    },
+    {
+      "runId": "ce9a5673-e13f-4dfd-b040-27ab2dbbb4f7",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180163,
+      "replayFrom": 14
+    },
+    {
+      "runId": "a015cd28-c1f5-492e-8a07-36180442a979",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180158,
+      "replayFrom": 14
+    },
+    {
+      "runId": "ad8729fa-2be7-4b20-875a-e1e7d913d843",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180158,
+      "replayFrom": 14
+    },
+    {
+      "runId": "ae7fccc4-5621-44da-b3d3-318520168004",
+      "provider": "codex",
+      "journalEvents": 28,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180157,
+      "replayFrom": 14
+    },
+    {
+      "runId": "6e9d6d62-ae14-4fff-8488-c27ad0db8777",
+      "provider": "antigravity",
+      "journalEvents": 28,
+      "stdoutBatches": 3,
+      "stdoutBytes": 180163,
+      "replayFrom": 14
+    },
+    {
+      "runId": "37a39d50-18d6-4b3e-8b66-1313bf772b6c",
+      "provider": "claude",
+      "journalEvents": 28,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "1bc2063e-c009-4366-bbc5-d24e37849b84",
+      "provider": "codex",
+      "journalEvents": 28,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "90a9a098-17cc-4bc8-880e-3395dbfac6fe",
+      "provider": "antigravity",
+      "journalEvents": 28,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "277727d5-e1e9-4258-8c09-2aa284df7909",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "a7e22831-4f51-4232-a167-883901472b2a",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "2f781f98-bf30-45d4-b7d0-c461408ced13",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "aa103c59-e330-4573-846f-f2b18a4988e9",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "29a18f23-5122-4b25-b568-109594e296ed",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "b5f4cafc-51c5-45be-b8c8-9a54e87bc365",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    },
+    {
+      "runId": "0871f465-2abd-47ed-a9b4-ef6d74e2c801",
+      "provider": "claude",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 268,
+      "replayFrom": 14
+    },
+    {
+      "runId": "d5afb9ad-0dc4-4a97-85bc-c01774dc84bf",
+      "provider": "codex",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 267,
+      "replayFrom": 14
+    },
+    {
+      "runId": "bdf4ae65-559c-4f4b-b5dd-62450b6a4a72",
+      "provider": "antigravity",
+      "journalEvents": 29,
+      "stdoutBatches": 2,
+      "stdoutBytes": 273,
+      "replayFrom": 14
+    }
+  ],
+  "samples": [
+    {
+      "milliseconds": 1123,
+      "rss": 112828416,
+      "heapTotal": 63696896,
+      "heapUsed": 32656456,
+      "external": 3880015,
+      "arrayBuffers": 138334
+    },
+    {
+      "milliseconds": 2184,
+      "rss": 116105216,
+      "heapTotal": 66318336,
+      "heapUsed": 33037216,
+      "external": 3936224,
+      "arrayBuffers": 186712
+    },
+    {
+      "milliseconds": 3192,
+      "rss": 118870016,
+      "heapTotal": 68571136,
+      "heapUsed": 38792360,
+      "external": 5120088,
+      "arrayBuffers": 1274984
+    },
+    {
+      "milliseconds": 4203,
+      "rss": 120471552,
+      "heapTotal": 69283840,
+      "heapUsed": 41504976,
+      "external": 4801947,
+      "arrayBuffers": 956833
+    },
+    {
+      "milliseconds": 5654,
+      "rss": 120721408,
+      "heapTotal": 70594560,
+      "heapUsed": 39125984,
+      "external": 4031969,
+      "arrayBuffers": 186875
+    },
+    {
+      "milliseconds": 6665,
+      "rss": 122429440,
+      "heapTotal": 71905280,
+      "heapUsed": 41854168,
+      "external": 4192305,
+      "arrayBuffers": 347191
+    },
+    {
+      "milliseconds": 7946,
+      "rss": 123629568,
+      "heapTotal": 72167424,
+      "heapUsed": 44947176,
+      "external": 4240114,
+      "arrayBuffers": 395010
+    },
+    {
+      "milliseconds": 8949,
+      "rss": 124502016,
+      "heapTotal": 73740288,
+      "heapUsed": 49527416,
+      "external": 4369114,
+      "arrayBuffers": 524000
+    },
+    {
+      "milliseconds": 9960,
+      "rss": 126132224,
+      "heapTotal": 75051008,
+      "heapUsed": 49907656,
+      "external": 4544839,
+      "arrayBuffers": 699725
+    },
+    {
+      "milliseconds": 11202,
+      "rss": 133201920,
+      "heapTotal": 76664832,
+      "heapUsed": 57673800,
+      "external": 7484990,
+      "arrayBuffers": 3639886
+    },
+    {
+      "milliseconds": 12211,
+      "rss": 131895296,
+      "heapTotal": 79065088,
+      "heapUsed": 50908600,
+      "external": 4649177,
+      "arrayBuffers": 804063
+    },
+    {
+      "milliseconds": 13347,
+      "rss": 132923392,
+      "heapTotal": 80113664,
+      "heapUsed": 50996584,
+      "external": 4204725,
+      "arrayBuffers": 359621
+    },
+    {
+      "milliseconds": 14357,
+      "rss": 132476928,
+      "heapTotal": 76845056,
+      "heapUsed": 27508320,
+      "external": 4204424,
+      "arrayBuffers": 359310
+    },
+    {
+      "milliseconds": 15406,
+      "rss": 132648960,
+      "heapTotal": 76845056,
+      "heapUsed": 31386552,
+      "external": 4263332,
+      "arrayBuffers": 418218
+    },
+    {
+      "milliseconds": 16421,
+      "rss": 133099520,
+      "heapTotal": 76845056,
+      "heapUsed": 35700560,
+      "external": 4453043,
+      "arrayBuffers": 607929
+    },
+    {
+      "milliseconds": 17433,
+      "rss": 133369856,
+      "heapTotal": 77033472,
+      "heapUsed": 32225856,
+      "external": 4286310,
+      "arrayBuffers": 441196
+    },
+    {
+      "milliseconds": 18442,
+      "rss": 135442432,
+      "heapTotal": 77221888,
+      "heapUsed": 39272000,
+      "external": 6536617,
+      "arrayBuffers": 2691503
+    },
+    {
+      "milliseconds": 21480,
+      "rss": 134664192,
+      "heapTotal": 62205952,
+      "heapUsed": 29353200,
+      "external": 4770387,
+      "arrayBuffers": 925273
+    },
+    {
+      "milliseconds": 23539,
+      "rss": 134615040,
+      "heapTotal": 62205952,
+      "heapUsed": 33841184,
+      "external": 4821267,
+      "arrayBuffers": 976183
+    },
+    {
+      "milliseconds": 24538,
+      "rss": 135204864,
+      "heapTotal": 62205952,
+      "heapUsed": 34845384,
+      "external": 5022992,
+      "arrayBuffers": 1177878
+    },
+    {
+      "milliseconds": 25551,
+      "rss": 135204864,
+      "heapTotal": 62468096,
+      "heapUsed": 26524192,
+      "external": 4644709,
+      "arrayBuffers": 799595
+    },
+    {
+      "milliseconds": 26590,
+      "rss": 135036928,
+      "heapTotal": 62468096,
+      "heapUsed": 31072976,
+      "external": 4784285,
+      "arrayBuffers": 939181
+    },
+    {
+      "milliseconds": 27662,
+      "rss": 135053312,
+      "heapTotal": 62468096,
+      "heapUsed": 33883328,
+      "external": 4817418,
+      "arrayBuffers": 972324
+    },
+    {
+      "milliseconds": 28687,
+      "rss": 136216576,
+      "heapTotal": 62656512,
+      "heapUsed": 32689528,
+      "external": 5613079,
+      "arrayBuffers": 1767965
+    },
+    {
+      "milliseconds": 29902,
+      "rss": 137236480,
+      "heapTotal": 62844928,
+      "heapUsed": 37433320,
+      "external": 6329298,
+      "arrayBuffers": 2484194
+    },
+    {
+      "milliseconds": 30929,
+      "rss": 138088448,
+      "heapTotal": 63746048,
+      "heapUsed": 35684872,
+      "external": 6619227,
+      "arrayBuffers": 2774123
+    },
+    {
+      "milliseconds": 32084,
+      "rss": 135749632,
+      "heapTotal": 63254528,
+      "heapUsed": 35134040,
+      "external": 5183763,
+      "arrayBuffers": 1338659
+    },
+    {
+      "milliseconds": 33094,
+      "rss": 134897664,
+      "heapTotal": 63516672,
+      "heapUsed": 26052248,
+      "external": 4340175,
+      "arrayBuffers": 495061
+    },
+    {
+      "milliseconds": 34177,
+      "rss": 135245824,
+      "heapTotal": 63516672,
+      "heapUsed": 30939848,
+      "external": 4422515,
+      "arrayBuffers": 577401
+    },
+    {
+      "milliseconds": 35275,
+      "rss": 136036352,
+      "heapTotal": 63516672,
+      "heapUsed": 35158072,
+      "external": 4538686,
+      "arrayBuffers": 693582
+    },
+    {
+      "milliseconds": 36309,
+      "rss": 135860224,
+      "heapTotal": 63516672,
+      "heapUsed": 36800896,
+      "external": 4553768,
+      "arrayBuffers": 708654
+    },
+    {
+      "milliseconds": 37329,
+      "rss": 137015296,
+      "heapTotal": 63516672,
+      "heapUsed": 37711904,
+      "external": 5500022,
+      "arrayBuffers": 1654918
+    },
+    {
+      "milliseconds": 38522,
+      "rss": 136765440,
+      "heapTotal": 63139840,
+      "heapUsed": 35930488,
+      "external": 6182447,
+      "arrayBuffers": 2337343
+    },
+    {
+      "milliseconds": 41926,
+      "rss": 137469952,
+      "heapTotal": 63516672,
+      "heapUsed": 32208912,
+      "external": 5789787,
+      "arrayBuffers": 1944673
+    },
+    {
+      "milliseconds": 44398,
+      "rss": 137584640,
+      "heapTotal": 63516672,
+      "heapUsed": 36480072,
+      "external": 5840667,
+      "arrayBuffers": 1995583
+    },
+    {
+      "milliseconds": 45405,
+      "rss": 137281536,
+      "heapTotal": 63516672,
+      "heapUsed": 26446608,
+      "external": 4430174,
+      "arrayBuffers": 585060
+    },
+    {
+      "milliseconds": 46418,
+      "rss": 136667136,
+      "heapTotal": 63516672,
+      "heapUsed": 29779176,
+      "external": 4526542,
+      "arrayBuffers": 681428
+    },
+    {
+      "milliseconds": 47421,
+      "rss": 136761344,
+      "heapTotal": 63516672,
+      "heapUsed": 29725224,
+      "external": 4566974,
+      "arrayBuffers": 721860
+    },
+    {
+      "milliseconds": 48480,
+      "rss": 136011776,
+      "heapTotal": 63778816,
+      "heapUsed": 30618120,
+      "external": 4433673,
+      "arrayBuffers": 588569
+    },
+    {
+      "milliseconds": 49816,
+      "rss": 134582272,
+      "heapTotal": 63098880,
+      "heapUsed": 22316496,
+      "external": 4113135,
+      "arrayBuffers": 268041
+    },
+    {
+      "milliseconds": 50865,
+      "rss": 136454144,
+      "heapTotal": 63664128,
+      "heapUsed": 27763224,
+      "external": 5248469,
+      "arrayBuffers": 1403375
+    },
+    {
+      "milliseconds": 51876,
+      "rss": 135376896,
+      "heapTotal": 64040960,
+      "heapUsed": 29945960,
+      "external": 4386908,
+      "arrayBuffers": 541794
+    },
+    {
+      "milliseconds": 53055,
+      "rss": 136257536,
+      "heapTotal": 64040960,
+      "heapUsed": 30961048,
+      "external": 4317620,
+      "arrayBuffers": 472516
+    },
+    {
+      "milliseconds": 54057,
+      "rss": 136323072,
+      "heapTotal": 64040960,
+      "heapUsed": 33878888,
+      "external": 4462386,
+      "arrayBuffers": 617272
+    },
+    {
+      "milliseconds": 55221,
+      "rss": 136712192,
+      "heapTotal": 64040960,
+      "heapUsed": 37004904,
+      "external": 4451594,
+      "arrayBuffers": 606490
+    },
+    {
+      "milliseconds": 56554,
+      "rss": 134266880,
+      "heapTotal": 61788160,
+      "heapUsed": 22187696,
+      "external": 4056062,
+      "arrayBuffers": 216639
+    },
+    {
+      "milliseconds": 57581,
+      "rss": 134455296,
+      "heapTotal": 62164992,
+      "heapUsed": 24230272,
+      "external": 4150399,
+      "arrayBuffers": 310966
+    },
+    {
+      "milliseconds": 58694,
+      "rss": 135974912,
+      "heapTotal": 62730240,
+      "heapUsed": 31796936,
+      "external": 5210956,
+      "arrayBuffers": 1371533
+    },
+    {
+      "milliseconds": 64216,
+      "rss": 136105984,
+      "heapTotal": 62730240,
+      "heapUsed": 29596040,
+      "external": 4163775,
+      "arrayBuffers": 324362
+    },
+    {
+      "milliseconds": 65228,
+      "rss": 135184384,
+      "heapTotal": 62730240,
+      "heapUsed": 27732864,
+      "external": 4121737,
+      "arrayBuffers": 282304
+    },
+    {
+      "milliseconds": 66284,
+      "rss": 135843840,
+      "heapTotal": 62730240,
+      "heapUsed": 27274176,
+      "external": 4031487,
+      "arrayBuffers": 192064
+    },
+    {
+      "milliseconds": 67293,
+      "rss": 136159232,
+      "heapTotal": 62730240,
+      "heapUsed": 32579464,
+      "external": 4258240,
+      "arrayBuffers": 418807
+    },
+    {
+      "milliseconds": 68292,
+      "rss": 135970816,
+      "heapTotal": 62730240,
+      "heapUsed": 35307800,
+      "external": 4931423,
+      "arrayBuffers": 1091990
+    },
+    {
+      "milliseconds": 69431,
+      "rss": 136302592,
+      "heapTotal": 62500864,
+      "heapUsed": 33987032,
+      "external": 5904502,
+      "arrayBuffers": 2065069
+    },
+    {
+      "milliseconds": 70434,
+      "rss": 136769536,
+      "heapTotal": 62500864,
+      "heapUsed": 32148376,
+      "external": 6561736,
+      "arrayBuffers": 2722303
+    },
+    {
+      "milliseconds": 71464,
+      "rss": 136949760,
+      "heapTotal": 63066112,
+      "heapUsed": 33304368,
+      "external": 5456627,
+      "arrayBuffers": 1617194
+    },
+    {
+      "milliseconds": 72868,
+      "rss": 136830976,
+      "heapTotal": 63254528,
+      "heapUsed": 36755800,
+      "external": 4879075,
+      "arrayBuffers": 1039652
+    },
+    {
+      "milliseconds": 73872,
+      "rss": 137043968,
+      "heapTotal": 63254528,
+      "heapUsed": 26552912,
+      "external": 4574527,
+      "arrayBuffers": 735094
+    },
+    {
+      "milliseconds": 75258,
+      "rss": 136200192,
+      "heapTotal": 63254528,
+      "heapUsed": 26194640,
+      "external": 5128869,
+      "arrayBuffers": 669315
+    },
+    {
+      "milliseconds": 76258,
+      "rss": 136445952,
+      "heapTotal": 63254528,
+      "heapUsed": 35872664,
+      "external": 4800007,
+      "arrayBuffers": 960574
+    },
+    {
+      "milliseconds": 77897,
+      "rss": 136462336,
+      "heapTotal": 63254528,
+      "heapUsed": 38171936,
+      "external": 4827647,
+      "arrayBuffers": 988214
+    },
+    {
+      "milliseconds": 80511,
+      "rss": 136486912,
+      "heapTotal": 63254528,
+      "heapUsed": 41183528,
+      "external": 4861961,
+      "arrayBuffers": 1022548
+    },
+    {
+      "milliseconds": 81539,
+      "rss": 136523776,
+      "heapTotal": 63254528,
+      "heapUsed": 29638824,
+      "external": 4833502,
+      "arrayBuffers": 994069
+    },
+    {
+      "milliseconds": 82675,
+      "rss": 137191424,
+      "heapTotal": 61976576,
+      "heapUsed": 33244328,
+      "external": 6533269,
+      "arrayBuffers": 2693836
+    },
+    {
+      "milliseconds": 83922,
+      "rss": 135708672,
+      "heapTotal": 62730240,
+      "heapUsed": 27003176,
+      "external": 4303379,
+      "arrayBuffers": 463946
+    },
+    {
+      "milliseconds": 84963,
+      "rss": 136478720,
+      "heapTotal": 62730240,
+      "heapUsed": 30702072,
+      "external": 4425450,
+      "arrayBuffers": 586017
+    },
+    {
+      "milliseconds": 86076,
+      "rss": 137281536,
+      "heapTotal": 62730240,
+      "heapUsed": 33220976,
+      "external": 4484389,
+      "arrayBuffers": 644966
+    },
+    {
+      "milliseconds": 87080,
+      "rss": 136237056,
+      "heapTotal": 62992384,
+      "heapUsed": 34952144,
+      "external": 4544515,
+      "arrayBuffers": 705082
+    },
+    {
+      "milliseconds": 88092,
+      "rss": 135991296,
+      "heapTotal": 61861888,
+      "heapUsed": 20143128,
+      "external": 3975581,
+      "arrayBuffers": 136148
+    },
+    {
+      "milliseconds": 89169,
+      "rss": 135720960,
+      "heapTotal": 61861888,
+      "heapUsed": 32539768,
+      "external": 4928504,
+      "arrayBuffers": 1089071
+    },
+    {
+      "milliseconds": 90280,
+      "rss": 138444800,
+      "heapTotal": 62427136,
+      "heapUsed": 36587352,
+      "external": 7426398,
+      "arrayBuffers": 3586975
+    },
+    {
+      "milliseconds": 91295,
+      "rss": 136151040,
+      "heapTotal": 62992384,
+      "heapUsed": 28520920,
+      "external": 4137949,
+      "arrayBuffers": 298516
+    },
+    {
+      "milliseconds": 92352,
+      "rss": 135786496,
+      "heapTotal": 62992384,
+      "heapUsed": 29843400,
+      "external": 4326087,
+      "arrayBuffers": 486654
+    },
+    {
+      "milliseconds": 93400,
+      "rss": 136355840,
+      "heapTotal": 62992384,
+      "heapUsed": 31694880,
+      "external": 4216341,
+      "arrayBuffers": 376908
+    },
+    {
+      "milliseconds": 94415,
+      "rss": 137080832,
+      "heapTotal": 62992384,
+      "heapUsed": 32944664,
+      "external": 4165847,
+      "arrayBuffers": 326414
+    },
+    {
+      "milliseconds": 95415,
+      "rss": 137097216,
+      "heapTotal": 62992384,
+      "heapUsed": 32078896,
+      "external": 4265226,
+      "arrayBuffers": 425793
+    },
+    {
+      "milliseconds": 97865,
+      "rss": 136044544,
+      "heapTotal": 61861888,
+      "heapUsed": 23623352,
+      "external": 4128766,
+      "arrayBuffers": 289333
+    },
+    {
+      "milliseconds": 100069,
+      "rss": 133406720,
+      "heapTotal": 61861888,
+      "heapUsed": 26836896,
+      "external": 4355099,
+      "arrayBuffers": 515666
+    }
+  ]
+}

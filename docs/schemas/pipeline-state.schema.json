@@ -1,0 +1,837 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deszo.local/documentation/pipeline-state.schema.json",
+  "title": "Proposed typed carried records for the reference pipeline",
+  "$defs": {
+    "issue": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "severity": {
+          "enum": [
+            "blocker",
+            "suggestion"
+          ]
+        },
+        "ownerRole": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$"
+        },
+        "requirementRefs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9-]*$"
+          },
+          "uniqueItems": true
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "requestedChange": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "id",
+        "severity",
+        "ownerRole",
+        "requirementRefs",
+        "message",
+        "requestedChange"
+      ],
+      "additionalProperties": false
+    },
+    "artifactSet": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "ArtifactSet"
+        },
+        "subjectId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "manifest": {
+          "type": "object",
+          "properties": {
+            "artifactId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "required": [
+            "artifactId",
+            "sha256"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "kind",
+        "subjectId",
+        "manifest"
+      ],
+      "additionalProperties": false
+    },
+    "recordRef": {
+      "type": "object",
+      "properties": {
+        "recordId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "artifact": {
+          "type": "object",
+          "properties": {
+            "artifactId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "required": [
+            "artifactId",
+            "sha256"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "recordId",
+        "artifact"
+      ],
+      "additionalProperties": false
+    },
+    "repair": {
+      "type": "object",
+      "properties": {
+        "cause": {
+          "enum": [
+            "implementation",
+            "tests",
+            "integration_conflict"
+          ]
+        },
+        "affectedTaskIds": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9-]*$"
+          },
+          "uniqueItems": true
+        },
+        "issues": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Z0-9-]*$"
+              },
+              "severity": {
+                "enum": [
+                  "blocker",
+                  "suggestion"
+                ]
+              },
+              "ownerRole": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,63}$"
+              },
+              "requirementRefs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9-]*$"
+                },
+                "uniqueItems": true
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "requestedChange": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "id",
+              "severity",
+              "ownerRole",
+              "requirementRefs",
+              "message",
+              "requestedChange"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "evidence": {
+          "type": "object",
+          "properties": {
+            "recordId": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9-]*$"
+            },
+            "artifact": {
+              "type": "object",
+              "properties": {
+                "artifactId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              },
+              "required": [
+                "artifactId",
+                "sha256"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "recordId",
+            "artifact"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "cause",
+        "affectedTaskIds",
+        "issues",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    "specificationState": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "businessTask": {
+          "type": "string"
+        },
+        "specification": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "const": "ArtifactSet"
+                },
+                "subjectId": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9-]*$"
+                },
+                "manifest": {
+                  "type": "object",
+                  "properties": {
+                    "artifactId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    }
+                  },
+                  "required": [
+                    "artifactId",
+                    "sha256"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "kind",
+                "subjectId",
+                "manifest"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Z0-9-]*$"
+              },
+              "severity": {
+                "enum": [
+                  "blocker",
+                  "suggestion"
+                ]
+              },
+              "ownerRole": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,63}$"
+              },
+              "requirementRefs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9-]*$"
+                },
+                "uniqueItems": true
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "requestedChange": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "id",
+              "severity",
+              "ownerRole",
+              "requirementRefs",
+              "message",
+              "requestedChange"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "documentationApproval": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "recordId": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9-]*$"
+                },
+                "artifact": {
+                  "type": "object",
+                  "properties": {
+                    "artifactId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    }
+                  },
+                  "required": [
+                    "artifactId",
+                    "sha256"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "recordId",
+                "artifact"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "base": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "ArtifactSet"
+            },
+            "subjectId": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9-]*$"
+            },
+            "manifest": {
+              "type": "object",
+              "properties": {
+                "artifactId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              },
+              "required": [
+                "artifactId",
+                "sha256"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "kind",
+            "subjectId",
+            "manifest"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "businessTask",
+        "base",
+        "specification",
+        "issues",
+        "documentationApproval"
+      ],
+      "additionalProperties": false
+    },
+    "deliveryState": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "businessTask": {
+          "type": "string"
+        },
+        "specification": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "const": "ArtifactSet"
+                },
+                "subjectId": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9-]*$"
+                },
+                "manifest": {
+                  "type": "object",
+                  "properties": {
+                    "artifactId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    }
+                  },
+                  "required": [
+                    "artifactId",
+                    "sha256"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "kind",
+                "subjectId",
+                "manifest"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Z0-9-]*$"
+              },
+              "severity": {
+                "enum": [
+                  "blocker",
+                  "suggestion"
+                ]
+              },
+              "ownerRole": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,63}$"
+              },
+              "requirementRefs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9-]*$"
+                },
+                "uniqueItems": true
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "requestedChange": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "id",
+              "severity",
+              "ownerRole",
+              "requirementRefs",
+              "message",
+              "requestedChange"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "documentationApproval": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "recordId": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9-]*$"
+                },
+                "artifact": {
+                  "type": "object",
+                  "properties": {
+                    "artifactId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    }
+                  },
+                  "required": [
+                    "artifactId",
+                    "sha256"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "recordId",
+                "artifact"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "priorMapState": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "recordId": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9-]*$"
+                },
+                "artifact": {
+                  "type": "object",
+                  "properties": {
+                    "artifactId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    }
+                  },
+                  "required": [
+                    "artifactId",
+                    "sha256"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "recordId",
+                "artifact"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "repair": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "cause": {
+                  "enum": [
+                    "implementation",
+                    "tests",
+                    "integration_conflict"
+                  ]
+                },
+                "affectedTaskIds": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[A-Z][A-Z0-9-]*$"
+                  },
+                  "uniqueItems": true
+                },
+                "issues": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^[A-Z][A-Z0-9-]*$"
+                      },
+                      "severity": {
+                        "enum": [
+                          "blocker",
+                          "suggestion"
+                        ]
+                      },
+                      "ownerRole": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                      },
+                      "requirementRefs": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[A-Z][A-Z0-9-]*$"
+                        },
+                        "uniqueItems": true
+                      },
+                      "message": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "requestedChange": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "severity",
+                      "ownerRole",
+                      "requirementRefs",
+                      "message",
+                      "requestedChange"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "evidence": {
+                  "type": "object",
+                  "properties": {
+                    "recordId": {
+                      "type": "string",
+                      "pattern": "^[A-Z][A-Z0-9-]*$"
+                    },
+                    "artifact": {
+                      "type": "object",
+                      "properties": {
+                        "artifactId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "sha256": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        }
+                      },
+                      "required": [
+                        "artifactId",
+                        "sha256"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "recordId",
+                    "artifact"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "cause",
+                "affectedTaskIds",
+                "issues",
+                "evidence"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "candidate": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "const": "ArtifactSet"
+                },
+                "subjectId": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9-]*$"
+                },
+                "manifest": {
+                  "type": "object",
+                  "properties": {
+                    "artifactId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    }
+                  },
+                  "required": [
+                    "artifactId",
+                    "sha256"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "kind",
+                "subjectId",
+                "manifest"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "finalAcceptance": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "recordId": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9-]*$"
+                },
+                "artifact": {
+                  "type": "object",
+                  "properties": {
+                    "artifactId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    }
+                  },
+                  "required": [
+                    "artifactId",
+                    "sha256"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "recordId",
+                "artifact"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "base": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "ArtifactSet"
+            },
+            "subjectId": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9-]*$"
+            },
+            "manifest": {
+              "type": "object",
+              "properties": {
+                "artifactId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              },
+              "required": [
+                "artifactId",
+                "sha256"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "kind",
+            "subjectId",
+            "manifest"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "businessTask",
+        "base",
+        "specification",
+        "issues",
+        "documentationApproval",
+        "priorMapState",
+        "repair",
+        "candidate",
+        "finalAcceptance"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

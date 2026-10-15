@@ -1,0 +1,624 @@
+{
+  "tables": [
+    "schema_migrations",
+    "artifacts",
+    "application_settings",
+    "workspaces",
+    "workflows",
+    "runs",
+    "node_instances",
+    "context_bindings",
+    "run_context_bindings",
+    "attempts",
+    "journal_events",
+    "command_receipts",
+    "resource_locks"
+  ],
+  "setup": [
+    {
+      "sql": "INSERT INTO artifacts VALUES (?,?,?,?,?,?)",
+      "params": [
+        "artifact",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        2,
+        "application/json",
+        "objects/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "2026-10-13T12:00:00Z"
+      ]
+    },
+    {
+      "sql": "INSERT INTO application_settings VALUES (?,?,?,?)",
+      "params": [
+        1,
+        1,
+        "artifact",
+        "2026-10-13T12:00:00Z"
+      ]
+    },
+    {
+      "sql": "INSERT INTO workspaces VALUES (?,?,?,?,?)",
+      "params": [
+        "w1",
+        "C:\\fixture-w1",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "2026-10-13T12:00:00Z",
+        "2026-10-13T12:00:00Z"
+      ]
+    },
+    {
+      "sql": "INSERT INTO workspaces VALUES (?,?,?,?,?)",
+      "params": [
+        "w2",
+        "C:\\fixture-w2",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "2026-10-13T12:00:00Z",
+        "2026-10-13T12:00:00Z"
+      ]
+    },
+    {
+      "sql": "INSERT INTO workspaces VALUES (?,?,?,?,?)",
+      "params": [
+        "w3",
+        "C:\\fixture-w3",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "2026-10-13T12:00:00Z",
+        "2026-10-13T12:00:00Z"
+      ]
+    },
+    {
+      "sql": "INSERT INTO workspaces VALUES (?,?,?,?,?)",
+      "params": [
+        "w4",
+        "C:\\fixture-w4",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "2026-10-13T12:00:00Z",
+        "2026-10-13T12:00:00Z"
+      ]
+    },
+    {
+      "sql": "INSERT INTO workflows VALUES (?,?,?,?)",
+      "params": [
+        "wf",
+        "artifact",
+        "2026-10-13T12:00:00Z",
+        "2026-10-13T12:00:00Z"
+      ]
+    },
+    {
+      "sql": "INSERT INTO runs VALUES (?,?,?,?,?,?,?,?,?)",
+      "params": [
+        "r1",
+        "wf",
+        "w1",
+        "artifact",
+        "artifact",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "succeeded",
+        0,
+        "2026-10-13T11:00:00Z"
+      ]
+    },
+    {
+      "sql": "INSERT INTO runs VALUES (?,?,?,?,?,?,?,?,?)",
+      "params": [
+        "r2",
+        "wf",
+        "w2",
+        "artifact",
+        "artifact",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "running",
+        0,
+        "2026-10-13T12:00:00Z"
+      ]
+    },
+    {
+      "sql": "INSERT INTO runs VALUES (?,?,?,?,?,?,?,?,?)",
+      "params": [
+        "r3",
+        "wf",
+        "w1",
+        "artifact",
+        "artifact",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "draining",
+        0,
+        "2026-10-13T13:00:00Z"
+      ]
+    },
+    {
+      "sql": "INSERT INTO node_instances VALUES (?,?,?,?,?)",
+      "params": [
+        "r1",
+        "proposal",
+        "proposal",
+        "agent",
+        "scheduled"
+      ]
+    },
+    {
+      "sql": "INSERT INTO node_instances VALUES (?,?,?,?,?)",
+      "params": [
+        "r2",
+        "proposal",
+        "proposal",
+        "agent",
+        "scheduled"
+      ]
+    },
+    {
+      "sql": "INSERT INTO node_instances VALUES (?,?,?,?,?)",
+      "params": [
+        "r3",
+        "proposal",
+        "proposal",
+        "agent",
+        "scheduled"
+      ]
+    },
+    {
+      "sql": "INSERT INTO context_bindings VALUES (?,?,?,?,?,?,?,?,?,?)",
+      "params": [
+        "b1",
+        "codex",
+        "w1",
+        "fixture-account",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "artifact",
+        "ready",
+        "2026-10-13T12:00:00Z"
+      ]
+    },
+    {
+      "sql": "INSERT INTO context_bindings VALUES (?,?,?,?,?,?,?,?,?,?)",
+      "params": [
+        "b2",
+        "claude",
+        "w2",
+        "fixture-account",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "artifact",
+        "ready",
+        "2026-10-13T12:00:00Z"
+      ]
+    },
+    {
+      "sql": "INSERT INTO run_context_bindings VALUES (?,?,?,?)",
+      "params": [
+        "r1",
+        "codex-history",
+        "new",
+        "b1"
+      ]
+    },
+    {
+      "sql": "INSERT INTO attempts(id,run_id,node_instance_id,ordinal,state,context_binding_id) VALUES (?,?,?,?,?,?)",
+      "params": [
+        "a1",
+        "r1",
+        "proposal",
+        1,
+        "scheduled",
+        "b1"
+      ]
+    },
+    {
+      "sql": "INSERT INTO attempts(id,run_id,node_instance_id,ordinal,state,context_binding_id) VALUES (?,?,?,?,?,?)",
+      "params": [
+        "a2",
+        "r2",
+        "proposal",
+        1,
+        "scheduled",
+        "b2"
+      ]
+    },
+    {
+      "sql": "INSERT INTO journal_events VALUES (?,?,?,?,?,?,?,?,?,?)",
+      "params": [
+        "r1",
+        1,
+        "e1",
+        "run.created",
+        null,
+        null,
+        "{}",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        2,
+        "2026-10-13T12:00:00Z"
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "id": "continued-binding-in-another-run",
+      "sql": "INSERT INTO run_context_bindings VALUES (?,?,?,?)",
+      "params": [
+        "r3",
+        "codex-history",
+        "continue",
+        "b1"
+      ],
+      "expected": "accept"
+    },
+    {
+      "id": "resolve-context-by-run-and-node",
+      "sql": "SELECT runs.workflow_id,context_node_id,mode,binding_id FROM run_context_bindings JOIN runs ON runs.id=run_id WHERE run_id=? AND context_node_id=?",
+      "params": [
+        "r3",
+        "codex-history"
+      ],
+      "expected": "accept",
+      "rows": [
+        [
+          "wf",
+          "codex-history",
+          "continue",
+          "b1"
+        ]
+      ]
+    },
+    {
+      "id": "draining-run-holds-workspace",
+      "sql": "INSERT INTO runs VALUES (?,?,?,?,?,?,?,?,?)",
+      "params": [
+        "r4",
+        "wf",
+        "w1",
+        "artifact",
+        "artifact",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "queued",
+        0,
+        "2026-10-13T12:00:00Z"
+      ],
+      "expected": "reject",
+      "reason": "UNIQUE constraint failed"
+    },
+    {
+      "id": "unknown-workflow-object",
+      "sql": "INSERT INTO workflows VALUES (?,?,?,?)",
+      "params": [
+        "bad",
+        "missing",
+        "2026-10-13T12:00:00Z",
+        "2026-10-13T12:00:00Z"
+      ],
+      "expected": "reject",
+      "reason": "FOREIGN KEY constraint failed"
+    },
+    {
+      "id": "unknown-run-state",
+      "sql": "UPDATE runs SET state=? WHERE id=?",
+      "params": [
+        "approved",
+        "r2"
+      ],
+      "expected": "reject",
+      "reason": "CHECK constraint failed"
+    },
+    {
+      "id": "second-new-origin",
+      "sql": "INSERT INTO run_context_bindings VALUES (?,?,?,?)",
+      "params": [
+        "r2",
+        "another-context",
+        "new",
+        "b1"
+      ],
+      "expected": "reject",
+      "reason": "UNIQUE constraint failed"
+    },
+    {
+      "id": "duplicate-run-context",
+      "sql": "INSERT INTO run_context_bindings VALUES (?,?,?,?)",
+      "params": [
+        "r3",
+        "codex-history",
+        "continue",
+        "b1"
+      ],
+      "expected": "reject",
+      "reason": "UNIQUE constraint failed"
+    },
+    {
+      "id": "missing-native-binding",
+      "sql": "INSERT INTO run_context_bindings VALUES (?,?,?,?)",
+      "params": [
+        "r2",
+        "claude-history",
+        "continue",
+        "missing"
+      ],
+      "expected": "reject",
+      "reason": "FOREIGN KEY constraint failed"
+    },
+    {
+      "id": "invalid-context-mode",
+      "sql": "INSERT INTO run_context_bindings VALUES (?,?,?,?)",
+      "params": [
+        "r2",
+        "claude-history",
+        "auto",
+        "b2"
+      ],
+      "expected": "reject",
+      "reason": "CHECK constraint failed"
+    },
+    {
+      "id": "zero-settings-revision",
+      "sql": "UPDATE application_settings SET revision=0",
+      "params": [],
+      "expected": "reject",
+      "reason": "CHECK constraint failed"
+    },
+    {
+      "id": "second-settings-owner",
+      "sql": "INSERT INTO application_settings VALUES (?,?,?,?)",
+      "params": [
+        2,
+        1,
+        "artifact",
+        "2026-10-13T12:00:00Z"
+      ],
+      "expected": "reject",
+      "reason": "CHECK constraint failed"
+    },
+    {
+      "id": "duplicate-journal-sequence",
+      "sql": "INSERT INTO journal_events VALUES (?,?,?,?,?,?,?,?,?,?)",
+      "params": [
+        "r1",
+        1,
+        "e2",
+        "run.created",
+        null,
+        null,
+        "{}",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        2,
+        "2026-10-13T12:00:00Z"
+      ],
+      "expected": "reject",
+      "reason": "UNIQUE constraint failed"
+    },
+    {
+      "id": "wrong-inline-byte-size",
+      "sql": "INSERT INTO journal_events VALUES (?,?,?,?,?,?,?,?,?,?)",
+      "params": [
+        "r1",
+        2,
+        "e2",
+        "run.created",
+        null,
+        null,
+        "{}",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        3,
+        "2026-10-13T12:00:00Z"
+      ],
+      "expected": "reject",
+      "reason": "CHECK constraint failed"
+    },
+    {
+      "id": "cross-run-attempt-event",
+      "sql": "INSERT INTO journal_events VALUES (?,?,?,?,?,?,?,?,?,?)",
+      "params": [
+        "r1",
+        2,
+        "e2",
+        "attempt.state_changed",
+        "proposal",
+        "a2",
+        "{}",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        2,
+        "2026-10-13T12:00:00Z"
+      ],
+      "expected": "reject",
+      "reason": "FOREIGN KEY constraint failed"
+    },
+    {
+      "id": "attempt-event-without-node",
+      "sql": "INSERT INTO journal_events VALUES (?,?,?,?,?,?,?,?,?,?)",
+      "params": [
+        "r1",
+        2,
+        "e2",
+        "attempt.state_changed",
+        null,
+        "a1",
+        "{}",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        2,
+        "2026-10-13T12:00:00Z"
+      ],
+      "expected": "reject",
+      "reason": "CHECK constraint failed"
+    },
+    {
+      "id": "duplicate-attempt-ordinal",
+      "sql": "INSERT INTO attempts(id,run_id,node_instance_id,ordinal,state) VALUES (?,?,?,?,?)",
+      "params": [
+        "a3",
+        "r1",
+        "proposal",
+        1,
+        "scheduled"
+      ],
+      "expected": "reject",
+      "reason": "UNIQUE constraint failed"
+    },
+    {
+      "id": "cross-run-resource-attempt",
+      "sql": "INSERT INTO resource_locks VALUES (?,?,?,?)",
+      "params": [
+        "native:b1",
+        "r1",
+        "a2",
+        "2026-10-13T12:00:00Z"
+      ],
+      "expected": "reject",
+      "reason": "FOREIGN KEY constraint failed"
+    },
+    {
+      "id": "zero-live-provider-needed-to-block",
+      "sql": "UPDATE attempts SET state='blocked' WHERE id=?",
+      "params": [
+        "a1"
+      ],
+      "expected": "accept"
+    },
+    {
+      "id": "blocked-attempt-query",
+      "sql": "SELECT state,process_id FROM attempts WHERE id=?",
+      "params": [
+        "a1"
+      ],
+      "expected": "accept",
+      "rows": [
+        [
+          "blocked",
+          null
+        ]
+      ]
+    },
+    {
+      "id": "another-workspace-can-run",
+      "sql": "INSERT INTO runs VALUES (?,?,?,?,?,?,?,?,?)",
+      "params": [
+        "r4",
+        "wf",
+        "w4",
+        "artifact",
+        "artifact",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "queued",
+        0,
+        "2026-10-13T14:00:00Z"
+      ],
+      "expected": "accept"
+    },
+    {
+      "id": "list-first-fenced-page",
+      "sql": "SELECT id FROM runs WHERE (created_at,id)<=(?,?) ORDER BY created_at DESC,id DESC LIMIT 1",
+      "params": [
+        "2026-10-13T13:00:00Z",
+        "r3"
+      ],
+      "expected": "accept",
+      "rows": [
+        [
+          "r3"
+        ]
+      ]
+    },
+    {
+      "id": "list-second-fenced-page",
+      "sql": "SELECT id FROM runs WHERE (created_at,id)<=(?,?) AND (created_at,id)<(?,?) ORDER BY created_at DESC,id DESC LIMIT 1",
+      "params": [
+        "2026-10-13T13:00:00Z",
+        "r3",
+        "2026-10-13T13:00:00Z",
+        "r3"
+      ],
+      "expected": "accept",
+      "rows": [
+        [
+          "r2"
+        ]
+      ]
+    },
+    {
+      "id": "list-last-fenced-page",
+      "sql": "SELECT id FROM runs WHERE (created_at,id)<=(?,?) AND (created_at,id)<(?,?) ORDER BY created_at DESC,id DESC LIMIT 1",
+      "params": [
+        "2026-10-13T13:00:00Z",
+        "r3",
+        "2026-10-13T12:00:00Z",
+        "r2"
+      ],
+      "expected": "accept",
+      "rows": [
+        [
+          "r1"
+        ]
+      ]
+    },
+    {
+      "id": "inline-envelope-avoids-object-per-event",
+      "sql": "SELECT envelope_json,envelope_byte_size FROM journal_events WHERE run_id=? AND sequence=?",
+      "params": [
+        "r1",
+        1
+      ],
+      "expected": "accept",
+      "rows": [
+        [
+          "{}",
+          2
+        ]
+      ]
+    },
+    {
+      "id": "reserved-wait-is-not-an-M1-db-state",
+      "sql": "UPDATE runs SET state=? WHERE id=?",
+      "params": [
+        "waiting_for_user",
+        "r2"
+      ],
+      "expected": "reject",
+      "reason": "CHECK constraint failed"
+    },
+    {
+      "id": "native-review-state-is-persisted-independently",
+      "sql": "UPDATE context_bindings SET state='needs_review' WHERE id=?",
+      "params": [
+        "b2"
+      ],
+      "expected": "accept"
+    },
+    {
+      "id": "terminal-failure-does-not-wait-for-review",
+      "sql": "UPDATE runs SET state='failed' WHERE id=?",
+      "params": [
+        "r2"
+      ],
+      "expected": "accept"
+    },
+    {
+      "id": "failed-run-and-review-binding-coexist",
+      "sql": "SELECT runs.state,context_bindings.state FROM runs JOIN context_bindings ON context_bindings.workspace_id=runs.workspace_id WHERE runs.id=?",
+      "params": [
+        "r2"
+      ],
+      "expected": "accept",
+      "rows": [
+        [
+          "failed",
+          "needs_review"
+        ]
+      ]
+    },
+    {
+      "id": "review-binding-does-not-retain-active-workspace",
+      "sql": "INSERT INTO runs VALUES (?,?,?,?,?,?,?,?,?)",
+      "params": [
+        "r5",
+        "wf",
+        "w2",
+        "artifact",
+        "artifact",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "queued",
+        0,
+        "2026-10-13T15:00:00Z"
+      ],
+      "expected": "accept"
+    }
+  ]
+}

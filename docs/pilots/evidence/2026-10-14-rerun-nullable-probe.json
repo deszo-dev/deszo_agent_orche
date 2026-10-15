@@ -1,0 +1,52 @@
+{
+  "run": {
+    "runId": "a423053b-e61b-46dc-9422-c5bc4da8d47f",
+    "workflowId": "nullable-check",
+    "workflowSnapshot": {
+      "artifactId": "2d041fe0-ba09-4526-ab66-9cf1a024ac04",
+      "sha256": "4a87b5ce44b0c840334a2cf509eaa03075654544a8a860989dca61536e02a43d"
+    },
+    "executionHash": "4a87b5ce44b0c840334a2cf509eaa03075654544a8a860989dca61536e02a43d",
+    "state": "succeeded",
+    "lastSequence": 28,
+    "createdAt": "2026-10-14T05:27:38.192Z",
+    "workspaceId": "main",
+    "kind": "workflow"
+  },
+  "instances": [
+    {
+      "nodeInstanceId": "request",
+      "nodeId": "request",
+      "state": "succeeded",
+      "attemptId": "9b8679d8-007d-4043-ad0a-425e67c99044",
+      "ordinal": 1,
+      "outputs": {
+        "artifactId": "f7206d74-342f-4686-88fc-761b8c804e65",
+        "sha256": "f224326e027bdc01b73e62f4c30455aa7c2a66608ee098ed2dc5000d36a26d32"
+      }
+    },
+    {
+      "nodeInstanceId": "agent",
+      "nodeId": "agent",
+      "state": "succeeded",
+      "attemptId": "acbc6880-37ba-498e-b117-4adfece23039",
+      "ordinal": 1,
+      "outputs": {
+        "artifactId": "dad77976-6215-4d39-88cd-5df5cf5d37ef",
+        "sha256": "956fdc72fbc6c138608441f3efd252e359b68c50c56e63f3d5cc11ac0d8bf27d"
+      }
+    },
+    {
+      "nodeInstanceId": "answer",
+      "nodeId": "answer",
+      "state": "succeeded",
+      "attemptId": "46a31c3d-0114-4c85-8342-42828893528a",
+      "ordinal": 1,
+      "outputs": {
+        "artifactId": "cd711936-11a9-4775-9061-dcd8e0bf548d",
+        "sha256": "d29462f1b114998dbe47984285992839f810bcc85b6f7b5b4b642b4eeb336cc0"
+      }
+    }
+  ],
+  "errors": []
+}

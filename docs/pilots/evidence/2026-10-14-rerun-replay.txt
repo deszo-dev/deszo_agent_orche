@@ -1,0 +1,211 @@
+- banner:
+  - generic: deszo
+  - generic: Read-only Replay — the editor draft is kept unchanged.
+- text: Replay · pilot-reference-delivery ·
+- code: 0eafbb01
+- button "First step":
+- button "Previous (←)":
+- slider: "438"
+- button "Next (→)":
+- button "Last step":
+- generic: 439 / 439
+- checkbox "Log batches"
+- text: Log batches
+- combobox:
+  - option "Workflow"
+  - option "Loop body · delivery"
+  - option "Loop body · delivery/1/specification" [selected]
+- combobox:
+  - option "Iteration 1"
+  - option "Iteration 2" [selected]
+- button "Exit replay":
+  - text: Exit replay
+- generic: "#981"
+- strong: Run waiting_for_user → failed
+- generic: 6:42:19 AM
+- generic: "Run: Failed"
+- generic: "Loop: canceled · iteration 2/3"
+- application:
+  - generic: Loop Input
+  - generic: Current value, iteration, feedback and fixed inputs
+  - generic: value
+  - generic: iteration
+  - generic: feedback
+  - generic: business
+  - generic: Succeeded
+  - generic: JSON Select
+  - generic: /businessTask → Text
+  - generic: value
+  - generic: value
+  - generic "Run after (order only)"
+  - generic "Order-only dependency"
+  - generic: issue-text
+  - generic: Succeeded
+  - generic: JSON Select
+  - generic: /issues → Text
+  - generic: value
+  - generic: value
+  - generic "Run after (order only)"
+  - generic "Order-only dependency"
+  - generic: issue-list
+  - generic: Succeeded
+  - generic: JSON Select
+  - generic: /issues → JsonValue
+  - generic: value
+  - generic: value
+  - generic "Run after (order only)"
+  - generic "Order-only dependency"
+  - generic: previous
+  - generic: Succeeded
+  - generic: JSON Select
+  - generic: /specification → ArtifactSet
+  - generic: value
+  - generic: value
+  - generic "Run after (order only)"
+  - generic "Order-only dependency"
+  - generic: analysis-prompt
+  - generic: Succeeded
+  - generic: Prompt Template
+  - generic: 2 slots
+  - generic: business
+  - generic: issues
+  - generic: text
+  - generic "Run after (order only)"
+  - generic "Order-only dependency"
+  - generic "Context"
+  - generic: analyst
+  - generic: Succeeded
+  - generic: Agent · Codex
+  - generic: gpt-6-luna · text · files in · captures
+  - generic: prompt
+  - generic: files
+  - generic: text
+  - generic: files
+  - generic "Run after (order only)"
+  - generic "Order-only dependency"
+  - generic: prepare
+  - generic: Succeeded
+  - generic: Gate
+  - generic: prepare · customer, readiness, testability
+  - generic: subject
+  - generic: issues
+  - generic: subject
+  - generic: plan
+  - generic: customer
+  - generic: readiness
+  - generic: testability
+  - generic "Run after (order only)"
+  - generic "Order-only dependency"
+  - generic: plan-text
+  - generic: Succeeded
+  - generic: JSON Select
+  - generic: (root) → Text
+  - generic: value
+  - generic: value
+  - generic "Run after (order only)"
+  - generic "Order-only dependency"
+  - generic: customer-prompt
+  - generic: Succeeded
+  - generic: Prompt Template
+  - generic: 1 slot
+  - generic: plan
+  - generic: text
+  - generic "Run after (order only)"
+  - generic "Order-only dependency"
+  - generic "Context"
+  - generic: customer-review
+  - generic: Succeeded
+  - generic: Agent · Codex
+  - generic: gpt-6-luna · json · files in
+  - generic: prompt
+  - generic: files
+  - generic: text
+  - generic: json
+  - generic "Run after (order only)"
+  - generic "Order-only dependency"
+  - generic: readiness-prompt
+  - generic: Succeeded
+  - generic: Prompt Template
+  - generic: 1 slot
+  - generic: plan
+  - generic: text
+  - generic "Run after (order only)"
+  - generic "Order-only dependency"
+  - generic "Context"
+  - generic: readiness-review
+  - generic: Failed
+  - generic: Agent · Claude Code
+  - generic: haiku · json · files in
+  - generic: prompt
+  - generic: files
+  - generic: text
+  - generic: json
+  - generic "Run after (order only)"
+  - generic "Order-only dependency"
+  - generic: testability-prompt
+  - generic: Succeeded
+  - generic: Prompt Template
+  - generic: 1 slot
+  - generic: plan
+  - generic: text
+  - generic "Run after (order only)"
+  - generic "Order-only dependency"
+  - generic "Context"
+  - generic: testability-review
+  - generic: Canceled
+  - generic: Agent · Antigravity
+  - generic: gemini-3.8-flash-low · json · files in
+  - generic: prompt
+  - generic: files
+  - generic: text
+  - generic: json
+  - generic "Run after (order only)"
+  - generic "Order-only dependency"
+  - generic: evaluate
+  - generic: Canceled
+  - generic: Gate
+  - generic: evaluate · customer, readiness, testability
+  - generic: subject
+  - generic: plan
+  - generic: customer
+  - generic: readiness
+  - generic: testability
+  - generic: report
+  - generic: certificate
+  - generic "Run after (order only)"
+  - generic "Order-only dependency"
+  - generic: carry
+  - generic: Canceled
+  - generic: Merge
+  - generic: Record · businessTask, base, specification, issues, documentationApproval
+  - generic: seed
+  - generic: subject
+  - generic: report
+  - generic: value
+  - generic "Run after (order only)"
+  - generic "Order-only dependency"
+  - generic: decide
+  - generic: Canceled
+  - generic: Condition
+  - generic: done when /status equals "OPEN"
+  - generic: value
+  - generic: decision
+  - generic "Run after (order only)"
+  - generic "Order-only dependency"
+  - generic: Loop Return
+  - generic: Candidate and checker decision
+  - generic: candidate
+  - generic: decision
+  - generic "Control Panel":
+    - button "Zoom In":
+    - button "Zoom Out":
+    - button "Fit View":
+  - link "React Flow attribution":
+    - /url: https://reactflow.dev/attribution
+    - text: React Flow
+- complementary:
+  - paragraph: Select a node to inspect what was committed by this step. Replay never runs anything.
+  - heading "Iterations" [level=4]
+  - generic "Iteration 1 · continue"
+  - generic "Iteration 2 · closed without a decision (canceled)"
+  - generic: "Feedback in: 1 review(s) requested changes; 5 open blocker(s) remain."

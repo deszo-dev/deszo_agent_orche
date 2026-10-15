@@ -1,0 +1,247 @@
+{
+  "schemaVersion": 1,
+  "workflowId": "context-chain",
+  "capabilities": [
+    "core-v1"
+  ],
+  "settings": {
+    "nativeConfiguration": "restricted"
+  },
+  "nodes": [
+    {
+      "id": "request",
+      "type": "text",
+      "config": {
+        "value": "Remember the control word ORBIT in this conversation. Propose one sentence describing a round-recovery API."
+      }
+    },
+    {
+      "id": "codex-history",
+      "type": "context",
+      "config": {
+        "provider": "codex",
+        "mode": "continue",
+        "bindingId": "00000000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "id": "claude-history",
+      "type": "context",
+      "config": {
+        "provider": "claude",
+        "mode": "new"
+      }
+    },
+    {
+      "id": "proposal",
+      "type": "agent",
+      "config": {
+        "provider": "codex",
+        "model": "explicit-test-model",
+        "contextId": "codex-history",
+        "timeoutSeconds": 600,
+        "output": {
+          "format": "json",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "id": "review-prompt",
+      "type": "prompt-template",
+      "config": {
+        "template": "Review this proposal and suggest one correction:\n{{proposal}}",
+        "slots": [
+          {
+            "id": "proposal"
+          }
+        ]
+      }
+    },
+    {
+      "id": "review",
+      "type": "agent",
+      "config": {
+        "provider": "claude",
+        "model": "explicit-test-model",
+        "contextId": "claude-history",
+        "timeoutSeconds": 600,
+        "output": {
+          "format": "json",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "id": "return-prompt",
+      "type": "prompt-template",
+      "config": {
+        "template": "The reviewer returned:\n{{review}}\nRevise your proposal and include the control word I asked you to remember earlier.",
+        "slots": [
+          {
+            "id": "review"
+          }
+        ]
+      }
+    },
+    {
+      "id": "revise",
+      "type": "agent",
+      "config": {
+        "provider": "codex",
+        "model": "explicit-test-model",
+        "contextId": "codex-history",
+        "timeoutSeconds": 600,
+        "output": {
+          "format": "json",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "id": "answer",
+      "type": "result-viewer",
+      "config": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "request-proposal",
+      "source": {
+        "nodeId": "request",
+        "port": "text"
+      },
+      "target": {
+        "nodeId": "proposal",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "proposal-template",
+      "source": {
+        "nodeId": "proposal",
+        "port": "text"
+      },
+      "target": {
+        "nodeId": "review-prompt",
+        "port": "proposal"
+      }
+    },
+    {
+      "id": "template-review",
+      "source": {
+        "nodeId": "review-prompt",
+        "port": "text"
+      },
+      "target": {
+        "nodeId": "review",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "review-template",
+      "source": {
+        "nodeId": "review",
+        "port": "text"
+      },
+      "target": {
+        "nodeId": "return-prompt",
+        "port": "review"
+      }
+    },
+    {
+      "id": "template-revise",
+      "source": {
+        "nodeId": "return-prompt",
+        "port": "text"
+      },
+      "target": {
+        "nodeId": "revise",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "revise-answer",
+      "source": {
+        "nodeId": "revise",
+        "port": "json"
+      },
+      "target": {
+        "nodeId": "answer",
+        "port": "value"
+      }
+    }
+  ],
+  "after": [],
+  "view": {
+    "request": {
+      "x": 0,
+      "y": 0
+    },
+    "proposal": {
+      "x": 230,
+      "y": 0
+    },
+    "review-prompt": {
+      "x": 460,
+      "y": 0
+    },
+    "review": {
+      "x": 690,
+      "y": 0
+    },
+    "return-prompt": {
+      "x": 920,
+      "y": 0
+    },
+    "revise": {
+      "x": 1150,
+      "y": 0
+    },
+    "answer": {
+      "x": 1380,
+      "y": 0
+    },
+    "codex-history": {
+      "x": 230,
+      "y": 220
+    },
+    "claude-history": {
+      "x": 690,
+      "y": 220
+    }
+  }
+}

@@ -1,0 +1,2019 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deszo.local/documentation/map.schema.json",
+  "title": "Implementation Map execution records (through M6)",
+  "$defs": {
+    "ref": {
+      "type": "object",
+      "properties": {
+        "artifactId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "artifactId",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "recordRef": {
+      "type": "object",
+      "properties": {
+        "recordId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "artifact": {
+          "$ref": "#/$defs/ref"
+        }
+      },
+      "required": [
+        "recordId",
+        "artifact"
+      ],
+      "additionalProperties": false
+    },
+    "issueDraft": {
+      "type": "object",
+      "properties": {
+        "localId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+        },
+        "severity": {
+          "enum": [
+            "blocker",
+            "suggestion"
+          ]
+        },
+        "requirementRefs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9-]*$"
+          },
+          "uniqueItems": true
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "requestedChange": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "localId",
+        "severity",
+        "requirementRefs",
+        "message",
+        "requestedChange"
+      ],
+      "additionalProperties": false
+    },
+    "taskReturn": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "const": 1
+            },
+            "kind": {
+              "const": "candidate"
+            },
+            "summary": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "kind",
+            "summary"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "const": 1
+            },
+            "kind": {
+              "const": "specification_revision_required"
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            },
+            "issues": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/issueDraft"
+                  },
+                  {
+                    "properties": {
+                      "severity": {
+                        "const": "blocker"
+                      },
+                      "requirementRefs": {
+                        "minItems": 1
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "kind",
+            "reason",
+            "issues"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "taskReview": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "taskId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "resultId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "criterionId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "verdict": {
+          "enum": [
+            "APPROVED",
+            "CHANGES_REQUESTED"
+          ]
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/issueDraft"
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "taskId",
+        "resultId",
+        "criterionId",
+        "verdict",
+        "issues"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "verdict": {
+                "const": "CHANGES_REQUESTED"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "issues": {
+                "contains": {
+                  "properties": {
+                    "severity": {
+                      "const": "blocker"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "verdict": {
+                "const": "APPROVED"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "suggestion"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "triageDecision": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "cause": {
+          "enum": [
+            "implementation",
+            "tests",
+            "specification",
+            "integration_conflict",
+            "unknown"
+          ]
+        },
+        "subjectId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "affectedTaskIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9-]*$"
+          },
+          "uniqueItems": true
+        },
+        "requirementRefs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9-]*$"
+          },
+          "uniqueItems": true
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "localId": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+              },
+              "severity": {
+                "const": "blocker"
+              },
+              "ownerRole": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,63}$"
+              },
+              "requirementRefs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9-]*$"
+                },
+                "uniqueItems": true
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "requestedChange": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "localId",
+              "severity",
+              "ownerRole",
+              "requirementRefs",
+              "message",
+              "requestedChange"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "cause",
+        "subjectId",
+        "affectedTaskIds",
+        "requirementRefs",
+        "reason",
+        "issues"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "cause": {
+                "enum": [
+                  "implementation",
+                  "tests",
+                  "integration_conflict"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "affectedTaskIds": {
+                "minItems": 1
+              },
+              "issues": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "cause": {
+                "const": "specification"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "requirementRefs": {
+                "minItems": 1
+              },
+              "issues": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "mapRepair": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "kind": {
+          "const": "MapRepair"
+        },
+        "subjectId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "taskIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9-]*$"
+          },
+          "uniqueItems": true,
+          "minItems": 1
+        },
+        "issues": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "pipeline-state.schema.json#/$defs/issue"
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "subjectId",
+        "taskIds",
+        "issues"
+      ],
+      "additionalProperties": false
+    },
+    "fileOperation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "create"
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "artifact": {
+              "$ref": "#/$defs/ref"
+            },
+            "byteSize": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "op",
+            "path",
+            "artifact",
+            "byteSize"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "replace"
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "preimage": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "artifact": {
+              "$ref": "#/$defs/ref"
+            },
+            "byteSize": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "op",
+            "path",
+            "preimage",
+            "artifact",
+            "byteSize"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "taskResult": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "kind": {
+          "const": "TaskResult"
+        },
+        "recordId": {
+          "type": "string",
+          "pattern": "^RES-[A-F0-9]{12}$"
+        },
+        "mapExecutionId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "subjectId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "taskId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "attempt": {
+          "type": "object",
+          "properties": {
+            "runId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "nodeInstanceId": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+            },
+            "attemptId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "role": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+            },
+            "requestedModel": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "observedModel": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "runId",
+            "nodeInstanceId",
+            "attemptId",
+            "role",
+            "requestedModel",
+            "observedModel"
+          ],
+          "additionalProperties": false
+        },
+        "templateRevision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,63}$"
+              },
+              "ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "required": [
+              "id",
+              "ref",
+              "digest"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "operations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/fileOperation"
+          }
+        },
+        "outputs": {
+          "type": "object",
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "const": "fileSet"
+                  },
+                  "manifest": {
+                    "$ref": "#/$defs/ref"
+                  }
+                },
+                "required": [
+                  "type",
+                  "manifest"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "const": "candidate"
+                  },
+                  "record": {
+                    "$ref": "#/$defs/recordRef"
+                  }
+                },
+                "required": [
+                  "type",
+                  "record"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "enum": [
+                      "json",
+                      "text"
+                    ]
+                  },
+                  "artifact": {
+                    "$ref": "#/$defs/ref"
+                  }
+                },
+                "required": [
+                  "type",
+                  "artifact"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "taskReturn": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ref"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "recordId",
+        "mapExecutionId",
+        "generation",
+        "subjectId",
+        "taskId",
+        "attempt",
+        "templateRevision",
+        "inputs",
+        "operations",
+        "outputs",
+        "taskReturn"
+      ],
+      "additionalProperties": false
+    },
+    "taskReviewRecord": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "kind": {
+          "const": "TaskReview"
+        },
+        "recordId": {
+          "type": "string",
+          "pattern": "^TREV-[A-F0-9]{12}$"
+        },
+        "mapExecutionId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "taskId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "resultId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "criterionId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "verdict": {
+          "enum": [
+            "APPROVED",
+            "CHANGES_REQUESTED"
+          ]
+        },
+        "decision": {
+          "$ref": "#/$defs/ref"
+        },
+        "reviewer": {
+          "type": "object",
+          "properties": {
+            "runId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "nodeInstanceId": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+            },
+            "attemptId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "role": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+            },
+            "requestedModel": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "observedModel": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "runId",
+            "nodeInstanceId",
+            "attemptId",
+            "role",
+            "requestedModel",
+            "observedModel"
+          ],
+          "additionalProperties": false
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "$ref": "pipeline-state.schema.json#/$defs/issue"
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "recordId",
+        "mapExecutionId",
+        "taskId",
+        "resultId",
+        "criterionId",
+        "verdict",
+        "decision",
+        "reviewer",
+        "issues"
+      ],
+      "additionalProperties": false
+    },
+    "checkReport": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "kind": {
+          "const": "CheckReport"
+        },
+        "recordId": {
+          "type": "string",
+          "pattern": "^CHK-[A-F0-9]{12}$"
+        },
+        "mapExecutionId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "taskId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "criterionId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "checkId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "subjectId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "source": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "enum": [
+                "candidate",
+                "task-result"
+              ]
+            },
+            "recordId": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9-]*$"
+            }
+          },
+          "required": [
+            "kind",
+            "recordId"
+          ],
+          "additionalProperties": false
+        },
+        "executable": {
+          "type": "string",
+          "minLength": 1
+        },
+        "executableVersion": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "arguments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "timeoutSeconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "requiredExitCode": {
+          "type": "integer"
+        },
+        "exitCode": {
+          "type": "integer"
+        },
+        "startedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "endedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "stdout": {
+          "$ref": "#/$defs/ref"
+        },
+        "stderr": {
+          "$ref": "#/$defs/ref"
+        },
+        "sourceIntegrity": {
+          "const": "intact"
+        },
+        "outcome": {
+          "enum": [
+            "passed",
+            "failed"
+          ]
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "recordId",
+        "mapExecutionId",
+        "taskId",
+        "criterionId",
+        "checkId",
+        "subjectId",
+        "source",
+        "executable",
+        "executableVersion",
+        "arguments",
+        "timeoutSeconds",
+        "requiredExitCode",
+        "exitCode",
+        "startedAt",
+        "endedAt",
+        "stdout",
+        "stderr",
+        "sourceIntegrity",
+        "outcome"
+      ],
+      "additionalProperties": false
+    },
+    "candidate": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "kind": {
+          "const": "Candidate"
+        },
+        "recordId": {
+          "type": "string",
+          "pattern": "^CAND-[A-F0-9]{12}$"
+        },
+        "mapExecutionId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "taskId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "base": {
+          "$ref": "#/$defs/ref"
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/recordRef"
+          }
+        },
+        "manifest": {
+          "$ref": "#/$defs/ref"
+        },
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "from": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[A-Z][A-Z0-9-]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "path",
+              "sha256",
+              "from"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "recordId",
+        "mapExecutionId",
+        "taskId",
+        "base",
+        "results",
+        "manifest",
+        "paths"
+      ],
+      "additionalProperties": false
+    },
+    "conflict": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "kind": {
+          "const": "Conflict"
+        },
+        "recordId": {
+          "type": "string",
+          "pattern": "^CONF-[A-F0-9]{12}$"
+        },
+        "mapExecutionId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "taskId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "base": {
+          "$ref": "#/$defs/ref"
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/recordRef"
+          }
+        },
+        "conflicts": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reason": {
+                "enum": [
+                  "different_content",
+                  "preimage_mismatch",
+                  "case_collision"
+                ]
+              },
+              "results": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9-]*$"
+                }
+              }
+            },
+            "required": [
+              "path",
+              "reason",
+              "results"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "recordId",
+        "mapExecutionId",
+        "taskId",
+        "base",
+        "results",
+        "conflicts"
+      ],
+      "additionalProperties": false
+    },
+    "triage": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "kind": {
+          "const": "Triage"
+        },
+        "recordId": {
+          "type": "string",
+          "pattern": "^TRI-[A-F0-9]{12}$"
+        },
+        "mapExecutionId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "taskId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "cycle": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "decision": {
+          "$ref": "#/$defs/ref"
+        },
+        "cause": {
+          "enum": [
+            "implementation",
+            "tests",
+            "specification",
+            "integration_conflict",
+            "unknown"
+          ]
+        },
+        "affectedTaskIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9-]*$"
+          },
+          "uniqueItems": true
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "$ref": "pipeline-state.schema.json#/$defs/issue"
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/recordRef"
+          }
+        },
+        "triager": {
+          "type": "object",
+          "properties": {
+            "runId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "nodeInstanceId": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+            },
+            "attemptId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "role": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+            },
+            "requestedModel": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "observedModel": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "runId",
+            "nodeInstanceId",
+            "attemptId",
+            "role",
+            "requestedModel",
+            "observedModel"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "recordId",
+        "mapExecutionId",
+        "taskId",
+        "cycle",
+        "decision",
+        "cause",
+        "affectedTaskIds",
+        "issues",
+        "evidence",
+        "triager"
+      ],
+      "additionalProperties": false
+    },
+    "mapState": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "kind": {
+          "const": "MapState"
+        },
+        "recordId": {
+          "type": "string",
+          "pattern": "^MST-[A-F0-9]{12}$"
+        },
+        "mapExecutionId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "subjectId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "templateFingerprint": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "state": {
+          "enum": [
+            "running",
+            "paused",
+            "finishing",
+            "implementation_complete",
+            "specification_revision_required",
+            "canceled",
+            "interrupted"
+          ]
+        },
+        "failedVerificationCycles": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxFailedVerificationCycles": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "pauseReason": {
+          "anyOf": [
+            {
+              "enum": [
+                "verification_limit",
+                "task_attempt_limit",
+                "triage_unknown"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tasks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "taskId": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Z0-9-]*$"
+              },
+              "state": {
+                "enum": [
+                  "waiting",
+                  "ready",
+                  "running",
+                  "awaiting_review",
+                  "accepted",
+                  "needs_changes",
+                  "stale",
+                  "blocked",
+                  "canceled"
+                ]
+              },
+              "selectedResult": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/recordRef"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "attempts": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "fingerprint": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "criteria": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "recordId"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[A-Z][A-Z0-9-]*$"
+                    },
+                    "recordId": {
+                      "type": "string",
+                      "pattern": "^[A-Z][A-Z0-9-]*$"
+                    }
+                  }
+                }
+              }
+            },
+            "required": [
+              "taskId",
+              "state",
+              "selectedResult",
+              "attempts"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "$ref": "pipeline-state.schema.json#/$defs/issue"
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "recordId",
+        "mapExecutionId",
+        "generation",
+        "subjectId",
+        "templateFingerprint",
+        "state",
+        "failedVerificationCycles",
+        "maxFailedVerificationCycles",
+        "pauseReason",
+        "tasks",
+        "issues"
+      ],
+      "additionalProperties": false
+    },
+    "summary": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "kind": {
+          "const": "MapSummary"
+        },
+        "mapExecutionId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "specificationId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "outcome": {
+          "enum": [
+            "implementation_complete",
+            "specification_revision_required"
+          ]
+        },
+        "state": {
+          "$ref": "#/$defs/recordRef"
+        },
+        "selectedResults": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "taskId": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Z0-9-]*$"
+              },
+              "result": {
+                "$ref": "#/$defs/recordRef"
+              }
+            },
+            "required": [
+              "taskId",
+              "result"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "$ref": "pipeline-state.schema.json#/$defs/issue"
+          }
+        },
+        "candidate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/recordRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/recordRef"
+          }
+        },
+        "carries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/recordRef"
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "mapExecutionId",
+        "generation",
+        "specificationId",
+        "outcome",
+        "state",
+        "selectedResults",
+        "issues",
+        "candidate",
+        "checks"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "implementation_complete"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "issues": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "specification_revision_required"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "issues": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "navigator": {
+      "type": "object",
+      "properties": {
+        "mapInstanceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+        },
+        "mapExecutionId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "specificationId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "state": {
+          "enum": [
+            "running",
+            "paused",
+            "finishing",
+            "implementation_complete",
+            "specification_revision_required",
+            "canceled",
+            "interrupted"
+          ]
+        },
+        "pauseReason": {
+          "anyOf": [
+            {
+              "enum": [
+                "verification_limit",
+                "task_attempt_limit",
+                "triage_unknown"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "failedVerificationCycles": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxFailedVerificationCycles": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxTaskAttempts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "progress": {
+          "type": "object",
+          "properties": {
+            "accepted": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "total": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "waiting": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "running": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "blocked": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "accepted",
+            "total",
+            "waiting",
+            "running",
+            "blocked"
+          ],
+          "additionalProperties": false
+        },
+        "tasks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "taskId": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Z0-9-]*$"
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1
+              },
+              "executorRole": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,63}$"
+              },
+              "dependsOn": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9-]*$"
+                },
+                "uniqueItems": true
+              },
+              "state": {
+                "enum": [
+                  "waiting",
+                  "ready",
+                  "running",
+                  "awaiting_review",
+                  "accepted",
+                  "needs_changes",
+                  "stale",
+                  "blocked",
+                  "canceled"
+                ]
+              },
+              "readiness": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "attempts": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "selectedResultId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[A-Z][A-Z0-9-]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "carried": {
+                "type": "boolean"
+              },
+              "criteria": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[A-Z][A-Z0-9-]*$"
+                    },
+                    "method": {
+                      "enum": [
+                        "review",
+                        "check"
+                      ]
+                    },
+                    "verdict": {
+                      "enum": [
+                        "pending",
+                        "passed",
+                        "failed"
+                      ]
+                    },
+                    "recordId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^[A-Z][A-Z0-9-]*$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "method",
+                    "verdict",
+                    "recordId"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "steps": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "nodeInstanceId": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+                    },
+                    "step": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                    },
+                    "state": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "ordinal": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "attemptId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "nodeInstanceId",
+                    "step",
+                    "state",
+                    "ordinal",
+                    "attemptId"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "issues": {
+                "type": "array",
+                "items": {
+                  "$ref": "pipeline-state.schema.json#/$defs/issue"
+                }
+              },
+              "fingerprint": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "carriedFrom": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "mapExecutionId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "subjectId": {
+                        "type": "string",
+                        "pattern": "^[A-Z][A-Z0-9-]*$"
+                      },
+                      "resultId": {
+                        "type": "string",
+                        "pattern": "^[A-Z][A-Z0-9-]*$"
+                      },
+                      "carryRecordId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^[A-Z][A-Z0-9-]*$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "crossRevision": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "mapExecutionId",
+                      "subjectId",
+                      "resultId",
+                      "carryRecordId",
+                      "crossRevision"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "results": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "recordId": {
+                      "type": "string",
+                      "pattern": "^[A-Z][A-Z0-9-]*$"
+                    },
+                    "status": {
+                      "enum": [
+                        "pending",
+                        "accepted",
+                        "rejected",
+                        "withdrawn",
+                        "carried"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "recordId",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "taskId",
+              "title",
+              "executorRole",
+              "dependsOn",
+              "state",
+              "readiness",
+              "attempts",
+              "selectedResultId",
+              "carried",
+              "criteria",
+              "steps",
+              "issues"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "runId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "priorExecutionId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "crossRevision": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "mapInstanceId",
+        "mapExecutionId",
+        "generation",
+        "specificationId",
+        "state",
+        "pauseReason",
+        "failedVerificationCycles",
+        "maxFailedVerificationCycles",
+        "maxTaskAttempts",
+        "progress",
+        "tasks"
+      ],
+      "additionalProperties": false
+    },
+    "taskCarry": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "kind": {
+          "const": "TaskCarry"
+        },
+        "recordId": {
+          "type": "string",
+          "pattern": "^TCAR-[A-F0-9]{12}$"
+        },
+        "mapExecutionId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "taskId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "subjectId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "priorSubjectId": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "priorMapExecutionId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "result": {
+          "$ref": "#/$defs/recordRef"
+        },
+        "fingerprint": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "verifiedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "recordId",
+        "mapExecutionId",
+        "taskId",
+        "subjectId",
+        "priorSubjectId",
+        "priorMapExecutionId",
+        "result",
+        "fingerprint",
+        "verifiedAt"
+      ],
+      "additionalProperties": false
+    },
+    "history": {
+      "type": "object",
+      "properties": {
+        "mapInstanceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+        },
+        "executions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "properties": {
+              "mapExecutionId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "runId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "mapInstanceId": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+              },
+              "generation": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "specificationId": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Z0-9-]*$"
+              },
+              "state": {
+                "type": "string",
+                "minLength": 1
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "priorExecutionId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "crossRevision": {
+                "type": "boolean"
+              },
+              "carried": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "accepted": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "total": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": [
+              "mapExecutionId",
+              "runId",
+              "mapInstanceId",
+              "generation",
+              "specificationId",
+              "state",
+              "createdAt",
+              "priorExecutionId",
+              "crossRevision",
+              "carried",
+              "accepted",
+              "total"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "mapInstanceId",
+        "executions"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

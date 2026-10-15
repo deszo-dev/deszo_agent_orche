@@ -1,0 +1,521 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-15",
+  "generatedAt": "2026-10-15T11:29:00.132Z",
+  "verdict": "passed_for_listed_windows_versions_and_scopes",
+  "privateEvidenceRoot": ".deszo/acceptance/adr0001-20261015-01",
+  "platform": "win32-x64",
+  "node": "v22.20.0",
+  "gates": {
+    "G0": {
+      "status": "passed",
+      "nodeTests": 373,
+      "nativeTests": 4,
+      "frontendBuild": true,
+      "runtimeBundle": true
+    },
+    "G1": {
+      "status": "passed",
+      "supportedScopes": [
+        "Windows user/global",
+        "Windows project"
+      ],
+      "bundledReruns": [
+        {
+          "privateEvidenceRoot": ".deszo/acceptance/adr0001-20261015-01/native-a7b04444",
+          "phases": [
+            {
+              "provider": "codex",
+              "phase": "authoring",
+              "cliVersion": "codex-cli 0.162.0-alpha.17.2",
+              "nativeConfiguration": "inherit",
+              "passed": true,
+              "mcpStarts": 2,
+              "calls": 2
+            },
+            {
+              "provider": "codex",
+              "phase": "managed",
+              "cliVersion": "codex-cli 0.162.0-alpha.17.2",
+              "nativeConfiguration": "inherit",
+              "passed": true,
+              "mcpStarts": 2,
+              "calls": 2
+            },
+            {
+              "provider": "codex",
+              "phase": "continued",
+              "cliVersion": "codex-cli 0.162.0-alpha.17.2",
+              "nativeConfiguration": "inherit",
+              "passed": true,
+              "mcpStarts": 2,
+              "calls": 2
+            },
+            {
+              "provider": "claude",
+              "phase": "authoring",
+              "cliVersion": "2.1.292 (Claude Code)",
+              "nativeConfiguration": "inherit",
+              "passed": true,
+              "mcpStarts": 2,
+              "calls": 2
+            },
+            {
+              "provider": "claude",
+              "phase": "managed",
+              "cliVersion": "2.1.292 (Claude Code)",
+              "nativeConfiguration": "inherit",
+              "passed": true,
+              "mcpStarts": 2,
+              "calls": 2
+            },
+            {
+              "provider": "claude",
+              "phase": "continued",
+              "cliVersion": "2.1.292 (Claude Code)",
+              "nativeConfiguration": "inherit",
+              "passed": true,
+              "mcpStarts": 2,
+              "calls": 2
+            },
+            {
+              "provider": "antigravity",
+              "phase": "authoring",
+              "cliVersion": "1.3.5",
+              "nativeConfiguration": "inherit",
+              "passed": true,
+              "mcpStarts": 2,
+              "calls": 2
+            },
+            {
+              "provider": "antigravity",
+              "phase": "managed",
+              "cliVersion": "1.3.5",
+              "nativeConfiguration": "inherit",
+              "passed": true,
+              "mcpStarts": 2,
+              "calls": 2
+            },
+            {
+              "provider": "antigravity",
+              "phase": "continued",
+              "cliVersion": "1.3.5",
+              "nativeConfiguration": "inherit",
+              "passed": true,
+              "mcpStarts": 2,
+              "calls": 2
+            }
+          ]
+        },
+        {
+          "privateEvidenceRoot": ".deszo/acceptance/adr0001-20261015-01/native-fdd93156",
+          "phases": [
+            {
+              "provider": "codex",
+              "phase": "authoring",
+              "cliVersion": "codex-cli 0.162.0-alpha.17.2",
+              "nativeConfiguration": "inherit",
+              "passed": true,
+              "mcpStarts": 2,
+              "calls": 2
+            },
+            {
+              "provider": "codex",
+              "phase": "managed",
+              "cliVersion": "codex-cli 0.162.0-alpha.17.2",
+              "nativeConfiguration": "restricted",
+              "passed": true,
+              "mcpStarts": 0,
+              "calls": 0
+            },
+            {
+              "provider": "codex",
+              "phase": "continued",
+              "cliVersion": "codex-cli 0.162.0-alpha.17.2",
+              "nativeConfiguration": "restricted",
+              "passed": true,
+              "mcpStarts": 0,
+              "calls": 0
+            }
+          ]
+        }
+      ]
+    },
+    "G2": {
+      "status": "passed_with_controller_recovery",
+      "runId": "55bbb7de-6652-47eb-a696-c0e99136fa45",
+      "providerCalls": {
+        "codex": 11,
+        "claude": 6,
+        "antigravity": 3
+      },
+      "explicitControllerRecoveries": 1,
+      "certificate": "CERT-5866E749D822",
+      "exportTests": 26,
+      "independentChecks": 21
+    },
+    "G3": {
+      "status": "passed",
+      "confirmationDefault": true,
+      "missingFieldFallback": true,
+      "persistedFalsePreserved": true,
+      "packagedFixtureFlagRejected": true
+    },
+    "G4": {
+      "status": "passed",
+      "v2SaveStatus": 410,
+      "v3ConditionalSaves": true,
+      "v2OtherRoutesRetained": true,
+      "smokeRunId": "73aeb1da-2be1-4b28-934d-fea59a41e654"
+    },
+    "G5": {
+      "status": "passed",
+      "clients": [
+        "codex",
+        "claude",
+        "antigravity"
+      ],
+      "mixedProviderRuns": 3,
+      "executionProviderCalls": 9,
+      "containmentProviderCalls": 2,
+      "noRunBeforeApproval": true,
+      "firstPartyUiDecisions": 5,
+      "directoryConflict": true,
+      "crossClientRace": {
+        "passed": true,
+        "baseRevision": 3,
+        "finalRevision": 4,
+        "results": [
+          {
+            "provider": "claude",
+            "requestId": "71e19199-81d5-4eb1-afab-a923b2132e85",
+            "raceOutcome": "conflict"
+          },
+          {
+            "provider": "codex",
+            "requestId": "050e1243-65c7-4ea5-84a9-a6f37cf82aeb",
+            "raceOutcome": "saved"
+          }
+        ]
+      },
+      "uiProofs": {
+        "cleanRefresh": ".deszo/acceptance/adr0001-20261015-01/clients/ui-clean-refresh.json",
+        "dirtyConflict": ".deszo/acceptance/adr0001-20261015-01/clients/ui-dirty-conflict.json",
+        "draftCopy": ".deszo/acceptance/adr0001-20261015-01/clients/ui-draft-copy.json",
+        "pendingQueue": ".deszo/acceptance/adr0001-20261015-01/clients/ui-pending-approvals.json",
+        "directoryConflict": ".deszo/acceptance/adr0001-20261015-01/clients/ui-directory-conflict.json"
+      },
+      "lifecycle": [
+        {
+          "phase": "runtime-crash",
+          "runId": "64b7c450-e991-4b79-a7e0-bde01de08be5",
+          "state": "interrupted",
+          "providerAttempts": 1,
+          "automaticRetry": false,
+          "bindingStates": [
+            "needs_review"
+          ]
+        },
+        {
+          "phase": "app-crash",
+          "runId": "a5fefbfb-f594-4687-8380-9ba2f6666d37",
+          "state": "interrupted",
+          "providerAttempts": 1,
+          "automaticRetry": false,
+          "bindingStates": [
+            "needs_review"
+          ]
+        }
+      ]
+    }
+  },
+  "clients": [
+    {
+      "provider": "codex",
+      "cliVersion": "codex-cli 0.162.0-alpha.17.2",
+      "requestedAuthoringModel": "gpt-6-luna",
+      "observedAuthoringModels": [
+        null
+      ],
+      "phases": [
+        {
+          "phase": "create",
+          "requestId": "2a2229cc-c424-470c-8734-821e8863f984",
+          "revision": 1,
+          "evidence": ".deszo/acceptance/adr0001-20261015-01/clients/codex-create-2a2229cc-result.json"
+        },
+        {
+          "phase": "edit",
+          "requestId": "41fd67fa-c39c-4a3f-93cb-80b301a211ee",
+          "revision": 3,
+          "evidence": ".deszo/acceptance/adr0001-20261015-01/clients/codex-edit-41fd67fa-result.json"
+        },
+        {
+          "phase": "edit",
+          "requestId": "8b2d8548-7b6d-488c-a67a-6092ec875a97",
+          "revision": 2,
+          "evidence": ".deszo/acceptance/adr0001-20261015-01/clients/codex-edit-8b2d8548-result.json"
+        },
+        {
+          "phase": "inspect",
+          "requestId": "fb71c4bf-5551-4f09-a627-2a44e284ca97",
+          "evidence": ".deszo/acceptance/adr0001-20261015-01/clients/codex-inspect-fb71c4bf-result.json"
+        },
+        {
+          "phase": "race",
+          "requestId": "050e1243-65c7-4ea5-84a9-a6f37cf82aeb",
+          "raceOutcome": "saved",
+          "evidence": ".deszo/acceptance/adr0001-20261015-01/clients/codex-race-050e1243-result.json"
+        },
+        {
+          "phase": "request",
+          "requestId": "8ece9d4c-95cb-48cd-b010-629dae73d457",
+          "evidence": ".deszo/acceptance/adr0001-20261015-01/clients/codex-request-8ece9d4c-result.json"
+        }
+      ],
+      "runId": "21334df7-7e0a-429c-bbb1-d25fda0711b3",
+      "runRequestId": "8ece9d4c-95cb-48cd-b010-629dae73d457",
+      "workflowId": "adr0001-codex-live",
+      "runState": "succeeded",
+      "eventCount": 69,
+      "exactlyOneRun": true,
+      "contiguousJournal": true,
+      "providerInvocations": [
+        {
+          "provider": "codex",
+          "requestedModel": "gpt-6-luna",
+          "observedModel": null,
+          "cliVersion": "codex-cli 0.162.0-alpha.17.2",
+          "isolationMechanism": "bridge-marker-refusal"
+        },
+        {
+          "provider": "claude",
+          "requestedModel": "haiku",
+          "observedModel": "claude-haiku-4-5-20251001",
+          "cliVersion": "2.1.292 (Claude Code)",
+          "isolationMechanism": "bridge-marker-refusal"
+        },
+        {
+          "provider": "antigravity",
+          "requestedModel": "gemini-3.8-flash-low",
+          "observedModel": "gemini-3.8-flash-low",
+          "cliVersion": "1.3.5",
+          "isolationMechanism": "bridge-marker-refusal"
+        }
+      ],
+      "finalArtifact": {
+        "artifactId": "2e38062f-904b-477d-859d-4745b7d43ec4",
+        "sha256": "025aa1306ee58585ca9960766773503b2c84b070d2d41b73abbe47725052d387"
+      }
+    },
+    {
+      "provider": "claude",
+      "cliVersion": "2.1.292 (Claude Code)",
+      "requestedAuthoringModel": "haiku",
+      "observedAuthoringModels": [
+        "claude-haiku-4-5-20251001"
+      ],
+      "phases": [
+        {
+          "phase": "create",
+          "requestId": "05006aa4-5ab4-413b-93fb-2fd05b12cbd6",
+          "revision": 1,
+          "evidence": ".deszo/acceptance/adr0001-20261015-01/clients/claude-create-05006aa4-result.json"
+        },
+        {
+          "phase": "edit",
+          "requestId": "71af8c4c-a17d-4bdc-816c-29674e45cecd",
+          "revision": 2,
+          "evidence": ".deszo/acceptance/adr0001-20261015-01/clients/claude-edit-71af8c4c-result.json"
+        },
+        {
+          "phase": "inspect",
+          "requestId": "2500cab0-764e-420b-baee-fe7578c4928e",
+          "evidence": ".deszo/acceptance/adr0001-20261015-01/clients/claude-inspect-2500cab0-result.json"
+        },
+        {
+          "phase": "race",
+          "requestId": "71e19199-81d5-4eb1-afab-a923b2132e85",
+          "raceOutcome": "conflict",
+          "evidence": ".deszo/acceptance/adr0001-20261015-01/clients/claude-race-71e19199-result.json"
+        },
+        {
+          "phase": "request",
+          "requestId": "1cd14ac6-e1b8-4b82-818f-3d738b8f98fb",
+          "evidence": ".deszo/acceptance/adr0001-20261015-01/clients/claude-request-1cd14ac6-result.json"
+        }
+      ],
+      "runId": "d597ae51-e067-4654-b6ac-a233345e561d",
+      "runRequestId": "1cd14ac6-e1b8-4b82-818f-3d738b8f98fb",
+      "workflowId": "adr0001-claude-live",
+      "runState": "succeeded",
+      "eventCount": 61,
+      "exactlyOneRun": true,
+      "contiguousJournal": true,
+      "providerInvocations": [
+        {
+          "provider": "codex",
+          "requestedModel": "gpt-6-luna",
+          "observedModel": null,
+          "cliVersion": "codex-cli 0.162.0-alpha.17.2",
+          "isolationMechanism": "bridge-marker-refusal"
+        },
+        {
+          "provider": "claude",
+          "requestedModel": "haiku",
+          "observedModel": "claude-haiku-4-5-20251001",
+          "cliVersion": "2.1.292 (Claude Code)",
+          "isolationMechanism": "bridge-marker-refusal"
+        },
+        {
+          "provider": "antigravity",
+          "requestedModel": "gemini-3.8-flash-low",
+          "observedModel": "gemini-3.8-flash-low",
+          "cliVersion": "1.3.5",
+          "isolationMechanism": "bridge-marker-refusal"
+        }
+      ],
+      "finalArtifact": {
+        "artifactId": "ac7097be-dc6c-4ea4-bd2b-e0d14873b8cf",
+        "sha256": "4a86ab9555f15e6c070da27dce61696c80dfa60d361a6cf9226f81520024890f"
+      }
+    },
+    {
+      "provider": "antigravity",
+      "cliVersion": "1.3.5",
+      "requestedAuthoringModel": "gemini-3.8-flash-low",
+      "observedAuthoringModels": [
+        "gemini-3.8-flash-low"
+      ],
+      "phases": [
+        {
+          "phase": "create",
+          "requestId": "0004e081-fcc5-4f5e-9eda-43ad35103032",
+          "revision": 1,
+          "evidence": ".deszo/acceptance/adr0001-20261015-01/clients/antigravity-create-0004e081-result.json"
+        },
+        {
+          "phase": "edit",
+          "requestId": "bc7978d4-5ba7-47c3-859a-d3755119e1ea",
+          "revision": 2,
+          "evidence": ".deszo/acceptance/adr0001-20261015-01/clients/antigravity-edit-bc7978d4-result.json"
+        },
+        {
+          "phase": "inspect",
+          "requestId": "03a75ec6-2af6-4959-97bf-b9998e8d77cb",
+          "evidence": ".deszo/acceptance/adr0001-20261015-01/clients/antigravity-inspect-03a75ec6-result.json"
+        },
+        {
+          "phase": "request",
+          "requestId": "1e749e71-9aa7-47bc-97d2-a1ece716e72e",
+          "evidence": ".deszo/acceptance/adr0001-20261015-01/clients/antigravity-request-1e749e71-result.json"
+        }
+      ],
+      "runId": "509399e4-8c6d-4ed9-b23a-02dab7711942",
+      "runRequestId": "1e749e71-9aa7-47bc-97d2-a1ece716e72e",
+      "workflowId": "adr0001-antigravity-live",
+      "runState": "succeeded",
+      "eventCount": 66,
+      "exactlyOneRun": true,
+      "contiguousJournal": true,
+      "providerInvocations": [
+        {
+          "provider": "codex",
+          "requestedModel": "gpt-6-luna",
+          "observedModel": null,
+          "cliVersion": "codex-cli 0.162.0-alpha.17.2",
+          "isolationMechanism": "bridge-marker-refusal"
+        },
+        {
+          "provider": "claude",
+          "requestedModel": "haiku",
+          "observedModel": "claude-haiku-4-5-20251001",
+          "cliVersion": "2.1.292 (Claude Code)",
+          "isolationMechanism": "bridge-marker-refusal"
+        },
+        {
+          "provider": "antigravity",
+          "requestedModel": "gemini-3.8-flash-low",
+          "observedModel": "gemini-3.8-flash-low",
+          "cliVersion": "1.3.5",
+          "isolationMechanism": "bridge-marker-refusal"
+        }
+      ],
+      "finalArtifact": {
+        "artifactId": "15754d78-76a4-4040-b692-cccf5b44dc22",
+        "sha256": "1a53f9465875c308a16307e28548fb0bd1b136d67625efaa2485cda24bb00061"
+      }
+    }
+  ],
+  "packages": {
+    "installedCandidate": {
+      "identifier": "local.deszo.acceptance20261015",
+      "installer": {
+        "path": "src-tauri/target/release/bundle/nsis/Deszo Acceptance_0.2.0_x64-setup.exe",
+        "byteSize": 2101945,
+        "sha256": "55d5808cb0e1c873beb99e0819c1a9769e53c45edb170a00ab4c7353f4b8d911"
+      },
+      "executable": {
+        "path": ".deszo/acceptance/adr0001-20261015-01/installed/deszo.exe",
+        "byteSize": 6704128,
+        "sha256": "882629ad06907ec7e9b20f2d4675a506d9416153728920952ef221d4a3f29ee6"
+      },
+      "bundles": [
+        {
+          "path": ".deszo/acceptance/adr0001-20261015-01/installed/runtime/runner.mjs",
+          "byteSize": 1138754,
+          "sha256": "c20ec4056efa0d3b2fc69caa311ed532db8625bb33579a51cc01902851a66d62"
+        },
+        {
+          "path": ".deszo/acceptance/adr0001-20261015-01/installed/runtime/bridge.mjs",
+          "byteSize": 1380094,
+          "sha256": "80eb927e741d05d5aea5ad9979a888d95f86966faafb12e07cf59264bf650815"
+        }
+      ]
+    },
+    "standardRelease": {
+      "identifier": "local.deszo.app",
+      "installer": {
+        "path": "src-tauri/target/release/bundle/nsis/Deszo_0.2.0_x64-setup.exe",
+        "byteSize": 2103978,
+        "sha256": "a50e80e6bb72f1800eda4a298160cc270e5c35fa4dc38dcaf8291d3445646525"
+      },
+      "installedOverExistingUserStore": false,
+      "runtimeAndFrontendMatchAcceptanceCandidate": true,
+      "frontendAssets": [
+        "dist/assets/event-BpPB0lbe.js",
+        "dist/assets/index-98RkXzUX.css",
+        "dist/assets/index-BpXYIE9O.js",
+        "dist/assets/index-D7a18C5j.js"
+      ]
+    }
+  },
+  "sourceManifest": {
+    "path": ".deszo/acceptance/adr0001-20261015-01/final-source-manifest.json",
+    "sha256": "3890434d4fb74e1504a317e9e750748a40e95b5b112a2c83702ea21360718ab3"
+  },
+  "postPilotChanges": {
+    "changedPreviouslyCapturedExecutionFiles": [
+      "mcp/bridge.mjs",
+      "runtime/core/engine.mjs"
+    ],
+    "addedBridgeTransport": "mcp/runtime-client.mjs",
+    "description": "Confirmation initialization/fallback and the reserved internal save guard changed in the engine. V2 retirement is in the HTTP router. Bridge HTTP transport gained same-store reconnection. Scheduler, process adapters, and isolation preparation stayed identical to the successful pilot; the changed bridge was re-probed with all three clients and both crash scenarios."
+  },
+  "cleanup": {
+    "temporaryProfileRegistrationsRemoved": true,
+    "ownedCrashDescendantsGone": true,
+    "activeInstalledRuns": 0,
+    "sqliteIntegrity": "ok"
+  },
+  "limitations": [
+    "Only the exact installed CLI versions and listed Windows scopes are verified; unknown versions and uncovered scopes fail closed when a Deszo registration is detected.",
+    "Claude local and managed/system registrations and non-Windows installations were not live-verified.",
+    "Codex explicit child-marker overrides support simple server names only; quoted dotted names are blocked.",
+    "The reference pilot needed one explicit controller retry and is not an unattended-success claim.",
+    "Codex did not expose an observed model ID in the parsed native evidence; its requested model is recorded without inventing an observed value.",
+    "An existing persisted confirmation=false remains false; fresh stores and missing fields default to true.",
+    "Live installed checks used an isolated application identifier. The standard installer is built from the same source and matching runtime/frontend assets and was not installed over the existing user store.",
+    "The mixed-provider smoke graph constrains only its first Agent to a literal response; later Agents receive the prior answer as their complete prompt. Final artifacts are checked for integrity and non-empty text, not a deterministic downstream sentence."
+  ]
+}

@@ -1,0 +1,866 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deszo.local/documentation/runtime-api.schema.json",
+  "title": "M1 API request and response definitions",
+  "$defs": {
+    "problem": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "enum": [
+            "invalid_request",
+            "unauthorized",
+            "not_found",
+            "forbidden",
+            "precondition_required",
+            "precondition_failed",
+            "api_upgrade_required",
+            "workspace_required",
+            "authoring_directory_conflict",
+            "managed_invocation_denied",
+            "result_too_large",
+            "conflict",
+            "validation_failed",
+            "provider_unavailable",
+            "context_unavailable",
+            "corruption",
+            "unsupported_capability",
+            "internal_error"
+          ]
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "path",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "details"
+      ],
+      "additionalProperties": false
+    },
+    "run": {
+      "type": "object",
+      "properties": {
+        "runId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "workflowId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$"
+        },
+        "workflowSnapshot": {
+          "type": "object",
+          "properties": {
+            "artifactId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "required": [
+            "artifactId",
+            "sha256"
+          ],
+          "additionalProperties": false
+        },
+        "executionHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "state": {
+          "enum": [
+            "queued",
+            "running",
+            "draining",
+            "stopping",
+            "succeeded",
+            "failed",
+            "canceled",
+            "interrupted"
+          ]
+        },
+        "lastSequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "workspaceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$"
+        }
+      },
+      "required": [
+        "runId",
+        "workflowId",
+        "workflowSnapshot",
+        "executionHash",
+        "state",
+        "lastSequence",
+        "createdAt",
+        "workspaceId"
+      ],
+      "additionalProperties": false
+    },
+    "createRun": {
+      "type": "object",
+      "properties": {
+        "workflowId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$"
+        },
+        "workspaceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$"
+        },
+        "requestId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "workflowSnapshotSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "workflowId",
+        "workflowSnapshotSha256",
+        "workspaceId",
+        "requestId"
+      ],
+      "additionalProperties": false
+    },
+    "acceptRun": {
+      "type": "object",
+      "properties": {
+        "run": {
+          "$ref": "#/$defs/run"
+        },
+        "requestId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "run",
+        "requestId"
+      ],
+      "additionalProperties": false
+    },
+    "validation": {
+      "type": "object",
+      "properties": {
+        "valid": {
+          "type": "boolean"
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "path",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "valid",
+        "issues"
+      ],
+      "additionalProperties": false
+    },
+    "savedWorkflow": {
+      "type": "object",
+      "properties": {
+        "workflow": {
+          "$ref": "workflow.schema.json"
+        },
+        "validation": {
+          "$ref": "#/$defs/validation"
+        },
+        "snapshotSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "executionHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "workflow",
+        "snapshotSha256",
+        "validation",
+        "executionHash"
+      ],
+      "additionalProperties": false
+    },
+    "stopRequest": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "requestId"
+      ],
+      "additionalProperties": false
+    },
+    "stopResponse": {
+      "type": "object",
+      "properties": {
+        "runId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "state": {
+          "enum": [
+            "queued",
+            "running",
+            "draining",
+            "stopping",
+            "succeeded",
+            "failed",
+            "canceled",
+            "interrupted"
+          ]
+        },
+        "requestId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "runId",
+        "state",
+        "requestId"
+      ],
+      "additionalProperties": false
+    },
+    "runSnapshot": {
+      "type": "object",
+      "properties": {
+        "run": {
+          "$ref": "#/$defs/run"
+        },
+        "instances": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "nodeInstanceId": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,63}$"
+              },
+              "nodeId": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,63}$"
+              },
+              "state": {
+                "enum": [
+                  "scheduled",
+                  "waiting",
+                  "running",
+                  "succeeded",
+                  "failed",
+                  "canceled",
+                  "blocked",
+                  "interrupted"
+                ]
+              },
+              "attemptId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "outputs": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "artifactId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "sha256": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      }
+                    },
+                    "required": [
+                      "artifactId",
+                      "sha256"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "nodeInstanceId",
+              "nodeId",
+              "state",
+              "attemptId",
+              "outputs"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "contexts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/runContextBinding"
+          }
+        }
+      },
+      "required": [
+        "run",
+        "instances",
+        "contexts"
+      ],
+      "additionalProperties": false
+    },
+    "capabilities": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "engineCapabilities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "uniqueItems": true
+        },
+        "providers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "provider": {
+                "enum": [
+                  "codex",
+                  "claude",
+                  "antigravity"
+                ]
+              },
+              "available": {
+                "type": "boolean"
+              },
+              "cliVersion": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "supportsNew": {
+                "type": "boolean"
+              },
+              "supportsResume": {
+                "type": "boolean"
+              },
+              "supportsJson": {
+                "type": "boolean"
+              },
+              "supportsInheritedConfiguration": {
+                "type": "boolean"
+              },
+              "reason": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "provider",
+              "available",
+              "cliVersion",
+              "supportsNew",
+              "supportsResume",
+              "supportsJson",
+              "supportsInheritedConfiguration",
+              "reason"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "maximumAgentTimeoutSeconds": {
+          "type": "integer",
+          "minimum": 5
+        },
+        "processContainment": {
+          "enum": [
+            "tauri-job",
+            "standalone-best-effort"
+          ]
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "engineCapabilities",
+        "providers",
+        "maximumAgentTimeoutSeconds",
+        "processContainment"
+      ],
+      "additionalProperties": false
+    },
+    "workspaceRequest": {
+      "type": "object",
+      "properties": {
+        "cwd": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "cwd"
+      ],
+      "additionalProperties": false
+    },
+    "workspace": {
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$"
+        },
+        "cwd": {
+          "type": "string"
+        },
+        "cwdIdentity": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "workspaceId",
+        "cwd",
+        "cwdIdentity",
+        "createdAt",
+        "updatedAt"
+      ],
+      "additionalProperties": false
+    },
+    "contextBinding": {
+      "type": "object",
+      "properties": {
+        "bindingId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "provider": {
+          "enum": [
+            "codex",
+            "claude",
+            "antigravity"
+          ]
+        },
+        "workspaceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$"
+        },
+        "state": {
+          "enum": [
+            "unbound",
+            "ready",
+            "writing",
+            "needs_review",
+            "unavailable"
+          ]
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "configurationHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "bindingSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "bindingId",
+        "provider",
+        "workspaceId",
+        "state",
+        "model",
+        "configurationHash",
+        "bindingSha256"
+      ],
+      "additionalProperties": false
+    },
+    "contextBindings": {
+      "type": "object",
+      "properties": {
+        "bindings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/contextBinding"
+          }
+        }
+      },
+      "required": [
+        "bindings"
+      ],
+      "additionalProperties": false
+    },
+    "acknowledgeContext": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "observedBindingSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "requestId",
+        "observedBindingSha256"
+      ],
+      "additionalProperties": false
+    },
+    "runContextBinding": {
+      "type": "object",
+      "properties": {
+        "contextNodeId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$"
+        },
+        "mode": {
+          "enum": [
+            "new",
+            "continue"
+          ]
+        },
+        "bindingId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "contextNodeId",
+        "mode",
+        "bindingId"
+      ],
+      "additionalProperties": false
+    },
+    "applicationSettings": {
+      "type": "object",
+      "properties": {
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "settings": {
+          "$ref": "application-settings.schema.json"
+        }
+      },
+      "required": [
+        "revision",
+        "sha256",
+        "settings"
+      ],
+      "additionalProperties": false
+    },
+    "updateApplicationSettings": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "expectedRevision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "settings": {
+          "$ref": "application-settings.schema.json"
+        }
+      },
+      "required": [
+        "requestId",
+        "expectedRevision",
+        "settings"
+      ],
+      "additionalProperties": false
+    },
+    "listQuery": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "cursor": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "runListQuery": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "cursor": {
+          "type": "string",
+          "minLength": 1
+        },
+        "workspaceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$"
+        },
+        "state": {
+          "enum": [
+            "queued",
+            "running",
+            "draining",
+            "stopping",
+            "succeeded",
+            "failed",
+            "canceled",
+            "interrupted"
+          ]
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "workflowSummary": {
+      "type": "object",
+      "properties": {
+        "workflowId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$"
+        },
+        "snapshotSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "executionHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "workflowId",
+        "snapshotSha256",
+        "executionHash",
+        "createdAt",
+        "updatedAt"
+      ],
+      "additionalProperties": false
+    },
+    "runs": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/run"
+          }
+        },
+        "nextCursor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "additionalProperties": false
+    },
+    "workflows": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/workflowSummary"
+          }
+        },
+        "nextCursor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "additionalProperties": false
+    },
+    "workspaces": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/workspace"
+          }
+        },
+        "nextCursor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "additionalProperties": false
+    },
+    "runSettings": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "applicationSettings": {
+          "$ref": "#/$defs/applicationSettings"
+        },
+        "nativeConfiguration": {
+          "enum": [
+            "restricted",
+            "inherit"
+          ]
+        },
+        "maximumAgentTimeoutSeconds": {
+          "type": "integer",
+          "minimum": 5
+        },
+        "processContainment": {
+          "enum": [
+            "tauri-job",
+            "standalone-best-effort"
+          ]
+        },
+        "workspace": {
+          "$ref": "#/$defs/workspace"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "applicationSettings",
+        "nativeConfiguration",
+        "maximumAgentTimeoutSeconds",
+        "processContainment",
+        "workspace"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "text": {
+    "type": "Text",
+    "artifact": {
+      "artifactId": "00000000-0000-4000-8000-000000000001",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "encoding": "utf-8"
+  },
+  "json": {
+    "type": "JsonValue",
+    "artifact": {
+      "artifactId": "00000000-0000-4000-8000-000000000001",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  }
+}

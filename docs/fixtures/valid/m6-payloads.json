@@ -1,0 +1,177 @@
+{
+  "needCarried": {
+    "schemaVersion": 1,
+    "kind": "ReviewNeed",
+    "slot": "customer",
+    "subjectId": "SPEC-BBBBBBBBBBBB",
+    "status": "carried",
+    "needsReview": false,
+    "scopeHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "carry": {
+      "schemaVersion": 1,
+      "kind": "ReviewCarryRequest",
+      "slot": "customer",
+      "subjectId": "SPEC-BBBBBBBBBBBB",
+      "priorReview": {
+        "recordId": "REV-0123456789AB",
+        "artifact": {
+          "artifactId": "00000000-0000-4000-8000-000000000001",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "scopeHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+  },
+  "needStale": {
+    "schemaVersion": 1,
+    "kind": "ReviewNeed",
+    "slot": "readiness",
+    "subjectId": "SPEC-BBBBBBBBBBBB",
+    "status": "stale",
+    "needsReview": true,
+    "scopeHash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "carry": null
+  },
+  "carryRequest": {
+    "schemaVersion": 1,
+    "kind": "ReviewCarryRequest",
+    "slot": "customer",
+    "subjectId": "SPEC-BBBBBBBBBBBB",
+    "priorReview": {
+      "recordId": "REV-0123456789AB",
+      "artifact": {
+        "artifactId": "00000000-0000-4000-8000-000000000001",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    "scopeHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "reviewCarry": {
+    "schemaVersion": 1,
+    "kind": "ReviewCarry",
+    "recordId": "RCAR-0123456789AB",
+    "subjectId": "SPEC-BBBBBBBBBBBB",
+    "priorSubjectId": "SPEC-AAAAAAAAAAAA",
+    "slot": "customer",
+    "role": "customer",
+    "verdict": "APPROVED",
+    "priorReview": {
+      "recordId": "REV-0123456789AB",
+      "artifact": {
+        "artifactId": "00000000-0000-4000-8000-000000000001",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    "scopeHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "policyFingerprint": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "reviewerFingerprint": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "runId": "00000000-0000-4000-8000-000000000002",
+    "verifiedAt": "2026-10-13T12:00:00Z"
+  },
+  "taskCarry": {
+    "schemaVersion": 1,
+    "kind": "TaskCarry",
+    "recordId": "TCAR-0123456789AB",
+    "mapExecutionId": "00000000-0000-4000-8000-000000000003",
+    "taskId": "TASK-AUTH-CODE",
+    "subjectId": "SPEC-BBBBBBBBBBBB",
+    "priorSubjectId": "SPEC-AAAAAAAAAAAA",
+    "priorMapExecutionId": "00000000-0000-4000-8000-000000000004",
+    "result": {
+      "recordId": "RES-0123456789AB",
+      "artifact": {
+        "artifactId": "00000000-0000-4000-8000-000000000005",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "verifiedAt": "2026-10-13T12:00:00Z"
+  },
+  "history": {
+    "mapInstanceId": "implement",
+    "executions": [
+      {
+        "mapExecutionId": "00000000-0000-4000-8000-000000000003",
+        "runId": "00000000-0000-4000-8000-000000000002",
+        "mapInstanceId": "implement",
+        "generation": 2,
+        "specificationId": "SPEC-BBBBBBBBBBBB",
+        "state": "implementation_complete",
+        "createdAt": "2026-10-13T12:00:00Z",
+        "priorExecutionId": "00000000-0000-4000-8000-000000000004",
+        "crossRevision": true,
+        "carried": 2,
+        "accepted": 5,
+        "total": 5
+      },
+      {
+        "mapExecutionId": "00000000-0000-4000-8000-000000000004",
+        "runId": "00000000-0000-4000-8000-000000000006",
+        "mapInstanceId": "implement",
+        "generation": 1,
+        "specificationId": "SPEC-AAAAAAAAAAAA",
+        "state": "implementation_complete",
+        "createdAt": "2026-10-13T12:00:00Z",
+        "priorExecutionId": null,
+        "crossRevision": false,
+        "carried": 0,
+        "accepted": 5,
+        "total": 5
+      }
+    ]
+  },
+  "events": [
+    {
+      "schemaVersion": 2,
+      "id": "00000000-0000-4000-8000-000000000007",
+      "runId": "00000000-0000-4000-8000-000000000002",
+      "sequence": 1,
+      "timestamp": "2026-10-13T12:00:00Z",
+      "nodeInstanceId": "evaluate",
+      "attemptId": "00000000-0000-4000-8000-000000000008",
+      "type": "gate.review_carried",
+      "payload": {
+        "slot": "customer",
+        "subjectId": "SPEC-BBBBBBBBBBBB",
+        "priorSubjectId": "SPEC-AAAAAAAAAAAA",
+        "record": {
+          "recordId": "RCAR-0123456789AB",
+          "artifact": {
+            "artifactId": "00000000-0000-4000-8000-000000000009",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "priorReview": {
+          "recordId": "REV-0123456789AB",
+          "artifact": {
+            "artifactId": "00000000-0000-4000-8000-000000000001",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        }
+      }
+    },
+    {
+      "schemaVersion": 2,
+      "id": "00000000-0000-4000-8000-000000000010",
+      "runId": "00000000-0000-4000-8000-000000000002",
+      "sequence": 2,
+      "timestamp": "2026-10-13T12:00:00Z",
+      "nodeInstanceId": "implement",
+      "attemptId": "00000000-0000-4000-8000-000000000011",
+      "type": "map.record_created",
+      "payload": {
+        "mapExecutionId": "00000000-0000-4000-8000-000000000003",
+        "taskId": "TASK-AUTH-CODE",
+        "kind": "TaskCarry",
+        "record": {
+          "recordId": "TCAR-0123456789AB",
+          "artifact": {
+            "artifactId": "00000000-0000-4000-8000-000000000012",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "stepInstanceId": null
+      }
+    }
+  ]
+}

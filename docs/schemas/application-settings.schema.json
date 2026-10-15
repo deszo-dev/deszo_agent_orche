@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deszo.local/documentation/application-settings.schema.json",
+  "title": "Application settings v1",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "globalLimit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 16
+    },
+    "externalRunConfirmation": {
+      "type": "boolean",
+      "default": true,
+      "description": "Require an in-app approval before external clients may dispatch a workflow run."
+    },
+    "providerLimits": {
+      "type": "object",
+      "properties": {
+        "codex": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "claude": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "antigravity": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        }
+      },
+      "required": [
+        "codex",
+        "claude",
+        "antigravity"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "globalLimit",
+    "providerLimits"
+  ],
+  "additionalProperties": false
+}

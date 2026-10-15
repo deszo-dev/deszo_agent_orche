@@ -1,0 +1,276 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deszo.local/documentation/runtime-api-v3.schema.json",
+  "title": "Workflow authoring API v3",
+  "$defs": {
+    "ref": { "$ref": "runtime-api-v2.schema.json#/$defs/ref" },
+    "validation": { "$ref": "runtime-api.schema.json#/$defs/validation" },
+    "problem": { "$ref": "runtime-api.schema.json#/$defs/problem" },
+    "authoringContract": {
+      "type": "object",
+      "properties": {
+        "descriptorVersion": { "const": 1 },
+        "contractVersion": { "const": "3.0" },
+        "apiVersions": { "type": "array", "items": { "enum": ["v2", "v3"] }, "uniqueItems": true },
+        "storeId": { "type": "string", "format": "uuid" },
+        "runtimeInstanceId": { "type": "string", "format": "uuid" },
+        "applicationRoot": { "type": "string", "minLength": 1 },
+        "nodeExecutable": { "type": "string", "minLength": 1 },
+        "workflowSchemaId": { "const": "workflow.schema.json" },
+        "workflowSchemaSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "capabilities": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "limits": {
+          "type": "object",
+          "properties": {
+            "maxRequestBytes": { "type": "integer", "minimum": 1 },
+            "maxResponseBytes": { "type": "integer", "minimum": 1 },
+            "maxPageSize": { "type": "integer", "minimum": 1 },
+            "maxEventPageSize": { "type": "integer", "minimum": 1 }
+          },
+          "required": ["maxRequestBytes", "maxResponseBytes", "maxPageSize", "maxEventPageSize"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["descriptorVersion", "contractVersion", "apiVersions", "storeId", "runtimeInstanceId", "applicationRoot", "nodeExecutable", "workflowSchemaId", "workflowSchemaSha256", "capabilities", "limits"],
+      "additionalProperties": false
+    },
+    "savedWorkflow": {
+      "type": "object",
+      "properties": {
+        "workflow": { "$ref": "workflow.schema.json" },
+        "revision": { "type": "integer", "minimum": 1 },
+        "snapshotSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "executionHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "etag": { "type": "string", "minLength": 1 },
+        "validation": { "$ref": "#/$defs/validation" }
+      },
+      "required": ["workflow", "revision", "snapshotSha256", "executionHash", "etag", "validation"],
+      "additionalProperties": false
+    },
+    "saveWorkflow": {
+      "type": "object",
+      "properties": {
+        "requestId": { "type": "string", "format": "uuid" },
+        "expectedEtag": { "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
+        "workflow": { "$ref": "workflow.schema.json" },
+        "authorLabel": { "type": "string", "maxLength": 120 }
+      },
+      "required": ["requestId", "expectedEtag", "workflow"],
+      "additionalProperties": false
+    },
+    "workflowSummary": {
+      "type": "object",
+      "properties": {
+        "workflowId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+        "revision": { "type": "integer", "minimum": 1 },
+        "snapshotSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "executionHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["workflowId", "revision", "snapshotSha256", "executionHash", "createdAt", "updatedAt"],
+      "additionalProperties": false
+    },
+    "workflowPage": {
+      "type": "object",
+      "properties": {
+        "items": { "type": "array", "items": { "$ref": "#/$defs/workflowSummary" }, "maxItems": 200 },
+        "nextCursor": { "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] }
+      },
+      "required": ["items", "nextCursor"],
+      "additionalProperties": false
+    },
+    "workflowChange": {
+      "type": "object",
+      "properties": {
+        "sequence": { "type": "integer", "minimum": 1 },
+        "eventId": { "type": "string", "format": "uuid" },
+        "workflowId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+        "revision": { "type": "integer", "minimum": 1 },
+        "snapshotSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "requestId": { "type": "string", "format": "uuid" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["sequence", "eventId", "workflowId", "revision", "snapshotSha256", "requestId", "createdAt"],
+      "additionalProperties": false
+    },
+    "workflowChanges": {
+      "type": "object",
+      "properties": {
+        "items": { "type": "array", "items": { "$ref": "#/$defs/workflowChange" }, "maxItems": 200 },
+        "nextCursor": { "anyOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }] },
+        "cursor": { "type": "integer", "minimum": 0 },
+        "resyncRequired": { "type": "boolean" }
+      },
+      "required": ["items", "nextCursor", "cursor", "resyncRequired"],
+      "additionalProperties": false
+    },
+    "runCreated": {
+      "type": "object",
+      "properties": {
+        "outcome": { "const": "created" },
+        "run": { "$ref": "runtime-api-v2.schema.json#/$defs/run" },
+        "requestId": { "type": "string", "format": "uuid" }
+      },
+      "required": ["outcome", "run", "requestId"],
+      "additionalProperties": false
+    },
+    "runPending": {
+      "type": "object",
+      "properties": {
+        "outcome": { "const": "confirmation_pending" },
+        "requestId": { "type": "string", "format": "uuid" },
+        "statusPath": { "type": "string", "minLength": 1 }
+      },
+      "required": ["outcome", "requestId", "statusPath"],
+      "additionalProperties": false
+    },
+    "runRequest": {
+      "type": "object",
+      "properties": {
+        "requestId": { "type": "string", "format": "uuid" },
+        "workflowId": { "type": "string" },
+        "workspaceId": { "type": "string" },
+        "workflowSnapshotSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "clientLabel": { "anyOf": [{ "type": "string", "maxLength": 120 }, { "type": "null" }] },
+        "state": { "enum": ["pending", "approved", "denied", "expired"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "runId": { "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }] },
+        "problem": { "anyOf": [{ "$ref": "#/$defs/problem" }, { "type": "null" }] }
+      },
+      "required": ["requestId", "workflowId", "workspaceId", "workflowSnapshotSha256", "clientLabel", "state", "createdAt", "expiresAt", "runId", "problem"],
+      "additionalProperties": false
+    },
+    "runtimeDescriptor": {
+      "type": "object",
+      "properties": {
+        "descriptorVersion": { "const": 1 },
+        "apiVersions": { "type": "array", "items": { "enum": ["v2", "v3"] }, "uniqueItems": true },
+        "storeId": { "type": "string", "format": "uuid" },
+        "runtimeInstanceId": { "type": "string", "format": "uuid" },
+        "applicationRoot": { "type": "string", "minLength": 1 },
+        "root": { "type": "string", "minLength": 1 },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "token": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+        "nodeExecutable": { "type": "string", "minLength": 1 },
+        "bridgeScript": { "type": "string", "minLength": 1 },
+        "connectionFile": { "type": "string", "minLength": 1 },
+        "scratchRoot": { "type": "string", "minLength": 1 },
+        "processContainment": { "enum": ["tauri-job", "standalone-best-effort"] }
+      },
+      "required": ["descriptorVersion", "apiVersions", "storeId", "runtimeInstanceId", "applicationRoot", "root", "port", "token", "nodeExecutable", "bridgeScript", "connectionFile", "scratchRoot", "processContainment"],
+      "additionalProperties": false
+    },
+    "bridgeHandshakeRequest": {
+      "type": "object",
+      "properties": {
+        "bridgeId": { "type": "string", "format": "uuid" },
+        "clientProvider": { "enum": ["codex", "claude", "antigravity", "other"] },
+        "workingDirectory": { "type": "string", "minLength": 1 },
+        "mcpConfigPath": { "type": "string", "minLength": 1 },
+        "isolationMechanism": { "type": "string", "maxLength": 120 }
+      },
+      "required": ["bridgeId", "clientProvider"],
+      "allOf": [{
+        "if": { "properties": { "clientProvider": { "const": "antigravity" } }, "required": ["clientProvider"] },
+        "then": { "required": ["workingDirectory", "mcpConfigPath"] }
+      }],
+      "additionalProperties": false
+    },
+    "bridgeHandshakeResponse": {
+      "type": "object",
+      "properties": {
+        "bridgeId": { "type": "string", "format": "uuid" },
+        "clientProvider": { "enum": ["codex", "claude", "antigravity", "other"] },
+        "workingDirectory": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+        "mcpConfigPath": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+        "storeId": { "type": "string", "format": "uuid" },
+        "runtimeInstanceId": { "type": "string", "format": "uuid" },
+        "applicationRoot": { "type": "string", "minLength": 1 },
+        "nodeExecutable": { "type": "string", "minLength": 1 }
+      },
+      "required": ["bridgeId", "clientProvider", "workingDirectory", "mcpConfigPath", "storeId", "runtimeInstanceId", "applicationRoot", "nodeExecutable"],
+      "additionalProperties": false
+    },
+    "validationResult": {
+      "type": "object",
+      "properties": {
+        "valid": { "type": "boolean" },
+        "issues": { "type": "array", "items": { "type": "object", "properties": { "path": { "type": "string" }, "message": { "type": "string" } }, "required": ["path", "message"], "additionalProperties": false } }
+      },
+      "required": ["valid", "issues"],
+      "additionalProperties": false
+    },
+    "workflowChangePage": {
+      "type": "object",
+      "properties": {
+        "items": { "type": "array", "items": { "$ref": "#/$defs/workflowChange" }, "maxItems": 200 },
+        "nextCursor": { "anyOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }] },
+        "cursor": { "type": "integer", "minimum": 0 },
+        "resyncRequired": { "type": "boolean" }
+      },
+      "required": ["items", "nextCursor", "cursor", "resyncRequired"],
+      "additionalProperties": false
+    },
+    "runRequestDecision": {
+      "type": "object",
+      "properties": { "requestId": { "type": "string", "format": "uuid" }, "decision": { "enum": ["approve", "deny"] } },
+      "required": ["requestId", "decision"],
+      "additionalProperties": false
+    },
+    "runRequestDecisionResponse": {
+      "oneOf": [
+        { "type": "object", "properties": { "request": { "$ref": "#/$defs/runRequest" }, "run": { "$ref": "runtime-api-v2.schema.json#/$defs/run" } }, "required": ["request", "run"], "additionalProperties": false },
+        { "$ref": "#/$defs/runRequest" }
+      ]
+    },
+    "runEventsPage": {
+      "type": "object",
+      "properties": {
+        "items": { "type": "array", "items": { "type": "object", "properties": {
+          "schemaVersion": { "enum": [1, 2] }, "id": { "type": "string", "format": "uuid" }, "runId": { "type": "string", "format": "uuid" },
+          "sequence": { "type": "integer", "minimum": 1 }, "timestamp": { "type": "string", "format": "date-time" },
+          "nodeInstanceId": { "anyOf": [{ "type": "string" }, { "type": "null" }] }, "attemptId": { "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }] },
+          "type": { "type": "string" }, "payload": { "type": "object" }
+        }, "required": ["schemaVersion", "id", "runId", "sequence", "timestamp", "nodeInstanceId", "attemptId", "type", "payload"], "additionalProperties": false }, "maxItems": 200 },
+        "nextCursor": { "anyOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }] }
+      },
+      "required": ["items", "nextCursor"],
+      "additionalProperties": false
+    },
+    "artifactProvenance": {
+      "type": "object",
+      "properties": {
+        "artifactId": { "type": "string", "format": "uuid" }, "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "byteSize": { "type": "integer", "minimum": 0 }, "mediaType": { "type": "string" },
+        "sources": { "type": "array", "items": { "type": "object", "properties": {
+          "runId": { "type": "string", "format": "uuid" }, "nodeInstanceId": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+          "attemptId": { "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }] }, "sourceKind": { "type": "string" },
+          "path": { "type": "array", "items": { "anyOf": [{ "type": "string" }, { "type": "integer", "minimum": 0 }] } }
+        }, "required": ["runId", "nodeInstanceId", "attemptId", "sourceKind", "path"], "additionalProperties": false }, "maxItems": 100 }
+      },
+      "required": ["artifactId", "sha256", "byteSize", "mediaType", "sources"],
+      "additionalProperties": false
+    },
+    "bridgeProblem": {
+      "type": "object",
+      "properties": {
+        "status": { "type": "integer", "minimum": 100, "maximum": 599 }, "code": { "type": "string", "minLength": 1 },
+        "message": { "type": "string" },
+        "details": { "type": "array", "items": { "type": "object", "properties": { "path": { "type": "string" }, "message": { "type": "string" } }, "required": ["path", "message"], "additionalProperties": false } }
+      },
+      "required": ["status", "code", "message", "details"],
+      "additionalProperties": false
+    },
+    "mcpToolEnvelope": {
+      "type": "object",
+      "properties": {
+        "envelopeVersion": { "const": 1 }, "status": { "enum": ["ok", "error"] }, "untrusted": { "type": "boolean" },
+        "data": { "type": "object" }, "error": { "$ref": "#/$defs/bridgeProblem" }
+      },
+      "required": ["envelopeVersion", "status"],
+      "additionalProperties": false
+    }
+  }
+}
