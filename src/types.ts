@@ -1,3 +1,6 @@
+import type { Effort } from '../shared/effort.mjs';
+export type { Effort } from '../shared/effort.mjs';
+
 export type Provider = 'codex' | 'claude' | 'antigravity';
 export const PROVIDERS: Provider[] = ['codex', 'claude', 'antigravity'];
 export const PROVIDER_NAMES: Record<Provider, string> = { codex: 'Codex', claude: 'Claude Code', antigravity: 'Antigravity' };
@@ -18,7 +21,7 @@ export interface LoopConfig {
 export type WorkflowNode =
   | { id: string; type: 'text'; config: { value: string } }
   | { id: string; type: 'prompt-template'; config: { template: string; slots: { id: string; description?: string }[] } }
-  | { id: string; type: 'agent'; config: { provider: Provider; model: string; contextId?: string; timeoutSeconds: number; output: OutputContract; attachFiles?: boolean; captures?: string[] } }
+  | { id: string; type: 'agent'; config: { provider: Provider; model: string; effort?: Effort; contextId?: string; timeoutSeconds: number; output: OutputContract; attachFiles?: boolean; captures?: string[] } }
   | { id: string; type: 'context'; config: { provider: Provider; mode: 'new'; lifetime?: 'run' | 'iteration' } | { provider: Provider; mode: 'continue'; bindingId: string } }
   | { id: string; type: 'result-viewer'; config: Record<string, never> }
   | { id: string; type: 'file-input'; config: { mode: 'files'; paths: string[] } | { mode: 'artifact'; valueType: ValueType; artifact: ArtifactRef } }
@@ -33,7 +36,7 @@ export type WorkflowNode =
   | { id: string; type: 'gate'; config: { mode: 'prepare' | 'evaluate' | 'verify'; policy: GatePolicy; carry?: boolean; subject?: 'specification' | 'delivery'; specificationPolicy?: GatePolicy; technicalPolicy?: GatePolicy } }
   | { id: string; type: 'map'; config: MapConfig };
 export type MapRole =
-  | { id: string; kind: 'agent'; provider: Provider; model: string; instructions: string; timeoutSeconds: number; context: 'task' | { contextId: string } }
+  | { id: string; kind: 'agent'; provider: Provider; model: string; effort?: Effort; instructions: string; timeoutSeconds: number; context: 'task' | { contextId: string } }
   | { id: string; kind: 'utility'; template: 'verification'; embeddedRoles: { triage: string } };
 export interface MapConfig {
   approvalPolicy: GatePolicy; optionalInputs: ('prior-state' | 'repair')[];

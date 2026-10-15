@@ -3,6 +3,7 @@ import { ArrowLeftToLine, ArrowRightFromLine, Bot, Braces, Database, Eye, FileIn
 import type { ReactNode } from 'react';
 import { NODE_LABELS, portsOf, type FlowNode } from './model';
 import { PROVIDER_NAMES, type NodeType } from './types';
+import { DEFAULT_EFFORT } from '../shared/effort.mjs';
 
 const ICONS: Record<NodeType, ReactNode> = {
   text: <FileText size={14} />, 'prompt-template': <Braces size={14} />, agent: <Bot size={14} />, context: <Link2 size={14} />, 'result-viewer': <Eye size={14} />,
@@ -22,7 +23,7 @@ function summary(data: FlowNode['data']): string {
   switch (node.type) {
     case 'text': return node.config.value.split('\n')[0] || 'Empty text';
     case 'prompt-template': return `${node.config.slots.length} slot${node.config.slots.length === 1 ? '' : 's'}`;
-    case 'agent': return `${node.config.model || 'model not set'} · ${node.config.output.format}${node.config.attachFiles ? ' · files in' : ''}${node.config.captures ? ' · captures' : ''}`;
+    case 'agent': return `${node.config.model || 'model not set'} · ${node.config.effort ?? (data.readOnly ? 'effort not specified' : DEFAULT_EFFORT)} · ${node.config.output.format}${node.config.attachFiles ? ' · files in' : ''}${node.config.captures ? ' · captures' : ''}`;
     case 'context': return node.config.mode === 'new' ? (node.config.lifetime === 'iteration' ? 'New each iteration' : 'New per run') : 'Continue binding';
     case 'file-input': return node.config.mode === 'files' ? node.config.paths.join(', ') : `Pinned ${node.config.valueType}`;
     case 'merge': if (node.config.mode === 'selected') return `Selected · one of ${node.config.inputs.length} alternatives`;

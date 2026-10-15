@@ -2,7 +2,7 @@ import { canonicalHash, canonicalize } from './canonical.mjs';
 import { SCHEMAS, check } from './schemas.mjs';
 
 // Pure Implementation Map helpers: definition validation, scopes, assembly and prompts.
-export const MAP_TEMPLATE_VERSION = 1;
+export const MAP_TEMPLATE_VERSION = 2;
 const MAP = SCHEMAS['map.schema.json'];
 
 export const shortHash = (value, length = 12) => canonicalHash(value).slice(0, length).toUpperCase();

@@ -4,6 +4,7 @@ import { DECISION_SCHEMA, MODEL_SUGGESTIONS, NODE_LABELS, syncSlots, validId } f
 import { PROVIDERS, PROVIDER_NAMES, VALUE_TYPES, type CachePin, type ContextBinding, type GatePolicy, type MapHistory, type MapNavigator, type MapRole, type FieldSource, type JournalEvent, type Provider, type TextSource, type ValueType, type WorkflowNode } from './types';
 import type { Client } from './transport';
 import { STATE_LABELS } from './nodes';
+import { DEFAULT_EFFORT, EFFORT_LEVELS, type Effort } from '../shared/effort.mjs';
 
 interface Props {
   node: WorkflowNode; label?: string; readOnly: boolean; bindings: ContextBinding[]; inBody: boolean;
@@ -80,6 +81,7 @@ export function Inspector(props: Props) {
         <datalist id={`models-${node.id}`}>{MODEL_SUGGESTIONS[node.config.provider].map(model => <option key={model} value={model} />)}</datalist>
         {!node.config.model && <small className="field-error">A model ID is required before saving.</small>}
       </label>
+      <EffortField value={node.config.effort} readOnly={readOnly} onChange={effort => update({ effort })} />
       <label className="field"><span>Timeout (seconds of active process time)</span>
         <input type="number" min={5} max={600} value={node.config.timeoutSeconds} disabled={readOnly} onChange={event => update({ timeoutSeconds: Math.max(5, Math.round(Number(event.target.value) || 5)) })} />
       </label>
@@ -315,6 +317,16 @@ export function Inspector(props: Props) {
   </div>;
 }
 
+export function EffortField({ value, readOnly, onChange }: { value?: Effort; readOnly: boolean; onChange: (effort: Effort) => void }) {
+  return <label className="field"><span>Reasoning effort</span>
+    <select value={value ?? (readOnly ? '' : DEFAULT_EFFORT)} disabled={readOnly} onChange={event => onChange(event.target.value as Effort)}>
+      {readOnly && value === undefined && <option value="">Not specified in snapshot</option>}
+      {EFFORT_LEVELS.map(effort => <option key={effort} value={effort}>{effort === 'xhigh' ? 'Extra high (xhigh)' : effort[0].toUpperCase() + effort.slice(1)}</option>)}
+    </select>
+    {value === undefined && !readOnly && <small className="muted">New runs use medium. Choose a level to save it explicitly.</small>}
+  </label>;
+}
+
 function RolesEditor({ roles, readOnly, contexts, onChange }: { roles: MapRole[]; readOnly: boolean; contexts: WorkflowNode[]; onChange: (roles: MapRole[]) => void }) {
   const set = (index: number, role: MapRole) => onChange(roles.map((item, i) => (i === index ? role : item)));
   return <div className="field"><span>Role registry <em>pinned into every run; models are explicit</em></span>
@@ -332,6 +344,7 @@ function RolesEditor({ roles, readOnly, contexts, onChange }: { roles: MapRole[]
           <input value={role.model} disabled={readOnly} placeholder="Exact model ID" onChange={event => set(index, { ...role, model: event.target.value.trim() })} />
         </div>
         {!role.model && <small className="field-error">A model ID is required before saving.</small>}
+        <EffortField value={role.effort} readOnly={readOnly} onChange={effort => set(index, { ...role, effort })} />
         <textarea rows={2} value={role.instructions} disabled={readOnly} onChange={event => set(index, { ...role, instructions: event.target.value })} />
         <select value={role.context === 'task' ? '' : role.context.contextId} disabled={readOnly} onChange={event => set(index, { ...role, context: event.target.value ? { contextId: event.target.value } : 'task' })}>
           <option value="">Fresh Context per task (task directory)</option>
@@ -343,7 +356,7 @@ function RolesEditor({ roles, readOnly, contexts, onChange }: { roles: MapRole[]
         </select></label>}
     </div>)}
     {!readOnly && <div className="row tight">
-      <button className="button small ghost" onClick={() => onChange([...roles, { id: `role-${roles.length + 1}`, kind: 'agent', provider: 'codex', model: '', instructions: 'Describe this role.', timeoutSeconds: 600, context: 'task' }])}><Plus size={12} />Agent role</button>
+      <button className="button small ghost" onClick={() => onChange([...roles, { id: `role-${roles.length + 1}`, kind: 'agent', provider: 'codex', model: '', effort: DEFAULT_EFFORT, instructions: 'Describe this role.', timeoutSeconds: 600, context: 'task' }])}><Plus size={12} />Agent role</button>
       {!roles.some(role => role.kind === 'utility') && <button className="button small ghost" onClick={() => onChange([...roles, { id: 'verification', kind: 'utility', template: 'verification', embeddedRoles: { triage: roles.find(role => role.kind === 'agent')?.id || 'analyst' } }])}><Plus size={12} />Verification utility</button>}
     </div>}
   </div>;
@@ -589,7 +602,7 @@ export async function loadAttempt(client: Client, inputs?: JournalEvent, outputs
       const text = await client.artifactText(value.artifact.artifactId);
       result.outputs[`${port} · ${value.type}`] = value.type === 'ArtifactSet' ? describeSet(JSON.parse(text)) : text;
     }
-    if (manifest.providerResult) result.model = `${manifest.providerResult.requestedModel}${manifest.providerResult.observedModel ? ` → observed ${manifest.providerResult.observedModel}` : ''}`;
+    if (manifest.providerResult) result.model = `${manifest.providerResult.requestedModel}${manifest.providerResult.observedModel ? ` → observed ${manifest.providerResult.observedModel}` : ''}${manifest.providerResult.requestedEffort ? ` · requested effort: ${manifest.providerResult.requestedEffort}` : ''}`;
   }
   if (invocation) {
     const manifest = await client.artifactJson(invocation.payload.manifest.artifactId);

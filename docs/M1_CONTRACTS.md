@@ -22,7 +22,7 @@ Data edges have one source and one target. A required input receives exactly one
 | --- | --- | --- | --- |
 | `text` | `value`: literal string | None | `text: Text` |
 | `prompt-template` | `template`: string; `slots`: declared slot IDs/descriptions | One required `Text` input named by each slot ID | `text: Text` |
-| `agent` | `provider`, explicit nonempty `model`, optional `contextId`, `timeoutSeconds`, `output` | `prompt: Text` | `text: Text`; also `json: JsonValue` when `output.format = json` |
+| `agent` | `provider`, explicit nonempty `model`, `effort`, optional `contextId`, `timeoutSeconds`, `output` | `prompt: Text` | `text: Text`; also `json: JsonValue` when `output.format = json` |
 | `context` | `provider`; `mode = new` or `continue`; `bindingId` required only for continue | None | None; Agent configuration refers to this node |
 | `result-viewer` | Empty config | `value: Text or JsonValue` | None |
 
@@ -31,6 +31,14 @@ Text can be empty. Prompt Template uses exact `{{slot-id}}` markers, with IDs ma
 Agent output `text` is the adapter's successful final answer, not the CLI's entire stdout. In JSON mode, parse that answer once, reject duplicate keys, validate the embedded optional `output.schema` as a standalone Draft 2020-12 JSON Schema, and expose a canonical JSON artifact at `json`. External schema references/network fetching are disallowed; local `#/$defs/...` references are allowed. The Text answer and parsed JSON commit atomically. Invalid JSON/schema, unsuccessful terminal status, or unsuccessful process exit produces no successful output.
 
 [M1 value references](schemas/value.schema.json) describe how committed values are referenced. [Attempt manifests](schemas/attempt-record.schema.json) map port IDs to these references, pin the exact pre-invocation binding artifact as well as its local ID, and capture requested/observed model and native-session facts after success. They pin the resolved prompt, configuration, and invocation. The engine appends the selected output contract as a visible prompt source, rather than relying on an agent to invent the format. Provider stdout, normalized events, and stderr remain separate captured evidence.
+
+### Reasoning effort
+
+Agent `config.effort` selects `low`, `medium`, `high`, `xhigh`, or `max`. New editor nodes and generated templates include `medium` explicitly. The field remains optional for existing workflow snapshots; omission resolves to `medium` at dispatch without modifying their saved bytes. Unknown levels are structural errors. Effort is an invocation parameter, like the requested model, and may change between ordered writes to the same Context.
+
+Every fresh and resumed invocation passes the resolved value through Codex `-c model_reasoning_effort="<level>"`, Claude Code `--effort <level>`, or Antigravity `--effort <level>`. The child environment removes `CLAUDE_CODE_EFFORT_LEVEL`, which could otherwise override Claude's command-line setting even in restricted configuration. Invocation manifests and successful `providerResult` records include `requestedEffort`. This is the requested setting, not a claim that the provider reported its effective reasoning level. Historical manifests without this field remain readable.
+
+Changing effort changes execution fingerprints, including dependent Cache fingerprints. Run Node cannot reuse inputs from a run captured before the explicit-effort policy; rerun its branch first. Explicitly frozen Cache pins retain their normal user-selected replay behavior. Historical Gate review fingerprints and Map template generations also become stale on this policy change. Context compatibility is unchanged: fresh and resumed calls both carry the requested effort explicitly.
 
 ## Semantic validation beyond JSON Schema
 

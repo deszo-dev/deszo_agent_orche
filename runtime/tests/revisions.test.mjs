@@ -253,6 +253,22 @@ test('R1: instructions changed through a template slot, or a changed native prof
   } finally { await api.close(); }
 });
 
+test('changing reviewer and Map role effort invalidates carried approvals and task selections', async () => {
+  const api = await startTestRunner();
+  try {
+    const workspace = await api.workspace();
+    writeProject(workspace.cwd);
+    const first = await run(api, selectiveWorkflow());
+    writeProject(workspace.cwd, { contractResume: 'Revision 2 clarifies concurrency.' });
+    const roles = ROLES.map(role => role.kind === 'agent' ? { ...role, effort: 'high' } : role);
+    const workflow = selectiveWorkflow({ id: 'changed-effort', prior: await priorOf(api, first), roles });
+    workflow.nodes.find(node => node.id === 'customer-review').config.effort = 'max';
+    const second = await run(api, workflow);
+    assert.equal(state(second, 'customer-review'), 'succeeded', 'the changed reviewer effort forces a live review');
+    assert.ok((await navigator(api, second.run.runId)).tasks.every(item => !item.carried), 'changed role effort prevents task carry');
+  } finally { await api.close(); }
+});
+
 test('an open blocker raised by a slot forces that reviewer to run live', async () => {
   const api = await startTestRunner();
   try {

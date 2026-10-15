@@ -189,6 +189,9 @@
                   "type": "string",
                   "minLength": 1
                 },
+                "requestedEffort": {
+                  "enum": ["low", "medium", "high", "xhigh", "max"]
+                },
                 "observedModel": {
                   "anyOf": [
                     {
@@ -293,6 +296,9 @@
         "requestedModel": {
           "type": "string",
           "minLength": 1
+        },
+        "requestedEffort": {
+          "enum": ["low", "medium", "high", "xhigh", "max"]
         },
         "cliExecutable": {
           "type": "string",

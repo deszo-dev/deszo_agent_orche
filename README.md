@@ -11,6 +11,7 @@ A personal desktop application for building workflows across AI agents. It uses 
 - A durable run journal for every run in SQLite. Events, inputs, invocations, log batches and outputs are content-addressed objects, and their digests are verified on every read.
 - A scheduler with application-wide capacity (3 calls overall and 1 per provider by default, editable), one writer per native session and per working directory, atomic resource acquisition, and draining after the first failure.
 - Context bindings: **New per run**, or **Continue** with an exact binding; there is no silent fresh-session fallback. Interrupted or failed native writes put a binding into `needs_review` until you accept its state.
+- Reasoning effort is selectable for every Agent and Implementation Map role: `low`, `medium`, `high`, `xhigh`, or `max`. Every invocation passes it explicitly to the provider CLI, including resumed sessions. Existing workflows without this field use explicit `medium`; invocation and output manifests record the requested effort.
 - Root Stop, active-process timeouts, typed failures (authentication, quota, billing policy, timeout, output contract, …), and restart recovery that never retries a model call automatically.
 - Desktop process containment: the Rust supervisor places the runtime in a Windows Job Object, so closing or crashing the app also terminates every CLI the runtime started.
 
