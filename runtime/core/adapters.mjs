@@ -5,6 +5,7 @@ import { delimiter, join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { canonicalHash, parseStrictJson } from './canonical.mjs';
 import { transportSchema } from './transport.mjs';
+import { resolveEffort } from '../../shared/effort.mjs';
 
 export const ADAPTER_VERSION = 2;
 
@@ -18,6 +19,7 @@ export function subscriptionEnvironment(source = process.env) {
     'ANTHROPIC_BASE_URL', 'ANTHROPIC_PROFILE', 'ANTHROPIC_FEDERATION_RULE_ID',
     'ANTHROPIC_ORGANIZATION_ID', 'ANTHROPIC_MODEL', 'ANTHROPIC_DEFAULT_OPUS_MODEL',
     'ANTHROPIC_DEFAULT_SONNET_MODEL', 'ANTHROPIC_DEFAULT_HAIKU_MODEL',
+    'CLAUDE_CODE_EFFORT_LEVEL',
   ].map(key => key.toLowerCase()));
   for (const key of Object.keys(env)) if (forbidden.has(key.toLowerCase())) delete env[key];
   return env;
@@ -104,7 +106,8 @@ export const outputContractText = output => output.format === 'json'
   ? `\n\nOutput contract: return only one JSON value${output.schema ? ` that validates against this complete JSON Schema after native transport decoding:\n${JSON.stringify(output.schema)}\nNative transport encoding: choose exactly one allowed object shape from the complete contract. The native finish schema can merge alternative shapes and require nullable fields. Set every field absent or forbidden in your chosen shape to null, never an empty array, empty string, invented issue or extra explanation. Supply the contract values for the fields your shape requires. Use the same encoded JSON object in your final response and native finish tool; do not add a separate reason or commentary to either.\n` : '. '}Do not wrap it in a code fence or add commentary.`
   : '';
 
-export function buildInvocation({ provider, cliPath, model, prompt, cwd, nativeSessionId, output, nativeConfiguration, timeoutSeconds, schemaPath }) {
+export function buildInvocation({ provider, cliPath, model, effort, prompt, cwd, nativeSessionId, output, nativeConfiguration, timeoutSeconds, schemaPath }) {
+  const requestedEffort = resolveEffort(effort);
   const restricted = nativeConfiguration !== 'inherit';
   const schema = output.format === 'json' && output.schema ? output.schema : null;
   let args, stdin = null;
@@ -113,6 +116,7 @@ export function buildInvocation({ provider, cliPath, model, prompt, cwd, nativeS
       '-C', cwd, 'exec', ...(nativeSessionId ? ['resume', nativeSessionId] : []),
       '--json', '--skip-git-repo-check', ...(restricted ? ['--ignore-user-config', '--ignore-rules'] : []),
       '-c', 'forced_login_method="chatgpt"', '-c', 'model_provider="openai"',
+      '-c', `model_reasoning_effort="${requestedEffort}"`,
       '--model', model, '--dangerously-bypass-approvals-and-sandbox',
       ...(schema ? ['--output-schema', schemaPath] : []), '-',
     ];
@@ -121,6 +125,7 @@ export function buildInvocation({ provider, cliPath, model, prompt, cwd, nativeS
     args = [
       '-p', '--verbose', '--output-format', 'stream-json', '--include-partial-messages',
       ...(schema ? ['--json-schema', JSON.stringify(schema)] : []), '--model', model,
+      '--effort', requestedEffort,
       '--dangerously-skip-permissions', ...(restricted ? ['--safe-mode', '--strict-mcp-config', '--setting-sources', ''] : []),
       ...(nativeSessionId ? ['--resume', nativeSessionId] : []),
     ];
@@ -128,6 +133,7 @@ export function buildInvocation({ provider, cliPath, model, prompt, cwd, nativeS
   } else {
     args = [
       '--print', prompt, '--output-format', 'stream-json', '--model', model,
+      '--effort', requestedEffort,
       ...(schema ? ['--json-schema', JSON.stringify(schema)] : []), '--dangerously-skip-permissions',
       '--print-timeout', `${timeoutSeconds}s`, ...(nativeSessionId ? ['--conversation', nativeSessionId] : []),
     ];

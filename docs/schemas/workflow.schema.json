@@ -506,6 +506,10 @@
               "type": "string",
               "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/\\[\\]-]*$"
             },
+            "effort": {
+              "enum": ["low", "medium", "high", "xhigh", "max"],
+              "description": "Explicit CLI reasoning effort. Legacy workflows that omit it run with medium."
+            },
             "contextId": {
               "$ref": "#/$defs/id"
             },
@@ -1972,6 +1976,10 @@
                       "model": {
                         "type": "string",
                         "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/\\[\\]-]*$"
+                      },
+                      "effort": {
+                        "enum": ["low", "medium", "high", "xhigh", "max"],
+                        "description": "Explicit CLI reasoning effort. Legacy roles that omit it run with medium."
                       },
                       "instructions": {
                         "type": "string",

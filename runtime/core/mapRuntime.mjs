@@ -534,7 +534,7 @@ export function installMapRuntime(Engine, { ApiError, UNSTARTED }) {
         : info.step === 'triage' ? this.triageSpec(state, exec, task, def, scope)
           : this.reviewSpec(state, exec, task, def, info, scope);
       spec.mapPrefix = `${exec.row.map_instance_id}/${exec.plan.seq}/`;
-      const node = { id: slug(info.taskId, info.step), type: 'agent', config: { provider: spec.role.provider, model: spec.role.model, timeoutSeconds: spec.role.timeoutSeconds, output: { format: 'json', schema: spec.schema } } };
+      const node = { id: slug(info.taskId, info.step), type: 'agent', config: { provider: spec.role.provider, model: spec.role.model, effort: spec.role.effort, timeoutSeconds: spec.role.timeoutSeconds, output: { format: 'json', schema: spec.schema } } };
       this.tryDispatchAgent(state, scope, node, attempt, spec);
       const record = this.processes.get(attempt.id);
       if (record) record.mapPrefix = spec.mapPrefix;

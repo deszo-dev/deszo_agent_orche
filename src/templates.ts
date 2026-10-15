@@ -6,13 +6,14 @@ import selective from '../docs/examples/m6-selective-delivery/workflow.json';
 import referenceDelivery from '../docs/examples/reference-delivery/workflow.json';
 import { DEFAULT_MODELS, allNodes } from './model';
 import type { Workflow } from './types';
+import { DEFAULT_EFFORT } from '../shared/effort.mjs';
 
 // Documented examples with fixture model IDs replaced by explicit defaults the user must confirm.
 function prepare(source: unknown): Workflow {
   const workflow = structuredClone(source) as Workflow;
   for (const node of allNodes(workflow)) {
-    if (node.type === 'agent') node.config.model = DEFAULT_MODELS[node.config.provider];
-    if (node.type === 'map') for (const role of node.config.roles) if (role.kind === 'agent') role.model = DEFAULT_MODELS[role.provider];
+    if (node.type === 'agent') { node.config.model = DEFAULT_MODELS[node.config.provider]; node.config.effort ??= DEFAULT_EFFORT; }
+    if (node.type === 'map') for (const role of node.config.roles) if (role.kind === 'agent') { role.model = DEFAULT_MODELS[role.provider]; role.effort ??= DEFAULT_EFFORT; }
   }
   // The documented layout is compact; spread it for the 230px canvas cards.
   for (const position of Object.values(workflow.view || {})) { position.x = Math.round(position.x * 1.25); position.y = Math.round(position.y * 1.1); }

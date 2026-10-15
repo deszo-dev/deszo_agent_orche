@@ -14,10 +14,10 @@ const POLICY = { slots: [{ id: 'readiness', role: 'implementation-readiness', vi
 
 function roles({ implementer = 'fixture-implementer', triage = 'fixture-triage', reviewer = 'fixture-task-reviewer', instructions = 'Implement the task exactly.' } = {}) {
   return [
-    { id: 'implementer', kind: 'agent', provider: 'claude', model: implementer, instructions, timeoutSeconds: 60, context: 'task' },
-    { id: 'test-author', kind: 'agent', provider: 'antigravity', model: 'fixture-test-author', instructions: 'Write the tests.', timeoutSeconds: 60, context: 'task' },
-    { id: 'reviewer', kind: 'agent', provider: 'codex', model: reviewer, instructions: 'Review the captured snapshot.', timeoutSeconds: 60, context: 'task' },
-    { id: 'analyst', kind: 'agent', provider: 'codex', model: triage, instructions: 'Triage failed verification.', timeoutSeconds: 60, context: { contextId: 'analyst-history' } },
+    { id: 'implementer', kind: 'agent', provider: 'claude', model: implementer, effort: 'xhigh', instructions, timeoutSeconds: 60, context: 'task' },
+    { id: 'test-author', kind: 'agent', provider: 'antigravity', model: 'fixture-test-author', effort: 'high', instructions: 'Write the tests.', timeoutSeconds: 60, context: 'task' },
+    { id: 'reviewer', kind: 'agent', provider: 'codex', model: reviewer, effort: 'medium', instructions: 'Review the captured snapshot.', timeoutSeconds: 60, context: 'task' },
+    { id: 'analyst', kind: 'agent', provider: 'codex', model: triage, effort: 'max', instructions: 'Triage failed verification.', timeoutSeconds: 60, context: { contextId: 'analyst-history' } },
     { id: 'verification', kind: 'utility', template: 'verification', embeddedRoles: { triage: 'analyst' } },
   ];
 }
@@ -101,6 +101,14 @@ test('round recovery: a failed real check is triaged, only the auth code is repa
     assert.ok(task(nav, 'TASK-AUTH-TESTS').criteria.every(item => item.verdict === 'passed'));
 
     const events = await api.events(runId);
+    const expectedEfforts = { 'fixture-implementer-buggy': 'xhigh', 'fixture-test-author': 'high', 'fixture-task-reviewer': 'medium', 'fixture-triage': 'max' };
+    const observedRoles = new Set();
+    for (const event of events.filter(item => item.type === 'attempt.invocation_committed' && item.nodeInstanceId.startsWith('implement/'))) {
+      const manifest = await api.artifactJson(event.payload.manifest.artifactId);
+      assert.equal(manifest.requestedEffort, expectedEfforts[manifest.requestedModel], 'generated Map steps retain their role effort');
+      observedRoles.add(manifest.requestedModel);
+    }
+    assert.deepEqual([...observedRoles].sort(), Object.keys(expectedEfforts).sort(), 'executors, reviewers and embedded triage all ran');
     const cycles = events.filter(event => event.type === 'map.verification_cycle').map(event => [event.payload.outcome, event.payload.failedVerificationCycles]);
     assert.deepEqual(cycles, [['failed', 1], ['passed', 1]]);
     const records = events.filter(event => event.type === 'map.record_created').map(event => event.payload.kind);

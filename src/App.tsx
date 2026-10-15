@@ -11,7 +11,8 @@ import { isTauri } from '@tauri-apps/api/core';
 import { ApiProblem, Client, getConnection } from './transport';
 import { INPUT, RETURN, allNodes, boundaryPorts, createNode, edgeId, emptyWorkflow, fromFlow, graphOf, loopOf, loopPath, mapAllNodes, portsOf, toFlow, uniqueId, updateLoop, validId, type FlowNode, type PortType } from './model';
 import { nodeTypes, STATE_LABELS } from './nodes';
-import { Inspector } from './Inspector';
+import { EffortField, Inspector } from './Inspector';
+import { DEFAULT_EFFORT, type Effort } from '../shared/effort.mjs';
 import { Replay } from './Replay';
 import { contextChainTemplate, deliveryTemplate, referenceDeliveryTemplate, reviewLoopTemplate, selectiveDeliveryTemplate, specificationLoopTemplate } from './templates';
 import {
@@ -1002,6 +1003,7 @@ function SettingsModal({ client, capabilities, onCapabilities, onClose, report }
 function ChatModal({ client, binding, workspaceId, onClose, report }: { client: Client; binding: ContextBinding; workspaceId: string; onClose: () => void; report: (error: unknown, prefix?: string) => void }) {
   const [turns, setTurns] = useState<{ runId: string; state: string; prompt: string; reply: string | null; error: string | null }[]>([]);
   const [model, setModel] = useState(binding.model || '');
+  const [effort, setEffort] = useState<Effort>(DEFAULT_EFFORT);
   const [prompt, setPrompt] = useState('');
   const [sending, setSending] = useState(false);
   const load = useCallback(async () => {
@@ -1024,7 +1026,7 @@ function ChatModal({ client, binding, workspaceId, onClose, report }: { client: 
     if (!prompt.trim() || !model) return;
     setSending(true);
     try {
-      const accepted = await client.post<{ run: Run }>(`/context-bindings/${binding.bindingId}/messages`, { requestId: crypto.randomUUID(), workspaceId, model, prompt });
+      const accepted = await client.post<{ run: Run }>(`/context-bindings/${binding.bindingId}/messages`, { requestId: crypto.randomUUID(), workspaceId, model, effort, prompt });
       setPrompt('');
       for (let i = 0; i < 1200; i++) {
         const snapshot = await client.get<RunSnapshot>(`/runs/${accepted.run.runId}`);
@@ -1042,6 +1044,7 @@ function ChatModal({ client, binding, workspaceId, onClose, report }: { client: 
       <div className="chat-agent"><strong>{PROVIDER_NAMES[binding.provider]}</strong>{turn.reply !== null ? <pre>{turn.reply}</pre> : <small className="muted">{turn.error || RUN_LABELS[turn.state]}</small>}</div>
     </div>)}</div>
     <label className="field"><span>Model ID <em>explicit; never substituted</em></span><input value={model} onChange={event => setModel(event.target.value.trim())} placeholder="Enter an exact model ID" /></label>
+    <EffortField value={effort} readOnly={sending} onChange={setEffort} />
     <label className="field"><span>Message</span><textarea rows={4} value={prompt} onChange={event => setPrompt(event.target.value)} /></label>
     <div className="modal-actions"><button className="button primary" onClick={send} disabled={sending || !prompt.trim() || !model}><MessageSquare size={14} />{sending ? 'Waiting for the reply…' : 'Send'}</button></div>
   </Modal>;

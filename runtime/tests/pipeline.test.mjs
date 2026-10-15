@@ -261,11 +261,13 @@ test('manual chat continues a ready binding as a chat run hidden from workflow l
     const first = await api.waitFor((await api.run(singleAgent())).body.run.runId, terminal);
     assert.equal(first.run.state, 'succeeded');
     const bindingId = first.contexts[0].bindingId;
-    const chat = await api.call('POST', `/api/v2/context-bindings/${bindingId}/messages`, { requestId: randomUUID(), workspaceId: 'main', model: 'fixture-echo', prompt: 'And now?' });
+    const chat = await api.call('POST', `/api/v2/context-bindings/${bindingId}/messages`, { requestId: randomUUID(), workspaceId: 'main', model: 'fixture-echo', effort: 'xhigh', prompt: 'And now?' });
     assert.equal(chat.status, 202, JSON.stringify(chat.body));
     assert.equal(chat.body.run.kind, 'chat');
     const turn = await api.waitFor(chat.body.run.runId, terminal);
     assert.equal(turn.run.state, 'succeeded');
+    const invocationEvent = (await api.events(turn.run.runId)).find(item => item.type === 'attempt.invocation_committed');
+    assert.equal((await api.artifactJson(invocationEvent.payload.manifest.artifactId)).requestedEffort, 'xhigh');
     assert.match(await outputText(api, turn, 'reply', 'text'), /turn 2: And now\?/);
     const transcript = await api.call('GET', `/api/v2/runs?kind=chat&bindingId=${bindingId}`);
     assert.equal(transcript.body.items.length, 1);

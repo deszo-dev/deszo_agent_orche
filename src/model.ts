@@ -1,5 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 import type { Capability, GatePolicy, LoopConfig, NodeType, Provider, ValueType, Workflow, WorkflowEdge, WorkflowNode } from './types';
+import { DEFAULT_EFFORT } from '../shared/effort.mjs';
 
 export type PortType = ValueType;
 export interface Ports { inputs: Record<string, PortType[]>; outputs: Record<string, PortType> }
@@ -93,7 +94,7 @@ export function createNode(type: NodeType, id: string, provider: Provider = 'cod
   switch (type) {
     case 'text': return { id, type, config: { value: '' } };
     case 'prompt-template': return { id, type, config: { template: 'Instruction:\n{{instruction}}\n\nMaterial:\n{{material}}', slots: [{ id: 'instruction' }, { id: 'material' }] } };
-    case 'agent': return { id, type, config: { provider, model: DEFAULT_MODELS[provider], timeoutSeconds: 600, output: { format: 'text' } } };
+    case 'agent': return { id, type, config: { provider, model: DEFAULT_MODELS[provider], effort: DEFAULT_EFFORT, timeoutSeconds: 600, output: { format: 'text' } } };
     case 'context': return { id, type, config: { provider, mode: 'new' } };
     case 'result-viewer': return { id, type, config: {} };
     case 'file-input': return { id, type, config: { mode: 'files', paths: ['README.md'] } };
@@ -105,10 +106,10 @@ export function createNode(type: NodeType, id: string, provider: Provider = 'cod
     case 'route': return { id, type, config: { valueType: 'JsonValue', selector: '/status', cases: [{ id: 'approved', equals: 'OPEN' }, { id: 'revise', equals: 'REVISION_REQUIRED' }], onUnmatched: 'error' } };
     case 'gate': return { id, type, config: { mode: 'prepare', policy: structuredClone(DEFAULT_POLICY) } };
     case 'map': return { id, type, config: { approvalPolicy: structuredClone(DEFAULT_POLICY), optionalInputs: [], limits: { maxFailedVerificationCycles: 3, maxTaskAttempts: 3 }, roles: [
-      { id: 'implementer', kind: 'agent', provider: 'claude', model: DEFAULT_MODELS.claude, instructions: 'Implement the approved task. Write only the listed outputs.', timeoutSeconds: 600, context: 'task' },
-      { id: 'test-author', kind: 'agent', provider: 'antigravity', model: DEFAULT_MODELS.antigravity, instructions: 'Write the approved tests. Write only the listed outputs.', timeoutSeconds: 600, context: 'task' },
-      { id: 'reviewer', kind: 'agent', provider: 'codex', model: DEFAULT_MODELS.codex, instructions: 'Review the captured snapshot against the criterion.', timeoutSeconds: 600, context: 'task' },
-      { id: 'analyst', kind: 'agent', provider: 'codex', model: DEFAULT_MODELS.codex, instructions: 'Triage the failed verification from the captured evidence.', timeoutSeconds: 600, context: 'task' },
+      { id: 'implementer', kind: 'agent', provider: 'claude', model: DEFAULT_MODELS.claude, effort: DEFAULT_EFFORT, instructions: 'Implement the approved task. Write only the listed outputs.', timeoutSeconds: 600, context: 'task' },
+      { id: 'test-author', kind: 'agent', provider: 'antigravity', model: DEFAULT_MODELS.antigravity, effort: DEFAULT_EFFORT, instructions: 'Write the approved tests. Write only the listed outputs.', timeoutSeconds: 600, context: 'task' },
+      { id: 'reviewer', kind: 'agent', provider: 'codex', model: DEFAULT_MODELS.codex, effort: DEFAULT_EFFORT, instructions: 'Review the captured snapshot against the criterion.', timeoutSeconds: 600, context: 'task' },
+      { id: 'analyst', kind: 'agent', provider: 'codex', model: DEFAULT_MODELS.codex, effort: DEFAULT_EFFORT, instructions: 'Triage the failed verification from the captured evidence.', timeoutSeconds: 600, context: 'task' },
       { id: 'verification', kind: 'utility', template: 'verification', embeddedRoles: { triage: 'analyst' } },
     ] } };
   }

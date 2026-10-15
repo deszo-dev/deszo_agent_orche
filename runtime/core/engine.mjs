@@ -15,6 +15,7 @@ import { allNodesDeep, bodyPrefix, enclosingLoops, fingerprints, parseInstance, 
 import * as gate from './gate.mjs';
 import { installMapRuntime } from './mapRuntime.mjs';
 import { prepareManagedToolIsolation } from './managed-isolation.mjs';
+import { DEFAULT_EFFORT, EFFORT_POLICY_VERSION, resolveEffort } from '../../shared/effort.mjs';
 import contextChainExample from '../../docs/examples/m1-context-chain/workflow.json' with { type: 'json' };
 import deliveryExample from '../../docs/examples/reference-delivery/workflow.json' with { type: 'json' };
 
@@ -389,8 +390,8 @@ export class Engine {
       workflow = structuredClone(templateId === 'context-chain' ? contextChainExample : deliveryExample);
       workflow.workflowId = 'replace-with-workflow-id';
       for (const node of allNodesDeep(workflow.nodes)) {
-        if (node.type === 'agent') node.config.model = `replace-with-${node.config.provider}-model-id`;
-        if (node.type === 'map') for (const role of node.config.roles) if (role.kind === 'agent') role.model = `replace-with-${role.provider}-model-id`;
+        if (node.type === 'agent') { node.config.model = `replace-with-${node.config.provider}-model-id`; node.config.effort ??= DEFAULT_EFFORT; }
+        if (node.type === 'map') for (const role of node.config.roles) if (role.kind === 'agent') { role.model = `replace-with-${role.provider}-model-id`; role.effort ??= DEFAULT_EFFORT; }
       }
     }
     return { ...metadata, workflow, notes: 'This is an example. Replace every explicit placeholder with a user-selected value, then discover, validate, and save it through this runtime.' };
@@ -672,7 +673,7 @@ export class Engine {
         nodes: [
           { id: 'message', type: 'text', config: { value: body.prompt } },
           { id: 'conversation', type: 'context', config: { provider: binding.provider, mode: 'continue', bindingId } },
-          { id: 'reply', type: 'agent', config: { provider: binding.provider, model: body.model, contextId: 'conversation', timeoutSeconds: body.timeoutSeconds ?? 600, output: { format: 'text' } } },
+          { id: 'reply', type: 'agent', config: { provider: binding.provider, model: body.model, effort: resolveEffort(body.effort), contextId: 'conversation', timeoutSeconds: body.timeoutSeconds ?? 600, output: { format: 'text' } } },
           { id: 'transcript', type: 'result-viewer', config: {} },
         ],
         edges: [
@@ -931,6 +932,7 @@ export class Engine {
       if (!attempt || !DONE_OK.has(attempt.state) || !attempt.outputs_artifact_id) continue;
       const captured = this.store.readJson(run.workflow_snapshot_artifact_id);
       const plan = run.plan_artifact_id ? this.store.readJson(run.plan_artifact_id) : { pins: {} };
+      if (plan.effortPolicyVersion !== EFFORT_POLICY_VERSION) continue;
       if (fingerprints(captured, plan.pins || {})[nodeId] !== fingerprint) continue;
       return { runId: run.id, attemptId: attempt.id, outputs: attempt.outputs_artifact_id, bindingId: attempt.context_binding_id };
     }
@@ -966,7 +968,7 @@ export class Engine {
     const runId = randomUUID();
     return this.store.transaction(() => {
       const settingsArtifact = this.store.putJson(runSettings);
-      const planRecord = { schemaVersion: 1, mode: plan.mode, targets: plan.targets, planned: [...plan.planned], refreshCaches: plan.refreshCaches, frozen: [...plan.frozen], pins: plan.pins,
+      const planRecord = { schemaVersion: 1, effortPolicyVersion: EFFORT_POLICY_VERSION, mode: plan.mode, targets: plan.targets, planned: [...plan.planned], refreshCaches: plan.refreshCaches, frozen: [...plan.frozen], pins: plan.pins,
         reused: Object.fromEntries([...plan.reused].map(([id, source]) => [id, { runId: source.runId, attemptId: source.attemptId }])) };
       const planArtifact = this.store.putJson(planRecord);
       const createdAt = nowIso();
@@ -1383,7 +1385,7 @@ export class Engine {
       return value;
     };
     const closure = visit(agent.id);
-    return unknown ? null : canonicalHash({ version: 3, closure, nativeConfiguration: state.workflow.settings.nativeConfiguration });
+    return unknown ? null : canonicalHash({ version: 4, closure, nativeConfiguration: state.workflow.settings.nativeConfiguration });
   }
 
   runGate(state, scope, node, attempt, values, events) {
@@ -1682,6 +1684,7 @@ export class Engine {
 
   async executeAgent(state, scope, node, attempt, workspace, mapping, record, spec = null) {
     const config = node.config;
+    const requestedEffort = resolveEffort(config.effort);
     const nativeConfiguration = state.workflow.settings.nativeConfiguration;
     const detection = await this.detect(config.provider);
     attempt = this.store.get('SELECT * FROM attempts WHERE id = ?', attempt.id);
@@ -1731,7 +1734,7 @@ export class Engine {
     if (config.output.format === 'json') promptSources.push({ kind: 'output-contract', artifact: ref(this.store.putText(outputContractText(config.output))) });
     const promptArtifact = this.store.putText(prompt);
     const schemaPath = transport ? join(tmp, 'output.schema.json') : null;
-    const invocation = this.adapters.buildInvocation({ provider: config.provider, cliPath: detection.cliPath, model: config.model, prompt, cwd: workspace.cwd,
+    const invocation = this.adapters.buildInvocation({ provider: config.provider, cliPath: detection.cliPath, model: config.model, effort: requestedEffort, prompt, cwd: workspace.cwd,
       nativeSessionId, output: transport ? { ...config.output, schema: transport.schema } : config.output, nativeConfiguration, timeoutSeconds: config.timeoutSeconds, schemaPath });
     invocation.env = { ...(invocation.env || process.env), DESZO_MANAGED_INVOCATION: this.runtimeInstanceId };
     let managedToolIsolation;
@@ -1747,7 +1750,7 @@ export class Engine {
     }
     if (transport) { mkdirSync(tmp, { recursive: true }); writeFileSync(schemaPath, JSON.stringify(transport.schema)); }
     const sessionBefore = nativeSessionId ? ref(this.store.putJson({ provider: config.provider, nativeSessionId })) : null;
-    const manifest = { schemaVersion: 1, runId: state.id, attemptId: attempt.id, provider: config.provider, requestedModel: config.model,
+    const manifest = { schemaVersion: 1, runId: state.id, attemptId: attempt.id, provider: config.provider, requestedModel: config.model, requestedEffort,
       cliExecutable: invocation.command, cliVersion: detection.cliVersion || '', arguments: invocation.args, cwd: invocation.cwd, cwdIdentity: workspace.cwd_identity,
       nativeConfiguration, configurationHash, environmentPolicy: 'subscription-only', stdin: invocation.stdin === null ? null : ref(this.store.putText(invocation.stdin)),
       managedToolIsolation: { ...managedToolIsolation, runtimeInstanceId: this.runtimeInstanceId },
@@ -1822,7 +1825,7 @@ export class Engine {
       const outputValues = { text: textValue(textArtifact), ...(jsonArtifact ? { json: jsonValue(jsonArtifact) } : {}), ...(captured ? { files: captured } : {}) };
       const sessionArtifact = this.store.putJson({ provider: config.provider, nativeSessionId: parser.sessionId ?? null });
       const usage = parser.usage ? ref(this.store.putJson(parser.usage)) : null;
-      const events = [this.commitOutputs(state, current, outputValues, { provider: config.provider, requestedModel: config.model, observedModel: parser.model, nativeSession: ref(sessionArtifact), usage })];
+      const events = [this.commitOutputs(state, current, outputValues, { provider: config.provider, requestedModel: config.model, requestedEffort, observedModel: parser.model, nativeSession: ref(sessionArtifact), usage })];
       if (binding) {
         const first = !this.bindingRecord(binding).nativeSessionId;
         const [event, updated] = this.bindingTransition(binding, 'ready', 'Invocation committed; native conversation advanced.', { nativeSessionId: parser.sessionId });

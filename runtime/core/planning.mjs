@@ -1,5 +1,6 @@
 import { canonicalHash } from './canonical.mjs';
 import { INPUT, RETURN, isExecutable } from './validate.mjs';
+import { EFFORT_POLICY_VERSION } from '../../shared/effort.mjs';
 
 // Scoped instance IDs: [loop, iteration]* node, for example "delivery/2/spec/1/analyst".
 export function parseInstance(id) {
@@ -57,7 +58,8 @@ export function fingerprints(graph, pins = {}) {
       .map(edge => [edge.target.port, edge.source.port, visit(edge.source.nodeId)]).sort((a, b) => (a[0] < b[0] ? -1 : 1));
     const after = graph.after.filter(pair => pair.after === id).map(pair => visit(pair.before)).sort();
     const pin = node.type === 'cache' && node.config.mode === 'frozen' ? pins[id]?.value?.artifact?.sha256 ?? null : null;
-    const value = canonicalHash({ definition, inputs, after, pin, bodyPins: node.type === 'loop' ? bodyPins(node) : null });
+    const value = canonicalHash({ definition, inputs, after, pin, bodyPins: node.type === 'loop' ? bodyPins(node) : null,
+      ...(['agent', 'loop', 'map'].includes(node.type) ? { effortPolicyVersion: EFFORT_POLICY_VERSION } : {}) });
     memo.set(id, value);
     return value;
   };

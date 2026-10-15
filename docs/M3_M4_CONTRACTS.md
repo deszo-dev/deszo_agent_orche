@@ -46,7 +46,7 @@ The captured `run.plan_json` records mode, targets, refreshed Caches, the pins u
 
 ## M3 — Context chat
 
-`POST /api/v2/context-bindings/{bindingId}/messages` with `chatRequest` (`requestId`, `workspaceId`, `model`, `prompt`, optional `timeoutSeconds`) creates a run of `kind: chat`. Its captured workflow is a generated core-v1 graph (Text → Agent with a `continue` Context on that binding → Result Viewer) under the system workflow `context-chat`, which workflow lists hide. Consequences:
+`POST /api/v2/context-bindings/{bindingId}/messages` with `chatRequest` (`requestId`, `workspaceId`, `model`, `prompt`, optional `effort` and `timeoutSeconds`) creates a run of `kind: chat`. Effort follows the [Agent effort contract](M1_CONTRACTS.md#reasoning-effort); the generated Agent captures the resolved level explicitly, and the chat editor offers the same selector. Its captured workflow is a generated core-v1 graph (Text → Agent with a `continue` Context on that binding → Result Viewer) under the system workflow `context-chat`, which workflow lists hide. Consequences:
 
 - The turn uses the same adapter, locks, journal, timeout and recovery as any run. It requires a `ready` binding (422 `context_unavailable` otherwise) and no active run in the workspace (409).
 - Responses are `acceptRun`; the transcript is the list of chat runs for that binding (`GET /api/v2/runs?kind=chat&bindingId=…`).
