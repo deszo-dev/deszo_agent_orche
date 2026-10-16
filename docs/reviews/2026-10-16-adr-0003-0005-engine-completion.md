@@ -37,6 +37,8 @@ The new optional `task-planning-v1` node drives a business request and immutable
 
 The complete regression preceded the last task-only receipt/accounting refinements; the final managed-task rerun covers those refinements. The receipt records commands, results and source digests rather than implying that an earlier test snapshot included later edits. The earlier negative runner remains diagnostic and is not counted as an assertion suite.
 
+Git stores audit evidence without newline conversion through the repository attributes, preserving its recorded byte digests on Windows and in the committed objects. Source digests in the receipt identify the tested working-tree bytes; they are labeled separately from Git commit identity.
+
 ## Remaining boundaries
 
 - This completes the bounded managed-task integration. The compiler executes one source bundle sequentially; automatic parallel Implementation Map decomposition remains outside this increment. Existing explicitly authored Map workflows passed regression.
