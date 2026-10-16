@@ -145,11 +145,18 @@ mod job {
     }
 }
 
+#[cfg(windows)]
+mod supervisor;
+
 struct Runner {
     child: Child,
     connection: Connection,
     #[cfg(windows)]
     job: job::Job,
+    // Lives as long as this runtime: its pipe and run Jobs end with it (ADR-0002 section 4). Held, never read.
+    #[cfg(windows)]
+    #[allow(dead_code)]
+    supervisor: Option<supervisor::Supervisor>,
 }
 
 impl Runner {
@@ -352,6 +359,15 @@ fn get_runner_connection(app: tauri::AppHandle, state: tauri::State<RuntimeState
     }
     #[cfg(windows)]
     let job = job::Job::new()?;
+    // The runtime learns the supervisor pipe, its control token and the shim location; it never receives them in a manifest.
+    #[cfg(windows)]
+    let supervisor = supervisor::Supervisor::start()?;
+    #[cfg(windows)]
+    {
+        // Every supervised process launches through the shim. Refuse to start rather than fail each run later.
+        let shim = launch_shim(&app)?;
+        command.env("DESZO_SUPERVISOR_PIPE", &supervisor.pipe_name).env("DESZO_SUPERVISOR_TOKEN", &supervisor.token).env("DESZO_LAUNCH_SHIM", shim);
+    }
     let mut child = command.spawn().map_err(|e| format!("Node.js could not be started: {e}"))?;
     // Node waits for this confirmation before it initializes and can start any CLI.
     #[cfg(windows)]
@@ -396,10 +412,25 @@ fn get_runner_connection(app: tauri::AppHandle, state: tauri::State<RuntimeState
         connection: connection.clone(),
         #[cfg(windows)]
         job,
+        #[cfg(windows)]
+        supervisor: Some(supervisor),
     });
     drop(guard);
     supervise(app.clone(), shared, generation);
     Ok(connection_for_window(connection, &app))
+}
+
+/// The native launch shim: the development build output, or the copy bundled with the application's runtime.
+#[cfg(windows)]
+fn launch_shim(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let mut candidates = Vec::new();
+    if cfg!(debug_assertions) {
+        candidates.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target").join("debug").join("deszo-launch-shim.exe"));
+    }
+    candidates.push(app.path().resource_dir().map_err(|e| e.to_string())?.join("runtime").join("deszo-launch-shim.exe"));
+    candidates.into_iter().find(|path| path.is_file()).ok_or_else(|| {
+        "The launch shim deszo-launch-shim.exe is missing, so no run could be contained. Run `npm run shim:dev` (development) or `npm run shim:build` (release), then restart Deszo.".to_string()
+    })
 }
 
 fn resolve_node_executable() -> Result<PathBuf, String> {
@@ -443,7 +474,8 @@ mod tests {
         let _serial = JOB_TESTS.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         let job = Job::new().expect("job");
         let mut child = Command::new("cmd")
-            .args(["/c", "ping -n 2 127.0.0.1 >nul & ping -n 60 127.0.0.1 >nul"])
+            // One long-lived descendant: a short leading ping could be the only member the loop sees before the kill.
+            .args(["/c", "ping -n 60 127.0.0.1 >nul"])
             .spawn()
             .expect("spawn");
         job.assign(&child).expect("assign");
@@ -484,7 +516,7 @@ mod tests {
         let probe = Job::duplicate_for_test(&job);
         let connection = Connection { port: 1, token: String::new(), first_party_token: None, root: String::new(), scratch_root: String::new(), process_containment: "tauri-job".into(),
             descriptor_version: 1, api_versions: vec!["v2".into(), "v3".into()], store_id: String::new(), runtime_instance_id: String::new(), application_root: String::new(), node_executable: String::new(), bridge_script: None, connection_file: None };
-        let shared = Arc::new(Mutex::new(Shared { runner: Some(Runner { child, connection, job }), generation: 7, uncertain: None }));
+        let shared = Arc::new(Mutex::new(Shared { runner: Some(Runner { child, connection, job, supervisor: None }), generation: 7, uncertain: None }));
         let (sender, receiver) = mpsc::channel();
         watch_generation(shared.clone(), 7, move |message| { let _ = sender.send(message); });
         let message = receiver.recv_timeout(Duration::from_secs(30)).expect("the supervisor reported the loss");

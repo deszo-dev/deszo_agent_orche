@@ -1,8 +1,8 @@
 # Decision Register
 
-Version: 0.8  
-Status: confirmed requirements, accepted ADR-0001, and proposed milestone baseline  
-Updated: 2026-10-15
+Version: 0.9
+Status: confirmed requirements, accepted ADR-0001 and ADR-0002, and milestone baseline
+Updated: 2026-10-16
 
 This is the sole register of requirement/proposal acceptance. The current request authorizes documentation corrections, not application implementation. No proposed default is silently marked human-confirmed.
 
@@ -30,6 +30,9 @@ This is the sole register of requirement/proposal acceptance. The current reques
 | D17 | The map covers implementation tasks; Analyst revisions and documentation approval belong to the surrounding pipeline, and the draft map evolves with documentation. | Explicit stage-boundary clarification. |
 | D18 | Claude documentation readiness and implementation are separate roles; Antigravity documentation testability and test authoring are separate roles. | Explicit role-separation clarification. |
 | D19 | Specify external workflow authoring through the API of an already running Deszo application, covering Codex, Claude Code, and Antigravity from the first integration release, with direct API use by other applications. | The 2026-10-15 request for an English ADR covering the discussed integration and all three clients; documentation is authorized, implementation is not. |
+| D20 | Preserve the maximum available execution information for complete post-run analysis, with explicit capture gaps and provider availability limits. | The 2026-10-16 request to plan further Deszo improvements and create an ADR. |
+| D21 | The user will launch the shadcn/ui implementation through the external assistant, which must observe/control the run and stop all work belonging to it when a Deszo bug is detected. | Explicit 2026-10-16 supervision and Stop requirement. |
+| D22 | Record a detected Deszo bug in Deszo with execution evidence. Prepare the design/ADR now; implementation and pilot execution remain pending. | Explicit 2026-10-16 reporting requirement and documentation-only instruction. |
 
 ## Inherited requirements
 
@@ -50,7 +53,7 @@ These are carried forward from the original architecture draft. Changing them re
 
 ## Proposed resolutions
 
-P01–P22 remain **Proposed** and answer the corresponding Q IDs. P23 is listed under accepted proposals below. Detailed behavior lives at the linked home; [MILESTONES.md](MILESTONES.md#m1-baseline-for-an-implementation-request) identifies the concrete M1 baseline.
+P01–P22 remain **Proposed** and answer the corresponding Q IDs. P23 and P24 are listed under accepted proposals below. Detailed behavior lives at the linked home; [MILESTONES.md](MILESTONES.md#m1-baseline-for-an-implementation-request) identifies the concrete M1 baseline.
 
 | ID | Proposed selection | Rule home |
 | --- | --- | --- |
@@ -82,6 +85,7 @@ P01–P22 remain **Proposed** and answer the corresponding Q IDs. P23 is listed 
 | ID | Accepted selection | Acceptance record | Rule home |
 | --- | --- | --- | --- |
 | P23 | One runtime-owned HTTP authoring contract and one stdio MCP bridge shared by Codex, Claude Code, and Antigravity, with guarded saves, durable changes, editor synchronization, and an explicit API migration. | Accepted 2026-10-15 after the sixth review reported no open findings. | [ADR-0001](adr/0001-external-workflow-authoring-api-and-mcp.md) |
+| P24 | Lossless qualified audit, bounded external supervision with a run-specific grant/watchdog, verified per-run Stop, local incidents and offline audit bundles. | Accepted 2026-10-16 after the second review reported no architecture findings; Stage 1/2 contract items remain required. | [ADR-0002](adr/0002-execution-audit-and-supervised-control.md) |
 
 ## Open decisions and implementation authorization
 
@@ -90,6 +94,8 @@ Q01–Q22 have selected proposals, so they no longer need a second copied answer
 Before implementation, record the scope the user has authorized and any corrections to this baseline. An explicit request to implement M1 under the documented baseline is sufficient; do not require additional individual approvals for P01/P03/P04/P07/P10/P11/P15 after that authorization. Silence alone is not acceptance.
 
 The 2026-10-15 external authoring request authorized ADR-0001 and its navigation/register updates. D19 is the requested integration scope. P23 and ADR-0001 were accepted on 2026-10-15 after the sixth review reported no open findings. This design acceptance does not authorize implementation, client configuration changes, or live provider tests; those require a separate instruction.
+
+D20–D22 record the user's audit, supervision and local bug-reporting requirements. P24 and ADR-0002 were accepted on 2026-10-16 after the second review reported no architecture findings. Acceptance authorizes the design only: implementation, new control permissions, client configuration changes, live provider calls and shadcn/ui pilot execution each require a separate instruction. ADR2-07 through ADR2-10 remain required Stage 1/2 contract and verification items.
 
 ## Superseded assumptions
 

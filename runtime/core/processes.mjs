@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { capture } from './adapters.mjs';
+import { SUPERVISOR_ENV } from './supervisor-client.mjs';
 
 // Owned process trees are terminated explicitly; the Rust Job Object is the crash backstop.
 export async function killTree(pid) {
@@ -22,7 +23,9 @@ export async function processStartTime(pid) {
 }
 
 export function launch({ command, args, cwd, env, stdin }) {
-  const child = spawn(command, args, { cwd, env, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], detached: process.platform !== 'win32' });
+  // The supervisor's pipe and token never reach a shim or a CLI: the CLI would inherit them as its environment.
+  const inherited = Object.fromEntries(Object.entries(env ?? process.env).filter(([key]) => !SUPERVISOR_ENV.includes(key)));
+  const child = spawn(command, args, { cwd, env: inherited, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], detached: process.platform !== 'win32' });
   child.stdin.on('error', () => {}); // A CLI may exit before consuming its prompt.
   child.once('spawn', () => child.stdin.end(stdin ?? ''));
   return child;

@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deszo.local/documentation/execution-evidence.schema.json",
+  "title": "Execution evidence, stream manifests, command manifests and termination proofs (ADR-0002)",
+  "$defs": {
+    "ref": {
+      "type": "object",
+      "properties": {
+        "artifactId": { "type": "string", "format": "uuid" },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "byteSize": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["artifactId", "sha256"],
+      "additionalProperties": false
+    },
+    "streamManifest": {
+      "type": "object",
+      "description": "Identity, chunk offsets, byte counts, completion and integrity of one captured stream. Raw bytes are the immutable chunk artifacts.",
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "kind": { "const": "StreamManifest" },
+        "stream": { "enum": ["stdout", "stderr", "normalized"] },
+        "mediaType": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "receivedBytes": { "type": "integer", "minimum": 0 },
+        "committedBytes": { "type": "integer", "minimum": 0 },
+        "chunkCount": { "type": "integer", "minimum": 0 },
+        "complete": { "type": "boolean" },
+        "endingReason": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "integrity": { "enum": ["complete", "partial", "capture_failed"] },
+        "chunks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "index": { "type": "integer", "minimum": 0 },
+              "byteOffset": { "type": "integer", "minimum": 0 },
+              "byteLength": { "type": "integer", "minimum": 0 },
+              "artifact": { "$ref": "#/$defs/ref" }
+            },
+            "required": ["index", "byteOffset", "byteLength", "artifact"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["schemaVersion", "kind", "stream", "mediaType", "receivedBytes", "committedBytes", "chunkCount", "complete", "endingReason", "integrity", "chunks"],
+      "additionalProperties": false
+    },
+    "commandManifest": {
+      "type": "object",
+      "description": "The exact command, arguments and policy captured before a check or Agent process is spawned.",
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "kind": { "const": "CommandManifest" },
+        "executable": { "type": "string", "minLength": 1 },
+        "arguments": { "type": "array", "items": { "type": "string" } },
+        "source": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "timeoutSeconds": { "type": "integer", "minimum": 1 },
+        "requiredExitCode": { "type": ["integer", "null"] },
+        "environmentPolicy": { "type": "string", "minLength": 1, "maxLength": 200 }
+      },
+      "required": ["schemaVersion", "kind", "executable", "arguments", "source", "timeoutSeconds", "environmentPolicy"],
+      "additionalProperties": false
+    },
+    "executionEvidence": {
+      "type": "object",
+      "description": "The evidence record for one attempt outcome. It exists for passed, failed, canceled, timed-out, interrupted, spawn-failed, invalid-source and capture-failed outcomes.",
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "kind": { "const": "ExecutionEvidence" },
+        "attemptId": { "type": "string", "format": "uuid" },
+        "nodeInstanceId": { "type": "string", "minLength": 1 },
+        "checkId": { "type": ["string", "null"] },
+        "outcome": { "enum": ["passed", "failed", "canceled", "timed_out", "interrupted", "spawn_failed", "invalid_source", "capture_failed", "process_failed"] },
+        "exitCode": { "type": ["integer", "null"] },
+        "signal": { "type": ["string", "null"] },
+        "startedAt": { "type": ["string", "null"] },
+        "endedAt": { "type": "string" },
+        "command": { "$ref": "#/$defs/ref" },
+        "streams": {
+          "type": "object",
+          "properties": {
+            "stdout": { "$ref": "#/$defs/ref" },
+            "stderr": { "$ref": "#/$defs/ref" }
+          },
+          "required": ["stdout", "stderr"],
+          "additionalProperties": false
+        },
+        "captureVerdict": { "enum": ["complete", "partial", "capture_failed"] },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 1000 }
+      },
+      "required": ["schemaVersion", "kind", "attemptId", "nodeInstanceId", "outcome", "endedAt", "command", "streams", "captureVerdict", "reason"],
+      "additionalProperties": false
+    },
+    "terminationProof": {
+      "type": "object",
+      "description": "The published result of a root Stop. The outcome is stopped only when native containment proves zero live members; otherwise it is termination_unconfirmed.",
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "kind": { "const": "TerminationProof" },
+        "runId": { "type": "string", "format": "uuid" },
+        "outcome": { "enum": ["stopped", "termination_unconfirmed"] },
+        "containment": { "enum": ["none", "windows-job"] },
+        "controlMode": { "enum": ["supervised", "unsupervised"] },
+        "requestedAt": { "type": "string" },
+        "confirmedAt": { "type": ["string", "null"] },
+        "ownedAttempts": { "type": "integer", "minimum": 0 },
+        "remainingMembers": { "type": ["integer", "null"], "minimum": 0 },
+        "members": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "attemptId": { "type": "string", "format": "uuid" },
+              "pid": { "type": ["integer", "null"] },
+              "state": { "enum": ["exited", "running", "unknown"] }
+            },
+            "required": ["attemptId", "pid", "state"],
+            "additionalProperties": false
+          }
+        },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 1000 }
+      },
+      "required": ["schemaVersion", "kind", "runId", "outcome", "containment", "controlMode", "requestedAt", "confirmedAt", "ownedAttempts", "remainingMembers", "members", "reason"],
+      "additionalProperties": false
+    }
+  }
+}

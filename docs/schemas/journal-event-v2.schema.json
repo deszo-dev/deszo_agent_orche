@@ -526,6 +526,14 @@
             "chunkIndex": {
               "type": "integer",
               "minimum": 0
+            },
+            "byteOffset": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "byteLength": {
+              "type": "integer",
+              "minimum": 0
             }
           },
           "required": [
@@ -605,7 +613,8 @@
                 "route_unmatched",
                 "context_prerequisite",
                 "capture_failed",
-                "managed_tool_isolation_unavailable"
+                "managed_tool_isolation_unavailable",
+                "capture_limit"
               ]
             },
             "message": {
@@ -1898,6 +1907,222 @@
             "priorReview"
           ],
           "additionalProperties": false
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "attempt.log_stream_closed"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "stream": {
+              "enum": [
+                "stdout",
+                "stderr",
+                "normalized"
+              ]
+            },
+            "manifest": {
+              "$ref": "#/$defs/ref"
+            },
+            "receivedBytes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "committedBytes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "chunkCount": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "complete": {
+              "type": "boolean"
+            },
+            "integrity": {
+              "enum": [
+                "complete",
+                "partial",
+                "capture_failed"
+              ]
+            },
+            "endingReason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          "required": [
+            "stream",
+            "manifest",
+            "receivedBytes",
+            "committedBytes",
+            "chunkCount",
+            "complete",
+            "integrity",
+            "endingReason"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "attempt.execution_evidence"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "evidence": {
+              "$ref": "#/$defs/ref"
+            },
+            "outcome": {
+              "enum": [
+                "passed",
+                "failed",
+                "canceled",
+                "timed_out",
+                "interrupted",
+                "spawn_failed",
+                "invalid_source",
+                "capture_failed",
+                "process_failed"
+              ]
+            },
+            "checkId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          "required": [
+            "evidence",
+            "outcome"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "run.termination_proof"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "proof": {
+              "$ref": "#/$defs/ref"
+            },
+            "outcome": {
+              "enum": [
+                "stopped",
+                "termination_unconfirmed"
+              ]
+            },
+            "containment": {
+              "enum": [
+                "none",
+                "windows-job"
+              ]
+            },
+            "controlMode": {
+              "enum": [
+                "supervised",
+                "unsupervised"
+              ]
+            }
+          },
+          "required": [
+            "proof",
+            "outcome",
+            "containment",
+            "controlMode"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "null"
+        },
+        "attemptId": {
+          "type": "null"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "run.control_grant_changed"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "grant": {
+              "$ref": "#/$defs/ref"
+            },
+            "state": {
+              "enum": [
+                "pending",
+                "active",
+                "denied",
+                "revoked",
+                "expired",
+                "extended"
+              ]
+            },
+            "extensionMs": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "required": [
+            "grant",
+            "state"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "null"
+        },
+        "attemptId": {
+          "type": "null"
         }
       },
       "required": [

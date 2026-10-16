@@ -1,0 +1,4604 @@
+{
+  "schemaVersion": 1,
+  "workflowId": "deszo-shadcn-ui",
+  "capabilities": [
+    "core-v1",
+    "loops-v1",
+    "pipeline-v1",
+    "delivery-v1",
+    "revisions-v1"
+  ],
+  "settings": {
+    "nativeConfiguration": "restricted"
+  },
+  "nodes": [
+    {
+      "id": "task",
+      "type": "text",
+      "config": {
+        "value": "Move all Deszo application panels, forms and dialogs to shadcn/ui. Preserve the current capabilities and workflow behavior, including React Flow editing, execution controls, recovery, history, Replay, Context chat and API/MCP authoring synchronization. Use the existing English product language.\r\n\r\nThe result is a separate local feature branch, `codex/shadcn-ui`, with the UI changes, relevant tests and documentation. Its starting point must include the verified explicit-effort change. Record the starting commit and the selected candidate before applying results. Merge and release remain separate actions.\n\nAcceptance scope:\n- The UI inventory covers the palette and application toolbar; workflow overview and node inspector; Map role editor and navigator; run, issue and Context panels; recovery controls; history and Replay; settings, workspace and workflow dialogs; external-run confirmation and Context chat.\r\n- Application-owned buttons, inputs, selectors, dialogs, tabs and status surfaces use the agreed shadcn/ui components and shared theme tokens. Keep the React Flow canvas, port connections, selection, zoom/pan and nested navigation functional.\r\n- Preserve save/load, validation, dirty-state handling, editor synchronization, run/stop/retry, task limits, Context behavior and all current configuration options, including reasoning effort.\r\n- Verify keyboard navigation, labels, visible focus, dialog focus handling, disabled/busy states, error states and small-window overflow on the affected surfaces.\r\n- Run the frontend build, appropriate runtime/contract regression checks and documentation checks. Add meaningful UI interaction coverage for the changed flows using the fixture runtime. Record browser screenshots and a desktop smoke result for behavior that depends on Tauri.\r\n- Produce the final diff, actual check evidence, known limitations and an Analyst verdict linked to the original task. This brief itself does not claim the pilot passed."
+      }
+    },
+    {
+      "id": "seed",
+      "type": "merge",
+      "config": {
+        "mode": "record",
+        "inputs": [
+          {
+            "id": "task",
+            "type": "Text"
+          },
+          {
+            "id": "base",
+            "type": "ArtifactSet"
+          }
+        ],
+        "fields": [
+          {
+            "name": "businessTask",
+            "source": {
+              "input": "task"
+            }
+          },
+          {
+            "name": "base",
+            "source": {
+              "input": "base"
+            }
+          },
+          {
+            "name": "specification",
+            "source": {
+              "literal": null
+            }
+          },
+          {
+            "name": "issues",
+            "source": {
+              "literal": []
+            }
+          },
+          {
+            "name": "documentationApproval",
+            "source": {
+              "literal": null
+            }
+          },
+          {
+            "name": "priorMapState",
+            "source": {
+              "literal": null
+            }
+          },
+          {
+            "name": "repair",
+            "source": {
+              "literal": null
+            }
+          },
+          {
+            "name": "candidate",
+            "source": {
+              "literal": null
+            }
+          },
+          {
+            "name": "finalAcceptance",
+            "source": {
+              "literal": null
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "analyst-history",
+      "type": "context",
+      "config": {
+        "provider": "codex",
+        "mode": "new"
+      }
+    },
+    {
+      "id": "delivery",
+      "type": "loop",
+      "config": {
+        "valueType": "JsonValue",
+        "stateSchema": {
+          "type": "object",
+          "properties": {
+            "businessTask": {
+              "type": "string"
+            },
+            "issues": {
+              "type": "array"
+            }
+          },
+          "required": [
+            "businessTask",
+            "base",
+            "specification",
+            "issues",
+            "documentationApproval",
+            "priorMapState",
+            "repair",
+            "candidate",
+            "finalAcceptance"
+          ]
+        },
+        "fixedInputs": [],
+        "limits": {
+          "maxIterations": 3,
+          "maxActiveMinutes": 480
+        },
+        "body": {
+          "nodes": [
+            {
+              "id": "spec-of",
+              "type": "json-select",
+              "config": {
+                "pointer": "/specification",
+                "outputType": "ArtifactSet",
+                "nullAs": "empty"
+              }
+            },
+            {
+              "id": "cert-of",
+              "type": "json-select",
+              "config": {
+                "pointer": "/documentationApproval",
+                "outputType": "JsonValue"
+              }
+            },
+            {
+              "id": "verify-docs",
+              "type": "gate",
+              "config": {
+                "mode": "verify",
+                "policy": {
+                  "slots": [
+                    {
+                      "id": "readiness",
+                      "role": "code-reviewer",
+                      "view": "full"
+                    },
+                    {
+                      "id": "testability",
+                      "role": "test-reviewer",
+                      "view": "full"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "spec-route",
+              "type": "route",
+              "config": {
+                "valueType": "JsonValue",
+                "selector": "/status",
+                "cases": [
+                  {
+                    "id": "approved",
+                    "equals": "OPEN"
+                  },
+                  {
+                    "id": "revise",
+                    "equals": "REVISION_REQUIRED"
+                  }
+                ],
+                "onUnmatched": "error"
+              }
+            },
+            {
+              "id": "spec-seed",
+              "type": "merge",
+              "config": {
+                "mode": "record",
+                "inputs": [
+                  {
+                    "id": "state",
+                    "type": "JsonValue"
+                  }
+                ],
+                "fields": [
+                  {
+                    "name": "businessTask",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/businessTask"
+                    }
+                  },
+                  {
+                    "name": "base",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/base"
+                    }
+                  },
+                  {
+                    "name": "specification",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/specification"
+                    }
+                  },
+                  {
+                    "name": "issues",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/issues"
+                    }
+                  },
+                  {
+                    "name": "documentationApproval",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/documentationApproval"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "id": "specification",
+              "type": "loop",
+              "config": {
+                "valueType": "JsonValue",
+                "stateSchema": {
+                  "type": "object",
+                  "properties": {
+                    "businessTask": {
+                      "type": "string"
+                    },
+                    "issues": {
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "businessTask",
+                    "base",
+                    "specification",
+                    "issues",
+                    "documentationApproval"
+                  ]
+                },
+                "fixedInputs": [],
+                "limits": {
+                  "maxIterations": 3,
+                  "maxActiveMinutes": 90
+                },
+                "body": {
+                  "nodes": [
+                    {
+                      "id": "business",
+                      "type": "json-select",
+                      "config": {
+                        "pointer": "/businessTask",
+                        "outputType": "Text",
+                        "render": "raw-string"
+                      }
+                    },
+                    {
+                      "id": "issue-text",
+                      "type": "json-select",
+                      "config": {
+                        "pointer": "/issues",
+                        "outputType": "Text",
+                        "render": "canonical-json"
+                      }
+                    },
+                    {
+                      "id": "issue-list",
+                      "type": "json-select",
+                      "config": {
+                        "pointer": "/issues",
+                        "outputType": "JsonValue"
+                      }
+                    },
+                    {
+                      "id": "previous",
+                      "type": "json-select",
+                      "config": {
+                        "pointer": "/specification",
+                        "outputType": "ArtifactSet",
+                        "nullAs": "empty"
+                      }
+                    },
+                    {
+                      "id": "analysis-prompt",
+                      "type": "prompt-template",
+                      "config": {
+                        "template": "Business task:\n{{business}}\n\nOpen issues (JSON):\n{{issues}}\n\nWrite or revise SPEC.md, spec-index.json and implementation-map.json in the working directory. Use exact '## ID' headings for every indexed section.\n\nYou are the senior Analyst and the first recipient of the original business task. Inspect the actual pinned Deszo source before specifying the change.\n\nInventory every application panel, form, dialog and owned control. Include the palette/toolbar, inspector, nested Loop navigation, Map roles/navigator, problems/run journal/history/Replay, Contexts/chat, recovery, settings/workspaces/workflows and external-run approvals.\n\nMigrate owned controls to shadcn/ui and shared theme tokens, preserving the React Flow canvas, graph interactions, existing English text, functional contracts and reasoning-effort settings. Preserve the Vite local-runtime connection plugin, Tauri behavior and @xyflow/react styling.\n\nRead docs/IMPLEMENTATION_MAP.md, docs/PIPELINE_EXECUTION.md and both docs/schemas/spec-section-index.schema.json and docs/schemas/implementation-map.schema.json. The round-recovery documents are FORMAT examples only; do not copy their fictional business requirements.\n\nWrite SPEC.md, spec-index.json and implementation-map.json. Use exactly ## ID headings for every indexed section, all headings indexed, stable acyclic IDs, requirementRefs limited to normative REQ-/CONTRACT- IDs. Every task needs its full transitive normative closure as explicit spec inputs AND readScopes, including test-case/check obligations. dependsOn entries are {taskId, milestone:\"accepted\"}, never section IDs or strings.\n\nAllowed executor role IDs: implementer, test-author, junior-analyst, verification. The code-reviewer role reviews code and implementation documentation; test-reviewer independently reviews tests and test evidence. The analyst role owns substantive decisions and verification triage. verification is an engine utility, not a provider.\n\nPlan bounded file groups. Give package.json/package-lock.json, theme/global CSS, Vite/TS setup and each shared source file exactly one owner; order every later task that modifies or consumes those files after its accepted producer. Test author and developer use separate task directories and approved interfaces.\n\nInclude an accepted documentation task owned by junior-analyst after the UI implementation. Its outputs describe the resulting UI and developer commands. Do not delegate requirement meaning to that role.\n\nInclude TASK-UI-EVIDENCE owned by test-author after ALL UI source and test-script outputs have been accepted. It runs node scripts/shadcn-pilot-check.mjs --ui-only --evidence-dir docs/pilots/shadcn-ui-evidence and captures docs/pilots/shadcn-ui-evidence/report.json, main.png, dialogs.png and small-window.png as a declared fileSet reviewed by test-reviewer. These are generated from the complete accepted UI, not hand-authored screenshots. Include this task and its evidence in final verification dependencies/candidate paths. Check-runner scratch directories are deleted; screenshots generated only during CHECK execution would otherwise be lost.\n\nCreate a final TASK-VERIFY utility task that depends on and consumes every accepted output needed in the complete candidate. Its candidate paths must include every changed/new deliverable. Do not include node_modules, dist, reports or temporary files as deliverables.\n\nThe approved final candidate check must run node scripts/shadcn-pilot-check.mjs (source candidate, requiredExitCode 0, timeoutSeconds 600). The wrapper installs pinned dependencies, builds, runs runtime regressions, documentation checks and npm run test:ui, then bundles the runtime. The foundation task must add the required browser-test dependency/script; test-author must provide meaningful fixture-runtime browser interaction coverage and screenshot evidence. Do not create test:ui as an empty stub.\n\ntest:ui must honor DESZO_UI_EVIDENCE_DIR (relative to the project), write report.json with schemaVersion 1, nonempty scenarios [{id,status:\"passed\"}] covering the approved scenario IDs, and screenshots [\"main.png\",\"dialogs.png\",\"small-window.png\"]. Write the three actual browser PNG screenshots in that directory. Include real viewport/interaction/expectation details and source-file digests in the report. The wrapper validates report presence, all scenario statuses and PNG signatures; The test reviewer judges coverage/evidence and the code reviewer judges implementation/visual behavior.\n\nFresh task/check directories have no node_modules. Give tasks that need npm/builds explicit scratch writeScopes for node_modules/**, dist/**, dist-runtime/**, .deszo/** and *.tsbuildinfo. The verification task must allow those NEW scratch paths. npm ci must not modify existing tracked inputs; never change source from a checker. All CHECK commands run independently in fresh directories, so keep full-candidate steps in the one wrapper.\n\nCapture representative browser screenshots and machine-readable assertions for critical UI flows, accessible labels/focus/dialog behavior, busy/disabled/error states, and small-window overflow. A browser result cannot prove a desktop-only behavior. Record the remaining Tauri desktop smoke for the operator after candidate application; do not claim it already happened.\n\nProvider invocations are bounded to 600 seconds. Split implementation into feasible tasks. Allow at most three task attempts and three failed verification cycles. On unknown triage preserve evidence and pause. Do not weaken requirements/checks to pass.\n\nThe source base is pinned by the prepared manifest. During documentation authoring write ONLY SPEC.md, spec-index.json and implementation-map.json. Never edit app source, package files or the pilot tooling in this directory. Return a concise summary of semantic decisions and remaining risks.\n\nBefore returning, run node \"C:\\\\my\\\\2026\\\\deszo_agent_orche\\\\.deszo\\\\pilots\\\\shadcn-ui\\\\validate-documents.mjs\". Correct schema/closure/role errors until it passes. The validator also detects changes to the pinned project; do not modify the validator or its manifest.\n\nIndependent review roles: implementer and junior-analyst tasks require code-reviewer review criteria; test-author tasks, including TASK-UI-EVIDENCE, require test-reviewer criteria. A task that changes both production code and tests requires both reviewers. Use distinct acceptance criterion IDs and the exact role IDs code-reviewer and test-reviewer; the old reviewer role does not exist. The two requirement-review slots and both final technical-review slots must approve independently before advancing.",
+                        "slots": [
+                          {
+                            "id": "business"
+                          },
+                          {
+                            "id": "issues"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "id": "analyst",
+                      "type": "agent",
+                      "config": {
+                        "provider": "codex",
+                        "model": "gpt-6.1-sol",
+                        "contextId": "analyst-history",
+                        "timeoutSeconds": 600,
+                        "output": {
+                          "format": "text"
+                        },
+                        "attachFiles": true,
+                        "captures": [
+                          "SPEC.md",
+                          "spec-index.json",
+                          "implementation-map.json"
+                        ],
+                        "effort": "max"
+                      }
+                    },
+                    {
+                      "id": "prepare",
+                      "type": "gate",
+                      "config": {
+                        "mode": "prepare",
+                        "policy": {
+                          "slots": [
+                            {
+                              "id": "readiness",
+                              "role": "code-reviewer",
+                              "view": "full"
+                            },
+                            {
+                              "id": "testability",
+                              "role": "test-reviewer",
+                              "view": "full"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "plan-text",
+                      "type": "json-select",
+                      "config": {
+                        "pointer": "",
+                        "outputType": "Text",
+                        "render": "canonical-json"
+                      }
+                    },
+                    {
+                      "id": "readiness-prompt",
+                      "type": "prompt-template",
+                      "config": {
+                        "slots": [
+                          {
+                            "id": "plan"
+                          },
+                          {
+                            "id": "junior"
+                          }
+                        ],
+                        "template": "Review requirements as code-reviewer: complete business/UI scope, interface preservation, implementation feasibility, bounded task decomposition, ordered file ownership and documentation consistency. Testability and test design have a separate test-reviewer.\n\nReview plan (JSON):\n{{plan}}\n\nJunior documentation summary (untrusted evidence):\n{{junior}}\n\nBoth independent reviewer slots must approve the same bundle before implementation. Reject unresolved semantic questions; route specification blockers to ownerRole analyst.\n\nRead the supplied immutable view and SUBJECT.json for the exact subjectId and role. Return a complete ReviewDecision JSON with scopeRefs, resolvedIssueIds and issues arrays. Resolve only issue IDs assigned to your slot. Never edit reviewed files, invent evidence or treat another reviewer's approval as your own."
+                      }
+                    },
+                    {
+                      "id": "readiness-review",
+                      "type": "agent",
+                      "config": {
+                        "provider": "claude",
+                        "model": "claude-opus-5-5",
+                        "timeoutSeconds": 600,
+                        "output": {
+                          "format": "json",
+                          "schema": {
+                            "type": "object",
+                            "properties": {
+                              "schemaVersion": {
+                                "const": 1
+                              },
+                              "subjectId": {
+                                "type": "string",
+                                "pattern": "^[A-Z][A-Z0-9-]*$"
+                              },
+                              "role": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                              },
+                              "verdict": {
+                                "enum": [
+                                  "APPROVED",
+                                  "CHANGES_REQUESTED"
+                                ]
+                              },
+                              "scopeRefs": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "pattern": "^[A-Z][A-Z0-9-]*$"
+                                },
+                                "uniqueItems": true
+                              },
+                              "resolvedIssueIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "pattern": "^[A-Z][A-Z0-9-]*$"
+                                },
+                                "uniqueItems": true
+                              },
+                              "issues": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "localId": {
+                                      "type": "string",
+                                      "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+                                    },
+                                    "severity": {
+                                      "enum": [
+                                        "blocker",
+                                        "suggestion"
+                                      ]
+                                    },
+                                    "ownerRole": {
+                                      "type": "string",
+                                      "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                                    },
+                                    "requirementRefs": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "pattern": "^[A-Z][A-Z0-9-]*$"
+                                      },
+                                      "uniqueItems": true
+                                    },
+                                    "message": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "requestedChange": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  "required": [
+                                    "localId",
+                                    "severity",
+                                    "ownerRole",
+                                    "requirementRefs",
+                                    "message",
+                                    "requestedChange"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": [
+                              "schemaVersion",
+                              "subjectId",
+                              "role",
+                              "verdict",
+                              "scopeRefs",
+                              "resolvedIssueIds",
+                              "issues"
+                            ],
+                            "additionalProperties": false,
+                            "allOf": [
+                              {
+                                "if": {
+                                  "properties": {
+                                    "verdict": {
+                                      "const": "CHANGES_REQUESTED"
+                                    }
+                                  }
+                                },
+                                "then": {
+                                  "properties": {
+                                    "issues": {
+                                      "contains": {
+                                        "properties": {
+                                          "severity": {
+                                            "const": "blocker"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "if": {
+                                  "properties": {
+                                    "verdict": {
+                                      "const": "APPROVED"
+                                    }
+                                  }
+                                },
+                                "then": {
+                                  "properties": {
+                                    "issues": {
+                                      "items": {
+                                        "properties": {
+                                          "severity": {
+                                            "const": "suggestion"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        },
+                        "attachFiles": true,
+                        "effort": "medium",
+                        "contextId": "code-reviewer-history"
+                      }
+                    },
+                    {
+                      "id": "evaluate",
+                      "type": "gate",
+                      "config": {
+                        "mode": "evaluate",
+                        "policy": {
+                          "slots": [
+                            {
+                              "id": "readiness",
+                              "role": "code-reviewer",
+                              "view": "full"
+                            },
+                            {
+                              "id": "testability",
+                              "role": "test-reviewer",
+                              "view": "full"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "carry",
+                      "type": "merge",
+                      "config": {
+                        "mode": "record",
+                        "inputs": [
+                          {
+                            "id": "seed",
+                            "type": "JsonValue"
+                          },
+                          {
+                            "id": "subject",
+                            "type": "ArtifactSet"
+                          },
+                          {
+                            "id": "report",
+                            "type": "JsonValue"
+                          }
+                        ],
+                        "fields": [
+                          {
+                            "name": "businessTask",
+                            "source": {
+                              "input": "seed",
+                              "pointer": "/businessTask"
+                            }
+                          },
+                          {
+                            "name": "base",
+                            "source": {
+                              "input": "seed",
+                              "pointer": "/base"
+                            }
+                          },
+                          {
+                            "name": "specification",
+                            "source": {
+                              "input": "subject"
+                            }
+                          },
+                          {
+                            "name": "issues",
+                            "source": {
+                              "input": "report",
+                              "pointer": "/issues"
+                            }
+                          },
+                          {
+                            "name": "documentationApproval",
+                            "source": {
+                              "input": "report",
+                              "pointer": "/certificate"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "id": "decide",
+                      "type": "condition",
+                      "config": {
+                        "doneWhen": {
+                          "pointer": "/status",
+                          "op": "equals",
+                          "value": "OPEN"
+                        },
+                        "reason": {
+                          "pointer": "/reason"
+                        },
+                        "feedback": {
+                          "pointer": "/reason"
+                        }
+                      }
+                    },
+                    {
+                      "id": "source-base",
+                      "type": "json-select",
+                      "config": {
+                        "pointer": "/base",
+                        "outputType": "ArtifactSet"
+                      }
+                    },
+                    {
+                      "id": "analyst-inputs",
+                      "type": "merge",
+                      "config": {
+                        "mode": "artifacts",
+                        "inputs": [
+                          {
+                            "id": "project"
+                          },
+                          {
+                            "id": "previous"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "id": "junior-prompt",
+                      "type": "prompt-template",
+                      "config": {
+                        "slots": [
+                          {
+                            "id": "decisions"
+                          }
+                        ],
+                        "template": "Apply documentation corrections to the senior Analyst bundle attached at its supplied paths. Preserve the senior decisions and all requirement, interface, scope and test obligations. Correct headings, schema formatting, cross-references, normative closure declarations and role IDs. Do not edit application source or pilot tooling.\n\nSenior Analyst summary and decisions:\n{{decisions}}\n\nWrite SPEC.md, spec-index.json and implementation-map.json in the working directory and run node \"C:\\\\my\\\\2026\\\\deszo_agent_orche\\\\.deszo\\\\pilots\\\\shadcn-ui\\\\validate-documents.mjs\" before returning.\n\nIf correction needs a new semantic decision, preserve the senior draft and state the exact unresolved point in your summary; do not invent a decision. The appropriate code or test reviewer must reject an unresolved semantic blocker."
+                      }
+                    },
+                    {
+                      "id": "junior-analyst",
+                      "type": "agent",
+                      "config": {
+                        "provider": "codex",
+                        "model": "gpt-6-luna",
+                        "effort": "max",
+                        "contextId": "junior-history",
+                        "timeoutSeconds": 600,
+                        "output": {
+                          "format": "text"
+                        },
+                        "attachFiles": true,
+                        "captures": [
+                          "SPEC.md",
+                          "spec-index.json",
+                          "implementation-map.json"
+                        ]
+                      }
+                    },
+                    {
+                      "id": "testability-review",
+                      "type": "agent",
+                      "config": {
+                        "provider": "claude",
+                        "model": "claude-opus-5-5",
+                        "timeoutSeconds": 600,
+                        "output": {
+                          "format": "json",
+                          "schema": {
+                            "type": "object",
+                            "properties": {
+                              "schemaVersion": {
+                                "const": 1
+                              },
+                              "subjectId": {
+                                "type": "string",
+                                "pattern": "^[A-Z][A-Z0-9-]*$"
+                              },
+                              "role": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                              },
+                              "verdict": {
+                                "enum": [
+                                  "APPROVED",
+                                  "CHANGES_REQUESTED"
+                                ]
+                              },
+                              "scopeRefs": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "pattern": "^[A-Z][A-Z0-9-]*$"
+                                },
+                                "uniqueItems": true
+                              },
+                              "resolvedIssueIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "pattern": "^[A-Z][A-Z0-9-]*$"
+                                },
+                                "uniqueItems": true
+                              },
+                              "issues": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "localId": {
+                                      "type": "string",
+                                      "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+                                    },
+                                    "severity": {
+                                      "enum": [
+                                        "blocker",
+                                        "suggestion"
+                                      ]
+                                    },
+                                    "ownerRole": {
+                                      "type": "string",
+                                      "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                                    },
+                                    "requirementRefs": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "pattern": "^[A-Z][A-Z0-9-]*$"
+                                      },
+                                      "uniqueItems": true
+                                    },
+                                    "message": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "requestedChange": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  "required": [
+                                    "localId",
+                                    "severity",
+                                    "ownerRole",
+                                    "requirementRefs",
+                                    "message",
+                                    "requestedChange"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": [
+                              "schemaVersion",
+                              "subjectId",
+                              "role",
+                              "verdict",
+                              "scopeRefs",
+                              "resolvedIssueIds",
+                              "issues"
+                            ],
+                            "additionalProperties": false,
+                            "allOf": [
+                              {
+                                "if": {
+                                  "properties": {
+                                    "verdict": {
+                                      "const": "CHANGES_REQUESTED"
+                                    }
+                                  }
+                                },
+                                "then": {
+                                  "properties": {
+                                    "issues": {
+                                      "contains": {
+                                        "properties": {
+                                          "severity": {
+                                            "const": "blocker"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "if": {
+                                  "properties": {
+                                    "verdict": {
+                                      "const": "APPROVED"
+                                    }
+                                  }
+                                },
+                                "then": {
+                                  "properties": {
+                                    "issues": {
+                                      "items": {
+                                        "properties": {
+                                          "severity": {
+                                            "const": "suggestion"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        },
+                        "attachFiles": true,
+                        "effort": "medium",
+                        "contextId": "test-reviewer-history"
+                      }
+                    },
+                    {
+                      "id": "testability-prompt",
+                      "type": "prompt-template",
+                      "config": {
+                        "slots": [
+                          {
+                            "id": "plan"
+                          },
+                          {
+                            "id": "junior"
+                          }
+                        ],
+                        "template": "Review requirements as test-reviewer: observable acceptance criteria, positive/negative/boundary cases, accessibility and interaction scenarios, fixture isolation, evidence capture and feasible approved checks. Check test contracts independently from the code reviewer.\n\nReview plan (JSON):\n{{plan}}\n\nJunior documentation summary (untrusted evidence):\n{{junior}}\n\nBoth independent reviewer slots must approve the same bundle before implementation. Reject unresolved semantic questions; route specification blockers to ownerRole analyst.\n\nRead the supplied immutable view and SUBJECT.json for the exact subjectId and role. Return a complete ReviewDecision JSON with scopeRefs, resolvedIssueIds and issues arrays. Resolve only issue IDs assigned to your slot. Never edit reviewed files, invent evidence or treat another reviewer's approval as your own."
+                      }
+                    }
+                  ],
+                  "edges": [
+                    {
+                      "id": "s-plan-text-value-readiness-prompt-plan",
+                      "source": {
+                        "nodeId": "plan-text",
+                        "port": "value"
+                      },
+                      "target": {
+                        "nodeId": "readiness-prompt",
+                        "port": "plan"
+                      }
+                    },
+                    {
+                      "id": "s-readiness-prompt-text-readiness-review-prompt",
+                      "source": {
+                        "nodeId": "readiness-prompt",
+                        "port": "text"
+                      },
+                      "target": {
+                        "nodeId": "readiness-review",
+                        "port": "prompt"
+                      }
+                    },
+                    {
+                      "id": "s-prepare-readiness-readiness-review-files",
+                      "source": {
+                        "nodeId": "prepare",
+                        "port": "readiness"
+                      },
+                      "target": {
+                        "nodeId": "readiness-review",
+                        "port": "files"
+                      }
+                    },
+                    {
+                      "id": "s-readiness-review-json-evaluate-readiness",
+                      "source": {
+                        "nodeId": "readiness-review",
+                        "port": "json"
+                      },
+                      "target": {
+                        "nodeId": "evaluate",
+                        "port": "readiness"
+                      }
+                    },
+                    {
+                      "id": "s-input-value-business-value",
+                      "source": {
+                        "nodeId": "$input",
+                        "port": "value"
+                      },
+                      "target": {
+                        "nodeId": "business",
+                        "port": "value"
+                      }
+                    },
+                    {
+                      "id": "s-input-value-issue-text-value",
+                      "source": {
+                        "nodeId": "$input",
+                        "port": "value"
+                      },
+                      "target": {
+                        "nodeId": "issue-text",
+                        "port": "value"
+                      }
+                    },
+                    {
+                      "id": "s-input-value-issue-list-value",
+                      "source": {
+                        "nodeId": "$input",
+                        "port": "value"
+                      },
+                      "target": {
+                        "nodeId": "issue-list",
+                        "port": "value"
+                      }
+                    },
+                    {
+                      "id": "s-input-value-previous-value",
+                      "source": {
+                        "nodeId": "$input",
+                        "port": "value"
+                      },
+                      "target": {
+                        "nodeId": "previous",
+                        "port": "value"
+                      }
+                    },
+                    {
+                      "id": "s-business-value-analysis-prompt-business",
+                      "source": {
+                        "nodeId": "business",
+                        "port": "value"
+                      },
+                      "target": {
+                        "nodeId": "analysis-prompt",
+                        "port": "business"
+                      }
+                    },
+                    {
+                      "id": "s-issue-text-value-analysis-prompt-issues",
+                      "source": {
+                        "nodeId": "issue-text",
+                        "port": "value"
+                      },
+                      "target": {
+                        "nodeId": "analysis-prompt",
+                        "port": "issues"
+                      }
+                    },
+                    {
+                      "id": "s-analysis-prompt-text-analyst-prompt",
+                      "source": {
+                        "nodeId": "analysis-prompt",
+                        "port": "text"
+                      },
+                      "target": {
+                        "nodeId": "analyst",
+                        "port": "prompt"
+                      }
+                    },
+                    {
+                      "id": "s-issue-list-value-prepare-issues",
+                      "source": {
+                        "nodeId": "issue-list",
+                        "port": "value"
+                      },
+                      "target": {
+                        "nodeId": "prepare",
+                        "port": "issues"
+                      }
+                    },
+                    {
+                      "id": "s-prepare-plan-plan-text-value",
+                      "source": {
+                        "nodeId": "prepare",
+                        "port": "plan"
+                      },
+                      "target": {
+                        "nodeId": "plan-text",
+                        "port": "value"
+                      }
+                    },
+                    {
+                      "id": "s-prepare-subject-evaluate-subject",
+                      "source": {
+                        "nodeId": "prepare",
+                        "port": "subject"
+                      },
+                      "target": {
+                        "nodeId": "evaluate",
+                        "port": "subject"
+                      }
+                    },
+                    {
+                      "id": "s-prepare-plan-evaluate-plan",
+                      "source": {
+                        "nodeId": "prepare",
+                        "port": "plan"
+                      },
+                      "target": {
+                        "nodeId": "evaluate",
+                        "port": "plan"
+                      }
+                    },
+                    {
+                      "id": "s-input-value-carry-seed",
+                      "source": {
+                        "nodeId": "$input",
+                        "port": "value"
+                      },
+                      "target": {
+                        "nodeId": "carry",
+                        "port": "seed"
+                      }
+                    },
+                    {
+                      "id": "s-prepare-subject-carry-subject",
+                      "source": {
+                        "nodeId": "prepare",
+                        "port": "subject"
+                      },
+                      "target": {
+                        "nodeId": "carry",
+                        "port": "subject"
+                      }
+                    },
+                    {
+                      "id": "s-evaluate-report-carry-report",
+                      "source": {
+                        "nodeId": "evaluate",
+                        "port": "report"
+                      },
+                      "target": {
+                        "nodeId": "carry",
+                        "port": "report"
+                      }
+                    },
+                    {
+                      "id": "s-evaluate-report-decide-value",
+                      "source": {
+                        "nodeId": "evaluate",
+                        "port": "report"
+                      },
+                      "target": {
+                        "nodeId": "decide",
+                        "port": "value"
+                      }
+                    },
+                    {
+                      "id": "s-carry-value-return-candidate",
+                      "source": {
+                        "nodeId": "carry",
+                        "port": "value"
+                      },
+                      "target": {
+                        "nodeId": "$return",
+                        "port": "candidate"
+                      }
+                    },
+                    {
+                      "id": "s-decide-decision-return-decision",
+                      "source": {
+                        "nodeId": "decide",
+                        "port": "decision"
+                      },
+                      "target": {
+                        "nodeId": "$return",
+                        "port": "decision"
+                      }
+                    },
+                    {
+                      "id": "p-input-value-source-base-value",
+                      "source": {
+                        "nodeId": "$input",
+                        "port": "value"
+                      },
+                      "target": {
+                        "nodeId": "source-base",
+                        "port": "value"
+                      }
+                    },
+                    {
+                      "id": "p-source-base-value-analyst-inputs-project",
+                      "source": {
+                        "nodeId": "source-base",
+                        "port": "value"
+                      },
+                      "target": {
+                        "nodeId": "analyst-inputs",
+                        "port": "project"
+                      }
+                    },
+                    {
+                      "id": "p-previous-value-analyst-inputs-previous",
+                      "source": {
+                        "nodeId": "previous",
+                        "port": "value"
+                      },
+                      "target": {
+                        "nodeId": "analyst-inputs",
+                        "port": "previous"
+                      }
+                    },
+                    {
+                      "id": "p-analyst-inputs-value-analyst-files",
+                      "source": {
+                        "nodeId": "analyst-inputs",
+                        "port": "value"
+                      },
+                      "target": {
+                        "nodeId": "analyst",
+                        "port": "files"
+                      }
+                    },
+                    {
+                      "id": "p-analyst-text-junior-prompt-decisions",
+                      "source": {
+                        "nodeId": "analyst",
+                        "port": "text"
+                      },
+                      "target": {
+                        "nodeId": "junior-prompt",
+                        "port": "decisions"
+                      }
+                    },
+                    {
+                      "id": "p-junior-prompt-text-junior-analyst-prompt",
+                      "source": {
+                        "nodeId": "junior-prompt",
+                        "port": "text"
+                      },
+                      "target": {
+                        "nodeId": "junior-analyst",
+                        "port": "prompt"
+                      }
+                    },
+                    {
+                      "id": "p-analyst-files-junior-analyst-files",
+                      "source": {
+                        "nodeId": "analyst",
+                        "port": "files"
+                      },
+                      "target": {
+                        "nodeId": "junior-analyst",
+                        "port": "files"
+                      }
+                    },
+                    {
+                      "id": "p-junior-analyst-files-prepare-subject",
+                      "source": {
+                        "nodeId": "junior-analyst",
+                        "port": "files"
+                      },
+                      "target": {
+                        "nodeId": "prepare",
+                        "port": "subject"
+                      }
+                    },
+                    {
+                      "id": "p-junior-analyst-text-readiness-prompt-junior",
+                      "source": {
+                        "nodeId": "junior-analyst",
+                        "port": "text"
+                      },
+                      "target": {
+                        "nodeId": "readiness-prompt",
+                        "port": "junior"
+                      }
+                    },
+                    {
+                      "id": "r-plan-text-value-testability-prompt-plan",
+                      "source": {
+                        "nodeId": "plan-text",
+                        "port": "value"
+                      },
+                      "target": {
+                        "nodeId": "testability-prompt",
+                        "port": "plan"
+                      }
+                    },
+                    {
+                      "id": "r-junior-analyst-text-testability-prompt-junior",
+                      "source": {
+                        "nodeId": "junior-analyst",
+                        "port": "text"
+                      },
+                      "target": {
+                        "nodeId": "testability-prompt",
+                        "port": "junior"
+                      }
+                    },
+                    {
+                      "id": "r-testability-prompt-text-testability-review-prompt",
+                      "source": {
+                        "nodeId": "testability-prompt",
+                        "port": "text"
+                      },
+                      "target": {
+                        "nodeId": "testability-review",
+                        "port": "prompt"
+                      }
+                    },
+                    {
+                      "id": "r-prepare-testability-testability-review-files",
+                      "source": {
+                        "nodeId": "prepare",
+                        "port": "testability"
+                      },
+                      "target": {
+                        "nodeId": "testability-review",
+                        "port": "files"
+                      }
+                    },
+                    {
+                      "id": "r-testability-review-json-evaluate-testability",
+                      "source": {
+                        "nodeId": "testability-review",
+                        "port": "json"
+                      },
+                      "target": {
+                        "nodeId": "evaluate",
+                        "port": "testability"
+                      }
+                    }
+                  ],
+                  "after": [],
+                  "view": {
+                    "business": {
+                      "x": 0,
+                      "y": 0
+                    },
+                    "issue-text": {
+                      "x": 0,
+                      "y": 175
+                    },
+                    "issue-list": {
+                      "x": 0,
+                      "y": 350
+                    },
+                    "previous": {
+                      "x": 0,
+                      "y": 525
+                    },
+                    "analysis-prompt": {
+                      "x": 330,
+                      "y": 0
+                    },
+                    "analyst": {
+                      "x": 660,
+                      "y": 0,
+                      "label": "Analyst · Sol · max"
+                    },
+                    "prepare": {
+                      "x": 1650,
+                      "y": 0
+                    },
+                    "plan-text": {
+                      "x": 1980,
+                      "y": 0
+                    },
+                    "readiness-prompt": {
+                      "x": 2310,
+                      "y": 0
+                    },
+                    "readiness-review": {
+                      "x": 2640,
+                      "y": 0,
+                      "label": "Code requirements review · Opus · medium"
+                    },
+                    "evaluate": {
+                      "x": 2970,
+                      "y": 0
+                    },
+                    "carry": {
+                      "x": 3300,
+                      "y": 0
+                    },
+                    "decide": {
+                      "x": 3300,
+                      "y": 175
+                    },
+                    "source-base": {
+                      "x": 0,
+                      "y": 700
+                    },
+                    "analyst-inputs": {
+                      "x": 330,
+                      "y": 175
+                    },
+                    "junior-prompt": {
+                      "x": 990,
+                      "y": 0
+                    },
+                    "junior-analyst": {
+                      "x": 1320,
+                      "y": 0,
+                      "label": "Documentation · Luna · max"
+                    },
+                    "testability-prompt": {
+                      "x": 2310,
+                      "y": 350,
+                      "label": "Testability review prompt"
+                    },
+                    "testability-review": {
+                      "x": 2640,
+                      "y": 350,
+                      "label": "Test requirements review · Opus · medium"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "id": "after-spec",
+              "type": "merge",
+              "config": {
+                "mode": "record",
+                "inputs": [
+                  {
+                    "id": "seed",
+                    "type": "JsonValue"
+                  },
+                  {
+                    "id": "spec",
+                    "type": "JsonValue"
+                  }
+                ],
+                "fields": [
+                  {
+                    "name": "businessTask",
+                    "source": {
+                      "input": "seed",
+                      "pointer": "/businessTask"
+                    }
+                  },
+                  {
+                    "name": "base",
+                    "source": {
+                      "input": "seed",
+                      "pointer": "/base"
+                    }
+                  },
+                  {
+                    "name": "specification",
+                    "source": {
+                      "input": "spec",
+                      "pointer": "/specification"
+                    }
+                  },
+                  {
+                    "name": "issues",
+                    "source": {
+                      "input": "spec",
+                      "pointer": "/issues"
+                    }
+                  },
+                  {
+                    "name": "documentationApproval",
+                    "source": {
+                      "input": "spec",
+                      "pointer": "/documentationApproval"
+                    }
+                  },
+                  {
+                    "name": "priorMapState",
+                    "source": {
+                      "input": "seed",
+                      "pointer": "/priorMapState"
+                    }
+                  },
+                  {
+                    "name": "repair",
+                    "source": {
+                      "literal": null
+                    }
+                  },
+                  {
+                    "name": "candidate",
+                    "source": {
+                      "literal": null
+                    }
+                  },
+                  {
+                    "name": "finalAcceptance",
+                    "source": {
+                      "literal": null
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "id": "reviewed",
+              "type": "merge",
+              "config": {
+                "mode": "selected",
+                "valueType": "JsonValue",
+                "inputs": [
+                  {
+                    "id": "approved"
+                  },
+                  {
+                    "id": "revised"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "doc-of",
+              "type": "json-select",
+              "config": {
+                "pointer": "/specification",
+                "outputType": "ArtifactSet"
+              }
+            },
+            {
+              "id": "approval-of",
+              "type": "json-select",
+              "config": {
+                "pointer": "/documentationApproval",
+                "outputType": "JsonValue"
+              }
+            },
+            {
+              "id": "base-of",
+              "type": "json-select",
+              "config": {
+                "pointer": "/base",
+                "outputType": "ArtifactSet"
+              }
+            },
+            {
+              "id": "prior-of",
+              "type": "json-select",
+              "config": {
+                "pointer": "/priorMapState",
+                "outputType": "JsonValue"
+              }
+            },
+            {
+              "id": "repair-of",
+              "type": "json-select",
+              "config": {
+                "pointer": "/repair",
+                "outputType": "JsonValue"
+              }
+            },
+            {
+              "id": "implement",
+              "type": "map",
+              "config": {
+                "approvalPolicy": {
+                  "slots": [
+                    {
+                      "id": "readiness",
+                      "role": "code-reviewer",
+                      "view": "full"
+                    },
+                    {
+                      "id": "testability",
+                      "role": "test-reviewer",
+                      "view": "full"
+                    }
+                  ]
+                },
+                "optionalInputs": [
+                  "prior-state",
+                  "repair"
+                ],
+                "limits": {
+                  "maxFailedVerificationCycles": 3,
+                  "maxTaskAttempts": 3
+                },
+                "roles": [
+                  {
+                    "id": "implementer",
+                    "kind": "agent",
+                    "provider": "claude",
+                    "model": "claude-haiku-5-5",
+                    "instructions": "Implement the approved task. Write only the listed outputs.\nUse English. Read the supplied approved specification sections and immutable input files.\nImplement only the task-owned concrete outputs. Never change Git metadata, credentials, the controlling Deszo installation or its data directory.\nDo not delete or rename existing base files: this pilot captures create/replace operations. Preserve compatibility exports if splitting an existing module.\nDependency manifests and shared components have one explicitly ordered owner. Do not run a CLI that rewrites undeclared files.\nUse npm ci only when the approved writeScopes include node_modules/** and required scratch paths. Scratch dependencies/build output must never be declared as captured outputs.\nReturn exactly the supplied Task Return JSON schema. Real blockers must be reported with evidence; never invent successful commands or screenshots.",
+                    "timeoutSeconds": 600,
+                    "context": "task",
+                    "effort": "xhigh"
+                  },
+                  {
+                    "id": "test-author",
+                    "kind": "agent",
+                    "provider": "claude",
+                    "model": "claude-haiku-5-5",
+                    "instructions": "Write the approved tests. Write only the listed outputs.\nUse English. Read the supplied approved specification sections and immutable input files.\nImplement only the task-owned concrete outputs. Never change Git metadata, credentials, the controlling Deszo installation or its data directory.\nDo not delete or rename existing base files: this pilot captures create/replace operations. Preserve compatibility exports if splitting an existing module.\nDependency manifests and shared components have one explicitly ordered owner. Do not run a CLI that rewrites undeclared files.\nUse npm ci only when the approved writeScopes include node_modules/** and required scratch paths. Scratch dependencies/build output must never be declared as captured outputs.\nReturn exactly the supplied Task Return JSON schema. Real blockers must be reported with evidence; never invent successful commands or screenshots.",
+                    "timeoutSeconds": 600,
+                    "context": "task",
+                    "effort": "xhigh"
+                  },
+                  {
+                    "id": "analyst",
+                    "kind": "agent",
+                    "provider": "codex",
+                    "model": "gpt-6.1-sol",
+                    "instructions": "Triage the failed verification from the captured evidence.\nUse English. Read the supplied approved specification sections and immutable input files.\nImplement only the task-owned concrete outputs. Never change Git metadata, credentials, the controlling Deszo installation or its data directory.\nDo not delete or rename existing base files: this pilot captures create/replace operations. Preserve compatibility exports if splitting an existing module.\nDependency manifests and shared components have one explicitly ordered owner. Do not run a CLI that rewrites undeclared files.\nUse npm ci only when the approved writeScopes include node_modules/** and required scratch paths. Scratch dependencies/build output must never be declared as captured outputs.\nReturn exactly the supplied Task Return JSON schema. Real blockers must be reported with evidence; never invent successful commands or screenshots.",
+                    "timeoutSeconds": 600,
+                    "context": {
+                      "contextId": "analyst-history"
+                    },
+                    "effort": "max"
+                  },
+                  {
+                    "id": "verification",
+                    "kind": "utility",
+                    "template": "verification",
+                    "embeddedRoles": {
+                      "triage": "analyst"
+                    }
+                  },
+                  {
+                    "id": "junior-analyst",
+                    "kind": "agent",
+                    "provider": "codex",
+                    "model": "gpt-6-luna",
+                    "effort": "max",
+                    "timeoutSeconds": 600,
+                    "context": "task",
+                    "instructions": "Update task-owned user/developer documentation to match approved requirements and the accepted implementation. Correct formatting, links, examples and UI terminology. Do not alter requirement meaning, check obligations or approved interfaces; return specification_revision_required for a substantive ambiguity.\nUse English. Read the supplied approved specification sections and immutable input files.\nImplement only the task-owned concrete outputs. Never change Git metadata, credentials, the controlling Deszo installation or its data directory.\nDo not delete or rename existing base files: this pilot captures create/replace operations. Preserve compatibility exports if splitting an existing module.\nDependency manifests and shared components have one explicitly ordered owner. Do not run a CLI that rewrites undeclared files.\nUse npm ci only when the approved writeScopes include node_modules/** and required scratch paths. Scratch dependencies/build output must never be declared as captured outputs.\nReturn exactly the supplied Task Return JSON schema. Real blockers must be reported with evidence; never invent successful commands or screenshots."
+                  },
+                  {
+                    "id": "code-reviewer",
+                    "kind": "agent",
+                    "provider": "claude",
+                    "model": "claude-opus-5-5",
+                    "instructions": "Review implementation correctness, approved interfaces, maintainability, UI behavior and implementation-documentation consistency. Test-source approval belongs to test-reviewer.\nReview the supplied immutable task-result snapshot against the named criterion and specification. Never edit outputs or repair the task yourself. The snapshot contains the base and accepted dependencies, not every parallel output. Do not reject isolated tests solely because a parallel implementation is absent; missing declared inputs and genuine defects remain blockers. The engine checks the full assembled candidate later. Return exactly the supplied review schema with concrete evidence and actionable findings.",
+                    "timeoutSeconds": 600,
+                    "context": "task",
+                    "effort": "medium"
+                  },
+                  {
+                    "id": "test-reviewer",
+                    "kind": "agent",
+                    "provider": "claude",
+                    "model": "claude-opus-5-5",
+                    "instructions": "Review tests, fixtures and UI evidence independently: required cases, assertion strength, boundary/error behavior, deterministic isolation and compatibility with approved interfaces. Implementation approval belongs to code-reviewer.\nReview the supplied immutable task-result snapshot against the named criterion and specification. Never edit outputs or repair the task yourself. The snapshot contains the base and accepted dependencies, not every parallel output. Do not reject isolated tests solely because a parallel implementation is absent; missing declared inputs and genuine defects remain blockers. The engine checks the full assembled candidate later. Return exactly the supplied review schema with concrete evidence and actionable findings.",
+                    "timeoutSeconds": 600,
+                    "context": "task",
+                    "effort": "medium"
+                  }
+                ],
+                "carryAcrossRevisions": true
+              }
+            },
+            {
+              "id": "map-route",
+              "type": "route",
+              "config": {
+                "valueType": "JsonValue",
+                "selector": "/outcome",
+                "cases": [
+                  {
+                    "id": "complete",
+                    "equals": "implementation_complete"
+                  },
+                  {
+                    "id": "revise",
+                    "equals": "specification_revision_required"
+                  }
+                ],
+                "onUnmatched": "error"
+              }
+            },
+            {
+              "id": "map-revision",
+              "type": "merge",
+              "config": {
+                "mode": "record",
+                "inputs": [
+                  {
+                    "id": "state",
+                    "type": "JsonValue"
+                  },
+                  {
+                    "id": "summary",
+                    "type": "JsonValue"
+                  }
+                ],
+                "fields": [
+                  {
+                    "name": "businessTask",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/businessTask"
+                    }
+                  },
+                  {
+                    "name": "base",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/base"
+                    }
+                  },
+                  {
+                    "name": "specification",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/specification"
+                    }
+                  },
+                  {
+                    "name": "issues",
+                    "source": {
+                      "input": "summary",
+                      "pointer": "/issues"
+                    }
+                  },
+                  {
+                    "name": "priorMapState",
+                    "source": {
+                      "input": "summary",
+                      "pointer": "/state"
+                    }
+                  },
+                  {
+                    "name": "documentationApproval",
+                    "source": {
+                      "literal": null
+                    }
+                  },
+                  {
+                    "name": "repair",
+                    "source": {
+                      "literal": null
+                    }
+                  },
+                  {
+                    "name": "candidate",
+                    "source": {
+                      "literal": null
+                    }
+                  },
+                  {
+                    "name": "finalAcceptance",
+                    "source": {
+                      "literal": null
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "id": "no-issues",
+              "type": "merge",
+              "config": {
+                "mode": "record",
+                "inputs": [],
+                "fields": [
+                  {
+                    "name": "issues",
+                    "source": {
+                      "literal": []
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "id": "final-issues",
+              "type": "json-select",
+              "config": {
+                "pointer": "/issues",
+                "outputType": "JsonValue"
+              }
+            },
+            {
+              "id": "final-prepare",
+              "type": "gate",
+              "config": {
+                "mode": "prepare",
+                "subject": "delivery",
+                "specificationPolicy": {
+                  "slots": [
+                    {
+                      "id": "readiness",
+                      "role": "code-reviewer",
+                      "view": "full"
+                    },
+                    {
+                      "id": "testability",
+                      "role": "test-reviewer",
+                      "view": "full"
+                    }
+                  ]
+                },
+                "policy": {
+                  "slots": [
+                    {
+                      "id": "quality",
+                      "role": "code-reviewer",
+                      "view": "full"
+                    },
+                    {
+                      "id": "test-quality",
+                      "role": "test-reviewer",
+                      "view": "full"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "final-plan",
+              "type": "json-select",
+              "config": {
+                "pointer": "",
+                "outputType": "Text",
+                "render": "canonical-json"
+              }
+            },
+            {
+              "id": "quality-prompt",
+              "type": "prompt-template",
+              "config": {
+                "slots": [
+                  {
+                    "id": "plan"
+                  }
+                ],
+                "template": "Review the delivery as code-reviewer: implementation correctness, architecture, preserved behavior, shadcn/ui use, shared component/theme consistency, accessibility and matching implementation documentation. Test quality has a separate test-reviewer.\n\nReview plan (JSON):\n{{plan}}\n\nAssess the exact selected complete candidate and actual engine check evidence. Distinguish source defects, test defects and unavailable environment evidence. Both independent technical slots must approve before Analyst business acceptance.\n\nRead the supplied immutable view and SUBJECT.json for the exact subjectId and role. Return a complete ReviewDecision JSON with scopeRefs, resolvedIssueIds and issues arrays. Resolve only issue IDs assigned to your slot. Never edit reviewed files, invent evidence or treat another reviewer's approval as your own."
+              }
+            },
+            {
+              "id": "quality-review",
+              "type": "agent",
+              "config": {
+                "provider": "claude",
+                "model": "claude-opus-5-5",
+                "timeoutSeconds": 600,
+                "output": {
+                  "format": "json",
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "schemaVersion": {
+                        "const": 1
+                      },
+                      "subjectId": {
+                        "type": "string",
+                        "pattern": "^[A-Z][A-Z0-9-]*$"
+                      },
+                      "role": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                      },
+                      "verdict": {
+                        "enum": [
+                          "APPROVED",
+                          "CHANGES_REQUESTED"
+                        ]
+                      },
+                      "scopeRefs": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[A-Z][A-Z0-9-]*$"
+                        },
+                        "uniqueItems": true
+                      },
+                      "resolvedIssueIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[A-Z][A-Z0-9-]*$"
+                        },
+                        "uniqueItems": true
+                      },
+                      "issues": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "localId": {
+                              "type": "string",
+                              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+                            },
+                            "severity": {
+                              "enum": [
+                                "blocker",
+                                "suggestion"
+                              ]
+                            },
+                            "ownerRole": {
+                              "type": "string",
+                              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                            },
+                            "requirementRefs": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "pattern": "^[A-Z][A-Z0-9-]*$"
+                              },
+                              "uniqueItems": true
+                            },
+                            "message": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "requestedChange": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "localId",
+                            "severity",
+                            "ownerRole",
+                            "requirementRefs",
+                            "message",
+                            "requestedChange"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "schemaVersion",
+                      "subjectId",
+                      "role",
+                      "verdict",
+                      "scopeRefs",
+                      "resolvedIssueIds",
+                      "issues"
+                    ],
+                    "additionalProperties": false,
+                    "allOf": [
+                      {
+                        "if": {
+                          "properties": {
+                            "verdict": {
+                              "const": "CHANGES_REQUESTED"
+                            }
+                          }
+                        },
+                        "then": {
+                          "properties": {
+                            "issues": {
+                              "contains": {
+                                "properties": {
+                                  "severity": {
+                                    "const": "blocker"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "if": {
+                          "properties": {
+                            "verdict": {
+                              "const": "APPROVED"
+                            }
+                          }
+                        },
+                        "then": {
+                          "properties": {
+                            "issues": {
+                              "items": {
+                                "properties": {
+                                  "severity": {
+                                    "const": "suggestion"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                },
+                "attachFiles": true,
+                "effort": "medium",
+                "contextId": "code-reviewer-history"
+              }
+            },
+            {
+              "id": "technical",
+              "type": "gate",
+              "config": {
+                "mode": "evaluate",
+                "policy": {
+                  "slots": [
+                    {
+                      "id": "quality",
+                      "role": "code-reviewer",
+                      "view": "full"
+                    },
+                    {
+                      "id": "test-quality",
+                      "role": "test-reviewer",
+                      "view": "full"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "technical-route",
+              "type": "route",
+              "config": {
+                "valueType": "JsonValue",
+                "selector": "/status",
+                "cases": [
+                  {
+                    "id": "open",
+                    "equals": "OPEN"
+                  },
+                  {
+                    "id": "revise",
+                    "equals": "REVISION_REQUIRED"
+                  }
+                ],
+                "onUnmatched": "error"
+              }
+            },
+            {
+              "id": "technical-certificate",
+              "type": "json-select",
+              "config": {
+                "pointer": "/certificate",
+                "outputType": "JsonValue"
+              }
+            },
+            {
+              "id": "customer-prepare",
+              "type": "gate",
+              "config": {
+                "mode": "prepare",
+                "subject": "delivery",
+                "specificationPolicy": {
+                  "slots": [
+                    {
+                      "id": "readiness",
+                      "role": "code-reviewer",
+                      "view": "full"
+                    },
+                    {
+                      "id": "testability",
+                      "role": "test-reviewer",
+                      "view": "full"
+                    }
+                  ]
+                },
+                "technicalPolicy": {
+                  "slots": [
+                    {
+                      "id": "quality",
+                      "role": "code-reviewer",
+                      "view": "full"
+                    },
+                    {
+                      "id": "test-quality",
+                      "role": "test-reviewer",
+                      "view": "full"
+                    }
+                  ]
+                },
+                "policy": {
+                  "slots": [
+                    {
+                      "id": "customer",
+                      "role": "analyst",
+                      "view": "full"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "customer-plan",
+              "type": "json-select",
+              "config": {
+                "pointer": "",
+                "outputType": "Text",
+                "render": "canonical-json"
+              }
+            },
+            {
+              "id": "final-customer-prompt",
+              "type": "prompt-template",
+              "config": {
+                "template": "Review the complete business delivery as the senior Analyst, using the full immutable candidate, public requirements, captured UI evidence and engine check summaries.\n\nReview plan (JSON):\n{{plan}}\n\nYou are the same senior Analyst who received the original business task. Accept the complete automated delivery only after mapping every approved business scenario and UI surface to actual evidence. List the operator desktop smoke as a remaining release check; this workflow cannot certify desktop behavior from browser evidence. Reject missing scope or invented results.\n\nOriginal business task:\nMove all Deszo application panels, forms and dialogs to shadcn/ui. Preserve the current capabilities and workflow behavior, including React Flow editing, execution controls, recovery, history, Replay, Context chat and API/MCP authoring synchronization. Use the existing English product language.\r\n\r\nThe result is a separate local feature branch, `codex/shadcn-ui`, with the UI changes, relevant tests and documentation. Its starting point must include the verified explicit-effort change. Record the starting commit and the selected candidate before applying results. Merge and release remain separate actions.\n\nAcceptance scope:\n- The UI inventory covers the palette and application toolbar; workflow overview and node inspector; Map role editor and navigator; run, issue and Context panels; recovery controls; history and Replay; settings, workspace and workflow dialogs; external-run confirmation and Context chat.\r\n- Application-owned buttons, inputs, selectors, dialogs, tabs and status surfaces use the agreed shadcn/ui components and shared theme tokens. Keep the React Flow canvas, port connections, selection, zoom/pan and nested navigation functional.\r\n- Preserve save/load, validation, dirty-state handling, editor synchronization, run/stop/retry, task limits, Context behavior and all current configuration options, including reasoning effort.\r\n- Verify keyboard navigation, labels, visible focus, dialog focus handling, disabled/busy states, error states and small-window overflow on the affected surfaces.\r\n- Run the frontend build, appropriate runtime/contract regression checks and documentation checks. Add meaningful UI interaction coverage for the changed flows using the fixture runtime. Record browser screenshots and a desktop smoke result for behavior that depends on Tauri.\r\n- Produce the final diff, actual check evidence, known limitations and an Analyst verdict linked to the original task. This brief itself does not claim the pilot passed.\n\nRead the attached immutable files at their supplied absolute paths. SUBJECT.json gives the exact subjectId and your role. Return the complete ReviewDecision JSON with scopeRefs, resolvedIssueIds and issues arrays. Resolve only IDs listed as resolvable for your slot. Never modify reviewed files or invent evidence.",
+                "slots": [
+                  {
+                    "id": "plan"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "final-customer",
+              "type": "agent",
+              "config": {
+                "provider": "codex",
+                "model": "gpt-6.1-sol",
+                "timeoutSeconds": 600,
+                "output": {
+                  "format": "json",
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "schemaVersion": {
+                        "const": 1
+                      },
+                      "subjectId": {
+                        "type": "string",
+                        "pattern": "^[A-Z][A-Z0-9-]*$"
+                      },
+                      "role": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                      },
+                      "verdict": {
+                        "enum": [
+                          "APPROVED",
+                          "CHANGES_REQUESTED"
+                        ]
+                      },
+                      "scopeRefs": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[A-Z][A-Z0-9-]*$"
+                        },
+                        "uniqueItems": true
+                      },
+                      "resolvedIssueIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[A-Z][A-Z0-9-]*$"
+                        },
+                        "uniqueItems": true
+                      },
+                      "issues": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "localId": {
+                              "type": "string",
+                              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+                            },
+                            "severity": {
+                              "enum": [
+                                "blocker",
+                                "suggestion"
+                              ]
+                            },
+                            "ownerRole": {
+                              "type": "string",
+                              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                            },
+                            "requirementRefs": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "pattern": "^[A-Z][A-Z0-9-]*$"
+                              },
+                              "uniqueItems": true
+                            },
+                            "message": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "requestedChange": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "localId",
+                            "severity",
+                            "ownerRole",
+                            "requirementRefs",
+                            "message",
+                            "requestedChange"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "schemaVersion",
+                      "subjectId",
+                      "role",
+                      "verdict",
+                      "scopeRefs",
+                      "resolvedIssueIds",
+                      "issues"
+                    ],
+                    "additionalProperties": false,
+                    "allOf": [
+                      {
+                        "if": {
+                          "properties": {
+                            "verdict": {
+                              "const": "CHANGES_REQUESTED"
+                            }
+                          }
+                        },
+                        "then": {
+                          "properties": {
+                            "issues": {
+                              "contains": {
+                                "properties": {
+                                  "severity": {
+                                    "const": "blocker"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "if": {
+                          "properties": {
+                            "verdict": {
+                              "const": "APPROVED"
+                            }
+                          }
+                        },
+                        "then": {
+                          "properties": {
+                            "issues": {
+                              "items": {
+                                "properties": {
+                                  "severity": {
+                                    "const": "suggestion"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                },
+                "attachFiles": true,
+                "contextId": "analyst-history",
+                "effort": "max"
+              }
+            },
+            {
+              "id": "final",
+              "type": "gate",
+              "config": {
+                "mode": "evaluate",
+                "policy": {
+                  "slots": [
+                    {
+                      "id": "customer",
+                      "role": "analyst",
+                      "view": "full"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "final-route",
+              "type": "route",
+              "config": {
+                "valueType": "JsonValue",
+                "selector": "/status",
+                "cases": [
+                  {
+                    "id": "open",
+                    "equals": "OPEN"
+                  },
+                  {
+                    "id": "revise",
+                    "equals": "REVISION_REQUIRED"
+                  }
+                ],
+                "onUnmatched": "error"
+              }
+            },
+            {
+              "id": "accepted",
+              "type": "merge",
+              "config": {
+                "mode": "record",
+                "inputs": [
+                  {
+                    "id": "state",
+                    "type": "JsonValue"
+                  },
+                  {
+                    "id": "summary",
+                    "type": "JsonValue"
+                  },
+                  {
+                    "id": "report",
+                    "type": "JsonValue"
+                  }
+                ],
+                "fields": [
+                  {
+                    "name": "businessTask",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/businessTask"
+                    }
+                  },
+                  {
+                    "name": "base",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/base"
+                    }
+                  },
+                  {
+                    "name": "specification",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/specification"
+                    }
+                  },
+                  {
+                    "name": "documentationApproval",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/documentationApproval"
+                    }
+                  },
+                  {
+                    "name": "issues",
+                    "source": {
+                      "literal": []
+                    }
+                  },
+                  {
+                    "name": "priorMapState",
+                    "source": {
+                      "input": "summary",
+                      "pointer": "/state"
+                    }
+                  },
+                  {
+                    "name": "repair",
+                    "source": {
+                      "literal": null
+                    }
+                  },
+                  {
+                    "name": "candidate",
+                    "source": {
+                      "input": "summary",
+                      "pointer": "/candidate"
+                    }
+                  },
+                  {
+                    "name": "finalAcceptance",
+                    "source": {
+                      "input": "report",
+                      "pointer": "/certificate"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "id": "technical-failure",
+              "type": "merge",
+              "config": {
+                "mode": "record",
+                "inputs": [
+                  {
+                    "id": "report",
+                    "type": "JsonValue"
+                  }
+                ],
+                "fields": [
+                  {
+                    "name": "stage",
+                    "source": {
+                      "literal": "technical"
+                    }
+                  },
+                  {
+                    "name": "report",
+                    "source": {
+                      "input": "report"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "id": "customer-failure",
+              "type": "merge",
+              "config": {
+                "mode": "record",
+                "inputs": [
+                  {
+                    "id": "report",
+                    "type": "JsonValue"
+                  }
+                ],
+                "fields": [
+                  {
+                    "name": "stage",
+                    "source": {
+                      "literal": "customer"
+                    }
+                  },
+                  {
+                    "name": "report",
+                    "source": {
+                      "input": "report"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "id": "failure",
+              "type": "merge",
+              "config": {
+                "mode": "selected",
+                "valueType": "JsonValue",
+                "inputs": [
+                  {
+                    "id": "technical"
+                  },
+                  {
+                    "id": "customer"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "failure-text",
+              "type": "json-select",
+              "config": {
+                "pointer": "",
+                "outputType": "Text",
+                "render": "canonical-json"
+              }
+            },
+            {
+              "id": "triage-prompt",
+              "type": "prompt-template",
+              "config": {
+                "template": "A final review rejected the delivery. Decide whether the approved tasks need repair or the specification must change.\n\nFailure (JSON):\n{{failure}}\n\nReturn the triage JSON.\n\nUse captured evidence. Route code defects to implementer, test defects to test-author, documentation-only implementation corrections to junior-analyst and requirement/contract changes to specification revision. Use unknown when evidence is insufficient; never widen scope or erase a failure.",
+                "slots": [
+                  {
+                    "id": "failure"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "triage",
+              "type": "agent",
+              "config": {
+                "provider": "codex",
+                "model": "gpt-6.1-sol",
+                "timeoutSeconds": 600,
+                "output": {
+                  "format": "json",
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "schemaVersion",
+                      "cause",
+                      "action",
+                      "affectedTaskIds",
+                      "requirementRefs",
+                      "reason"
+                    ],
+                    "properties": {
+                      "schemaVersion": {
+                        "const": 1
+                      },
+                      "cause": {
+                        "enum": [
+                          "implementation",
+                          "tests",
+                          "specification",
+                          "integration_conflict",
+                          "unknown"
+                        ]
+                      },
+                      "action": {
+                        "enum": [
+                          "repair-tasks",
+                          "revise-specification",
+                          "unknown"
+                        ]
+                      },
+                      "affectedTaskIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^TASK-[A-Z0-9-]+$"
+                        },
+                        "uniqueItems": true
+                      },
+                      "requirementRefs": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "allOf": [
+                      {
+                        "if": {
+                          "properties": {
+                            "action": {
+                              "const": "repair-tasks"
+                            }
+                          }
+                        },
+                        "then": {
+                          "properties": {
+                            "affectedTaskIds": {
+                              "minItems": 1
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                },
+                "contextId": "analyst-history",
+                "effort": "max"
+              }
+            },
+            {
+              "id": "triage-route",
+              "type": "route",
+              "config": {
+                "valueType": "JsonValue",
+                "selector": "/action",
+                "cases": [
+                  {
+                    "id": "specification",
+                    "equals": "revise-specification"
+                  },
+                  {
+                    "id": "repair",
+                    "equals": "repair-tasks"
+                  }
+                ],
+                "onUnmatched": "pause"
+              }
+            },
+            {
+              "id": "spec-revision",
+              "type": "merge",
+              "config": {
+                "mode": "record",
+                "inputs": [
+                  {
+                    "id": "state",
+                    "type": "JsonValue"
+                  },
+                  {
+                    "id": "failure",
+                    "type": "JsonValue"
+                  },
+                  {
+                    "id": "summary",
+                    "type": "JsonValue"
+                  }
+                ],
+                "fields": [
+                  {
+                    "name": "businessTask",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/businessTask"
+                    }
+                  },
+                  {
+                    "name": "base",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/base"
+                    }
+                  },
+                  {
+                    "name": "specification",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/specification"
+                    }
+                  },
+                  {
+                    "name": "issues",
+                    "source": {
+                      "input": "failure",
+                      "pointer": "/report/issues"
+                    }
+                  },
+                  {
+                    "name": "priorMapState",
+                    "source": {
+                      "input": "summary",
+                      "pointer": "/state"
+                    }
+                  },
+                  {
+                    "name": "documentationApproval",
+                    "source": {
+                      "literal": null
+                    }
+                  },
+                  {
+                    "name": "repair",
+                    "source": {
+                      "literal": null
+                    }
+                  },
+                  {
+                    "name": "candidate",
+                    "source": {
+                      "literal": null
+                    }
+                  },
+                  {
+                    "name": "finalAcceptance",
+                    "source": {
+                      "literal": null
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "id": "repair-request",
+              "type": "merge",
+              "config": {
+                "mode": "record",
+                "inputs": [
+                  {
+                    "id": "failure",
+                    "type": "JsonValue"
+                  },
+                  {
+                    "id": "triage",
+                    "type": "JsonValue"
+                  },
+                  {
+                    "id": "summary",
+                    "type": "JsonValue"
+                  }
+                ],
+                "fields": [
+                  {
+                    "name": "schemaVersion",
+                    "source": {
+                      "literal": 1
+                    }
+                  },
+                  {
+                    "name": "kind",
+                    "source": {
+                      "literal": "MapRepair"
+                    }
+                  },
+                  {
+                    "name": "subjectId",
+                    "source": {
+                      "input": "summary",
+                      "pointer": "/specificationId"
+                    }
+                  },
+                  {
+                    "name": "taskIds",
+                    "source": {
+                      "input": "triage",
+                      "pointer": "/affectedTaskIds"
+                    }
+                  },
+                  {
+                    "name": "issues",
+                    "source": {
+                      "input": "failure",
+                      "pointer": "/report/issues"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "id": "repair-state",
+              "type": "merge",
+              "config": {
+                "mode": "record",
+                "inputs": [
+                  {
+                    "id": "state",
+                    "type": "JsonValue"
+                  },
+                  {
+                    "id": "repair",
+                    "type": "JsonValue"
+                  },
+                  {
+                    "id": "summary",
+                    "type": "JsonValue"
+                  }
+                ],
+                "fields": [
+                  {
+                    "name": "businessTask",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/businessTask"
+                    }
+                  },
+                  {
+                    "name": "base",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/base"
+                    }
+                  },
+                  {
+                    "name": "specification",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/specification"
+                    }
+                  },
+                  {
+                    "name": "documentationApproval",
+                    "source": {
+                      "input": "state",
+                      "pointer": "/documentationApproval"
+                    }
+                  },
+                  {
+                    "name": "issues",
+                    "source": {
+                      "literal": []
+                    }
+                  },
+                  {
+                    "name": "priorMapState",
+                    "source": {
+                      "input": "summary",
+                      "pointer": "/state"
+                    }
+                  },
+                  {
+                    "name": "repair",
+                    "source": {
+                      "input": "repair"
+                    }
+                  },
+                  {
+                    "name": "candidate",
+                    "source": {
+                      "literal": null
+                    }
+                  },
+                  {
+                    "name": "finalAcceptance",
+                    "source": {
+                      "literal": null
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "id": "next",
+              "type": "merge",
+              "config": {
+                "mode": "selected",
+                "valueType": "JsonValue",
+                "inputs": [
+                  {
+                    "id": "map-revision"
+                  },
+                  {
+                    "id": "spec-revision"
+                  },
+                  {
+                    "id": "repair"
+                  },
+                  {
+                    "id": "accepted"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "done",
+              "type": "condition",
+              "config": {
+                "doneWhen": {
+                  "pointer": "/finalAcceptance",
+                  "op": "not-equals",
+                  "value": null
+                },
+                "reason": {
+                  "literal": "Continue until final acceptance is recorded."
+                },
+                "feedback": {
+                  "literal": "Use the carried structured issue and repair records."
+                }
+              }
+            },
+            {
+              "id": "test-quality-review",
+              "type": "agent",
+              "config": {
+                "provider": "claude",
+                "model": "claude-opus-5-5",
+                "timeoutSeconds": 600,
+                "output": {
+                  "format": "json",
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "schemaVersion": {
+                        "const": 1
+                      },
+                      "subjectId": {
+                        "type": "string",
+                        "pattern": "^[A-Z][A-Z0-9-]*$"
+                      },
+                      "role": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                      },
+                      "verdict": {
+                        "enum": [
+                          "APPROVED",
+                          "CHANGES_REQUESTED"
+                        ]
+                      },
+                      "scopeRefs": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[A-Z][A-Z0-9-]*$"
+                        },
+                        "uniqueItems": true
+                      },
+                      "resolvedIssueIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[A-Z][A-Z0-9-]*$"
+                        },
+                        "uniqueItems": true
+                      },
+                      "issues": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "localId": {
+                              "type": "string",
+                              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+                            },
+                            "severity": {
+                              "enum": [
+                                "blocker",
+                                "suggestion"
+                              ]
+                            },
+                            "ownerRole": {
+                              "type": "string",
+                              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                            },
+                            "requirementRefs": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "pattern": "^[A-Z][A-Z0-9-]*$"
+                              },
+                              "uniqueItems": true
+                            },
+                            "message": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "requestedChange": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "localId",
+                            "severity",
+                            "ownerRole",
+                            "requirementRefs",
+                            "message",
+                            "requestedChange"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "schemaVersion",
+                      "subjectId",
+                      "role",
+                      "verdict",
+                      "scopeRefs",
+                      "resolvedIssueIds",
+                      "issues"
+                    ],
+                    "additionalProperties": false,
+                    "allOf": [
+                      {
+                        "if": {
+                          "properties": {
+                            "verdict": {
+                              "const": "CHANGES_REQUESTED"
+                            }
+                          }
+                        },
+                        "then": {
+                          "properties": {
+                            "issues": {
+                              "contains": {
+                                "properties": {
+                                  "severity": {
+                                    "const": "blocker"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "if": {
+                          "properties": {
+                            "verdict": {
+                              "const": "APPROVED"
+                            }
+                          }
+                        },
+                        "then": {
+                          "properties": {
+                            "issues": {
+                              "items": {
+                                "properties": {
+                                  "severity": {
+                                    "const": "suggestion"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                },
+                "attachFiles": true,
+                "effort": "medium",
+                "contextId": "test-reviewer-history"
+              }
+            },
+            {
+              "id": "test-quality-prompt",
+              "type": "prompt-template",
+              "config": {
+                "slots": [
+                  {
+                    "id": "plan"
+                  }
+                ],
+                "template": "Review the delivery as test-reviewer: independent assertions, approved case coverage, meaningful failure detection, fixture isolation, reproducible checks and captured UI evidence. Passing exit codes alone do not establish adequate tests. Implementation has a separate code-reviewer.\n\nReview plan (JSON):\n{{plan}}\n\nAssess the exact selected complete candidate and actual engine check evidence. Distinguish source defects, test defects and unavailable environment evidence. Both independent technical slots must approve before Analyst business acceptance.\n\nRead the supplied immutable view and SUBJECT.json for the exact subjectId and role. Return a complete ReviewDecision JSON with scopeRefs, resolvedIssueIds and issues arrays. Resolve only issue IDs assigned to your slot. Never edit reviewed files, invent evidence or treat another reviewer's approval as your own."
+              }
+            }
+          ],
+          "edges": [
+            {
+              "id": "d-input-value-spec-of-value",
+              "source": {
+                "nodeId": "$input",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "spec-of",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-input-value-cert-of-value",
+              "source": {
+                "nodeId": "$input",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "cert-of",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-spec-of-value-verify-docs-subject",
+              "source": {
+                "nodeId": "spec-of",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "verify-docs",
+                "port": "subject"
+              }
+            },
+            {
+              "id": "d-cert-of-value-verify-docs-certificate",
+              "source": {
+                "nodeId": "cert-of",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "verify-docs",
+                "port": "certificate"
+              }
+            },
+            {
+              "id": "d-verify-docs-report-spec-route-selector",
+              "source": {
+                "nodeId": "verify-docs",
+                "port": "report"
+              },
+              "target": {
+                "nodeId": "spec-route",
+                "port": "selector"
+              }
+            },
+            {
+              "id": "d-input-value-spec-route-value",
+              "source": {
+                "nodeId": "$input",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "spec-route",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-spec-route-revise-spec-seed-state",
+              "source": {
+                "nodeId": "spec-route",
+                "port": "revise"
+              },
+              "target": {
+                "nodeId": "spec-seed",
+                "port": "state"
+              }
+            },
+            {
+              "id": "d-spec-seed-value-specification-seed",
+              "source": {
+                "nodeId": "spec-seed",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "specification",
+                "port": "seed"
+              }
+            },
+            {
+              "id": "d-spec-route-revise-after-spec-seed",
+              "source": {
+                "nodeId": "spec-route",
+                "port": "revise"
+              },
+              "target": {
+                "nodeId": "after-spec",
+                "port": "seed"
+              }
+            },
+            {
+              "id": "d-specification-result-after-spec-spec",
+              "source": {
+                "nodeId": "specification",
+                "port": "result"
+              },
+              "target": {
+                "nodeId": "after-spec",
+                "port": "spec"
+              }
+            },
+            {
+              "id": "d-spec-route-approved-reviewed-approved",
+              "source": {
+                "nodeId": "spec-route",
+                "port": "approved"
+              },
+              "target": {
+                "nodeId": "reviewed",
+                "port": "approved"
+              }
+            },
+            {
+              "id": "d-after-spec-value-reviewed-revised",
+              "source": {
+                "nodeId": "after-spec",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "reviewed",
+                "port": "revised"
+              }
+            },
+            {
+              "id": "d-reviewed-value-doc-of-value",
+              "source": {
+                "nodeId": "reviewed",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "doc-of",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-reviewed-value-approval-of-value",
+              "source": {
+                "nodeId": "reviewed",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "approval-of",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-reviewed-value-base-of-value",
+              "source": {
+                "nodeId": "reviewed",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "base-of",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-reviewed-value-prior-of-value",
+              "source": {
+                "nodeId": "reviewed",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "prior-of",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-reviewed-value-repair-of-value",
+              "source": {
+                "nodeId": "reviewed",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "repair-of",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-doc-of-value-implement-documentation",
+              "source": {
+                "nodeId": "doc-of",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "implement",
+                "port": "documentation"
+              }
+            },
+            {
+              "id": "d-approval-of-value-implement-approval",
+              "source": {
+                "nodeId": "approval-of",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "implement",
+                "port": "approval"
+              }
+            },
+            {
+              "id": "d-base-of-value-implement-base",
+              "source": {
+                "nodeId": "base-of",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "implement",
+                "port": "base"
+              }
+            },
+            {
+              "id": "d-prior-of-value-implement-prior-state",
+              "source": {
+                "nodeId": "prior-of",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "implement",
+                "port": "prior-state"
+              }
+            },
+            {
+              "id": "d-repair-of-value-implement-repair",
+              "source": {
+                "nodeId": "repair-of",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "implement",
+                "port": "repair"
+              }
+            },
+            {
+              "id": "d-implement-summary-map-route-selector",
+              "source": {
+                "nodeId": "implement",
+                "port": "summary"
+              },
+              "target": {
+                "nodeId": "map-route",
+                "port": "selector"
+              }
+            },
+            {
+              "id": "d-implement-summary-map-route-value",
+              "source": {
+                "nodeId": "implement",
+                "port": "summary"
+              },
+              "target": {
+                "nodeId": "map-route",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-reviewed-value-map-revision-state",
+              "source": {
+                "nodeId": "reviewed",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "map-revision",
+                "port": "state"
+              }
+            },
+            {
+              "id": "d-map-route-revise-map-revision-summary",
+              "source": {
+                "nodeId": "map-route",
+                "port": "revise"
+              },
+              "target": {
+                "nodeId": "map-revision",
+                "port": "summary"
+              }
+            },
+            {
+              "id": "d-no-issues-value-final-issues-value",
+              "source": {
+                "nodeId": "no-issues",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "final-issues",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-doc-of-value-final-prepare-documentation",
+              "source": {
+                "nodeId": "doc-of",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "final-prepare",
+                "port": "documentation"
+              }
+            },
+            {
+              "id": "d-approval-of-value-final-prepare-approval",
+              "source": {
+                "nodeId": "approval-of",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "final-prepare",
+                "port": "approval"
+              }
+            },
+            {
+              "id": "d-map-route-complete-final-prepare-summary",
+              "source": {
+                "nodeId": "map-route",
+                "port": "complete"
+              },
+              "target": {
+                "nodeId": "final-prepare",
+                "port": "summary"
+              }
+            },
+            {
+              "id": "d-implement-result-final-prepare-candidate",
+              "source": {
+                "nodeId": "implement",
+                "port": "result"
+              },
+              "target": {
+                "nodeId": "final-prepare",
+                "port": "candidate"
+              }
+            },
+            {
+              "id": "d-final-issues-value-final-prepare-issues",
+              "source": {
+                "nodeId": "final-issues",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "final-prepare",
+                "port": "issues"
+              }
+            },
+            {
+              "id": "d-doc-of-value-customer-prepare-documentation",
+              "source": {
+                "nodeId": "doc-of",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "customer-prepare",
+                "port": "documentation"
+              }
+            },
+            {
+              "id": "d-approval-of-value-customer-prepare-approval",
+              "source": {
+                "nodeId": "approval-of",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "customer-prepare",
+                "port": "approval"
+              }
+            },
+            {
+              "id": "d-map-route-complete-customer-prepare-summary",
+              "source": {
+                "nodeId": "map-route",
+                "port": "complete"
+              },
+              "target": {
+                "nodeId": "customer-prepare",
+                "port": "summary"
+              }
+            },
+            {
+              "id": "d-implement-result-customer-prepare-candidate",
+              "source": {
+                "nodeId": "implement",
+                "port": "result"
+              },
+              "target": {
+                "nodeId": "customer-prepare",
+                "port": "candidate"
+              }
+            },
+            {
+              "id": "d-final-issues-value-customer-prepare-issues",
+              "source": {
+                "nodeId": "final-issues",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "customer-prepare",
+                "port": "issues"
+              }
+            },
+            {
+              "id": "d-final-prepare-plan-final-plan-value",
+              "source": {
+                "nodeId": "final-prepare",
+                "port": "plan"
+              },
+              "target": {
+                "nodeId": "final-plan",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-final-plan-value-quality-prompt-plan",
+              "source": {
+                "nodeId": "final-plan",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "quality-prompt",
+                "port": "plan"
+              }
+            },
+            {
+              "id": "d-quality-prompt-text-quality-review-prompt",
+              "source": {
+                "nodeId": "quality-prompt",
+                "port": "text"
+              },
+              "target": {
+                "nodeId": "quality-review",
+                "port": "prompt"
+              }
+            },
+            {
+              "id": "d-final-prepare-quality-quality-review-files",
+              "source": {
+                "nodeId": "final-prepare",
+                "port": "quality"
+              },
+              "target": {
+                "nodeId": "quality-review",
+                "port": "files"
+              }
+            },
+            {
+              "id": "d-quality-review-json-technical-quality",
+              "source": {
+                "nodeId": "quality-review",
+                "port": "json"
+              },
+              "target": {
+                "nodeId": "technical",
+                "port": "quality"
+              }
+            },
+            {
+              "id": "d-final-prepare-subject-technical-subject",
+              "source": {
+                "nodeId": "final-prepare",
+                "port": "subject"
+              },
+              "target": {
+                "nodeId": "technical",
+                "port": "subject"
+              }
+            },
+            {
+              "id": "d-final-prepare-plan-technical-plan",
+              "source": {
+                "nodeId": "final-prepare",
+                "port": "plan"
+              },
+              "target": {
+                "nodeId": "technical",
+                "port": "plan"
+              }
+            },
+            {
+              "id": "d-technical-report-technical-route-selector",
+              "source": {
+                "nodeId": "technical",
+                "port": "report"
+              },
+              "target": {
+                "nodeId": "technical-route",
+                "port": "selector"
+              }
+            },
+            {
+              "id": "d-technical-report-technical-route-value",
+              "source": {
+                "nodeId": "technical",
+                "port": "report"
+              },
+              "target": {
+                "nodeId": "technical-route",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-technical-route-open-technical-certificate-value",
+              "source": {
+                "nodeId": "technical-route",
+                "port": "open"
+              },
+              "target": {
+                "nodeId": "technical-certificate",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-technical-certificate-value-customer-prepare-technical",
+              "source": {
+                "nodeId": "technical-certificate",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "customer-prepare",
+                "port": "technical"
+              }
+            },
+            {
+              "id": "d-customer-prepare-plan-customer-plan-value",
+              "source": {
+                "nodeId": "customer-prepare",
+                "port": "plan"
+              },
+              "target": {
+                "nodeId": "customer-plan",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-customer-plan-value-final-customer-prompt-plan",
+              "source": {
+                "nodeId": "customer-plan",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "final-customer-prompt",
+                "port": "plan"
+              }
+            },
+            {
+              "id": "d-final-customer-prompt-text-final-customer-prompt",
+              "source": {
+                "nodeId": "final-customer-prompt",
+                "port": "text"
+              },
+              "target": {
+                "nodeId": "final-customer",
+                "port": "prompt"
+              }
+            },
+            {
+              "id": "d-customer-prepare-customer-final-customer-files",
+              "source": {
+                "nodeId": "customer-prepare",
+                "port": "customer"
+              },
+              "target": {
+                "nodeId": "final-customer",
+                "port": "files"
+              }
+            },
+            {
+              "id": "d-final-customer-json-final-customer",
+              "source": {
+                "nodeId": "final-customer",
+                "port": "json"
+              },
+              "target": {
+                "nodeId": "final",
+                "port": "customer"
+              }
+            },
+            {
+              "id": "d-customer-prepare-subject-final-subject",
+              "source": {
+                "nodeId": "customer-prepare",
+                "port": "subject"
+              },
+              "target": {
+                "nodeId": "final",
+                "port": "subject"
+              }
+            },
+            {
+              "id": "d-customer-prepare-plan-final-plan",
+              "source": {
+                "nodeId": "customer-prepare",
+                "port": "plan"
+              },
+              "target": {
+                "nodeId": "final",
+                "port": "plan"
+              }
+            },
+            {
+              "id": "d-final-report-final-route-selector",
+              "source": {
+                "nodeId": "final",
+                "port": "report"
+              },
+              "target": {
+                "nodeId": "final-route",
+                "port": "selector"
+              }
+            },
+            {
+              "id": "d-final-report-final-route-value",
+              "source": {
+                "nodeId": "final",
+                "port": "report"
+              },
+              "target": {
+                "nodeId": "final-route",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-reviewed-value-accepted-state",
+              "source": {
+                "nodeId": "reviewed",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "accepted",
+                "port": "state"
+              }
+            },
+            {
+              "id": "d-map-route-complete-accepted-summary",
+              "source": {
+                "nodeId": "map-route",
+                "port": "complete"
+              },
+              "target": {
+                "nodeId": "accepted",
+                "port": "summary"
+              }
+            },
+            {
+              "id": "d-final-route-open-accepted-report",
+              "source": {
+                "nodeId": "final-route",
+                "port": "open"
+              },
+              "target": {
+                "nodeId": "accepted",
+                "port": "report"
+              }
+            },
+            {
+              "id": "d-technical-route-revise-technical-failure-report",
+              "source": {
+                "nodeId": "technical-route",
+                "port": "revise"
+              },
+              "target": {
+                "nodeId": "technical-failure",
+                "port": "report"
+              }
+            },
+            {
+              "id": "d-final-route-revise-customer-failure-report",
+              "source": {
+                "nodeId": "final-route",
+                "port": "revise"
+              },
+              "target": {
+                "nodeId": "customer-failure",
+                "port": "report"
+              }
+            },
+            {
+              "id": "d-technical-failure-value-failure-technical",
+              "source": {
+                "nodeId": "technical-failure",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "failure",
+                "port": "technical"
+              }
+            },
+            {
+              "id": "d-customer-failure-value-failure-customer",
+              "source": {
+                "nodeId": "customer-failure",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "failure",
+                "port": "customer"
+              }
+            },
+            {
+              "id": "d-failure-value-failure-text-value",
+              "source": {
+                "nodeId": "failure",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "failure-text",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-failure-text-value-triage-prompt-failure",
+              "source": {
+                "nodeId": "failure-text",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "triage-prompt",
+                "port": "failure"
+              }
+            },
+            {
+              "id": "d-triage-prompt-text-triage-prompt",
+              "source": {
+                "nodeId": "triage-prompt",
+                "port": "text"
+              },
+              "target": {
+                "nodeId": "triage",
+                "port": "prompt"
+              }
+            },
+            {
+              "id": "d-triage-json-triage-route-selector",
+              "source": {
+                "nodeId": "triage",
+                "port": "json"
+              },
+              "target": {
+                "nodeId": "triage-route",
+                "port": "selector"
+              }
+            },
+            {
+              "id": "d-failure-value-triage-route-value",
+              "source": {
+                "nodeId": "failure",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "triage-route",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-reviewed-value-spec-revision-state",
+              "source": {
+                "nodeId": "reviewed",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "spec-revision",
+                "port": "state"
+              }
+            },
+            {
+              "id": "d-triage-route-specification-spec-revision-failure",
+              "source": {
+                "nodeId": "triage-route",
+                "port": "specification"
+              },
+              "target": {
+                "nodeId": "spec-revision",
+                "port": "failure"
+              }
+            },
+            {
+              "id": "d-implement-summary-spec-revision-summary",
+              "source": {
+                "nodeId": "implement",
+                "port": "summary"
+              },
+              "target": {
+                "nodeId": "spec-revision",
+                "port": "summary"
+              }
+            },
+            {
+              "id": "d-triage-route-repair-repair-request-failure",
+              "source": {
+                "nodeId": "triage-route",
+                "port": "repair"
+              },
+              "target": {
+                "nodeId": "repair-request",
+                "port": "failure"
+              }
+            },
+            {
+              "id": "d-triage-json-repair-request-triage",
+              "source": {
+                "nodeId": "triage",
+                "port": "json"
+              },
+              "target": {
+                "nodeId": "repair-request",
+                "port": "triage"
+              }
+            },
+            {
+              "id": "d-implement-summary-repair-request-summary",
+              "source": {
+                "nodeId": "implement",
+                "port": "summary"
+              },
+              "target": {
+                "nodeId": "repair-request",
+                "port": "summary"
+              }
+            },
+            {
+              "id": "d-reviewed-value-repair-state-state",
+              "source": {
+                "nodeId": "reviewed",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "repair-state",
+                "port": "state"
+              }
+            },
+            {
+              "id": "d-repair-request-value-repair-state-repair",
+              "source": {
+                "nodeId": "repair-request",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "repair-state",
+                "port": "repair"
+              }
+            },
+            {
+              "id": "d-implement-summary-repair-state-summary",
+              "source": {
+                "nodeId": "implement",
+                "port": "summary"
+              },
+              "target": {
+                "nodeId": "repair-state",
+                "port": "summary"
+              }
+            },
+            {
+              "id": "d-map-revision-value-next-map-revision",
+              "source": {
+                "nodeId": "map-revision",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "next",
+                "port": "map-revision"
+              }
+            },
+            {
+              "id": "d-spec-revision-value-next-spec-revision",
+              "source": {
+                "nodeId": "spec-revision",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "next",
+                "port": "spec-revision"
+              }
+            },
+            {
+              "id": "d-repair-state-value-next-repair",
+              "source": {
+                "nodeId": "repair-state",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "next",
+                "port": "repair"
+              }
+            },
+            {
+              "id": "d-accepted-value-next-accepted",
+              "source": {
+                "nodeId": "accepted",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "next",
+                "port": "accepted"
+              }
+            },
+            {
+              "id": "d-next-value-done-value",
+              "source": {
+                "nodeId": "next",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "done",
+                "port": "value"
+              }
+            },
+            {
+              "id": "d-next-value-return-candidate",
+              "source": {
+                "nodeId": "next",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "$return",
+                "port": "candidate"
+              }
+            },
+            {
+              "id": "d-done-decision-return-decision",
+              "source": {
+                "nodeId": "done",
+                "port": "decision"
+              },
+              "target": {
+                "nodeId": "$return",
+                "port": "decision"
+              }
+            },
+            {
+              "id": "r-final-plan-value-test-quality-prompt-plan",
+              "source": {
+                "nodeId": "final-plan",
+                "port": "value"
+              },
+              "target": {
+                "nodeId": "test-quality-prompt",
+                "port": "plan"
+              }
+            },
+            {
+              "id": "r-test-quality-prompt-text-test-quality-review-prompt",
+              "source": {
+                "nodeId": "test-quality-prompt",
+                "port": "text"
+              },
+              "target": {
+                "nodeId": "test-quality-review",
+                "port": "prompt"
+              }
+            },
+            {
+              "id": "r-final-prepare-test-quality-test-quality-review-files",
+              "source": {
+                "nodeId": "final-prepare",
+                "port": "test-quality"
+              },
+              "target": {
+                "nodeId": "test-quality-review",
+                "port": "files"
+              }
+            },
+            {
+              "id": "r-test-quality-review-json-technical-test-quality",
+              "source": {
+                "nodeId": "test-quality-review",
+                "port": "json"
+              },
+              "target": {
+                "nodeId": "technical",
+                "port": "test-quality"
+              }
+            }
+          ],
+          "after": [],
+          "view": {
+            "spec-of": {
+              "x": 0,
+              "y": 0
+            },
+            "cert-of": {
+              "x": 0,
+              "y": 175
+            },
+            "verify-docs": {
+              "x": 330,
+              "y": 0
+            },
+            "spec-route": {
+              "x": 660,
+              "y": 0
+            },
+            "spec-seed": {
+              "x": 990,
+              "y": 0
+            },
+            "specification": {
+              "x": 1320,
+              "y": 0
+            },
+            "after-spec": {
+              "x": 1650,
+              "y": 0
+            },
+            "reviewed": {
+              "x": 1980,
+              "y": 0
+            },
+            "doc-of": {
+              "x": 2310,
+              "y": 0
+            },
+            "approval-of": {
+              "x": 2310,
+              "y": 175
+            },
+            "base-of": {
+              "x": 2310,
+              "y": 350
+            },
+            "prior-of": {
+              "x": 2310,
+              "y": 525
+            },
+            "repair-of": {
+              "x": 2310,
+              "y": 700
+            },
+            "implement": {
+              "x": 2640,
+              "y": 0
+            },
+            "map-route": {
+              "x": 2970,
+              "y": 0
+            },
+            "map-revision": {
+              "x": 3300,
+              "y": 0
+            },
+            "no-issues": {
+              "x": 0,
+              "y": 350
+            },
+            "final-issues": {
+              "x": 330,
+              "y": 175
+            },
+            "final-prepare": {
+              "x": 3300,
+              "y": 175
+            },
+            "final-plan": {
+              "x": 3630,
+              "y": 0
+            },
+            "quality-prompt": {
+              "x": 3960,
+              "y": 0
+            },
+            "quality-review": {
+              "x": 4290,
+              "y": 0,
+              "label": "Code review · Opus · medium"
+            },
+            "technical": {
+              "x": 4620,
+              "y": 0
+            },
+            "technical-route": {
+              "x": 4950,
+              "y": 0
+            },
+            "technical-certificate": {
+              "x": 5280,
+              "y": 0
+            },
+            "customer-prepare": {
+              "x": 5610,
+              "y": 0
+            },
+            "customer-plan": {
+              "x": 5940,
+              "y": 0
+            },
+            "final-customer-prompt": {
+              "x": 6270,
+              "y": 0
+            },
+            "final-customer": {
+              "x": 6600,
+              "y": 0,
+              "label": "Business acceptance · Sol · max"
+            },
+            "final": {
+              "x": 6930,
+              "y": 0
+            },
+            "final-route": {
+              "x": 7260,
+              "y": 0
+            },
+            "accepted": {
+              "x": 7590,
+              "y": 0
+            },
+            "technical-failure": {
+              "x": 5280,
+              "y": 175
+            },
+            "customer-failure": {
+              "x": 7590,
+              "y": 175
+            },
+            "failure": {
+              "x": 7920,
+              "y": 0
+            },
+            "failure-text": {
+              "x": 8250,
+              "y": 0
+            },
+            "triage-prompt": {
+              "x": 8580,
+              "y": 0
+            },
+            "triage": {
+              "x": 8910,
+              "y": 0
+            },
+            "triage-route": {
+              "x": 9240,
+              "y": 0
+            },
+            "spec-revision": {
+              "x": 9570,
+              "y": 0
+            },
+            "repair-request": {
+              "x": 9570,
+              "y": 175
+            },
+            "repair-state": {
+              "x": 9900,
+              "y": 0
+            },
+            "next": {
+              "x": 10230,
+              "y": 0
+            },
+            "done": {
+              "x": 10560,
+              "y": 0
+            },
+            "test-quality-prompt": {
+              "x": 3960,
+              "y": 350,
+              "label": "Test quality review prompt"
+            },
+            "test-quality-review": {
+              "x": 4290,
+              "y": 350,
+              "label": "Test review · Opus · medium"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "acceptance",
+      "type": "json-select",
+      "config": {
+        "pointer": "/finalAcceptance",
+        "outputType": "JsonValue"
+      }
+    },
+    {
+      "id": "candidate",
+      "type": "json-select",
+      "config": {
+        "pointer": "/candidate",
+        "outputType": "JsonValue"
+      }
+    },
+    {
+      "id": "acceptance-view",
+      "type": "result-viewer",
+      "config": {}
+    },
+    {
+      "id": "candidate-view",
+      "type": "result-viewer",
+      "config": {}
+    },
+    {
+      "id": "junior-history",
+      "type": "context",
+      "config": {
+        "provider": "codex",
+        "mode": "new"
+      }
+    },
+    {
+      "id": "project-1",
+      "type": "file-input",
+      "config": {
+        "mode": "files",
+        "paths": [
+          ".claude/launch.json",
+          ".gitignore",
+          "README.md",
+          "docs/ARCHITECTURE.md",
+          "docs/DECISIONS.md",
+          "docs/IMPLEMENTATION_MAP.md",
+          "docs/LOOPS.md",
+          "docs/M1_CONTRACTS.md",
+          "docs/M2_CONTRACTS.md",
+          "docs/M3_M4_CONTRACTS.md",
+          "docs/M5_CONTRACTS.md",
+          "docs/M6_CONTRACTS.md",
+          "docs/MILESTONES.md",
+          "docs/OPEN_QUESTIONS.md",
+          "docs/PIPELINE_EXECUTION.md",
+          "docs/PRODUCT_SPEC.md",
+          "docs/PROPOSED_BASELINE.md",
+          "docs/README.md",
+          "docs/RUN_HISTORY_AND_REPLAY.md",
+          "docs/STORAGE.md",
+          "docs/TEST_PIPELINE.md",
+          "docs/adr/0001-external-workflow-authoring-api-and-mcp.md",
+          "docs/adr/0001-implementation-status.md",
+          "docs/adr/README.md",
+          "docs/authoring/ACCEPTANCE_TEST_PLAN.md",
+          "docs/authoring/MIGRATION_V3.md",
+          "docs/authoring/README.md",
+          "docs/authoring/mcp-neutralizers.json",
+          "docs/examples/m1-context-chain/README.md",
+          "docs/examples/m1-context-chain/workflow.json",
+          "docs/examples/m2-review-loop/workflow.json",
+          "docs/examples/m3-cache/workflow.json",
+          "docs/examples/m4-specification-loop/workflow.json",
+          "docs/examples/m5-delivery/workflow.json",
+          "docs/examples/m6-selective-delivery/workflow.json",
+          "docs/examples/reference-delivery/workflow.json",
+          "docs/examples/round-recovery/SPEC.md",
+          "docs/examples/round-recovery/implementation-map.json",
+          "docs/examples/round-recovery/project/fixtures/tokens.json",
+          "docs/examples/round-recovery/project/src/api.mjs",
+          "docs/examples/round-recovery/spec-index.json",
+          "docs/fixtures/README.md",
+          "docs/fixtures/decisions.json",
+          "docs/fixtures/invalid/cases.json",
+          "docs/fixtures/manifest.json",
+          "docs/fixtures/roles.json",
+          "docs/fixtures/sql-cases-m2.json",
+          "docs/fixtures/sql-cases-m3.json",
+          "docs/fixtures/sql-cases-m4.json",
+          "docs/fixtures/sql-cases-m5.json",
+          "docs/fixtures/sql-cases.json",
+          "docs/fixtures/valid/api-payloads.json",
+          "docs/fixtures/valid/application-settings.json",
+          "docs/fixtures/valid/attempt-manifests.json",
+          "docs/fixtures/valid/journal-events.json",
+          "docs/fixtures/valid/loop-decisions.json",
+          "docs/fixtures/valid/m2-payloads.json",
+          "docs/fixtures/valid/m34-payloads.json",
+          "docs/fixtures/valid/m5-payloads.json",
+          "docs/fixtures/valid/m6-payloads.json",
+          "docs/fixtures/valid/pipeline-states.json",
+          "docs/fixtures/valid/review-fix-payloads.json",
+          "docs/fixtures/valid/values.json",
+          "docs/fixtures/valid/workflow-claude-alias.json",
+          "docs/fixtures/valid/workflow-continue.json",
+          "docs/pilots/2026-10-14-after-rerun04-validation.md",
+          "docs/pilots/2026-10-14-pilot-rerun-resolution.md",
+          "docs/pilots/2026-10-14-pilot-rerun.md",
+          "docs/pilots/2026-10-14-pilot-resolution.md",
+          "docs/pilots/2026-10-14-pilot-validation.md",
+          "docs/pilots/2026-10-15-authoring-acceptance.md",
+          "docs/pilots/evidence/2026-10-14-after-rerun04-acceptance.json",
+          "docs/pilots/evidence/2026-10-14-after-rerun04-delivery-audit.json",
+          "docs/pilots/evidence/2026-10-14-after-rerun04-final-checks.json",
+          "docs/pilots/evidence/2026-10-14-after-rerun04-summary.json",
+          "docs/pilots/evidence/2026-10-14-bundle-api.json",
+          "docs/pilots/evidence/2026-10-14-installer-hash.json",
+          "docs/pilots/evidence/2026-10-14-load-result.json",
+          "docs/pilots/evidence/2026-10-14-loop-replay.json",
+          "docs/pilots/evidence/2026-10-14-real-replay.jpg",
+          "docs/pilots/evidence/2026-10-14-real-replay.txt",
+          "docs/pilots/evidence/2026-10-14-real-summary.json",
+          "docs/pilots/evidence/2026-10-14-replay.jpg",
+          "docs/pilots/evidence/2026-10-14-replay.txt",
+          "docs/pilots/evidence/2026-10-14-rerun-checks.json",
+          "docs/pilots/evidence/2026-10-14-rerun-desktop-startup-final.json",
+          "docs/pilots/evidence/2026-10-14-rerun-desktop.json",
+          "docs/pilots/evidence/2026-10-14-rerun-issue-resolution.json",
+          "docs/pilots/evidence/2026-10-14-rerun-nullable-probe.json",
+          "docs/pilots/evidence/2026-10-14-rerun-package.json",
+          "docs/pilots/evidence/2026-10-14-rerun-real-summary.json",
+          "docs/pilots/evidence/2026-10-14-rerun-replay.jpg",
+          "docs/pilots/evidence/2026-10-14-rerun-replay.json",
+          "docs/pilots/evidence/2026-10-14-rerun-replay.txt",
+          "docs/pilots/evidence/2026-10-14-rerun-soak.json",
+          "docs/pilots/evidence/2026-10-14-rerun-task-return-probe.json",
+          "docs/pilots/evidence/2026-10-14-rerun-uninstall.json",
+          "docs/pilots/evidence/2026-10-14-rerun04-fix-check.json",
+          "docs/pilots/evidence/2026-10-14-uninstall.json",
+          "docs/pilots/evidence/2026-10-15-authoring-acceptance.json",
+          "docs/pilots/evidence/2026-10-15-authoring-compatibility.json",
+          "docs/pilots/evidence/2026-10-15-authoring-pilot.json",
+          "docs/pilots/shadcn-ui-brief.md",
+          "docs/pilots/shadcn-ui-workflow.json",
+          "docs/pilots/shadcn-ui-workflow.md",
+          "docs/reviews/2026-10-13-fourth-review.md",
+          "docs/reviews/2026-10-13-m1-m6-implementation-review-resolution.md",
+          "docs/reviews/2026-10-13-m1-m6-implementation-review.md",
+          "docs/reviews/2026-10-13-m1-m6-resolution-followup-review-resolution.md",
+          "docs/reviews/2026-10-13-m1-m6-resolution-followup-review.md",
+          "docs/reviews/2026-10-13-m1-m6-review-closure.md",
+          "docs/reviews/2026-10-13-pre-implementation-review.md",
+          "docs/reviews/2026-10-13-review-resolution.md",
+          "docs/reviews/2026-10-13-second-review-resolution.md",
+          "docs/reviews/2026-10-13-second-review.md",
+          "docs/reviews/2026-10-13-third-review-resolution.md",
+          "docs/reviews/2026-10-13-third-review.md",
+          "docs/reviews/2026-10-15-adr-0001-fifth-review.md",
+          "docs/reviews/2026-10-15-adr-0001-fourth-review.md",
+          "docs/reviews/2026-10-15-adr-0001-implementation-closure-review.md",
+          "docs/reviews/2026-10-15-adr-0001-implementation-followup-review.md",
+          "docs/reviews/2026-10-15-adr-0001-implementation-review.md",
+          "docs/reviews/2026-10-15-adr-0001-review.md",
+          "docs/reviews/2026-10-15-adr-0001-second-review.md",
+          "docs/reviews/2026-10-15-adr-0001-sixth-review.md",
+          "docs/reviews/2026-10-15-adr-0001-third-review.md",
+          "docs/reviews/reproducers/2026-10-13-cli-fixture.mjs",
+          "docs/reviews/reproducers/2026-10-13-real-cli-probes.mjs",
+          "docs/reviews/reproducers/2026-10-13-real-cli-results.json",
+          "docs/reviews/reproducers/2026-10-13-resolution-code-variant.mjs",
+          "docs/reviews/reproducers/2026-10-13-resolution-followup-probes.mjs",
+          "docs/reviews/reproducers/2026-10-13-resolution-followup-results.json",
+          "docs/reviews/reproducers/2026-10-13-runtime-probe-results.json",
+          "docs/reviews/reproducers/2026-10-13-runtime-probes.mjs",
+          "docs/reviews/reproducers/2026-10-13-ui-replay.jpg",
+          "docs/reviews/reproducers/2026-10-13-ui-seed.mjs",
+          "docs/schemas/application-settings.schema.json",
+          "docs/schemas/attempt-record.schema.json",
+          "docs/schemas/gate.schema.json",
+          "docs/schemas/implementation-map.schema.json",
+          "docs/schemas/journal-event-v2.schema.json",
+          "docs/schemas/journal-event.schema.json",
+          "docs/schemas/loop-decision.schema.json",
+          "docs/schemas/map.schema.json",
+          "docs/schemas/pipeline-state.schema.json",
+          "docs/schemas/review-decision.schema.json",
+          "docs/schemas/runtime-api-v2.schema.json",
+          "docs/schemas/runtime-api-v3.schema.json",
+          "docs/schemas/runtime-api.schema.json",
+          "docs/schemas/spec-section-index.schema.json",
+          "docs/schemas/value.schema.json",
+          "docs/schemas/workflow.schema.json",
+          "docs/storage/m1.sql",
+          "docs/storage/m2.sql",
+          "docs/storage/m3.sql",
+          "docs/storage/m4.sql",
+          "docs/storage/m5.sql",
+          "docs/storage/m6.sql",
+          "docs/storage/m7.sql",
+          "docs/tools/README.md",
+          "docs/tools/requirements.txt",
+          "docs/tools/validate-docs.mjs",
+          "docs/tools/validate_docs.py",
+          "index.html",
+          "mcp/bridge.mjs",
+          "mcp/managed-invocation.mjs",
+          "mcp/runtime-client.mjs",
+          "package-lock.json",
+          "package.json",
+          "runtime/core/adapters.mjs",
+          "runtime/core/canonical.mjs",
+          "runtime/core/engine.mjs",
+          "runtime/core/gate.mjs",
+          "runtime/core/managed-isolation.mjs",
+          "runtime/core/map.mjs",
+          "runtime/core/mapRuntime.mjs",
+          "runtime/core/planning.mjs",
+          "runtime/core/processes.mjs",
+          "runtime/core/schemas.mjs",
+          "runtime/core/store.mjs",
+          "scripts/shadcn-pilot-reviewers.mjs"
+        ]
+      }
+    },
+    {
+      "id": "project-2",
+      "type": "file-input",
+      "config": {
+        "mode": "files",
+        "paths": [
+          "runtime/core/transport.mjs",
+          "runtime/core/utilities.mjs",
+          "runtime/core/validate.mjs",
+          "runtime/lock.mjs",
+          "runtime/runner.mjs",
+          "runtime/tests/authoring.test.mjs",
+          "runtime/tests/bridge.test.mjs",
+          "runtime/tests/code-variant-preload.mjs",
+          "runtime/tests/contracts.test.mjs",
+          "runtime/tests/effort.test.mjs",
+          "runtime/tests/engine.test.mjs",
+          "runtime/tests/fixture-cli.mjs",
+          "runtime/tests/followup.test.mjs",
+          "runtime/tests/helpers.mjs",
+          "runtime/tests/integrity.test.mjs",
+          "runtime/tests/loops.test.mjs",
+          "runtime/tests/map.test.mjs",
+          "runtime/tests/pilot.test.mjs",
+          "runtime/tests/pipeline.test.mjs",
+          "runtime/tests/reference.test.mjs",
+          "runtime/tests/release.test.mjs",
+          "runtime/tests/revisions.test.mjs",
+          "runtime/tests/stream-fixture.mjs",
+          "runtime/tests/toy/auth-buggy.mjs",
+          "runtime/tests/toy/auth.mjs",
+          "runtime/tests/toy/auth.test.mjs",
+          "runtime/tests/toy/resume.mjs",
+          "runtime/tests/toy/resume.test.mjs",
+          "scripts/authoring-acceptance-report.mjs",
+          "scripts/authoring-client-check.mjs",
+          "scripts/authoring-compatibility-probe.mjs",
+          "scripts/authoring-directory-check.mjs",
+          "scripts/authoring-observe-run.mjs",
+          "scripts/authoring-package-check.mjs",
+          "scripts/authoring-probe-server.mjs",
+          "scripts/authoring-release-check.mjs",
+          "scripts/authoring-test-support.mjs",
+          "scripts/bundle-runtime.mjs",
+          "scripts/fixture-runner.mjs",
+          "scripts/generate-icon.mjs",
+          "scripts/pilot-acceptance.mjs",
+          "scripts/pilot-desktop.mjs",
+          "scripts/pilot-documents.mjs",
+          "scripts/pilot-issue-resolution-check.mjs",
+          "scripts/pilot-issue-resolution-probe.mjs",
+          "scripts/pilot-load.mjs",
+          "scripts/pilot-summarize.mjs",
+          "scripts/pilot-transport-probe.mjs",
+          "scripts/pilot.mjs",
+          "scripts/prepare-shadcn-pilot.mjs",
+          "scripts/shadcn-pilot-check.mjs",
+          "scripts/smoke.mjs",
+          "shared/effort.d.mts",
+          "shared/effort.mjs",
+          "shared/replay.d.mts",
+          "shared/replay.mjs",
+          "src-tauri/Cargo.lock",
+          "src-tauri/Cargo.toml",
+          "src-tauri/build.rs",
+          "src-tauri/capabilities/default.json",
+          "src-tauri/gen/schemas/acl-manifests.json",
+          "src-tauri/gen/schemas/capabilities.json",
+          "src-tauri/gen/schemas/desktop-schema.json",
+          "src-tauri/gen/schemas/windows-schema.json",
+          "src-tauri/icons/icon.ico",
+          "src-tauri/icons/icon.png",
+          "src-tauri/src/main.rs",
+          "src-tauri/tauri.conf.json",
+          "src/App.tsx",
+          "src/Inspector.tsx",
+          "src/Replay.tsx",
+          "src/main.tsx",
+          "src/model.ts",
+          "src/nodes.tsx",
+          "src/styles.css",
+          "src/templates.ts",
+          "src/transport.ts",
+          "src/types.ts",
+          "tsconfig.json",
+          "vite.config.ts"
+        ]
+      }
+    },
+    {
+      "id": "project",
+      "type": "merge",
+      "config": {
+        "mode": "artifacts",
+        "inputs": [
+          {
+            "id": "project-1"
+          },
+          {
+            "id": "project-2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "code-reviewer-history",
+      "type": "context",
+      "config": {
+        "provider": "claude",
+        "mode": "new"
+      }
+    },
+    {
+      "id": "test-reviewer-history",
+      "type": "context",
+      "config": {
+        "provider": "claude",
+        "mode": "new"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "o-task-text-seed-task",
+      "source": {
+        "nodeId": "task",
+        "port": "text"
+      },
+      "target": {
+        "nodeId": "seed",
+        "port": "task"
+      }
+    },
+    {
+      "id": "o-seed-value-delivery-seed",
+      "source": {
+        "nodeId": "seed",
+        "port": "value"
+      },
+      "target": {
+        "nodeId": "delivery",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "o-delivery-result-acceptance-value",
+      "source": {
+        "nodeId": "delivery",
+        "port": "result"
+      },
+      "target": {
+        "nodeId": "acceptance",
+        "port": "value"
+      }
+    },
+    {
+      "id": "o-delivery-result-candidate-value",
+      "source": {
+        "nodeId": "delivery",
+        "port": "result"
+      },
+      "target": {
+        "nodeId": "candidate",
+        "port": "value"
+      }
+    },
+    {
+      "id": "o-acceptance-value-acceptance-view-value",
+      "source": {
+        "nodeId": "acceptance",
+        "port": "value"
+      },
+      "target": {
+        "nodeId": "acceptance-view",
+        "port": "value"
+      }
+    },
+    {
+      "id": "o-candidate-value-candidate-view-value",
+      "source": {
+        "nodeId": "candidate",
+        "port": "value"
+      },
+      "target": {
+        "nodeId": "candidate-view",
+        "port": "value"
+      }
+    },
+    {
+      "id": "p-project-1-value-project-project-1",
+      "source": {
+        "nodeId": "project-1",
+        "port": "value"
+      },
+      "target": {
+        "nodeId": "project",
+        "port": "project-1"
+      }
+    },
+    {
+      "id": "p-project-2-value-project-project-2",
+      "source": {
+        "nodeId": "project-2",
+        "port": "value"
+      },
+      "target": {
+        "nodeId": "project",
+        "port": "project-2"
+      }
+    },
+    {
+      "id": "p-project-value-seed-base",
+      "source": {
+        "nodeId": "project",
+        "port": "value"
+      },
+      "target": {
+        "nodeId": "seed",
+        "port": "base"
+      }
+    }
+  ],
+  "after": [],
+  "view": {
+    "task": {
+      "x": 0,
+      "y": 0
+    },
+    "seed": {
+      "x": 660,
+      "y": 0
+    },
+    "analyst-history": {
+      "x": -330,
+      "y": 0
+    },
+    "delivery": {
+      "x": 990,
+      "y": 0,
+      "label": "shadcn/ui delivery"
+    },
+    "acceptance": {
+      "x": 1320,
+      "y": 0
+    },
+    "candidate": {
+      "x": 1320,
+      "y": 175
+    },
+    "acceptance-view": {
+      "x": 1650,
+      "y": 0
+    },
+    "candidate-view": {
+      "x": 1650,
+      "y": 175
+    },
+    "junior-history": {
+      "x": -330,
+      "y": 175
+    },
+    "project-1": {
+      "x": 0,
+      "y": 175
+    },
+    "project-2": {
+      "x": 0,
+      "y": 350
+    },
+    "project": {
+      "x": 330,
+      "y": 0
+    },
+    "code-reviewer-history": {
+      "x": -330,
+      "y": 350,
+      "label": "Code review Context"
+    },
+    "test-reviewer-history": {
+      "x": -330,
+      "y": 525,
+      "label": "Test review Context"
+    }
+  }
+}

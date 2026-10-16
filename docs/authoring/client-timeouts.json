@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "status": "unverified",
+  "updatedAt": "2026-10-16",
+  "notes": "ADR-0002 section 2 and Stage 1: exact watch and acknowledgement timing is published only after each client's MCP tool-call timeout is measured. Until an entry is verified, supervision grants are refused with supervision_unavailable.",
+  "entries": [
+    {
+      "provider": "codex",
+      "status": "unverified",
+      "testedVersion": null,
+      "maxToolTimeoutSeconds": null,
+      "notes": "No measured per-server MCP tool timeout. Generated configurations must pin it above maxWatchWait once measured."
+    },
+    {
+      "provider": "claude",
+      "status": "unverified",
+      "testedVersion": null,
+      "maxToolTimeoutSeconds": null,
+      "notes": "No measured per-server MCP tool timeout. Generated configurations must pin it above maxWatchWait once measured."
+    },
+    {
+      "provider": "antigravity",
+      "status": "unverified",
+      "testedVersion": null,
+      "maxToolTimeoutSeconds": null,
+      "notes": "No measured per-server MCP tool timeout. Generated configurations must pin it above maxWatchWait once measured."
+    },
+    {
+      "provider": "other",
+      "status": "unverified",
+      "testedVersion": null,
+      "maxToolTimeoutSeconds": null,
+      "notes": "Unknown clients are never supervised."
+    }
+  ]
+}

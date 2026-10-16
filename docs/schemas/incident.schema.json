@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deszo.local/documentation/incident.schema.json",
+  "title": "Local product incident observations and updates (ADR-0002 section 5)",
+  "$defs": {
+    "incidentObservation": {
+      "type": "object",
+      "description": "The immutable initial observation of an incident, or an appended observation or occurrence. A suspected cause is never recorded as a confirmed one.",
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "kind": { "const": "IncidentObservation" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "component": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "category": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "severity": { "enum": ["low", "medium", "high", "critical"] },
+        "confidence": { "enum": ["low", "medium", "high"] },
+        "causeStatus": { "enum": ["suspected", "confirmed"] },
+        "expected": { "type": "string", "maxLength": 4000 },
+        "actual": { "type": "string", "maxLength": 4000 },
+        "reproduction": { "type": "array", "maxItems": 50, "items": { "type": "string", "maxLength": 1000 } },
+        "versions": {
+          "type": "object",
+          "properties": {
+            "app": { "type": ["string", "null"] },
+            "runtime": { "type": ["string", "null"] },
+            "cli": { "type": ["string", "null"] }
+          },
+          "required": ["app", "runtime", "cli"],
+          "additionalProperties": false
+        },
+        "sourceRevision": { "type": ["string", "null"] },
+        "runId": { "type": ["string", "null"], "format": "uuid" },
+        "nodeInstanceId": { "type": ["string", "null"] },
+        "attemptId": { "type": ["string", "null"], "format": "uuid" },
+        "eventRange": {
+          "type": ["object", "null"],
+          "properties": {
+            "fromSequence": { "type": "integer", "minimum": 0 },
+            "toSequence": { "type": "integer", "minimum": 0 }
+          },
+          "required": ["fromSequence", "toSequence"],
+          "additionalProperties": false
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "artifactId": { "type": "string", "format": "uuid" },
+              "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+            },
+            "required": ["artifactId", "sha256"],
+            "additionalProperties": false
+          }
+        },
+        "captureGaps": { "type": "array", "items": { "type": "string", "maxLength": 500 } },
+        "controllerCommandId": { "type": ["string", "null"] },
+        "stopResult": { "type": ["object", "null"] },
+        "reporter": {
+          "type": "object",
+          "properties": {
+            "authority": { "enum": ["external", "first-party", "system"] },
+            "sessionId": { "type": ["string", "null"], "format": "uuid" }
+          },
+          "required": ["authority", "sessionId"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["schemaVersion", "kind", "title", "component", "category", "severity", "confidence", "causeStatus", "expected", "actual", "reproduction", "versions", "sourceRevision", "runId", "nodeInstanceId", "attemptId", "eventRange", "artifacts", "captureGaps", "controllerCommandId", "reporter"],
+      "additionalProperties": false
+    }
+  }
+}
