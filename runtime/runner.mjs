@@ -8,6 +8,7 @@ import { writeFileSync, renameSync } from 'node:fs';
 import { ApiError, Engine } from './core/engine.mjs';
 import { ContractError } from './core/schemas.mjs';
 import { CorruptionError } from './core/store.mjs';
+import { supervisorFromEnvironment } from './core/supervisor-client.mjs';
 import { acquireRuntimeLock } from './lock.mjs';
 
 const ORIGINS = new Set(['http://127.0.0.1:1420', 'http://localhost:1420', 'tauri://localhost', 'http://tauri.localhost', 'https://tauri.localhost']);
@@ -65,7 +66,7 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
   let engine;
   try {
     if (PACKAGED_RUNTIME && devTestConfirmationOff) throw new Error('The packaged runtime does not support the fixture confirmation policy.');
-    engine = new Engine({ root, adapters, runtimeInstanceId, nodeExecutable, bridgeScript: bridgeFile,
+    engine = new Engine({ root, adapters, runtimeInstanceId, nodeExecutable, bridgeScript: bridgeFile, supervisor: supervisorFromEnvironment(),
       externalRunConfirmationOverride: devTestConfirmationOff ? false : null,
       processContainment: supervised ? 'tauri-job' : 'standalone-best-effort', ...(maximumAgentTimeoutSeconds ? { maximumAgentTimeoutSeconds } : {}), ...(loopMinuteMs ? { loopMinuteMs } : {}) });
     await engine.initialize();
@@ -85,6 +86,15 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
   };
   const parse = text => { try { return JSON.parse(text || '{}'); } catch (error) { throw new ApiError(400, 'invalid_request', `Malformed JSON: ${error.message}`); } };
 
+  // Every incident or stop write records the authority the caller actually holds, not the one its body claims (ADR-0002 section 7).
+  // A session id is recorded only when the controller credential for it is presented; a presented but unknown credential is refused.
+  const controllerTokenOf = req => req.headers['x-deszo-controller-token'] ?? null;
+  const reporterFor = (req, source) => {
+    const token = controllerTokenOf(req);
+    const session = token ? engine.controllerSessionFor(token) : null;
+    if (token && !session) throw new ApiError(403, 'controller_credential_required', 'The controller credential is not recognised.');
+    return { authority: req.authRole === 'first-party' ? 'first-party' : 'external', sessionId: session?.id ?? null };
+  };
   const routes = [
     ['GET', /^\/api\/v3\/authoring\/contract$/, async () => [200, engine.authoringContract()]],
     ['GET', new RegExp(`^/api/v3/authoring/schemas/([^/]+)$`), ({ match }) => [200, engine.authoringSchema(decodeURIComponent(match[1]))]],
@@ -142,7 +152,7 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
     ['POST', new RegExp(`^/api/v2/context-bindings/(${UUID})/acknowledge$`), async ({ req, match }) => [200, engine.acknowledgeBinding(match[1], parse(await readBody(req)))]],
     ['POST', new RegExp(`^/api/v2/context-bindings/(${UUID})/messages$`), async ({ req, match }) => { const result = engine.sendChat(match[1], parse(await readBody(req))); return [result.status, result.body]; }],
     ['GET', /^\/api\/v2\/runs$/, ({ url }) => [200, engine.listRuns(query(url, ['workspaceId', 'state', 'kind', 'bindingId', 'limit', 'cursor'], ['limit']))]],
-    ['POST', /^\/api\/v2\/runs$/, async ({ req }) => { const result = engine.createRun(parse(await readBody(req)), { role: req.authRole, clientLabel: req.headers['x-deszo-client-label'] }); return [result.status, result.body]; }],
+    ['POST', /^\/api\/v2\/runs$/, async ({ req }) => { const result = engine.createRun(parse(await readBody(req)), { role: req.authRole, clientLabel: req.headers['x-deszo-client-label'], controllerToken: controllerTokenOf(req) }); return [result.status, result.body]; }],
     ['GET', /^\/api\/v2\/run-requests$/, ({ url }) => {
       const params = query(url, ['state', 'limit'], ['limit']);
       return [200, engine.listRunRequests(params)];
@@ -163,6 +173,29 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
     ['GET', new RegExp(`^/api/v2/runs/(${UUID})/maps/([^/]+)/executions$`), ({ match }) => [200, engine.mapHistory(match[1], decodeURIComponent(match[2]))]],
     ['GET', new RegExp(`^/api/v2/map-executions/(${UUID})$`), ({ match }) => [200, engine.mapExecutionNavigator(match[1])]],
     ['GET', new RegExp(`^/api/v2/artifacts/(${UUID})/provenance$`), ({ match }) => [200, engine.artifactProvenance(match[1])]],
+    // ADR-0002 observation, supervision, incidents and audit. Grants, incident triage and revocation are first-party only.
+    ['POST', /^\/api\/v2\/controller-sessions$/, async ({ req }) => { const result = engine.createControllerSession(parse(await readBody(req))); return [result.status, result.body]; }],
+    ['POST', /^\/api\/v2\/control-grants$/, async ({ req }) => { const result = engine.requestControlGrant(parse(await readBody(req)), { controllerToken: controllerTokenOf(req) }); return [result.status, result.body]; }],
+    ['GET', new RegExp(`^/api/v2/control-grants/(${UUID})$`), ({ match }) => [200, engine.getControlGrant(match[1])]],
+    ['POST', new RegExp(`^/api/v2/control-grants/(${UUID})/decision$`), async ({ req, match }) => { const result = engine.decideControlGrant(match[1], parse(await readBody(req))); return [result.status, result.body]; }],
+    ['POST', new RegExp(`^/api/v2/control-grants/(${UUID})/revoke$`), async ({ req, match }) => { const result = engine.revokeControlGrant(match[1], parse(await readBody(req))); return [result.status, result.body]; }],
+    ['GET', new RegExp(`^/api/v2/runs/(${UUID})/control$`), ({ match }) => [200, engine.getRunControl(match[1])]],
+    ['GET', new RegExp(`^/api/v2/runs/(${UUID})/watch$`), async ({ match, url }) => [200, await engine.watchRun(match[1], query(url, ['cursor', 'waitMs'], ['cursor', 'waitMs']))]],
+    ['POST', new RegExp(`^/api/v2/runs/(${UUID})/observation-acks$`), async ({ req, match }) => { const result = engine.acknowledgeObservation(match[1], parse(await readBody(req)), { controllerToken: controllerTokenOf(req) }); return [result.status, result.body]; }],
+    ['GET', new RegExp(`^/api/v2/runs/(${UUID})/evidence$`), ({ match }) => [200, { items: engine.runEvidence(match[1]) }]],
+    ['GET', new RegExp(`^/api/v2/runs/(${UUID})/processes$`), ({ match }) => [200, { items: engine.runProcesses(match[1]) }]],
+    ['POST', new RegExp(`^/api/v2/runs/(${UUID})/stop-and-report$`), async ({ req, match }) => { const body = parse(await readBody(req)); const result = engine.stopAndReport(match[1], body, reporterFor(req, body)); return [result.status, result.body]; }],
+    ['POST', new RegExp(`^/api/v2/runs/(${UUID})/audit-bundles$`), async ({ req, match }) => { const result = await engine.createAuditBundle(match[1], parse(await readBody(req))); return [result.status, result.body]; }],
+    ['GET', new RegExp(`^/api/v2/audit-bundles/(${UUID})$`), ({ match }) => [200, engine.getAuditBundle(match[1])]],
+    ['GET', new RegExp(`^/api/v2/artifacts/(${UUID})/range$`), ({ match, url }) => [200, engine.readArtifactRange(match[1], query(url, ['offset', 'length'], ['offset', 'length']))]],
+    ['POST', /^\/api\/v2\/incidents$/, async ({ req }) => { const body = parse(await readBody(req)); body.observation = { ...body.observation, reporter: reporterFor(req, body.observation) }; const result = engine.fileIncident(body); return [result.status, result.body]; }],
+    ['GET', /^\/api\/v2\/incidents$/, ({ url }) => [200, engine.listIncidents(query(url, ['state', 'runId', 'limit'], ['limit']))]],
+    ['GET', new RegExp(`^/api/v2/incidents/(${UUID})$`), ({ match }) => [200, engine.getIncident(match[1])]],
+    ['POST', new RegExp(`^/api/v2/incidents/(${UUID})/observations$`), async ({ req, match }) => { const body = parse(await readBody(req)); body.observation = { ...body.observation, reporter: reporterFor(req, body.observation) }; const result = engine.appendObservation(match[1], body); return [result.status, result.body]; }],
+    ['POST', new RegExp(`^/api/v2/incidents/(${UUID})/triage$`), async ({ req, match }) => { const result = engine.triageIncident(match[1], parse(await readBody(req))); return [result.status, result.body]; }],
+    ['GET', new RegExp(`^/api/v2/command-status/(${UUID})$`), ({ match }) => [200, engine.commandStatus(match[1])]],
+    ['GET', new RegExp(`^/api/v2/runs/(${UUID})/emergency-credential$`), ({ req, match }) => [200, engine.emergencyCredential(match[1], controllerTokenOf(req))]],
+    ['POST', new RegExp(`^/api/v2/runs/(${UUID})/control-extension$`), async ({ req, match }) => { const result = await engine.extendEscalation(match[1], parse(await readBody(req))); return [result.status, result.body]; }],
     ['POST', new RegExp(`^/api/v2/runs/(${UUID})/nodes/([^/]+)/stop$`), async ({ req, match }) => {
       const result = engine.stopNode(match[1], decodeURIComponent(match[2]), parse(await readBody(req))); return [result.status, result.body];
     }],
@@ -231,6 +264,9 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
     if (method === 'POST' && /^\/api\/v2\/runs\/[^/]+\/recovery$/.test(pathname)) return true;
     if (method === 'GET' && /^\/api\/v2\/run-requests$/.test(pathname)) return true;
     if (method === 'POST' && /^\/api\/v2\/run-requests\/[^/]+\/decision$/.test(pathname)) return true;
+    if (method === 'POST' && /^\/api\/v2\/control-grants\/[^/]+\/(decision|revoke)$/.test(pathname)) return true;
+    if (method === 'POST' && /^\/api\/v2\/incidents\/[^/]+\/triage$/.test(pathname)) return true;
+    if (method === 'POST' && /^\/api\/v2\/runs\/[^/]+\/control-extension$/.test(pathname)) return true;
     return false;
   };
 

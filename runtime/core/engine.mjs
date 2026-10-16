@@ -14,6 +14,9 @@ import { transportSchema } from './transport.mjs';
 import { allNodesDeep, bodyPrefix, enclosingLoops, fingerprints, parseInstance, requiredSet, returnSources } from './planning.mjs';
 import * as gate from './gate.mjs';
 import { installMapRuntime } from './mapRuntime.mjs';
+import { installSupervision } from './supervision.mjs';
+import { shimFailureOf } from './supervisor-client.mjs';
+import { StreamRecorder } from './streams.mjs';
 import { prepareManagedToolIsolation } from './managed-isolation.mjs';
 import { DEFAULT_EFFORT, EFFORT_POLICY_VERSION, resolveEffort } from '../../shared/effort.mjs';
 import contextChainExample from '../../docs/examples/m1-context-chain/workflow.json' with { type: 'json' };
@@ -32,8 +35,6 @@ const TERMINAL_ATTEMPT = new Set(['succeeded', 'failed', 'canceled', 'blocked', 
 const DONE_OK = new Set(['succeeded', 'reused']);
 const UNSTARTED = new Set(['scheduled', 'waiting']);
 const DEFAULT_SETTINGS = { schemaVersion: 1, globalLimit: 3, providerLimits: { codex: 1, claude: 1, antigravity: 1 }, externalRunConfirmation: true };
-const LOG_BATCH_BYTES = 64 * 1024;
-const LOG_BATCH_MS = 250;
 const LIST_DEFAULT = 50;
 const STARTUP_TOLERANCE_MS = 5_000;
 const API = 'runtime-api-v2.schema.json';
@@ -80,7 +81,7 @@ export function routeCase(cases, selected) {
 }
 
 export class Engine {
-  constructor({ root, adapters = defaultAdapters, processContainment = 'standalone-best-effort', supervisorGeneration = randomUUID(), runtimeInstanceId = randomUUID(), nodeExecutable = process.execPath, bridgeScript = resolve(import.meta.dirname, '../../mcp/bridge.mjs'), externalRunConfirmationOverride = null, maximumAgentTimeoutSeconds = M1_MAXIMUM_TIMEOUT, detectionTtlMs = 30_000, loopMinuteMs = 60_000 } = {}) {
+  constructor({ root, adapters = defaultAdapters, processContainment = 'standalone-best-effort', supervisorGeneration = randomUUID(), runtimeInstanceId = randomUUID(), nodeExecutable = process.execPath, bridgeScript = resolve(import.meta.dirname, '../../mcp/bridge.mjs'), externalRunConfirmationOverride = null, maximumAgentTimeoutSeconds = M1_MAXIMUM_TIMEOUT, detectionTtlMs = 30_000, loopMinuteMs = 60_000, supervisor = null } = {}) {
     this.store = new Store(root);
     this.values = valueHelpers(this.store);
     this.adapters = adapters;
@@ -89,6 +90,15 @@ export class Engine {
     this.runtimeInstanceId = runtimeInstanceId;
     this.nodeExecutable = resolve(nodeExecutable);
     this.bridgeScript = resolve(bridgeScript);
+    // The native supervisor is optional: without one, supervision grants are refused and Stop cannot prove termination.
+    this.supervisor = supervisor;
+    // The runtime's own liveness is reported on its own clock; a hung runtime stops being reported and its runs are stopped.
+    if (supervisor) { this.runtimeHeartbeat = setInterval(() => { void Promise.resolve().then(() => supervisor.runtimeAlive()).catch(() => {}); }, 1000); this.runtimeHeartbeat.unref?.(); }
+    this.stopRequests = new Map();
+    this.dispatchPaused = new Set();
+    this.watchdogs = new Map();
+    this.awaitingArm = new Set();
+    this.emergencyCredentials = new Map();
     this.externalRunConfirmationOverride = externalRunConfirmationOverride;
     this.maximumAgentTimeoutSeconds = maximumAgentTimeoutSeconds;
     this.detectionTtlMs = detectionTtlMs;
@@ -107,6 +117,7 @@ export class Engine {
   off(...args) { return this.store.off(...args); }
 
   async initialize() {
+    this.reconcileIncidentSpool();
     if (!this.store.get('SELECT * FROM application_settings WHERE singleton = 1')) {
       const artifact = this.store.putJson(DEFAULT_SETTINGS);
       this.store.run('INSERT INTO application_settings(singleton, revision, settings_artifact_id, updated_at) VALUES (1, 1, ?, ?)', artifact.artifactId, nowIso());
@@ -717,7 +728,7 @@ export class Engine {
     const loops = this.store.all('SELECT * FROM loop_executions WHERE run_id = ? ORDER BY rowid', runId).map(item => ({
       loopNodeId: item.loop_node_id, state: item.state, iteration: item.iteration, maxIterations: item.max_iterations, maxActiveMinutes: item.max_active_minutes,
       activeMs: this.activeMs(runId, item.loop_node_id, item), pauseReason: item.pause_reason }));
-    return { run: this.runBody(row), instances, contexts, loops, maps: this.mapSnapshots(runId) };
+    return { run: this.runBody(row), instances, contexts, loops, maps: this.mapSnapshots(runId), controlMode: this.controlModeOf(runId) };
   }
 
   listRuns({ workspaceId, state, kind, bindingId, limit, cursor } = {}) {
@@ -734,7 +745,7 @@ export class Engine {
   }
 
   // ---------- Run creation ----------
-  createRun(body, { role = 'first-party', clientLabel = null } = {}) {
+  createRun(body, { role = 'first-party', clientLabel = null, controllerToken = null } = {}) {
     this.validateBody('createRun', body);
     if (this.recoveryBlocked) throw new ApiError(409, 'conflict', this.recoveryBlocked);
     if (this.closing) throw new ApiError(409, 'conflict', 'The runtime is shutting down.');
@@ -748,6 +759,8 @@ export class Engine {
       const snapshot = this.store.artifactRow(workflowRow.snapshot_artifact_id);
       if (snapshot.sha256 !== body.workflowSnapshotSha256) throw new ApiError(409, 'conflict', 'The saved workflow changed; reload it before running.');
       const settings = this.currentSettings().settings;
+      // A supervised run must be bound to its approved grant before launch; a confirmation queue cannot hold that binding.
+      if (body.controlGrantId && external && settings.externalRunConfirmation) throw new ApiError(409, 'confirmation_required', 'A supervised run needs its control grant bound at creation. Confirmation is on, so request the supervised run from the Deszo window.');
       if (external && settings.externalRunConfirmation) {
         const createdAt = nowIso();
         const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
@@ -758,6 +771,9 @@ export class Engine {
       }
       const workflow = this.store.readJson(snapshot.id);
       const result = this.captureRun({ workflow, snapshot, workspace, kind: 'workflow', options: { mode: body.mode || 'workflow', targets: body.targets, refreshCaches: body.refreshCaches || [] }, requestId: body.requestId });
+      // The observer is armed here, inside the creating transaction and before the queued start.
+      if (body.controlGrantId) this.bindControlGrant(body.controlGrantId, { runId: result.body.run.runId, workflowId: body.workflowId, workspaceId: body.workspaceId,
+        snapshotSha256: body.workflowSnapshotSha256, controllerToken });
       if (external) {
         const createdAt = nowIso();
         const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
@@ -1152,6 +1168,9 @@ export class Engine {
   }
 
   pumpRun(state) {
+    // A missed controller acknowledgement pauses new dispatch only; work already running keeps its own timeouts.
+    // Nothing launches for a supervised run until its observer is armed, and a paused controller stops new dispatch.
+    if (this.dispatchPaused.has(state.id) || this.awaitingArm.has(state.id)) return;
     if (this.runState(state.id) === 'running') {
       for (const attempt of this.latestAttempts(state.id)) {
         const ready = this.readiness(state, attempt);
@@ -1198,7 +1217,8 @@ export class Engine {
     }
     if (!to) return;
     this.store.transaction(() => this.store.appendEvents(state.id, [this.runEvent(row, to, reason)]));
-    if (TERMINAL_RUN.has(to)) this.forget(state);
+    if (row.state === 'stopping') this.recordTerminationProof(state.id).catch(error => process.stderr.write(`Termination proof for run ${state.id} failed: ${error.message}\n`));
+    if (TERMINAL_RUN.has(to)) { this.endControl(state.id); this.forget(state); }
   }
 
   forget(state) {
@@ -1850,20 +1870,25 @@ export class Engine {
       // Capture failures (for example a full disk) happen in stream callbacks and timers, outside
       // the awaited invocation: contain them, stop the owned process and report them distinctly.
       const fault = error => this.captureFault(record, error);
-      const batches = { stdout: new LogBatch(this, state.id, attempt, 'stdout', 'application/octet-stream', fault), stderr: new LogBatch(this, state.id, attempt, 'stderr', 'application/octet-stream', fault),
-        normalized: new LogBatch(this, state.id, attempt, 'normalized', 'application/x-ndjson', fault) };
+      // Every byte is durable as it arrives; the stream manifests are published when the process ends (ADR-0002 section 1).
+      const extended = this.store.get('SELECT journal_version AS version FROM runs WHERE id = ?', state.id).version >= 2;
+      const recorder = (stream, mediaType) => new StreamRecorder({ store: this.store, runId: state.id, attempt, stream, mediaType, onFault: fault, extended });
+      const streams = { stdout: recorder('stdout', 'application/octet-stream'), stderr: recorder('stderr', 'application/octet-stream'), normalized: recorder('normalized', 'application/x-ndjson') };
       // Multibyte UTF-8 characters may be split across chunks; decode as a stream.
       const stdoutDecoder = new StringDecoder('utf8'), stderrDecoder = new StringDecoder('utf8');
       let stdoutRemainder = '', stderrTail = '', settled = false, timer = null;
       record.exited = new Promise(done => { record.resolveExit = done; });
       let child;
-      try { child = launch(invocation); }
+      try { child = this.launchContained(state.id, invocation); }
       catch (error) { resolvePromise({ launched: false, error: error.message, parser }); return; }
       record.child = child;
-      const finish = result => {
+      const finish = (result, { complete = false } = {}) => {
         if (settled) return; settled = true; clearTimeout(timer);
-        for (const batch of Object.values(batches)) batch.flush();
-        resolvePromise({ ...result, parser, stderrTail: stderrTail.slice(-8000), captureError: record.captureError ?? null });
+        const endingReason = result.launched ? (result.signal ? `process ended by signal ${result.signal}` : `process exited with code ${result.code}`) : (result.error || 'process did not launch');
+        let manifests = {};
+        try { manifests = Object.fromEntries(Object.entries(streams).map(([name, stream]) => [name, stream.close(endingReason, { complete })])); }
+        catch (error) { fault(error); }
+        resolvePromise({ ...result, parser, stderrTail: stderrTail.slice(-8000), captureError: record.captureError ?? null, streams: manifests });
       };
       child.once('error', error => { if (!record.launched) finish({ launched: false, error: error.message }); });
       child.once('spawn', () => { try {
@@ -1878,22 +1903,25 @@ export class Engine {
       } catch (error) { fault(error); } });
       child.stdout.on('data', chunk => {
         try {
-          batches.stdout.add(chunk);
+          streams.stdout.add(chunk);
           const lines = (stdoutRemainder + stdoutDecoder.write(chunk)).split(/\r?\n/);
           stdoutRemainder = lines.pop();
-          for (const line of lines) this.observe(parser, line, batches.normalized);
+          for (const line of lines) this.observe(parser, line, streams.normalized);
         } catch (error) { fault(error); }
       });
       child.stderr.on('data', chunk => {
-        try { batches.stderr.add(chunk); stderrTail = (stderrTail + stderrDecoder.write(chunk)).slice(-16000); } catch (error) { fault(error); }
+        try { streams.stderr.add(chunk); stderrTail = (stderrTail + stderrDecoder.write(chunk)).slice(-16000); } catch (error) { fault(error); }
       });
       child.once('close', (code, signal) => {
         try {
           stdoutRemainder += stdoutDecoder.end();
           stderrTail += stderrDecoder.end();
-          if (stdoutRemainder) this.observe(parser, stdoutRemainder, batches.normalized);
+          if (stdoutRemainder) this.observe(parser, stdoutRemainder, streams.normalized);
         } catch (error) { fault(error); }
-        if (record.launched) finish({ launched: true, code, signal });
+        // A shim failure exit means the CLI never ran; it is reported as a launch failure, not as the CLI's own result.
+        const shimFailure = this.supervisor ? shimFailureOf(code) : null;
+        if (shimFailure) finish({ launched: false, error: `The launch shim could not start the CLI (${shimFailure}).` });
+        else if (record.launched) finish({ launched: true, code, signal }, { complete: true });
         else finish({ launched: false, error: 'Process closed before launch.' });
       });
     });
@@ -1953,6 +1981,9 @@ export class Engine {
       }
       return { status: 202, body: { runId, state: 'stopping', requestId: body.requestId } };
     }, () => {
+      // The proof names every launched member, so termination is checked against what this Stop actually owned.
+      if (shouldSignalProcesses) this.stopRequests.set(runId, { requestedAt: nowIso(), observed: true,
+        pids: [...this.processes.entries()].filter(([, record]) => record.runId === runId && record.launched && record.child?.pid).map(([attemptId, record]) => ({ attemptId, pid: record.child.pid })) });
       if (shouldSignalProcesses) for (const record of this.processes.values()) if (record.runId === runId) {
         record.stopRequested = true;
         if (record.child?.pid && record.launched) killTree(record.child.pid);
@@ -2110,37 +2141,11 @@ export class Engine {
     await Promise.all(live.map(record => record.exited).filter(Boolean));
     for (const state of this.runs.values()) for (const loop of state.loops.values()) clearInterval(loop.timer);
     await new Promise(done => setTimeout(done, 50));
+    if (this.runtimeHeartbeat) clearInterval(this.runtimeHeartbeat);
     this.store.close();
   }
 }
 
 installMapRuntime(Engine, { ApiError, UNSTARTED });
+installSupervision(Engine, { ApiError });
 
-// Captured byte batches: flush at 64 KiB or 250 ms after the first buffered byte.
-class LogBatch {
-  constructor(engine, runId, attempt, stream, mediaType, onError) {
-    Object.assign(this, { engine, runId, attempt, stream, mediaType, onError, chunks: [], size: 0, index: 0, timer: null, failed: false });
-  }
-  add(chunk) {
-    let offset = 0;
-    while (offset < chunk.length) {
-      const take = Math.min(chunk.length - offset, LOG_BATCH_BYTES - this.size);
-      this.chunks.push(chunk.subarray(offset, offset + take)); this.size += take; offset += take;
-      if (this.size >= LOG_BATCH_BYTES) this.flush();
-    }
-    if (this.size && !this.timer) this.timer = setTimeout(() => this.flush(), LOG_BATCH_MS);
-  }
-  flush() {
-    clearTimeout(this.timer); this.timer = null;
-    if (!this.size) return;
-    const bytes = Buffer.concat(this.chunks); this.chunks = []; this.size = 0;
-    if (this.failed) return;
-    const store = this.engine.store;
-    try {
-      store.transaction(() => {
-        const artifact = store.putBytes(bytes, this.mediaType);
-        store.appendEvents(this.runId, [{ type: 'attempt.log_chunk', nodeInstanceId: this.attempt.node_instance_id, attemptId: this.attempt.id, payload: { stream: this.stream, chunk: ref(artifact), chunkIndex: this.index++ } }]);
-      });
-    } catch (error) { this.failed = true; this.onError?.(error); }
-  }
-}

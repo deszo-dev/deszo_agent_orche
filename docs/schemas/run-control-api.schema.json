@@ -1,0 +1,363 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deszo.local/documentation/run-control-api.schema.json",
+  "title": "Request bodies and grant records for run observation, supervised control and incidents (ADR-0002 sections 2, 3, 5 and 6)",
+  "$defs": {
+    "controllerSessionRequest": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "clientLabel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "clientProvider": {
+          "enum": [
+            "codex",
+            "claude",
+            "antigravity",
+            "other"
+          ]
+        }
+      },
+      "required": [
+        "requestId",
+        "clientLabel",
+        "clientProvider"
+      ],
+      "additionalProperties": false
+    },
+    "controlGrantRequest": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "controllerSessionId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "workflowId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$"
+        },
+        "workspaceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$"
+        },
+        "clientProvider": {
+          "enum": [
+            "codex",
+            "claude",
+            "antigravity",
+            "other"
+          ]
+        },
+        "clientVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "requestedActions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "observe",
+              "acknowledge",
+              "stop",
+              "stop-and-report",
+              "scoped-stop",
+              "retry",
+              "recover"
+            ]
+          }
+        },
+        "observationDeadlineMs": {
+          "type": "integer",
+          "minimum": 5000,
+          "maximum": 600000
+        },
+        "escalationDeadlineMs": {
+          "type": "integer",
+          "minimum": 10000,
+          "maximum": 3600000
+        },
+        "workflowSnapshotSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "requestId",
+        "controllerSessionId",
+        "workflowId",
+        "workspaceId",
+        "clientProvider",
+        "requestedActions",
+        "observationDeadlineMs",
+        "escalationDeadlineMs",
+        "workflowSnapshotSha256"
+      ],
+      "additionalProperties": false
+    },
+    "controlGrantDecision": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "decision": {
+          "enum": [
+            "approve",
+            "deny"
+          ]
+        }
+      },
+      "required": [
+        "requestId",
+        "decision"
+      ],
+      "additionalProperties": false
+    },
+    "controlGrantRevoke": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      },
+      "required": [
+        "requestId",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "observationAckRequest": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "cursor": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "requestId",
+        "cursor"
+      ],
+      "additionalProperties": false
+    },
+    "incidentFileRequest": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "observation": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "requestId",
+        "observation"
+      ],
+      "additionalProperties": false
+    },
+    "incidentTriageRequest": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "state": {
+          "enum": [
+            "triaged",
+            "closed"
+          ]
+        },
+        "causeStatus": {
+          "enum": [
+            "suspected",
+            "confirmed"
+          ]
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        }
+      },
+      "required": [
+        "requestId"
+      ],
+      "anyOf": [
+        {
+          "required": [
+            "state"
+          ]
+        },
+        {
+          "required": [
+            "causeStatus"
+          ]
+        }
+      ],
+      "additionalProperties": false
+    },
+    "stopAndReportRequest": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "observation": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "requestId",
+        "reason",
+        "observation"
+      ],
+      "additionalProperties": false
+    },
+    "auditBundleRequest": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "profile": {
+          "enum": [
+            "private-local",
+            "shareable"
+          ]
+        }
+      },
+      "required": [
+        "requestId",
+        "profile"
+      ],
+      "additionalProperties": false
+    },
+    "controlGrantRecord": {
+      "type": "object",
+      "description": "The immutable reviewable content of a supervision grant; its digest is what first-party approval reviews.",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "kind": {
+          "const": "ControlGrant"
+        },
+        "controllerSessionId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "workflowId": {
+          "type": "string"
+        },
+        "workflowSnapshotSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "workspaceId": {
+          "type": "string"
+        },
+        "clientProvider": {
+          "enum": [
+            "codex",
+            "claude",
+            "antigravity",
+            "other"
+          ]
+        },
+        "clientVersion": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "requestedActions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "observationDeadlineMs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "escalationDeadlineMs": {
+          "type": "integer",
+          "minimum": 2
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "controllerSessionId",
+        "workflowId",
+        "workflowSnapshotSha256",
+        "workspaceId",
+        "clientProvider",
+        "clientVersion",
+        "requestedActions",
+        "observationDeadlineMs",
+        "escalationDeadlineMs"
+      ],
+      "additionalProperties": false
+    },
+    "controlExtensionRequest": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "extensionMs": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 1800000
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      },
+      "required": [
+        "requestId",
+        "extensionMs",
+        "reason"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

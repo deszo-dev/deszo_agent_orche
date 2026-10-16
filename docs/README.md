@@ -1,8 +1,8 @@
 # Deszo Orchestrator Documentation
 
-Version: 0.15  
-Status: confirmed product requirements, accepted ADR-0001 verified for listed Windows clients/scopes, and staged proposed contracts  
-Updated: 2026-10-15
+Version: 0.17
+Status: confirmed requirements, verified ADR-0001, accepted ADR-0002, and staged proposed contracts
+Updated: 2026-10-16
 
 Deszo is a personal Tauri/React/React Flow desktop application with an Orange-inspired node workspace. Milestones M1–M6 and the reference delivery pipeline are implemented. ADR-0001 external authoring passed its ordered acceptance campaign with the listed Windows Codex, Claude Code, and Antigravity versions.
 
@@ -16,11 +16,12 @@ Version 0.8 resolves [the third review](reviews/2026-10-13-third-review.md): M1'
 4. [Decision register](DECISIONS.md): confirmed requirements and proposal status.
 5. [Product specification](PRODUCT_SPEC.md) and [architecture](ARCHITECTURE.md): UX and component/data flow.
 6. [Project README](../README.md): current prototype commands and recorded checks.
-7. [Architecture decision records](adr/README.md): accepted external workflow authoring through the API and shared MCP tools for Codex, Claude Code, and Antigravity.
+7. [Architecture decision records](adr/README.md): accepted external authoring and execution audit, supervision and incident reporting.
 8. [Authoring bridge setup](authoring/README.md): generated client configuration and local setup for Codex, Claude Code, and Antigravity.
 9. [ADR-0001 implementation status](adr/0001-implementation-status.md): implemented code paths and remaining release evidence.
 10. [External authoring acceptance test plan](authoring/ACCEPTANCE_TEST_PLAN.md): ordered release gates, native compatibility probes, pilot rerun, policy/cutover checks, and installed-client acceptance.
 11. [Authoring acceptance report](pilots/2026-10-15-authoring-acceptance.md) and [migration note](authoring/MIGRATION_V3.md): executed G0–G5 results, supported versions/scopes, v2 retirement, and confirmation settings.
+12. [Accepted ADR-0002](adr/0002-execution-audit-and-supervised-control.md): complete available execution evidence, assistant control, verified root Stop, local bugs and audit export before the shadcn/ui pilot.
 
 ## Rule ownership and precedence
 
@@ -42,6 +43,7 @@ Confirmed user requirements in [DECISIONS.md](DECISIONS.md) take precedence over
 | Accepted external authoring architecture, shared MCP bridge, API migration, and integration acceptance criteria | [ADR-0001](adr/0001-external-workflow-authoring-api-and-mcp.md) |
 | ADR-0001 code delivery and outstanding verification | [ADR-0001 implementation status](adr/0001-implementation-status.md) |
 | ADR-0001 verification sequence and evidence requirements | [Acceptance test plan](authoring/ACCEPTANCE_TEST_PLAN.md) |
+| Accepted audit/supervision/incident architecture; current runtime behavior stays unchanged until implementation | [ADR-0002](adr/0002-execution-audit-and-supervised-control.md) |
 
 Product specification describes interactions; architecture describes components. [Proposed baseline](PROPOSED_BASELINE.md) preserves Q01–Q22 navigation without duplicating rules. [Open questions](OPEN_QUESTIONS.md) redirects to the decision register and staged contract prerequisites.
 
@@ -71,6 +73,8 @@ ADR-0001 is implemented and verified within its documented Windows support bound
 
 | Date | Version | Change |
 | --- | --- | --- |
+| 2026-10-16 | 0.17 | Accepted ADR-0002 after the second review; recorded P24 and Stage 1/2 contract requirements; no implementation or pilot execution |
+| 2026-10-16 | 0.16 | Added D20–D22 and proposed ADR-0002 for execution audit, supervised control, verified root Stop, local incidents and audit bundles; no new runtime behavior or pilot execution |
 | 2026-10-15 | 0.15 | Completed ADR-0001 G0–G5 for listed Windows clients/scopes, verified native isolation and the real-provider pilot, enabled default confirmation, retired v2 saves, and published migration and installed-client evidence |
 | 2026-10-15 | 0.14 | Added the ADR-0001 acceptance plan for exact-version MCP isolation, the real-provider rerun, default confirmation, v2 save retirement, and all three installed authoring clients |
 | 2026-10-15 | 0.13 | Began implementing accepted ADR-0001; added API v3, shared MCP bridge, guarded authoring and approval flow; client and pilot verification remain staged |

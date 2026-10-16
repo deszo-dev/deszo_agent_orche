@@ -8,6 +8,8 @@ import { UtilityError, jsonValue, ref, setValue, textValue } from './utilities.m
 import { enclosingLoops, parseInstance } from './planning.mjs';
 import { nodePorts } from './validate.mjs';
 import { killTree, launch } from './processes.mjs';
+import { StreamRecorder } from './streams.mjs';
+import { shimFailureOf } from './supervisor-client.mjs';
 import * as gate from './gate.mjs';
 import { assemble, carryDecision, consumersOf, taskFingerprints, executePrompt, issueId, mapIssues, outputSchema, recordId, reviewPrompt, scopeMatches, templateFingerprint, topologicalTasks, triagePrompt } from './map.mjs';
 
@@ -15,7 +17,15 @@ import { assemble, carryDecision, consumersOf, taskFingerprints, executePrompt, 
 // "<map instance>/<execution>/<task>-<step>" with ordinary attempts, locks and recovery.
 const OPEN_EXEC = ['running', 'paused', 'finishing'];
 const OUTPUT_TAIL = 4000;
-const STREAM_LIMIT = 1024 * 1024;
+// Check streams become a single CheckReport artifact, so they are bounded more tightly than Agent logs.
+const CHECK_STREAM_LIMIT_BYTES = 64 * 1024 * 1024;
+// The weakest stream integrity decides the verdict; an unknown or failed capture is never reported as complete.
+const captureVerdictOf = closed => {
+  if (!closed) return 'capture_failed';
+  const verdicts = [closed.stdout.integrity, closed.stderr.integrity];
+  if (verdicts.includes('capture_failed')) return 'capture_failed';
+  return verdicts.every(value => value === 'complete') ? 'complete' : 'partial';
+};
 const fail = message => { throw new UtilityError('output_contract', message); };
 const slug = (taskId, step) => {
   const text = `${taskId.toLowerCase()}-${step}`;
@@ -746,11 +756,24 @@ export function installMapRuntime(Engine, { ApiError, UNSTARTED }) {
     const record = { runId: state.id, loops: enclosingLoops(scope.prefix).map(item => item.loopInstance), provider: null, keys: [], child: null, stopRequested: false, timedOut: false, launched: false,
       mapPrefix: `${exec.row.map_instance_id}/${exec.plan.seq}/` };
     this.processes.set(attempt.id, record);
-    let stdout = Buffer.alloc(0), stderr = Buffer.alloc(0), startedAt = null, settled = false;
+    // The command manifest is captured before spawn (ADR-0002 section 1); streams are durable as they arrive.
+    const commandRef = ref(this.store.putJson({ schemaVersion: 1, kind: 'CommandManifest', executable, arguments: command.args, source: source.kind,
+      timeoutSeconds: command.timeoutSeconds, requiredExitCode: command.requiredExitCode ?? null, environmentPolicy: 'check-environment' }));
+    const extended = this.store.get('SELECT journal_version AS version FROM runs WHERE id = ?', state.id).version >= 2;
+    const fault = error => this.captureFault(record, error);
+    const streams = { stdout: new StreamRecorder({ store: this.store, runId: state.id, attempt, stream: 'stdout', mediaType: 'application/octet-stream', hardLimitBytes: CHECK_STREAM_LIMIT_BYTES, onFault: fault, extended }),
+      stderr: new StreamRecorder({ store: this.store, runId: state.id, attempt, stream: 'stderr', mediaType: 'application/octet-stream', hardLimitBytes: CHECK_STREAM_LIMIT_BYTES, onFault: fault, extended }) };
+    let startedAt = null, settled = false;
     const finish = outcome => {
       if (settled) return; settled = true;
       clearTimeout(record.timer);
-      try { this.finishCheck(state, exec, def, criterion, attempt, { outcome, dir, before, executable, command, source, stdout, stderr, startedAt, record }); }
+      // Streams close on every outcome, so the evidence record always has manifests to point at.
+      const endingReason = !record.launched ? 'process did not start' : record.captureError ? 'process stopped after a capture fault' : record.timedOut ? 'process stopped after its timeout'
+        : record.stopRequested ? 'process stopped by Stop' : outcome.signal ? `process ended by signal ${outcome.signal}` : `process exited with code ${outcome.code}`;
+      let closed = null;
+      try { closed = { stdout: streams.stdout.close(endingReason, { complete: outcome.complete === true }), stderr: streams.stderr.close(endingReason, { complete: outcome.complete === true }) }; }
+      catch (error) { fault(error); }
+      try { this.finishCheck(state, exec, def, criterion, attempt, { outcome, dir, before, executable, command, source, streams, closed, startedAt, record, commandRef }); }
       catch (error) { try { this.failAttempt(state, this.store.get('SELECT * FROM attempts WHERE id = ?', attempt.id), 'output_contract', error.message); } catch { /* Journal unavailable. */ } }
       finally {
         rmSync(dir, { recursive: true, force: true });
@@ -763,7 +786,7 @@ export function installMapRuntime(Engine, { ApiError, UNSTARTED }) {
     this.store.transaction(() => this.store.appendEvents(state.id, [this.commitInputs(state, attempt, {})]));
     record.exited = new Promise(done => { record.resolveExit = done; });
     let child;
-    try { child = launch({ command: executable, args: command.args, cwd: dir, env: checkEnvironment(), stdin: '' }); }
+    try { child = this.launchContained(state.id, { command: executable, args: command.args, cwd: dir, env: checkEnvironment(), stdin: '' }); }
     catch (error) { return finish({ spawnError: error.message }); }
     record.child = child;
     child.once('error', error => { if (!record.launched) finish({ spawnError: error.message }); });
@@ -777,37 +800,79 @@ export function installMapRuntime(Engine, { ApiError, UNSTARTED }) {
       record.timer = setTimeout(() => { record.timedOut = true; killTree(child.pid); }, command.timeoutSeconds * 1000);
       if (record.stopRequested) killTree(child.pid);
     });
-    child.stdout.on('data', chunk => { if (stdout.length < STREAM_LIMIT) stdout = Buffer.concat([stdout, chunk]); });
-    child.stderr.on('data', chunk => { if (stderr.length < STREAM_LIMIT) stderr = Buffer.concat([stderr, chunk]); });
-    child.once('close', (code, signal) => finish({ code, signal }));
+    child.stdout.on('data', chunk => { try { streams.stdout.add(chunk); } catch (error) { fault(error); } });
+    child.stderr.on('data', chunk => { try { streams.stderr.add(chunk); } catch (error) { fault(error); } });
+    child.once('close', (code, signal) => {
+      // A shim failure exit means the CLI never ran: a spawn failure with no result to judge.
+      const shimFailure = this.supervisor ? shimFailureOf(code) : null;
+      if (shimFailure) finish({ spawnError: `the launch shim could not start the CLI (${shimFailure})` });
+      else finish({ code, signal, complete: true });
+    });
   };
 
-  P.finishCheck = function finishCheck(state, exec, def, criterion, attempt, { outcome, dir, before, executable, command, source, stdout, stderr, startedAt, record }) {
+  // ADR-0002 section 1: every check outcome leaves an evidence record with its command and stream manifests.
+  // A check that never closed its streams has no manifests to point at; its captured chunks stay journaled.
+  P.checkEvidence = function checkEvidence(state, attempt, criterion, { kind, reason, outcome, startedAt, commandRef, closed }) {
+    if (!closed) return { ref: null, events: [] };
+    const captureVerdict = captureVerdictOf(closed);
+    const evidence = { schemaVersion: 1, kind: 'ExecutionEvidence', attemptId: attempt.id, nodeInstanceId: attempt.node_instance_id, checkId: criterion.checkId,
+      outcome: kind, exitCode: outcome.code ?? null, signal: outcome.signal ?? null, startedAt: startedAt ?? null, endedAt: nowIso(), command: commandRef,
+      streams: { stdout: closed.stdout.manifestRef, stderr: closed.stderr.manifestRef }, captureVerdict, reason };
+    assertValid('execution-evidence.schema.json', 'executionEvidence', evidence, 'Execution evidence');
+    const artifact = this.store.putJson(evidence);
+    this.store.run('INSERT INTO execution_evidence(id, run_id, attempt_id, outcome, evidence_artifact_id, created_at) VALUES (?, ?, ?, ?, ?, ?)', randomUUID(), state.id, attempt.id, kind, artifact.artifactId, nowIso());
+    const journalled = this.store.get('SELECT journal_version AS version FROM runs WHERE id = ?', state.id).version >= 2;
+    const events = journalled ? [{ type: 'attempt.execution_evidence', nodeInstanceId: attempt.node_instance_id, attemptId: attempt.id, payload: { evidence: ref(artifact), outcome: kind, checkId: criterion.checkId } }] : [];
+    return { ref: ref(artifact), events };
+  };
+
+  P.streamBytes = function streamBytes(manifest) {
+    return Buffer.concat(manifest.chunks.map(chunk => this.store.readBytes(chunk.artifact.artifactId).bytes));
+  };
+
+  P.finishCheck = function finishCheck(state, exec, def, criterion, attempt, { outcome, dir, before, executable, command, source, streams, closed, startedAt, record, commandRef }) {
     let current = this.store.get('SELECT * FROM attempts WHERE id = ?', attempt.id);
-    if (record.stopRequested) return this.store.transaction(() => this.store.appendEvents(state.id, this.attemptTransition(current, 'canceled', 'Stopped by the user.')));
-    if (outcome.spawnError) return this.failAttempt(state, current, 'process', `The check ${criterion.checkId} could not start: ${outcome.spawnError}`);
-    if (record.timedOut) return this.failAttempt(state, current, 'timeout', `${criterion.checkId} exceeded ${command.timeoutSeconds} seconds.`);
-    if (outcome.code === null) return this.failAttempt(state, current, 'process', `${criterion.checkId} ended by signal ${outcome.signal}; no passing evidence.`);
+    const evidence = (kind, reason) => this.checkEvidence(state, current, criterion, { kind, reason, outcome, startedAt, commandRef, closed });
+    // Failures commit their evidence first, then the attempt failure that refers to it.
+    const failWithEvidence = (kind, reason, code, message) => {
+      const ev = evidence(kind, reason);
+      if (ev.events.length) this.store.transaction(() => this.store.appendEvents(state.id, ev.events));
+      this.failAttempt(state, current, code, message, { evidence: ev.ref });
+    };
+    if (record.stopRequested) {
+      const ev = evidence('canceled', 'The check was stopped by Stop.');
+      return this.store.transaction(() => this.store.appendEvents(state.id, [...ev.events, ...this.attemptTransition(current, 'canceled', 'Stopped by the user.')]));
+    }
+    if (record.captureError) {
+      const code = record.captureError.code === 'capture_limit' ? 'capture_limit' : 'capture_failed';
+      return failWithEvidence('capture_failed', `Capture stopped the process: ${record.captureError.message}`, code, record.captureError.message);
+    }
+    if (outcome.spawnError) return failWithEvidence('spawn_failed', `The process did not start: ${outcome.spawnError}`, 'process', `The check ${criterion.checkId} could not start: ${outcome.spawnError}`);
+    if (record.timedOut) return failWithEvidence('timed_out', `The process exceeded ${command.timeoutSeconds} seconds.`, 'timeout', `${criterion.checkId} exceeded ${command.timeoutSeconds} seconds.`);
+    if (outcome.code === null) return failWithEvidence('interrupted', `The process ended by signal ${outcome.signal}.`, 'process', `${criterion.checkId} ended by signal ${outcome.signal}; no passing evidence.`);
     const after = snapshot(dir);
     const modified = [...new Set([...Object.keys(before), ...Object.keys(after)])].filter(path => before[path] !== after[path] && !(def.writeScopes.some(scope => scopeMatchesSafe(path, scope)) && !(path in before)));
-    if (modified.length) return this.failAttempt(state, current, 'output_contract', `${criterion.checkId} modified sources (${modified.slice(0, 5).join(', ')}); its evidence is invalid.`);
+    if (modified.length) return failWithEvidence('invalid_source', `The check modified sources: ${modified.slice(0, 5).join(', ')}.`, 'output_contract', `${criterion.checkId} modified sources (${modified.slice(0, 5).join(', ')}); its evidence is invalid.`);
     this.store.transaction(() => {
       current = this.store.get('SELECT * FROM attempts WHERE id = ?', attempt.id);
       const passed = outcome.code === command.requiredExitCode;
+      const ev = evidence(passed ? 'passed' : 'failed', `Exit code ${outcome.code}; required ${command.requiredExitCode}.`);
       const report = this.mapRecord(state, 'CheckReport', 'checkReport', { schemaVersion: 1, kind: 'CheckReport', recordId: recordId('CHK', { attempt: attempt.id }), mapExecutionId: exec.row.id,
         taskId: def.id, criterionId: criterion.id, checkId: criterion.checkId, subjectId: exec.row.subject_id, source, executable, executableVersion: command.program === 'node' ? process.version : null,
         arguments: command.args, timeoutSeconds: command.timeoutSeconds, requiredExitCode: command.requiredExitCode, exitCode: outcome.code, startedAt: startedAt || nowIso(), endedAt: nowIso(),
-        stdout: ref(this.store.putBytes(stdout, 'text/plain; charset=utf-8')), stderr: ref(this.store.putBytes(stderr, 'text/plain; charset=utf-8')), sourceIntegrity: 'intact', outcome: passed ? 'passed' : 'failed' });
+        stdout: ref(this.store.putBytes(this.streamBytes(closed.stdout.manifest), 'text/plain; charset=utf-8')), stderr: ref(this.store.putBytes(this.streamBytes(closed.stderr.manifest), 'text/plain; charset=utf-8')),
+        sourceIntegrity: 'intact', outcome: passed ? 'passed' : 'failed' });
       const fresh = this.loadExec(state, exec.row.id);
       const task = fresh.tasks.get(def.id);
       const events = [this.mapEvent(fresh, 'map.record_created', { taskId: def.id, kind: 'CheckReport', record: report, stepInstanceId: attempt.node_instance_id })];
       events.push(this.commitOutputs(state, current, { report: jsonValue(this.store.putJson(report)) }));
+      events.push(...ev.events);
       events.push(...this.attemptTransition(current, 'succeeded', passed ? `${criterion.checkId} passed (exit ${outcome.code}).` : `${criterion.checkId} failed: exit ${outcome.code}, required ${command.requiredExitCode}.`));
       if (source.kind === 'candidate') { if (task.data.cycle?.candidate?.recordId === source.recordId) task.data.cycle.checks[criterion.id] = { ref: report, outcome: passed ? 'passed' : 'failed' }; }
       else if (task.data.currentResultId === source.recordId && task.data.criteria[criterion.id]) {
         task.data.criteria[criterion.id] = { verdict: passed ? 'passed' : 'failed', recordId: report.recordId,
           issues: passed ? [] : [{ id: issueId('MAP', { report: report.recordId }), severity: 'blocker', ownerRole: def.executorRole, requirementRefs: def.requirementRefs,
-            message: `${criterion.checkId} exited ${outcome.code} (required ${command.requiredExitCode}).`, requestedChange: `Make ${criterion.checkId} pass: ${tail(stderr.toString('utf8') || stdout.toString('utf8')).slice(-600)}` }] };
+            message: `${criterion.checkId} exited ${outcome.code} (required ${command.requiredExitCode}).`, requestedChange: `Make ${criterion.checkId} pass: ${tail(streams.stderr.tailText() || streams.stdout.tailText()).slice(-600)}` }] };
       }
       this.saveTask(fresh, task);
       this.store.appendEvents(state.id, events);

@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deszo.local/documentation/audit-manifest.schema.json",
+  "title": "Offline audit bundle manifest (ADR-0002 section 6)",
+  "$defs": {
+    "auditManifest": {
+      "type": "object",
+      "description": "Every member's size and digest, the reference closure, the completeness verdict and every known omission. Written beside the bundle members.",
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "kind": { "const": "AuditManifest" },
+        "exportId": { "type": "string", "format": "uuid" },
+        "runId": { "type": "string", "format": "uuid" },
+        "profile": { "enum": ["private-local", "shareable"] },
+        "pinnedSequence": { "type": "integer", "minimum": 0 },
+        "runState": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "verdict": { "enum": ["complete", "partial"] },
+        "generatedAt": { "type": "string" },
+        "controlMode": { "enum": ["supervised", "unsupervised"] },
+        "members": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": { "type": "string", "minLength": 1, "maxLength": 300 },
+              "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "byteSize": { "type": "integer", "minimum": 0 },
+              "role": { "enum": ["journal", "object", "manifest", "index", "incidents", "evidence", "termination"] },
+              "completeness": { "enum": ["complete", "partial", "unknown"] }
+            },
+            "required": ["path", "sha256", "byteSize", "role", "completeness"],
+            "additionalProperties": false
+          }
+        },
+        "omissions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "category": { "type": "string", "minLength": 1, "maxLength": 120 },
+              "reason": { "type": "string", "minLength": 1, "maxLength": 500 }
+            },
+            "required": ["category", "reason"],
+            "additionalProperties": false
+          }
+        },
+        "redactionManifest": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "category": { "type": "string", "minLength": 1, "maxLength": 120 },
+              "reason": { "type": "string", "minLength": 1, "maxLength": 500 }
+            },
+            "required": ["category", "reason"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["schemaVersion", "kind", "exportId", "runId", "profile", "pinnedSequence", "runState", "verdict", "generatedAt", "controlMode", "members", "omissions", "redactionManifest"],
+      "additionalProperties": false
+    }
+  }
+}

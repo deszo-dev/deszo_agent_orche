@@ -16,6 +16,10 @@ import apiV3 from '../../docs/schemas/runtime-api-v3.schema.json' with { type: '
 import reviewDecision from '../../docs/schemas/review-decision.schema.json' with { type: 'json' };
 import gate from '../../docs/schemas/gate.schema.json' with { type: 'json' };
 import mapSchema from '../../docs/schemas/map.schema.json' with { type: 'json' };
+import executionEvidence from '../../docs/schemas/execution-evidence.schema.json' with { type: 'json' };
+import incident from '../../docs/schemas/incident.schema.json' with { type: 'json' };
+import auditManifest from '../../docs/schemas/audit-manifest.schema.json' with { type: 'json' };
+import runControlApi from '../../docs/schemas/run-control-api.schema.json' with { type: 'json' };
 
 export const SCHEMAS = {
   'workflow.schema.json': workflow,
@@ -34,6 +38,10 @@ export const SCHEMAS = {
   'review-decision.schema.json': reviewDecision,
   'gate.schema.json': gate,
   'map.schema.json': mapSchema,
+  'execution-evidence.schema.json': executionEvidence,
+  'incident.schema.json': incident,
+  'audit-manifest.schema.json': auditManifest,
+  'run-control-api.schema.json': runControlApi,
 };
 
 const AjvClass = Ajv2020.default || Ajv2020;

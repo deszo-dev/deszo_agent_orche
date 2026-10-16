@@ -25,8 +25,10 @@ const BUNDLED_M6 = new URL('./m6.sql', import.meta.url);
 const M6_PATH = existsSync(BUNDLED_M6) ? BUNDLED_M6 : new URL('../../docs/storage/m6.sql', import.meta.url);
 const BUNDLED_M7 = new URL('./m7.sql', import.meta.url);
 const M7_PATH = existsSync(BUNDLED_M7) ? BUNDLED_M7 : new URL('../../docs/storage/m7.sql', import.meta.url);
+const BUNDLED_M8 = new URL('./m8.sql', import.meta.url);
+const M8_PATH = existsSync(BUNDLED_M8) ? BUNDLED_M8 : new URL('../../docs/storage/m8.sql', import.meta.url);
 export const nowIso = () => new Date().toISOString();
-export const MIGRATION_PATHS = [DDL_PATH, M2_PATH, M3_PATH, M4_PATH, M5_PATH, M6_PATH, M7_PATH];
+export const MIGRATION_PATHS = [DDL_PATH, M2_PATH, M3_PATH, M4_PATH, M5_PATH, M6_PATH, M7_PATH, M8_PATH];
 
 // A reference script's transaction and pragma lines are applied by the runtime around it, so the
 // schema change and its schema_migrations row commit together.
