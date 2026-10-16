@@ -549,6 +549,7 @@ function Workspace() {
         <PaletteItem icon={<Repeat size={14} />} label="Loop" hint={scope ? 'Nested loop (pipeline)' : 'Repeat a body until done'} onClick={() => addNode('loop')} />
         <PaletteItem icon={<Database size={14} />} label="Cache" hint="Checkpoint; freeze to skip its producer" onClick={() => addNode('cache')} />
         <h4>Pipeline</h4>
+        <PaletteItem icon={<ListChecks size={14} />} label="Managed Task" hint="Assess, plan, implement and verify" onClick={() => addNode('task')} />
         <PaletteItem icon={<Split size={14} />} label="Route" hint="Pick one branch by a JSON value" onClick={() => addNode('route')} />
         <PaletteItem icon={<ShieldCheck size={14} />} label="Gate" hint="Prepare, evaluate or verify reviews" onClick={() => addNode('gate')} />
         <PaletteItem icon={<ListChecks size={14} />} label="Implementation Map" hint="Run approved tasks with checks" onClick={() => addNode('map')} />

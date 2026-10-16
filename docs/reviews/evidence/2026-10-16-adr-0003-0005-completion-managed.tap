@@ -1,0 +1,133 @@
+TAP version 13
+# Subtest: managed task runs assessment, deterministic planning, isolated test/code roles, checks and authoritative acceptance through Engine
+ok 1 - managed task runs assessment, deterministic planning, isolated test/code roles, checks and authoritative acceptance through Engine
+  ---
+  duration_ms: 7039.8591
+  type: 'test'
+  ...
+# Subtest: managed task delivers a byte-verified feature branch without changing the caller checkout
+ok 2 - managed task delivers a byte-verified feature branch without changing the caller checkout
+  ---
+  duration_ms: 24815.7714
+  type: 'test'
+  ...
+# Subtest: check and reviewer repair loops consume the shared bound and require fresh evidence before acceptance
+ok 3 - check and reviewer repair loops consume the shared bound and require fresh evidence before acceptance
+  ---
+  duration_ms: 9737.3954
+  type: 'test'
+  ...
+# Subtest: incomplete review, absent dependencies, scope violations and reviewer mutations block acceptance without fake repair
+    # Subtest: REVIEW_INCOMPLETE
+    ok 1 - REVIEW_INCOMPLETE
+      ---
+      duration_ms: 3754.1609
+      type: 'test'
+      ...
+    # Subtest: MISSING_CONTEXT
+    ok 2 - MISSING_CONTEXT
+      ---
+      duration_ms: 4266.5551
+      type: 'test'
+      ...
+    # Subtest: SCOPE_VIOLATION
+    ok 3 - SCOPE_VIOLATION
+      ---
+      duration_ms: 3963.3104
+      type: 'test'
+      ...
+    # Subtest: REVIEW_MUTATION
+    ok 4 - REVIEW_MUTATION
+      ---
+      duration_ms: 3567.4666
+      type: 'test'
+      ...
+    1..4
+ok 4 - incomplete review, absent dependencies, scope violations and reviewer mutations block acceptance without fake repair
+  ---
+  duration_ms: 15552.9107
+  type: 'test'
+  ...
+# Subtest: aggregate attempts include preparation and cannot be reset through retry
+ok 5 - aggregate attempts include preparation and cannot be reset through retry
+  ---
+  duration_ms: 2295.0925
+  type: 'test'
+  ...
+# Subtest: the aggregate elapsed deadline interrupts a running Agent sooner than its local timeout and cannot be reset
+ok 6 - the aggregate elapsed deadline interrupts a running Agent sooner than its local timeout and cannot be reset
+  ---
+  duration_ms: 1842.1931
+  type: 'test'
+  ...
+# Subtest: root, task and command Stop during actual delivery smoke terminate child trees and never publish a branch
+    # Subtest: root
+    ok 1 - root
+      ---
+      duration_ms: 12059.7747
+      type: 'test'
+      ...
+    # Subtest: task
+    ok 2 - task
+      ---
+      duration_ms: 10933.6448
+      type: 'test'
+      ...
+    # Subtest: command
+    ok 3 - command
+      ---
+      duration_ms: 11957.164
+      type: 'test'
+      ...
+    1..3
+ok 7 - root, task and command Stop during actual delivery smoke terminate child trees and never publish a branch
+  ---
+  duration_ms: 34952.6872
+  type: 'test'
+  ...
+# Subtest: final manual acceptance evidence comes from a fresh policy-selected accepter, never a readiness review
+    # Subtest: same Analyst fresh Context
+    ok 1 - same Analyst fresh Context
+      ---
+      duration_ms: 3390.6898
+      type: 'test'
+      ...
+    # Subtest: independent
+    ok 2 - independent
+      ---
+      duration_ms: 3155.7849
+      type: 'test'
+      ...
+    1..2
+ok 8 - final manual acceptance evidence comes from a fresh policy-selected accepter, never a readiness review
+  ---
+  duration_ms: 6547.3664
+  type: 'test'
+  ...
+# Subtest: an indeterminate ref-update receipt pauses delivery, preserves commit intent and refuses blind retry
+ok 9 - an indeterminate ref-update receipt pauses delivery, preserves commit intent and refuses blind retry
+  ---
+  duration_ms: 15275.4337
+  type: 'test'
+  ...
+# Subtest: restart preserves delivery intent for reconciliation and never resumes publishing
+ok 10 - restart preserves delivery intent for reconciliation and never resumes publishing
+  ---
+  duration_ms: 3984.935
+  type: 'test'
+  ...
+# Subtest: candidate risk escalation, bounded discovery and context expansion execute actual extra Engine attempts
+ok 11 - candidate risk escalation, bounded discovery and context expansion execute actual extra Engine attempts
+  ---
+  duration_ms: 10119.0129
+  type: 'test'
+  ...
+1..11
+# tests 20
+# suites 0
+# pass 20
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 132545.5371

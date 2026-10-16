@@ -15,12 +15,15 @@ import { allNodesDeep, bodyPrefix, enclosingLoops, fingerprints, parseInstance, 
 import * as gate from './gate.mjs';
 import { installMapRuntime } from './mapRuntime.mjs';
 import { installSupervision } from './supervision.mjs';
+import { installTaskRuntime } from './taskRuntime.mjs';
+import { installTaskProcesses } from './taskProcesses.mjs';
 import { shimFailureOf } from './supervisor-client.mjs';
 import { StreamRecorder } from './streams.mjs';
 import { prepareManagedToolIsolation } from './managed-isolation.mjs';
 import { DEFAULT_EFFORT, EFFORT_POLICY_VERSION, resolveEffort } from '../../shared/effort.mjs';
 import contextChainExample from '../../docs/examples/m1-context-chain/workflow.json' with { type: 'json' };
 import deliveryExample from '../../docs/examples/reference-delivery/workflow.json' with { type: 'json' };
+import managedTaskExample from '../../docs/examples/managed-task/workflow.json' with { type: 'json' };
 
 export { parseInstance };
 
@@ -155,12 +158,13 @@ export class Engine {
       this.store.transaction(() => {
         const events = [];
         for (const attempt of this.store.all('SELECT * FROM attempts WHERE run_id = ? ORDER BY rowid', run.id)) {
-          const loop = this.store.get('SELECT 1 FROM loop_executions WHERE run_id = ? AND attempt_id = ?', run.id, attempt.id) || this.store.get('SELECT 1 FROM map_executions WHERE run_id = ? AND attempt_id = ?', run.id, attempt.id);
+          const loop = this.store.get('SELECT 1 FROM loop_executions WHERE run_id = ? AND attempt_id = ?', run.id, attempt.id) || this.store.get('SELECT 1 FROM map_executions WHERE run_id = ? AND attempt_id = ?', run.id, attempt.id) || this.store.get('SELECT 1 FROM managed_tasks WHERE run_id=? AND attempt_id=?', run.id, attempt.id);
           if (attempt.state === 'running' || (loop && attempt.state === 'waiting')) events.push(...this.attemptTransition(attempt, 'interrupted', 'Runtime restarted while the attempt was active.'));
           else if (UNSTARTED.has(attempt.state)) events.push(...this.attemptTransition(attempt, 'canceled', 'Runtime restarted before the attempt started.'));
         }
         this.store.run(`UPDATE loop_executions SET state = 'interrupted', pause_reason = NULL WHERE run_id = ? AND state IN ('running','paused')`, run.id);
         this.store.run(`UPDATE map_executions SET state = 'interrupted', pause_reason = NULL WHERE run_id = ? AND state IN ('running','paused','finishing')`, run.id);
+        this.interruptManagedTasks(run.id, events);
         this.store.run(`UPDATE loop_iterations SET outcome = 'interrupted', ended_at = ? WHERE run_id = ? AND outcome IN ('running','paused')`, nowIso(), run.id);
         for (const binding of this.store.all(`SELECT b.* FROM context_bindings b JOIN run_context_bindings m ON m.binding_id = b.id WHERE m.run_id = ? AND b.state = 'writing'`, run.id))
           events.push(this.bindingTransition(binding, 'needs_review', 'Runtime restarted during a native write; native history may have advanced.')[0]);
@@ -184,7 +188,7 @@ export class Engine {
   async capabilities() {
     const providers = await Promise.all(PROVIDERS.map(provider => this.detect(provider, { fresh: true })));
     const body = {
-      schemaVersion: 1, engineCapabilities: ['core-v1', 'loops-v1', 'cache-v1', 'pipeline-v1', 'delivery-v1', 'revisions-v1'],
+      schemaVersion: 1, engineCapabilities: ['core-v1', 'loops-v1', 'cache-v1', 'pipeline-v1', 'delivery-v1', 'revisions-v1', 'task-planning-v1'],
       providers: providers.map(p => ({ provider: p.provider, available: p.available, cliVersion: p.cliVersion, supportsNew: p.supportsNew, supportsResume: p.supportsResume, supportsJson: p.supportsJson, supportsInheritedConfiguration: p.supportsInheritedConfiguration, reason: p.reason })),
       maximumAgentTimeoutSeconds: this.maximumAgentTimeoutSeconds, processContainment: this.processContainment,
     };
@@ -348,7 +352,7 @@ export class Engine {
     return {
       descriptorVersion: 1, contractVersion: '3.0', apiVersions: ['v2', 'v3'], ...identity,
       workflowSchemaId: 'workflow.schema.json', workflowSchemaSha256: sha256(canonicalBytes(workflowSchema)),
-      capabilities: ['core-v1', 'loops-v1', 'cache-v1', 'pipeline-v1', 'delivery-v1', 'revisions-v1'],
+      capabilities: ['core-v1', 'loops-v1', 'cache-v1', 'pipeline-v1', 'delivery-v1', 'revisions-v1', 'task-planning-v1'],
       limits: { maxRequestBytes: 4 * 1024 * 1024, maxResponseBytes: 4 * 1024 * 1024, maxPageSize: 200, maxEventPageSize: 200 },
     };
   }
@@ -371,7 +375,7 @@ export class Engine {
     const definitions = {
       text: 'textNode', 'prompt-template': 'promptTemplateNode', agent: 'agentNode', context: 'contextNode',
       'result-viewer': 'resultViewerNode', 'file-input': 'fileInputNode', merge: 'mergeNode', 'json-select': 'jsonSelectNode',
-      condition: 'conditionNode', loop: 'loopNode', cache: 'cacheNode', route: 'routeNode', gate: 'gateNode', map: 'mapNode',
+      condition: 'conditionNode', loop: 'loopNode', cache: 'cacheNode', route: 'routeNode', gate: 'gateNode', map: 'mapNode', task: 'taskNode',
     };
     return { schemaId: 'workflow.schema.json', types: Object.entries(definitions).map(([type, definition]) => ({
       type, schemaRef: `workflow.schema.json#/$defs/${definition}`, configurationDependentPorts: true,
@@ -384,6 +388,7 @@ export class Engine {
       { templateId: 'empty', version: 1, title: 'Empty workflow', requiredCapabilities: ['core-v1'], placeholders: ['workflowId'] },
       { templateId: 'context-chain', version: 1, title: 'Context chain', requiredCapabilities: ['core-v1'], placeholders: ['workflowId', 'codexModel', 'claudeModel'] },
       { templateId: 'delivery-loop', version: 1, title: 'Delivery Loop reference', requiredCapabilities: ['core-v1', 'loops-v1', 'pipeline-v1', 'delivery-v1'], placeholders: ['workflowId', 'modelIds'] },
+      { templateId: 'managed-task', version: 1, title: 'Managed development task', requiredCapabilities: ['core-v1', 'loops-v1', 'task-planning-v1'], placeholders: ['workflowId', 'request', 'sourcePaths', 'roleBindings', 'checks'] },
     ];
   }
 
@@ -398,7 +403,7 @@ export class Engine {
           { id: 'result', type: 'result-viewer', config: {} },
         ], edges: [{ id: 'request-text-result', source: { nodeId: 'request', port: 'text' }, target: { nodeId: 'result', port: 'value' } }], after: [] };
     } else {
-      workflow = structuredClone(templateId === 'context-chain' ? contextChainExample : deliveryExample);
+      workflow = structuredClone(templateId === 'context-chain' ? contextChainExample : templateId === 'managed-task' ? managedTaskExample : deliveryExample);
       workflow.workflowId = 'replace-with-workflow-id';
       for (const node of allNodesDeep(workflow.nodes)) {
         if (node.type === 'agent') { node.config.model = `replace-with-${node.config.provider}-model-id`; node.config.effort ??= DEFAULT_EFFORT; }
@@ -942,6 +947,8 @@ export class Engine {
 
   // Most recent succeeded attempt of `nodeId` whose captured fingerprint equals the current one.
   reuseSource(workflowId, workspaceId, nodeId, fingerprint) {
+    const saved = this.store.get('SELECT snapshot_artifact_id FROM workflows WHERE id=?', workflowId);
+    if (saved && allNodesDeep(this.store.readJson(saved.snapshot_artifact_id).nodes).some(node => node.id === nodeId && node.type === 'task')) return null;
     const runs = this.store.all(`SELECT * FROM runs WHERE workflow_id = ? AND workspace_id = ? AND kind = 'workflow' ORDER BY created_at DESC LIMIT 50`, workflowId, workspaceId);
     for (const run of runs) {
       const attempt = this.latestAttempt(run.id, nodeId);
@@ -1033,6 +1040,7 @@ export class Engine {
   }
 
   startRun() {
+    if (this.closing) return;
     for (const row of this.store.all(`SELECT * FROM runs WHERE state = 'queued' ORDER BY created_at`)) {
       if (this.runs.has(row.id)) continue;
       const workflow = this.store.readJson(row.workflow_snapshot_artifact_id);
@@ -1144,6 +1152,7 @@ export class Engine {
   }
 
   readiness(state, attempt) {
+    if (this.isManagedTaskStep(state, attempt.node_instance_id)) return this.managedTaskReadiness(state, attempt);
     if (this.isMapStep(state, attempt.node_instance_id)) return this.mapStepReadiness(state, attempt);
     if (!UNSTARTED.has(attempt.state) || this.processes.has(attempt.id)) return null;
     const located = this.locate(state, attempt.node_instance_id);
@@ -1151,6 +1160,7 @@ export class Engine {
     const { scope, node } = located;
     if (node.type === 'loop' && this.loopRow(state, attempt.node_instance_id)) return null;
     if (node.type === 'map' && this.store.get('SELECT 1 FROM map_executions WHERE run_id = ? AND attempt_id = ?', state.id, attempt.id)) return null;
+    if (node.type === 'task' && this.store.get('SELECT 1 FROM managed_tasks WHERE run_id=? AND attempt_id=?', state.id, attempt.id)) return null;
     for (const before of scope.afterPredecessors.get(node.id)) {
       const previous = this.latestAttempt(state.id, scope.prefix + before);
       if (previous && !['succeeded', 'reused', 'skipped'].includes(previous.state)) return null;
@@ -1168,6 +1178,7 @@ export class Engine {
   }
 
   pumpRun(state) {
+    if (this.closing) return;
     // A missed controller acknowledgement pauses new dispatch only; work already running keeps its own timeouts.
     // Nothing launches for a supervised run until its observer is armed, and a paused controller stops new dispatch.
     if (this.dispatchPaused.has(state.id) || this.awaitingArm.has(state.id)) return;
@@ -1178,6 +1189,8 @@ export class Engine {
         if (ready.action === 'skip') { this.skipAttempt(state, attempt, 'An input comes from an inactive Route output or a skipped node.'); this.pumpAgain = true; }
         else if (ready.action === 'conflict') this.failAttempt(state, attempt, 'output_contract', 'More than one alternative of a selected Merge is active.');
         else if (ready.action === 'map-step') { if (this.dispatchMapStep(state, attempt, ready.info)) this.pumpAgain = true; }
+        else if (ready.action === 'task-step') this.dispatchManagedTaskStep(state, attempt, ready.info);
+        else if (ready.node.type === 'task') { this.startManagedTask(state, ready.scope, ready.node, attempt); this.pumpAgain = true; }
         else if (ready.node.type === 'agent') this.tryDispatchAgent(state, ready.scope, ready.node, attempt);
         else if (ready.node.type === 'loop') { this.startLoop(state, ready.scope, ready.node, attempt); this.pumpAgain = true; }
         else if (ready.node.type === 'map') { this.startMap(state, ready.scope, ready.node, attempt); this.pumpAgain = true; }
@@ -1186,8 +1199,10 @@ export class Engine {
       }
       if (this.runState(state.id) === 'running') for (const loop of this.store.all(`SELECT loop_node_id FROM loop_executions WHERE run_id = ? AND state = 'running'`, state.id)) this.maybeReturn(state, loop.loop_node_id);
       if (this.runState(state.id) === 'running' && this.advanceMaps(state)) this.pumpAgain = true;
+      if (this.runState(state.id) === 'running' && this.advanceManagedTasks(state)) this.pumpAgain = true;
     }
     for (const loopInstance of state.loops.keys()) this.maybeSettlePause(state, loopInstance);
+    if (this.runState(state.id) === 'draining') this.advanceManagedTasks(state);
     this.finishRunIfDone(state);
   }
 
@@ -1390,7 +1405,7 @@ export class Engine {
       if (memo.has(id)) return memo.get(id);
       memo.set(id, null);
       const node = scope.nodes.get(id);
-      if (!node || (id !== agent.id && ['agent', 'loop', 'map', 'gate'].includes(node.type)) || (node.type === 'file-input' && node.config.mode === 'files')) unknown = true;
+      if (!node || (id !== agent.id && ['agent', 'loop', 'map', 'gate', 'task'].includes(node.type)) || (node.type === 'file-input' && node.config.mode === 'files')) unknown = true;
       let context = null;
       if (node?.type === 'agent' && node.config.contextId) {
         context = scope.nodes.get(node.config.contextId) || this.contextNodes(state.workflow).find(item => item.node.id === node.config.contextId)?.node;
@@ -1652,8 +1667,12 @@ export class Engine {
     this.stopLoopBody(state, loopInstance);
   }
   stopLoopBody(state, loopInstance) {
+    const taskEvents = [];
+    for (const execution of this.taskState(state).executions.values()) if (execution.row.node_instance_id.startsWith(`${loopInstance}/`)) this.cancelManagedTasks(state.id, taskEvents, 'Managed task canceled when its enclosing loop stopped.', execution.row.node_instance_id);
+    if (taskEvents.length) this.store.appendEvents(state.id, taskEvents);
     for (const record of this.liveIn(state).filter(item => item.loops.includes(loopInstance))) {
       record.stopRequested = true;
+      record.abortController?.abort();
       if (record.child?.pid && record.launched) killTree(record.child.pid);
     }
     queueMicrotask(() => this.pump());
@@ -1686,7 +1705,8 @@ export class Engine {
       return;
     }
     for (const key of keys) { this.locks.add(key); this.store.run('INSERT INTO resource_locks(resource_key, run_id, attempt_id, acquired_at) VALUES (?, ?, ?, ?)', key, state.id, attempt.id, nowIso()); }
-    const record = { runId: state.id, loops: enclosingLoops(scope.prefix).map(item => item.loopInstance), provider: node.config.provider, keys, child: null, stopRequested: false, timedOut: false, launched: false };
+    const record = { runId: state.id, taskExecutionId: spec?.taskExecutionId, loops: enclosingLoops(scope.prefix).map(item => item.loopInstance), provider: node.config.provider, keys, child: null, stopRequested: false, timedOut: false, launched: false };
+    record.exited = new Promise(done => { record.resolveExit = done; });
     this.processes.set(attempt.id, record);
     this.executeAgent(state, scope, node, attempt, workspace, mapping, record, spec).catch(error => {
       try { this.failAttempt(state, this.store.get('SELECT * FROM attempts WHERE id = ?', attempt.id), error instanceof CorruptionError ? 'corruption' : error.code === 'input_unavailable' ? 'input_unavailable' : 'process', error.message); }
@@ -1695,6 +1715,7 @@ export class Engine {
   }
 
   releaseAgent(state, attempt, record) {
+    this.finishTaskWork(record.workId, null, record.outputBytes || 0);
     for (const key of record.keys) { this.locks.delete(key); this.store.run('DELETE FROM resource_locks WHERE resource_key = ?', key); }
     this.processes.delete(attempt.id);
     if (record.counted) for (const loopInstance of record.loops) this.bodyEnded(state, loopInstance);
@@ -1728,6 +1749,11 @@ export class Engine {
       catch (error) { return this.failAttempt(state, attempt, 'output_contract', `The output schema cannot be sent as ${config.provider} native structured output: ${error.message}`); }
     }
     record.launching = true;
+    if (spec?.taskExecutionId) {
+      const task = this.managedTask(state, spec.taskExecutionId);
+      record.workId = this.reserveTaskWork(task, attempt, 'agent', 1);
+      record.taskDeadlineMs = Date.now() + this.taskRemainingMs(task);
+    }
     const nativeSessionId = binding ? this.bindingRecord(binding).nativeSessionId : null;
     const values = spec ? spec.values() : { prompt: this.inputValue(state, scope, node.id, 'prompt') };
     let prompt = this.store.readText(values.prompt.artifact.artifactId);
@@ -1877,7 +1903,7 @@ export class Engine {
       // Multibyte UTF-8 characters may be split across chunks; decode as a stream.
       const stdoutDecoder = new StringDecoder('utf8'), stderrDecoder = new StringDecoder('utf8');
       let stdoutRemainder = '', stderrTail = '', settled = false, timer = null;
-      record.exited = new Promise(done => { record.resolveExit = done; });
+      if (!record.exited) record.exited = new Promise(done => { record.resolveExit = done; });
       let child;
       try { child = this.launchContained(state.id, invocation); }
       catch (error) { resolvePromise({ launched: false, error: error.message, parser }); return; }
@@ -1893,15 +1919,24 @@ export class Engine {
       child.once('error', error => { if (!record.launched) finish({ launched: false, error: error.message }); });
       child.once('spawn', () => { try {
         record.launched = true;
+        this.markTaskWorkLaunched(record.workId);
         if (record.loops.length) { record.counted = true; for (const loopInstance of record.loops) this.bodyStarted(state, loopInstance); }
         const startIdentity = `${child.pid}@${new Date().toISOString()}`;
         this.store.run('UPDATE attempts SET process_id = ?, process_start_identity = ?, supervisor_generation = ?, started_at = ? WHERE id = ?', child.pid, startIdentity, this.supervisorGeneration, nowIso(), attempt.id);
         const current = this.store.get('SELECT * FROM attempts WHERE id = ?', attempt.id);
         this.store.transaction(() => this.store.appendEvents(state.id, this.attemptTransition(current, 'running', 'CLI process launched.', { pid: child.pid, startIdentity, supervisorGeneration: this.supervisorGeneration })));
-        timer = record.timer = setTimeout(() => { record.timedOut = true; killTree(child.pid); }, node.config.timeoutSeconds * 1000);
+        const timeoutMs = Math.max(1, Math.min(node.config.timeoutSeconds * 1000, record.taskDeadlineMs ? record.taskDeadlineMs - Date.now() : Infinity));
+        timer = record.timer = setTimeout(() => {
+          record.timedOut = true;
+          if (record.taskExecutionId && Date.now() >= record.taskDeadlineMs) {
+            const task = this.managedTask(state, record.taskExecutionId); task.data.incompleteReason = 'aggregate_budget_exhausted'; this.saveManagedTask(task, null, 'budget');
+          }
+          killTree(child.pid);
+        }, timeoutMs);
         if (record.stopRequested) killTree(child.pid);
       } catch (error) { fault(error); } });
       child.stdout.on('data', chunk => {
+        record.outputBytes = (record.outputBytes || 0) + chunk.length;
         try {
           streams.stdout.add(chunk);
           const lines = (stdoutRemainder + stdoutDecoder.write(chunk)).split(/\r?\n/);
@@ -1910,6 +1945,7 @@ export class Engine {
         } catch (error) { fault(error); }
       });
       child.stderr.on('data', chunk => {
+        record.outputBytes = (record.outputBytes || 0) + chunk.length;
         try { streams.stderr.add(chunk); stderrTail = (stderrTail + stderrDecoder.write(chunk)).slice(-16000); } catch (error) { fault(error); }
       });
       child.once('close', (code, signal) => {
@@ -1976,6 +2012,7 @@ export class Engine {
             events.push(...this.attemptTransition(attempt, 'canceled', 'Canceled by root Stop before it started.'));
           this.cancelLoops(runId, events, 'Loop canceled by root Stop.');
           this.cancelMaps(runId, events, 'Map canceled by root Stop.');
+          this.cancelManagedTasks(runId, events, 'Managed task canceled by root Stop.');
           this.store.appendEvents(runId, events);
         });
       }
@@ -1986,6 +2023,7 @@ export class Engine {
         pids: [...this.processes.entries()].filter(([, record]) => record.runId === runId && record.launched && record.child?.pid).map(([attemptId, record]) => ({ attemptId, pid: record.child.pid })) });
       if (shouldSignalProcesses) for (const record of this.processes.values()) if (record.runId === runId) {
         record.stopRequested = true;
+        record.abortController?.abort();
         if (record.child?.pid && record.launched) killTree(record.child.pid);
       }
       queueMicrotask(() => this.pump());
@@ -1996,6 +2034,7 @@ export class Engine {
     this.validateBody('nodeStopRequest', body);
     let loopToStop = null;
     let processToStop = null;
+    let taskToStop = null;
     return this.idempotent(`POST /runs/${runId}/nodes/${instanceId}/stop`, body.requestId, body, () => {
       const row = this.requireRun(runId);
       const state = this.runs.get(runId);
@@ -2003,7 +2042,10 @@ export class Engine {
       const attempt = this.latestAttempt(runId, instanceId);
       if (!attempt) throw new ApiError(404, 'not_found', `Node instance "${instanceId}" does not exist in this run.`);
       const loop = this.loopRow(state, instanceId);
-      if (loop) {
+      const task = this.store.get("SELECT id FROM managed_tasks WHERE run_id=? AND node_instance_id=? AND state IN ('running','paused')", runId, instanceId);
+      if (task) {
+        taskToStop = { state, instanceId };
+      } else if (loop) {
         if (loop.state !== 'running') throw new ApiError(409, 'conflict', `Loop "${instanceId}" is ${loop.state}.`);
         loopToStop = { state, instanceId };
       } else {
@@ -2013,12 +2055,25 @@ export class Engine {
       }
       return { status: 202, body: { runId, state: row.state, requestId: body.requestId } };
     }, () => {
-      if (loopToStop) {
+      if (taskToStop) {
+        const events = [];
+        this.cancelManagedTasks(runId, events, 'Managed task canceled by scoped Stop.', instanceId);
+        this.store.appendEvents(runId, events);
+        for (const record of this.processes.values()) if (record.taskExecutionId === this.store.get('SELECT id FROM managed_tasks WHERE run_id=? AND node_instance_id=? ORDER BY created_at DESC LIMIT 1', runId, instanceId)?.id) {
+          if (record.child?.pid && record.launched) killTree(record.child.pid);
+        }
+        queueMicrotask(() => this.pump());
+      } else if (loopToStop) {
         this.loopRuntime(loopToStop.state, loopToStop.instanceId).pending = ['stopped', 'Stopped by the user.'];
         this.stopLoopBody(loopToStop.state, loopToStop.instanceId);
       } else if (processToStop) {
         processToStop.stopRequested = true;
         processToStop.stopReason = 'Stopped by the user (scoped Stop).';
+        processToStop.abortController?.abort();
+        if (processToStop.parentAttemptId) {
+          const parent = this.processes.get(processToStop.parentAttemptId);
+          if (parent) { parent.stopRequested = true; parent.abortController?.abort(); }
+        }
         if (processToStop.child?.pid && processToStop.launched) killTree(processToStop.child.pid);
         queueMicrotask(() => this.pump());
       }
@@ -2042,12 +2097,14 @@ export class Engine {
             events.push(...this.attemptTransition(attempt, 'canceled', 'Closed by the user.'));
           this.cancelLoops(runId, events, 'Loop canceled when the run was closed.');
           this.cancelMaps(runId, events, 'Map canceled when the run was closed.');
+          this.cancelManagedTasks(runId, events, 'Managed task canceled when the run was closed.');
           events.push(this.runEvent(row, 'failed', 'Closed by the user after a failure or pause.'));
           this.store.appendEvents(runId, events);
           this.forget(state);
           return { status: 200, body: { runId, state: 'failed', requestId: body.requestId } };
         }
-        if (body.action === 'retry' && this.isMapStep(state, body.nodeInstanceId)) this.retryMapStep(state, body, events);
+        if (body.action === 'retry' && this.isManagedTaskStep(state, body.nodeInstanceId)) this.retryManagedTaskStep(state, body, events);
+        else if (body.action === 'retry' && this.isMapStep(state, body.nodeInstanceId)) this.retryMapStep(state, body, events);
         else if (body.action === 'retry') this.retry(state, body, events);
         else if (body.action === 'raise-map-limit') this.raiseMapLimit(state, body, events);
         else if (body.action === 'raise-limit') this.raiseLimit(state, body, events);
@@ -2072,6 +2129,7 @@ export class Engine {
       if (loop.state === 'paused' && ['iteration_limit', 'time_limit'].includes(loop.pause_reason)) throw new ApiError(409, 'conflict', `The loop is paused at its ${loop.pause_reason.replace('_', ' ')}; raise the limit first.`);
     }
     const node = located.node;
+    if (node.type === 'task' && this.store.get('SELECT 1 FROM managed_tasks WHERE run_id=? AND node_instance_id=?', state.id, body.nodeInstanceId)) throw new ApiError(409, 'conflict', 'Recover the current managed task step; retrying its parent would reset aggregate accounting. After cancellation, start a newly captured run.');
     if (node.type === 'agent' && node.config.contextId) {
       const key = this.contextKey(state, located.scope, node.config.contextId);
       const mapping = this.store.get('SELECT * FROM run_context_bindings WHERE run_id = ? AND context_node_id = ?', state.id, key);
@@ -2137,7 +2195,7 @@ export class Engine {
   async shutdown() {
     this.closing = true;
     const live = [...this.processes.values()];
-    for (const record of live) { record.stopRequested = true; if (record.child?.pid && record.launched) await killTree(record.child.pid); }
+    for (const record of live) { record.stopRequested = true; record.abortController?.abort(); if (record.child?.pid && record.launched) await killTree(record.child.pid); }
     await Promise.all(live.map(record => record.exited).filter(Boolean));
     for (const state of this.runs.values()) for (const loop of state.loops.values()) clearInterval(loop.timer);
     await new Promise(done => setTimeout(done, 50));
@@ -2148,4 +2206,6 @@ export class Engine {
 
 installMapRuntime(Engine, { ApiError, UNSTARTED });
 installSupervision(Engine, { ApiError });
+installTaskRuntime(Engine, { ApiError });
+installTaskProcesses(Engine);
 

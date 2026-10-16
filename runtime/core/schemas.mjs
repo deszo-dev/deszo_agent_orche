@@ -20,6 +20,14 @@ import executionEvidence from '../../docs/schemas/execution-evidence.schema.json
 import incident from '../../docs/schemas/incident.schema.json' with { type: 'json' };
 import auditManifest from '../../docs/schemas/audit-manifest.schema.json' with { type: 'json' };
 import runControlApi from '../../docs/schemas/run-control-api.schema.json' with { type: 'json' };
+import taskAssessment from '../../docs/schemas/task-assessment.schema.json' with { type: 'json' };
+import executionPlan from '../../docs/schemas/execution-plan.schema.json' with { type: 'json' };
+import evaluationRecord from '../../docs/schemas/evaluation-record.schema.json' with { type: 'json' };
+import acceptanceRecord from '../../docs/schemas/acceptance-record.schema.json' with { type: 'json' };
+import contextPackage from '../../docs/schemas/context-package.schema.json' with { type: 'json' };
+import deliveryPlan from '../../docs/schemas/delivery-plan.schema.json' with { type: 'json' };
+import deliveryResult from '../../docs/schemas/delivery-result.schema.json' with { type: 'json' };
+import managedTask from '../../docs/schemas/managed-task.schema.json' with { type: 'json' };
 
 export const SCHEMAS = {
   'workflow.schema.json': workflow,
@@ -42,6 +50,14 @@ export const SCHEMAS = {
   'incident.schema.json': incident,
   'audit-manifest.schema.json': auditManifest,
   'run-control-api.schema.json': runControlApi,
+  'task-assessment.schema.json': taskAssessment,
+  'execution-plan.schema.json': executionPlan,
+  'evaluation-record.schema.json': evaluationRecord,
+  'acceptance-record.schema.json': acceptanceRecord,
+  'context-package.schema.json': contextPackage,
+  'delivery-plan.schema.json': deliveryPlan,
+  'delivery-result.schema.json': deliveryResult,
+  'managed-task.schema.json': managedTask,
 };
 
 const AjvClass = Ajv2020.default || Ajv2020;

@@ -32,4 +32,7 @@ copyFileSync(resolve(root, 'docs/storage/m5.sql'), resolve(out, 'm5.sql'));
 copyFileSync(resolve(root, 'docs/storage/m6.sql'), resolve(out, 'm6.sql'));
 copyFileSync(resolve(root, 'docs/storage/m7.sql'), resolve(out, 'm7.sql'));
 copyFileSync(resolve(root, 'docs/storage/m8.sql'), resolve(out, 'm8.sql'));
+copyFileSync(resolve(root, 'docs/storage/m9.sql'), resolve(out, 'm9.sql'));
+copyFileSync(resolve(root, 'docs/storage/m10.sql'), resolve(out, 'm10.sql'));
+copyFileSync(resolve(root, 'docs/storage/m11.sql'), resolve(out, 'm11.sql'));
 console.log(`Runtime bundled into ${out}`);

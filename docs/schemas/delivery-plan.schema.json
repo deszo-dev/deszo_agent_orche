@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deszo.local/documentation/delivery-plan.schema.json",
+  "title": "Branch Delivery Plan (ADR-0005)",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "kind": {
+      "const": "DeliveryPlan"
+    },
+    "deliveryPlanId": {
+      "type": "string"
+    },
+    "runId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "candidateDigest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "repositoryPath": {
+      "type": "string",
+      "minLength": 1
+    },
+    "baseCommit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "targetBranchRef": {
+      "type": "string",
+      "minLength": 1
+    },
+    "branchExpectedOldValue": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "isolation": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "const": "separate_clone"
+        },
+        "cloneStrategy": {
+          "enum": [
+            "hardlink",
+            "reference_dissociate"
+          ]
+        }
+      },
+      "required": [
+        "mode",
+        "cloneStrategy"
+      ],
+      "additionalProperties": false
+    },
+    "hookPolicy": {
+      "type": "object",
+      "properties": {
+        "installHooks": {
+          "type": "boolean"
+        },
+        "hookSource": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "hooksJournal": {
+          "enum": [
+            "none",
+            "installed"
+          ]
+        }
+      },
+      "required": [
+        "installHooks",
+        "hookSource",
+        "hooksJournal"
+      ],
+      "additionalProperties": false
+    },
+    "verificationChecks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "command": {
+            "type": "string"
+          },
+          "args": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "expectedExitCode": {
+            "type": "integer"
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 600000
+          }
+        },
+        "required": [
+          "id",
+          "command",
+          "args",
+          "expectedExitCode"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "commitPolicy": {
+      "type": "object",
+      "properties": {
+        "authorName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authorEmail": {
+          "type": "string",
+          "minLength": 1
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "authorName",
+        "authorEmail",
+        "message"
+      ],
+      "additionalProperties": false
+    },
+    "boundaryCriteria": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "description"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "manifestVersion": {
+      "enum": [
+        1,
+        2
+      ]
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "kind",
+    "deliveryPlanId",
+    "runId",
+    "candidateDigest",
+    "repositoryPath",
+    "baseCommit",
+    "targetBranchRef",
+    "branchExpectedOldValue",
+    "isolation",
+    "hookPolicy",
+    "verificationChecks",
+    "commitPolicy",
+    "boundaryCriteria",
+    "createdAt"
+  ],
+  "additionalProperties": false
+}

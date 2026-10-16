@@ -1,0 +1,193 @@
+{
+  "schemaVersion": 1,
+  "workflowId": "managed-task-reference",
+  "capabilities": [
+    "core-v1",
+    "loops-v1",
+    "task-planning-v1"
+  ],
+  "settings": {
+    "nativeConfiguration": "restricted"
+  },
+  "nodes": [
+    {
+      "id": "request",
+      "type": "text",
+      "config": {
+        "value": "Change feature() in src/feature.mjs to return 42. Preserve the export. Define criterion AC-1 for the engine-run node test. The Test Author writes tests/feature.test.mjs; the Junior Analyst may update docs/usage.md without changing the requirements."
+      }
+    },
+    {
+      "id": "source",
+      "type": "file-input",
+      "config": {
+        "mode": "files",
+        "paths": [
+          "README.md",
+          "src/feature.mjs",
+          "docs/usage.md"
+        ]
+      }
+    },
+    {
+      "id": "task",
+      "type": "task",
+      "config": {
+        "roles": {
+          "analyst": {
+            "role": "analyst",
+            "provider": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "max",
+            "timeoutSeconds": 600
+          },
+          "codeReviewer": {
+            "role": "codeReviewer",
+            "provider": "claude",
+            "model": "claude-opus-5-5",
+            "effort": "medium",
+            "timeoutSeconds": 600
+          },
+          "testReviewer": {
+            "role": "testReviewer",
+            "provider": "claude",
+            "model": "claude-opus-5-5",
+            "effort": "medium",
+            "timeoutSeconds": 600
+          },
+          "testAuthor": {
+            "role": "testAuthor",
+            "provider": "claude",
+            "model": "claude-haiku-5-5",
+            "effort": "xhigh",
+            "timeoutSeconds": 600
+          },
+          "developer": {
+            "role": "developer",
+            "provider": "claude",
+            "model": "claude-haiku-5-5",
+            "effort": "xhigh",
+            "timeoutSeconds": 600
+          },
+          "juniorAnalyst": {
+            "role": "juniorAnalyst",
+            "provider": "codex",
+            "model": "gpt-6-luna",
+            "effort": "max",
+            "timeoutSeconds": 600
+          }
+        },
+        "scope": {
+          "production": [
+            "src/**"
+          ],
+          "tests": [
+            "tests/**"
+          ],
+          "documentation": [
+            "docs/**"
+          ],
+          "excludedOutputs": [
+            "node_modules/**",
+            "dist/**"
+          ]
+        },
+        "projectPolicy": {
+          "criticalAreas": [
+            "docs/storage/*.sql",
+            "runtime/core/**"
+          ],
+          "publicContracts": [
+            "docs/schemas/*.json",
+            "src/types.ts"
+          ],
+          "requireIndependentAcceptance": false
+        },
+        "bounds": {
+          "maxAttempts": 60,
+          "maxElapsedSeconds": 3600,
+          "maxContextTurns": 3,
+          "maxRepairIterations": 3,
+          "maxDiscoveryTurns": 2
+        },
+        "checks": [
+          {
+            "id": "feature",
+            "command": "node",
+            "args": [
+              "--test",
+              "tests/feature.test.mjs"
+            ],
+            "expectedExitCode": 0,
+            "timeoutMs": 30000,
+            "criteria": [
+              "AC-1"
+            ]
+          }
+        ],
+        "delivery": {
+          "boundary": "candidate"
+        }
+      }
+    },
+    {
+      "id": "result",
+      "type": "result-viewer",
+      "config": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "request-task",
+      "source": {
+        "nodeId": "request",
+        "port": "text"
+      },
+      "target": {
+        "nodeId": "task",
+        "port": "request"
+      }
+    },
+    {
+      "id": "source-task",
+      "source": {
+        "nodeId": "source",
+        "port": "value"
+      },
+      "target": {
+        "nodeId": "task",
+        "port": "source"
+      }
+    },
+    {
+      "id": "task-result",
+      "source": {
+        "nodeId": "task",
+        "port": "summary"
+      },
+      "target": {
+        "nodeId": "result",
+        "port": "value"
+      }
+    }
+  ],
+  "after": [],
+  "view": {
+    "request": {
+      "x": 0,
+      "y": 0
+    },
+    "source": {
+      "x": 0,
+      "y": 240
+    },
+    "task": {
+      "x": 300,
+      "y": 0
+    },
+    "result": {
+      "x": 620,
+      "y": 0
+    }
+  }
+}

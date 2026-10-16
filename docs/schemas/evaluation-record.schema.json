@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deszo.local/documentation/evaluation-record.schema.json",
+  "title": "Evaluation Record (ADR-0003)",
+  "type": "object",
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "kind": { "const": "EvaluationRecord" },
+    "evaluationId": { "type": "string" },
+    "caseClass": {
+      "enum": [
+        "local_bug_fix",
+        "single_module_behavior_change",
+        "shared_contract_change",
+        "parallel_multi_component",
+        "ambiguous_request",
+        "nonsemantic_documentation",
+        "small_change_critical_consequences"
+      ]
+    },
+    "policyVariant": { "enum": ["reference_baseline", "compact_packages", "controlled_prose"] },
+    "runId": { "type": "string", "format": "uuid" },
+    "planRevisionId": { "type": "string" },
+    "plannedStages": { "type": "array", "items": { "type": "string" } },
+    "observedStages": { "type": "array", "items": { "type": "string" } },
+    "revisions": { "type": "integer", "minimum": 0 },
+    "qualityResult": {
+      "type": "object",
+      "properties": {
+        "independentAcceptance": { "enum": ["passed", "failed", "unverified"] },
+        "escapedDefects": { "type": "integer", "minimum": 0 },
+        "falseApprovals": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["independentAcceptance", "escapedDefects", "falseApprovals"],
+      "additionalProperties": false
+    },
+    "workMetrics": {
+      "type": "object",
+      "properties": {
+        "invocations": { "type": "integer", "minimum": 0 },
+        "repairCycles": { "type": "integer", "minimum": 0 },
+        "repeatedReviews": { "type": "integer", "minimum": 0 },
+        "durationMs": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["invocations", "repairCycles", "repeatedReviews", "durationMs"],
+      "additionalProperties": false
+    },
+    "evaluatedAt": { "type": "string", "format": "date-time" }
+  },
+  "required": [
+    "schemaVersion", "kind", "evaluationId", "caseClass", "policyVariant",
+    "runId", "planRevisionId", "plannedStages", "observedStages", "revisions",
+    "qualityResult", "workMetrics", "evaluatedAt"
+  ],
+  "additionalProperties": false
+}

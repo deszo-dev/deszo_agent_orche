@@ -4,6 +4,8 @@ A personal desktop application for building workflows across AI agents. It uses 
 
 **Status:** milestones M1–M6, the reference Delivery Loop, and ADR-0001 external authoring are implemented. API v3 conditional saves, editor synchronization, scoped credentials, approval-gated execution, and the shared MCP bridge passed acceptance with the listed Windows Codex, Claude Code, and Antigravity versions. Confirmation defaults to on; v2 workflow saves return `410`. See the [acceptance report](docs/pilots/2026-10-15-authoring-acceptance.md), [implementation status](docs/adr/0001-implementation-status.md), and [migration note](docs/authoring/MIGRATION_V3.md).
 
+Managed development tasks (`task-planning-v1`) now connect assessment and deterministic stage selection to isolated roles, checks/repair, criterion evidence and optional verified local feature-branch delivery. See the [managed task contract and reference workflow](docs/MANAGED_TASKS.md). CLI fixtures exercise the full engine lifecycle; no real-provider evaluation or shadcn/ui migration is implied.
+
 ## What M1 does
 
 - An editable canvas with five node types: Text, Prompt Template, Agent (Codex / Claude Code / Antigravity), Context and Result Viewer. Typed ports, Context reference links and order-only After links are drawn distinctly.

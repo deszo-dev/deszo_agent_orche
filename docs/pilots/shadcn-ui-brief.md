@@ -6,7 +6,12 @@ Status: agreed business input and role assignments; workflow execution and UI mi
 
 Move all Deszo application panels, forms and dialogs to shadcn/ui. Preserve the current capabilities and workflow behavior, including React Flow editing, execution controls, recovery, history, Replay, Context chat and API/MCP authoring synchronization. Use the existing English product language.
 
-The result is a separate local feature branch, `codex/shadcn-ui`, with the UI changes, relevant tests and documentation. Its starting point must include the verified explicit-effort change. Record the starting commit and the selected candidate before applying results. Merge and release remain separate actions.
+The result is a separate local feature branch, `codex/shadcn-ui`, with the UI changes, relevant tests and documentation. Because `codex/shadcn-ui` already exists on origin and carries the ADR-0002 implementation commit, the delivery starting point before pilot execution must either:
+
+1. explicitly accept the current head of `codex/shadcn-ui` (which includes the ADR-0002 commit and explicit-effort baseline) as the captured base commit to advance under an expected-ref condition; or
+2. designate a fresh delivery branch from `main` (such as `codex/shadcn-ui-migration`), recording the branch absence condition.
+
+Record the starting commit and the selected candidate before applying results. Merge and release remain separate actions.
 
 ## Roles
 

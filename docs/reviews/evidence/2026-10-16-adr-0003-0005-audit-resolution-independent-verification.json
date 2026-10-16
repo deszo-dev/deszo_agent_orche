@@ -1,0 +1,345 @@
+{
+  "capturedAt": "2026-10-16T16:19:15.853Z",
+  "head": "7178032a9c8b4ce1f7a97590e57ab10c7af05fcf",
+  "disposition": {
+    "A1": "partially resolved; engine supervision, aggregate accounting, output completeness and publication cancellation limits remain",
+    "A2": "resolved within evaluator; engine resolver integration deferred",
+    "A3": "resolved in exercised hook fixtures",
+    "A4": "resolved in retry/conflict/rollback fixtures",
+    "A5": "resolved in tested legacy-m9 upgrade",
+    "A6": "partially resolved; external checkout race remains"
+  },
+  "verifiedInputDigests": {
+    "runtime/core/branchDelivery.mjs": "36fa3575aa9289ca474f3edc368c3852ce7e07bd5d7db57ba8a51cfe26af1129",
+    "runtime/core/contextPackage.mjs": "3b4a0ad12d86e48fc4e70967bef79f5e773c8b671a6de6376737084d7b8ce8bc",
+    "runtime/core/taskAssessment.mjs": "4fec6e2a0c375d62eee2ae5cf038f435fa037b0c748ba5215a03de56d08a12ec",
+    "runtime/core/store.mjs": "d178ff99296fddb3b8f05327743e117ebfaa127f0d481032f7cfac8d9b355407",
+    "docs/storage/m9.sql": "74179d9176d004169de4dfeefaf95dbf89331d95318923c29f7d58c25624d432",
+    "docs/schemas/delivery-plan.schema.json": "54e50374bcfa29f168971906595e26556a9c091d1076b5d1981871d6705fbe0f",
+    "docs/schemas/acceptance-record.schema.json": "690d9a89059fad7bac2375850a864ecb8a03588b6632d74717064525ebf6601c",
+    "docs/schemas/execution-plan.schema.json": "bf80858ca0784ec3d434fcc0966003f5b50ba0635293b004897cf08d808cadf2"
+  },
+  "changedInputs": [],
+  "m10DigestAtReceipt": "ee59469ef780e51c113857b443d33e4f1823828e06e7aa5bc45377f0862719f6",
+  "auditProbeRerun": {
+    "capturedAt": "2026-10-16T16:15:52.682Z",
+    "checkout": "C:\\my\\2026\\deszo_agent_orche",
+    "head": "7178032a9c8b4ce1f7a97590e57ab10c7af05fcf",
+    "scratch": "C:\\Users\\jusse\\AppData\\Local\\Temp\\deszo-resolution-audit-7U7cL8",
+    "inputDigests": {
+      "runtime/core/branchDelivery.mjs": "36fa3575aa9289ca474f3edc368c3852ce7e07bd5d7db57ba8a51cfe26af1129",
+      "runtime/core/contextPackage.mjs": "3b4a0ad12d86e48fc4e70967bef79f5e773c8b671a6de6376737084d7b8ce8bc",
+      "runtime/core/taskAssessment.mjs": "4fec6e2a0c375d62eee2ae5cf038f435fa037b0c748ba5215a03de56d08a12ec",
+      "runtime/core/store.mjs": "d178ff99296fddb3b8f05327743e117ebfaa127f0d481032f7cfac8d9b355407",
+      "docs/storage/m9.sql": "74179d9176d004169de4dfeefaf95dbf89331d95318923c29f7d58c25624d432"
+    },
+    "changedInputs": [],
+    "summary": {
+      "total": 8,
+      "passed": 8,
+      "failed": 0
+    },
+    "results": [
+      {
+        "name": "control_callback_must_run_before_smoke_ends_and_ref_is_published",
+        "passed": true,
+        "observed": {
+          "status": "READY_FOR_MERGE",
+          "startedAt": 1792167344093,
+          "returnedAt": 1792167344114,
+          "smokeEndedAt": 1792167345545,
+          "callbackAt": 1792167344192,
+          "publishedAtCallback": false,
+          "refPublishedBeforeAwait": false,
+          "synchronousCallMs": 21
+        }
+      },
+      {
+        "name": "hooks_none_must_also_cover_host_ref_publication",
+        "passed": true,
+        "observed": {
+          "status": "READY_FOR_MERGE",
+          "hookExecution": {
+            "status": "none",
+            "journal": "Hooks policy: none; host ref publication runs with hooks disabled"
+          },
+          "hostHookRan": false,
+          "marker": null
+        }
+      },
+      {
+        "name": "checked_out_target_must_be_rechecked_after_smoke",
+        "passed": true,
+        "observed": {
+          "status": "precondition_failed",
+          "beforeRef": "refs/heads/main",
+          "afterRef": "refs/heads/codex/audit",
+          "hostStatus": ""
+        }
+      },
+      {
+        "name": "structural_validation_without_trusted_inputs_cannot_open_gate",
+        "passed": true,
+        "observed": {
+          "valid": true,
+          "canOpenGate": false,
+          "reason": "Structural validation only; no Gate opened. Authoritative evaluation requires: expectedCriteria, expectedBoundary, expectedSubjectId, expectedCandidateDigest, resolveEvidence."
+        }
+      },
+      {
+        "name": "evidence_id_membership_cannot_replace_digest_verification",
+        "passed": true,
+        "observed": {
+          "valid": true,
+          "canOpenGate": false,
+          "reason": "Structural validation only; no Gate opened. Authoritative evaluation requires: resolveEvidence.",
+          "incomplete": {
+            "valid": true,
+            "canOpenGate": false,
+            "reason": "Evidence not verified against immutable engine records: AC-1 check-1: incomplete or malformed engine record."
+          }
+        }
+      },
+      {
+        "name": "resolved_evidence_must_match_kind_source_and_success",
+        "passed": true,
+        "observed": {
+          "valid": true,
+          "canOpenGate": false,
+          "reason": "Evidence not verified against immutable engine records: AC-1 check-1: record kind \"artifact\" differs from referenced kind \"check\".",
+          "resolvedRecord": {
+            "id": "check-1",
+            "kind": "artifact",
+            "digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "subjectId": "OTHER-SUBJECT",
+            "candidateDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "boundary": "candidate",
+            "source": "engine",
+            "outcome": "failed",
+            "appliesToCriteria": [
+              "AC-1"
+            ],
+            "recordedAt": "2026-10-16T12:00:00.000Z"
+          }
+        }
+      },
+      {
+        "name": "failed_revision_retry_must_preserve_the_active_revision",
+        "passed": true,
+        "observed": {
+          "revisions": [
+            {
+              "id": "PLAN-6f2570a7630c",
+              "plan_revision_id": "REV-2026-10-16T16-15-52-465Z",
+              "status": "active"
+            }
+          ]
+        }
+      },
+      {
+        "name": "opening_an_existing_m9_store_must_upgrade_the_plan_revision_key",
+        "passed": true,
+        "observed": {
+          "legacyPrimaryKeyColumns": [
+            "id"
+          ],
+          "version": 10,
+          "primaryKeyColumns": [
+            "id",
+            "plan_revision_id"
+          ]
+        }
+      }
+    ]
+  },
+  "followupProbeRerun": {
+    "capturedAt": "2026-10-16T16:15:57.731Z",
+    "checkout": "C:\\my\\2026\\deszo_agent_orche",
+    "head": "7178032a9c8b4ce1f7a97590e57ab10c7af05fcf",
+    "scratch": "C:\\Users\\jusse\\AppData\\Local\\Temp\\deszo-follow-up-XfqQ0v",
+    "inputDigests": {
+      "runtime/core/branchDelivery.mjs": "36fa3575aa9289ca474f3edc368c3852ce7e07bd5d7db57ba8a51cfe26af1129",
+      "runtime/core/taskAssessment.mjs": "4fec6e2a0c375d62eee2ae5cf038f435fa037b0c748ba5215a03de56d08a12ec",
+      "runtime/core/contextPackage.mjs": "3b4a0ad12d86e48fc4e70967bef79f5e773c8b671a6de6376737084d7b8ce8bc",
+      "runtime/core/store.mjs": "d178ff99296fddb3b8f05327743e117ebfaa127f0d481032f7cfac8d9b355407",
+      "docs/schemas/delivery-plan.schema.json": "54e50374bcfa29f168971906595e26556a9c091d1076b5d1981871d6705fbe0f",
+      "docs/schemas/acceptance-record.schema.json": "690d9a89059fad7bac2375850a864ecb8a03588b6632d74717064525ebf6601c",
+      "docs/schemas/execution-plan.schema.json": "bf80858ca0784ec3d434fcc0966003f5b50ba0635293b004897cf08d808cadf2",
+      "docs/storage/m9.sql": "74179d9176d004169de4dfeefaf95dbf89331d95318923c29f7d58c25624d432"
+    },
+    "changedInputs": [],
+    "summary": {
+      "total": 14,
+      "passed": 14,
+      "failed": 0
+    },
+    "results": [
+      {
+        "name": "existing_directory_and_traversal_are_rejected",
+        "passed": true,
+        "observed": {
+          "existingStatus": "precondition_failed",
+          "sentinel": "PRESERVE",
+          "traversalStatus": "precondition_failed"
+        }
+      },
+      {
+        "name": "explicit_bindings_and_distinct_role_ids_are_required",
+        "passed": true,
+        "observed": {
+          "rejectionsConfirmed": true
+        }
+      },
+      {
+        "name": "context_expansion_ignores_attempt_ids_and_retains_missing_dependencies",
+        "passed": true,
+        "observed": {
+          "sameExpandedFingerprint": true,
+          "resumed": false,
+          "missing": [
+            "missing.js"
+          ]
+        }
+      },
+      {
+        "name": "every_candidate_file_must_exist_in_the_commit",
+        "passed": true,
+        "observed": {
+          "status": "delivery_failed",
+          "ready": false,
+          "candidateFileCommitted": false
+        }
+      },
+      {
+        "name": "undeclared_git_conversions_cannot_change_accepted_bytes",
+        "passed": true,
+        "observed": {
+          "status": "delivery_failed",
+          "candidateContent": "APPROVED\r\n",
+          "committedContent": null
+        }
+      },
+      {
+        "name": "smoke_must_not_verify_a_different_tracked_source_tree",
+        "passed": true,
+        "observed": {
+          "status": "verification_failed",
+          "statusAfterSmoke": " M README.md\nA  approved.txt\n",
+          "smokeSource": "SMOKE-ONLY SOURCE\n",
+          "committedSource": null
+        }
+      },
+      {
+        "name": "delivery_cannot_silently_switch_the_declared_base",
+        "passed": true,
+        "observed": {
+          "status": "precondition_failed",
+          "declaredBase": "9cd40dccf13411cf2af6f662c6ccf8d9d1c5714b",
+          "reportedSource": "9cd40dccf13411cf2af6f662c6ccf8d9d1c5714b",
+          "actualParent": null
+        }
+      },
+      {
+        "name": "delivery_must_preserve_the_callers_checked_out_branch_state",
+        "passed": true,
+        "observed": {
+          "status": "precondition_failed",
+          "headChanged": false,
+          "hostStatus": ""
+        }
+      },
+      {
+        "name": "hooks_none_must_apply_before_clone_and_checkout",
+        "passed": true,
+        "observed": {
+          "status": "READY_FOR_MERGE",
+          "hookExecution": {
+            "status": "none",
+            "journal": "Hooks policy: none; host ref publication runs with hooks disabled"
+          },
+          "ambientHookRan": false
+        }
+      },
+      {
+        "name": "acceptance_cannot_open_with_unresolved_evidence",
+        "passed": true,
+        "observed": {
+          "valid": true,
+          "canOpenGate": false,
+          "reason": "Structural validation only; no Gate opened. Authoritative evaluation requires: expectedBoundary, resolveEvidence."
+        }
+      },
+      {
+        "name": "plan_fingerprint_must_include_constraints_and_exclusions",
+        "passed": true,
+        "observed": {
+          "sameFingerprint": false,
+          "first": "4f8910ce3c128329d6d9cc303ef06ccadb93111dd635ec9e5cc142ea5da0cd07",
+          "second": "aae60d50c903a89f429795b305caea6c38f754836088a158ca06e6d033ac971c"
+        }
+      },
+      {
+        "name": "fixed_planning_inputs_must_not_depend_on_the_clock",
+        "passed": true,
+        "observed": {
+          "sameFingerprint": true,
+          "firstConfirmation": "2026-10-16T12:00:00.000Z",
+          "secondConfirmation": "2026-10-16T12:00:00.000Z"
+        }
+      },
+      {
+        "name": "store_must_retain_multiple_revisions_of_one_plan",
+        "passed": true,
+        "observed": {
+          "firstPlanId": "PLAN-92c606da7fd5",
+          "revisedPlanId": "PLAN-92c606da7fd5",
+          "distinctRevisionIds": true,
+          "storedRevisions": 2
+        }
+      },
+      {
+        "name": "delivery_must_not_block_runtime_control_callbacks",
+        "passed": true,
+        "observed": {
+          "status": "READY_FOR_MERGE",
+          "elapsedMs": 2423,
+          "controlCallbackRan": true
+        }
+      }
+    ]
+  },
+  "moduleTests": {
+    "command": "node --disable-warning=ExperimentalWarning --test --test-concurrency=1 runtime/tests/task-assessment.test.mjs runtime/tests/context-contracts.test.mjs runtime/tests/branch-delivery.test.mjs",
+    "exitCode": 0,
+    "total": 39,
+    "passed": 39,
+    "failed": 0,
+    "durationMs": 24967.206
+  },
+  "startedSmokeAndDescendantStop": {
+    "root": "C:\\Users\\jusse\\AppData\\Local\\Temp\\deszo-started-smoke-stop-f2lQhM",
+    "abortedAfterSmokeAndDescendantStarted": true,
+    "status": "stopped",
+    "ready": false,
+    "refUpdated": false,
+    "refPresent": false,
+    "parentPid": 16340,
+    "childPid": 27952,
+    "parentAlive": false,
+    "childAlive": false
+  },
+  "docsCheck": {
+    "exitCode": 0,
+    "schemas": 27,
+    "markdownFiles": 81,
+    "localLinks": 806,
+    "errors": []
+  },
+  "runtimeBundle": {
+    "exitCode": 0,
+    "existingShimPreserved": true,
+    "m10MatchesSource": true
+  },
+  "full444TestSuiteRepeated": false,
+  "implementationChangedByThisVerification": false
+}

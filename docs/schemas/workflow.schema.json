@@ -23,11 +23,12 @@
           "cache-v1",
           "pipeline-v1",
           "delivery-v1",
-          "revisions-v1"
+          "revisions-v1",
+          "task-planning-v1"
         ]
       },
       "minItems": 1,
-      "maxItems": 6,
+      "maxItems": 7,
       "uniqueItems": true
     },
     "settings": {
@@ -91,6 +92,9 @@
           },
           {
             "$ref": "#/$defs/loopNode"
+          },
+          {
+            "$ref": "#/$defs/taskNode"
           }
         ]
       }
@@ -507,7 +511,13 @@
               "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/\\[\\]-]*$"
             },
             "effort": {
-              "enum": ["low", "medium", "high", "xhigh", "max"],
+              "enum": [
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
               "description": "Explicit CLI reasoning effort. Legacy workflows that omit it run with medium."
             },
             "contextId": {
@@ -1723,6 +1733,9 @@
         },
         {
           "$ref": "#/$defs/loopNode"
+        },
+        {
+          "$ref": "#/$defs/taskNode"
         }
       ]
     },
@@ -1978,7 +1991,13 @@
                         "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/\\[\\]-]*$"
                       },
                       "effort": {
-                        "enum": ["low", "medium", "high", "xhigh", "max"],
+                        "enum": [
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max"
+                        ],
                         "description": "Explicit CLI reasoning effort. Legacy roles that omit it run with medium."
                       },
                       "instructions": {
@@ -2067,6 +2086,26 @@
             "roles"
           ],
           "additionalProperties": false
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "config"
+      ],
+      "additionalProperties": false
+    },
+    "taskNode": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "type": {
+          "const": "task"
+        },
+        "config": {
+          "$ref": "managed-task.schema.json#/$defs/config"
         }
       },
       "required": [

@@ -8,7 +8,7 @@ import { DEFAULT_EFFORT } from '../shared/effort.mjs';
 const ICONS: Record<NodeType, ReactNode> = {
   text: <FileText size={14} />, 'prompt-template': <Braces size={14} />, agent: <Bot size={14} />, context: <Link2 size={14} />, 'result-viewer': <Eye size={14} />,
   'file-input': <FileInput size={14} />, merge: <GitMerge size={14} />, 'json-select': <Filter size={14} />, condition: <Scale size={14} />, loop: <Repeat size={14} />,
-  cache: <Database size={14} />, route: <Split size={14} />, gate: <ShieldCheck size={14} />, map: <ListChecks size={14} />,
+  cache: <Database size={14} />, route: <Split size={14} />, gate: <ShieldCheck size={14} />, map: <ListChecks size={14} />, task: <ListChecks size={14} />,
 };
 export const STATE_LABELS: Record<string, string> = {
   scheduled: 'Planned', waiting: 'Waiting', running: 'Running', succeeded: 'Succeeded', failed: 'Failed', canceled: 'Canceled', blocked: 'Blocked', interrupted: 'Interrupted',
@@ -21,6 +21,7 @@ export const STATE_LABELS: Record<string, string> = {
 function summary(data: FlowNode['data']): string {
   const node = data.node!;
   switch (node.type) {
+    case 'task': return `${node.config.delivery.boundary === 'verified_branch' ? 'Verified branch' : 'Candidate acceptance'} · ${Object.keys(node.config.roles).length} roles · ≤${node.config.bounds.maxAttempts} attempts`;
     case 'text': return node.config.value.split('\n')[0] || 'Empty text';
     case 'prompt-template': return `${node.config.slots.length} slot${node.config.slots.length === 1 ? '' : 's'}`;
     case 'agent': return `${node.config.model || 'model not set'} · ${node.config.effort ?? (data.readOnly ? 'effort not specified' : DEFAULT_EFFORT)} · ${node.config.output.format}${node.config.attachFiles ? ' · files in' : ''}${node.config.captures ? ' · captures' : ''}`;
@@ -91,6 +92,7 @@ export function BoundaryCard({ data }: NodeProps<FlowNode>) {
 }
 
 export const nodeTypes = {
+  task: WorkflowNodeCard,
   text: WorkflowNodeCard, 'prompt-template': WorkflowNodeCard, agent: WorkflowNodeCard, context: WorkflowNodeCard, 'result-viewer': WorkflowNodeCard,
   'file-input': WorkflowNodeCard, merge: WorkflowNodeCard, 'json-select': WorkflowNodeCard, condition: WorkflowNodeCard, loop: WorkflowNodeCard, boundary: BoundaryCard,
   cache: WorkflowNodeCard, route: WorkflowNodeCard, gate: WorkflowNodeCard, map: WorkflowNodeCard,

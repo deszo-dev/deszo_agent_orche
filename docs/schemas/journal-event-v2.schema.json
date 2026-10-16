@@ -2129,6 +2129,34 @@
         "type",
         "payload"
       ]
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "task.recorded"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "minLength": 1
+            },
+            "record": {
+              "$ref": "#/$defs/ref"
+            }
+          },
+          "required": [
+            "kind",
+            "record"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
     }
   ],
   "$defs": {

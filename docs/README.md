@@ -1,7 +1,7 @@
 # Deszo Orchestrator Documentation
 
-Version: 0.17
-Status: confirmed requirements, verified ADR-0001, accepted ADR-0002, and staged proposed contracts
+Version: 0.22
+Status: confirmed requirements, verified ADR-0001, accepted ADR-0002 through ADR-0005, and staged contracts
 Updated: 2026-10-16
 
 Deszo is a personal Tauri/React/React Flow desktop application with an Orange-inspired node workspace. Milestones M1–M6 and the reference delivery pipeline are implemented. ADR-0001 external authoring passed its ordered acceptance campaign with the listed Windows Codex, Claude Code, and Antigravity versions.
@@ -16,12 +16,16 @@ Version 0.8 resolves [the third review](reviews/2026-10-13-third-review.md): M1'
 4. [Decision register](DECISIONS.md): confirmed requirements and proposal status.
 5. [Product specification](PRODUCT_SPEC.md) and [architecture](ARCHITECTURE.md): UX and component/data flow.
 6. [Project README](../README.md): current prototype commands and recorded checks.
-7. [Architecture decision records](adr/README.md): accepted external authoring and execution audit, supervision and incident reporting.
+7. [Architecture decision records](adr/README.md): accepted external authoring, audit/supervision, task assessment/workflow planning, agent communication/context contracts, and verified branch delivery.
 8. [Authoring bridge setup](authoring/README.md): generated client configuration and local setup for Codex, Claude Code, and Antigravity.
 9. [ADR-0001 implementation status](adr/0001-implementation-status.md): implemented code paths and remaining release evidence.
 10. [External authoring acceptance test plan](authoring/ACCEPTANCE_TEST_PLAN.md): ordered release gates, native compatibility probes, pilot rerun, policy/cutover checks, and installed-client acceptance.
 11. [Authoring acceptance report](pilots/2026-10-15-authoring-acceptance.md) and [migration note](authoring/MIGRATION_V3.md): executed G0–G5 results, supported versions/scopes, v2 retirement, and confirmation settings.
 12. [Accepted ADR-0002](adr/0002-execution-audit-and-supervised-control.md): complete available execution evidence, assistant control, verified root Stop, local bugs and audit export before the shadcn/ui pilot.
+13. [Accepted ADR-0003](adr/0003-task-assessment-and-workflow-planning.md): general development workflow, task assessment, explainable plan selection and comparative evaluation across task classes.
+14. [Accepted ADR-0004](adr/0004-agent-communication-and-context-contracts.md): structured results, controlled technical prose, context packages, feedback on changes and measured efficiency with full available audit.
+15. [Accepted ADR-0005](adr/0005-verified-feature-branch-delivery.md): exact candidate application, environment verification and verified commit evidence for a local feature branch.
+16. [Managed tasks](MANAGED_TASKS.md): executable `task-planning-v1` node, reference role bindings, engine dispatch, Context/evidence retrieval, shared limits, Stop/recovery and verified branch delivery.
 
 ## Rule ownership and precedence
 
@@ -44,12 +48,15 @@ Confirmed user requirements in [DECISIONS.md](DECISIONS.md) take precedence over
 | ADR-0001 code delivery and outstanding verification | [ADR-0001 implementation status](adr/0001-implementation-status.md) |
 | ADR-0001 verification sequence and evidence requirements | [Acceptance test plan](authoring/ACCEPTANCE_TEST_PLAN.md) |
 | Accepted audit/supervision/incident architecture; current runtime behavior stays unchanged until implementation | [ADR-0002](adr/0002-execution-audit-and-supervised-control.md) |
+| Managed task node/configuration, compiler and run-level contracts | [Managed tasks](MANAGED_TASKS.md) |
 
 Product specification describes interactions; architecture describes components. [Proposed baseline](PROPOSED_BASELINE.md) preserves Q01–Q22 navigation without duplicating rules. [Open questions](OPEN_QUESTIONS.md) redirects to the decision register and staged contract prerequisites.
 
 Edit a rule in its home and update affected examples/schemas/links. Do not copy its full wording into four other documents.
 
 ## Schemas and examples
+
+Managed task execution: [task schema](schemas/managed-task.schema.json), [reference workflow](examples/managed-task/workflow.json), [migration 11](storage/m11.sql), and [execution contract](MANAGED_TASKS.md). The engine advertises `task-planning-v1` through API v3; no existing workflow is rewritten.
 
 M1: [application settings](schemas/application-settings.schema.json), [workflow](schemas/workflow.schema.json), [values](schemas/value.schema.json), [attempt manifests](schemas/attempt-record.schema.json), [journal](schemas/journal-event.schema.json), [API definitions](schemas/runtime-api.schema.json), [reference SQL](storage/m1.sql), and [Context-chain fixture](examples/m1-context-chain/workflow.json).
 
@@ -73,6 +80,11 @@ ADR-0001 is implemented and verified within its documented Windows support bound
 
 | Date | Version | Change |
 | --- | --- | --- |
+| 2026-10-16 | 0.22 | Wired managed tasks into the ordinary engine lifecycle: assessment/plans, isolated role Contexts, evidence retrieval, bounded repair, acceptance resolver, contained Git/check children, durable delivery reconciliation, UI/MCP inspection and offline reference closure; real-provider evaluation remains separate |
+| 2026-10-16 | 0.21 | Implemented ADR-0003, ADR-0004, and ADR-0005 through Stage 3: task assessment, source-derived floors, candidate-time floor checks, structured results, deterministic context packages, fingerprint v2 invalidation, REVIEW_INCOMPLETE loop rules, criterion-to-evidence acceptance, isolated separate-clone branch delivery, environment smoke and verified READY_FOR_MERGE commits; migration m9 and schemas added |
+| 2026-10-16 | 0.20 | Resolved review findings for ADR-0003–0005: source-derived risk floors, lifecycle linkage, evaluation cost estimate, mid-run request-and-resume context, package determinism/invalidation, REVIEW_INCOMPLETE loop rules, separate-clone delivery model, aggregate delivery budget linkage, and pilot branch base clarity; documentation only |
+| 2026-10-16 | 0.19 | Refined ADR-0003/ADR-0004 with acceptance independence, deterministic selection, typed criterion evidence, incomplete review and baseline-first experiments; added D25/P27 and proposed ADR-0005 for verified local branch delivery; documentation only |
+| 2026-10-16 | 0.18 | Added D23–D24 and proposed ADR-0003/ADR-0004 for general workflow planning/evaluation and agent communication/context contracts; no runtime, schema, saved-workflow or provider changes |
 | 2026-10-16 | 0.17 | Accepted ADR-0002 after the second review; recorded P24 and Stage 1/2 contract requirements; no implementation or pilot execution |
 | 2026-10-16 | 0.16 | Added D20–D22 and proposed ADR-0002 for execution audit, supervised control, verified root Stop, local incidents and audit bundles; no new runtime behavior or pilot execution |
 | 2026-10-15 | 0.15 | Completed ADR-0001 G0–G5 for listed Windows clients/scopes, verified native isolation and the real-provider pilot, enabled default confirmation, retired v2 saves, and published migration and installed-client evidence |

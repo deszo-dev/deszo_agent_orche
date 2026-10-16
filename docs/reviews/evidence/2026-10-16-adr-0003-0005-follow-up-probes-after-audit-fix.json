@@ -1,0 +1,156 @@
+{
+  "capturedAt": "2026-10-16T16:07:58.300Z",
+  "checkout": "C:\\my\\2026\\deszo_agent_orche",
+  "head": "7178032a9c8b4ce1f7a97590e57ab10c7af05fcf",
+  "scratch": "C:\\Users\\jusse\\AppData\\Local\\Temp\\deszo-follow-up-tBvb7S",
+  "inputDigests": {
+    "runtime/core/branchDelivery.mjs": "36fa3575aa9289ca474f3edc368c3852ce7e07bd5d7db57ba8a51cfe26af1129",
+    "runtime/core/taskAssessment.mjs": "4fec6e2a0c375d62eee2ae5cf038f435fa037b0c748ba5215a03de56d08a12ec",
+    "runtime/core/contextPackage.mjs": "3b4a0ad12d86e48fc4e70967bef79f5e773c8b671a6de6376737084d7b8ce8bc",
+    "runtime/core/store.mjs": "d178ff99296fddb3b8f05327743e117ebfaa127f0d481032f7cfac8d9b355407",
+    "docs/schemas/delivery-plan.schema.json": "54e50374bcfa29f168971906595e26556a9c091d1076b5d1981871d6705fbe0f",
+    "docs/schemas/acceptance-record.schema.json": "690d9a89059fad7bac2375850a864ecb8a03588b6632d74717064525ebf6601c",
+    "docs/schemas/execution-plan.schema.json": "bf80858ca0784ec3d434fcc0966003f5b50ba0635293b004897cf08d808cadf2",
+    "docs/storage/m9.sql": "74179d9176d004169de4dfeefaf95dbf89331d95318923c29f7d58c25624d432"
+  },
+  "changedInputs": [],
+  "summary": {
+    "total": 14,
+    "passed": 14,
+    "failed": 0
+  },
+  "results": [
+    {
+      "name": "existing_directory_and_traversal_are_rejected",
+      "passed": true,
+      "observed": {
+        "existingStatus": "precondition_failed",
+        "sentinel": "PRESERVE",
+        "traversalStatus": "precondition_failed"
+      }
+    },
+    {
+      "name": "explicit_bindings_and_distinct_role_ids_are_required",
+      "passed": true,
+      "observed": {
+        "rejectionsConfirmed": true
+      }
+    },
+    {
+      "name": "context_expansion_ignores_attempt_ids_and_retains_missing_dependencies",
+      "passed": true,
+      "observed": {
+        "sameExpandedFingerprint": true,
+        "resumed": false,
+        "missing": [
+          "missing.js"
+        ]
+      }
+    },
+    {
+      "name": "every_candidate_file_must_exist_in_the_commit",
+      "passed": true,
+      "observed": {
+        "status": "delivery_failed",
+        "ready": false,
+        "candidateFileCommitted": false
+      }
+    },
+    {
+      "name": "undeclared_git_conversions_cannot_change_accepted_bytes",
+      "passed": true,
+      "observed": {
+        "status": "delivery_failed",
+        "candidateContent": "APPROVED\r\n",
+        "committedContent": null
+      }
+    },
+    {
+      "name": "smoke_must_not_verify_a_different_tracked_source_tree",
+      "passed": true,
+      "observed": {
+        "status": "verification_failed",
+        "statusAfterSmoke": " M README.md\nA  approved.txt\n",
+        "smokeSource": "SMOKE-ONLY SOURCE\n",
+        "committedSource": null
+      }
+    },
+    {
+      "name": "delivery_cannot_silently_switch_the_declared_base",
+      "passed": true,
+      "observed": {
+        "status": "precondition_failed",
+        "declaredBase": "76706d40407eab37090d2b9d74c1074cd84c25f4",
+        "reportedSource": "76706d40407eab37090d2b9d74c1074cd84c25f4",
+        "actualParent": null
+      }
+    },
+    {
+      "name": "delivery_must_preserve_the_callers_checked_out_branch_state",
+      "passed": true,
+      "observed": {
+        "status": "precondition_failed",
+        "headChanged": false,
+        "hostStatus": ""
+      }
+    },
+    {
+      "name": "hooks_none_must_apply_before_clone_and_checkout",
+      "passed": true,
+      "observed": {
+        "status": "READY_FOR_MERGE",
+        "hookExecution": {
+          "status": "none",
+          "journal": "Hooks policy: none; host ref publication runs with hooks disabled"
+        },
+        "ambientHookRan": false
+      }
+    },
+    {
+      "name": "acceptance_cannot_open_with_unresolved_evidence",
+      "passed": true,
+      "observed": {
+        "valid": true,
+        "canOpenGate": false,
+        "reason": "Structural validation only; no Gate opened. Authoritative evaluation requires: expectedBoundary, resolveEvidence."
+      }
+    },
+    {
+      "name": "plan_fingerprint_must_include_constraints_and_exclusions",
+      "passed": true,
+      "observed": {
+        "sameFingerprint": false,
+        "first": "4f8910ce3c128329d6d9cc303ef06ccadb93111dd635ec9e5cc142ea5da0cd07",
+        "second": "aae60d50c903a89f429795b305caea6c38f754836088a158ca06e6d033ac971c"
+      }
+    },
+    {
+      "name": "fixed_planning_inputs_must_not_depend_on_the_clock",
+      "passed": true,
+      "observed": {
+        "sameFingerprint": true,
+        "firstConfirmation": "2026-10-16T12:00:00.000Z",
+        "secondConfirmation": "2026-10-16T12:00:00.000Z"
+      }
+    },
+    {
+      "name": "store_must_retain_multiple_revisions_of_one_plan",
+      "passed": true,
+      "observed": {
+        "firstPlanId": "PLAN-92c606da7fd5",
+        "revisedPlanId": "PLAN-92c606da7fd5",
+        "distinctRevisionIds": true,
+        "storedRevisions": 2
+      }
+    },
+    {
+      "name": "delivery_must_not_block_runtime_control_callbacks",
+      "passed": true,
+      "observed": {
+        "status": "READY_FOR_MERGE",
+        "elapsedMs": 2399,
+        "controlCallbackRan": true
+      }
+    }
+  ]
+}

@@ -54,6 +54,10 @@
         "executable": { "type": "string", "minLength": 1 },
         "arguments": { "type": "array", "items": { "type": "string" } },
         "source": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "cwd": { "type": "string", "minLength": 1 },
+        "taskExecutionId": { "type": "string", "format": "uuid" },
+        "parentAttemptId": { "type": "string", "format": "uuid" },
+        "timeoutMs": { "type": "integer", "minimum": 1 },
         "timeoutSeconds": { "type": "integer", "minimum": 1 },
         "requiredExitCode": { "type": ["integer", "null"] },
         "environmentPolicy": { "type": "string", "minLength": 1, "maxLength": 200 }

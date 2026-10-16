@@ -27,8 +27,14 @@ const BUNDLED_M7 = new URL('./m7.sql', import.meta.url);
 const M7_PATH = existsSync(BUNDLED_M7) ? BUNDLED_M7 : new URL('../../docs/storage/m7.sql', import.meta.url);
 const BUNDLED_M8 = new URL('./m8.sql', import.meta.url);
 const M8_PATH = existsSync(BUNDLED_M8) ? BUNDLED_M8 : new URL('../../docs/storage/m8.sql', import.meta.url);
+const BUNDLED_M9 = new URL('./m9.sql', import.meta.url);
+const M9_PATH = existsSync(BUNDLED_M9) ? BUNDLED_M9 : new URL('../../docs/storage/m9.sql', import.meta.url);
+const BUNDLED_M10 = new URL('./m10.sql', import.meta.url);
+const M10_PATH = existsSync(BUNDLED_M10) ? BUNDLED_M10 : new URL('../../docs/storage/m10.sql', import.meta.url);
+const BUNDLED_M11 = new URL('./m11.sql', import.meta.url);
+const M11_PATH = existsSync(BUNDLED_M11) ? BUNDLED_M11 : new URL('../../docs/storage/m11.sql', import.meta.url);
 export const nowIso = () => new Date().toISOString();
-export const MIGRATION_PATHS = [DDL_PATH, M2_PATH, M3_PATH, M4_PATH, M5_PATH, M6_PATH, M7_PATH, M8_PATH];
+export const MIGRATION_PATHS = [DDL_PATH, M2_PATH, M3_PATH, M4_PATH, M5_PATH, M6_PATH, M7_PATH, M8_PATH, M9_PATH, M10_PATH, M11_PATH];
 
 // A reference script's transaction and pragma lines are applied by the runtime around it, so the
 // schema change and its schema_migrations row commit together.
@@ -236,6 +242,88 @@ export class Store extends EventEmitter {
         if (bytes.length !== row.envelope_byte_size || sha256(bytes) !== row.envelope_sha256) throw new CorruptionError(`Journal event of run ${runId} failed digest verification.`);
         return parseStrictJson(row.envelope_json);
       });
+  }
+
+  recordTaskAssessment(assessment) {
+    const { artifactId } = this.putJson(assessment);
+    this.run(
+      `INSERT INTO task_assessments(id, assessment_run_id, business_request_id, source_snapshot_hash, assessment_artifact_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      assessment.assessmentId,
+      assessment.assessmentRunId,
+      assessment.businessRequestId,
+      assessment.sourceSnapshotHash,
+      artifactId,
+      assessment.createdAt || nowIso()
+    );
+    return { assessmentId: assessment.assessmentId, artifactId };
+  }
+
+  // Supersession and insertion commit together (A4). An identical retry of a stored revision returns its original
+  // receipt; a different document under an existing revision id is refused and leaves the active revision in place.
+  recordExecutionPlan(plan, assessmentId, status = 'active') {
+    return this.transaction(() => {
+      const { artifactId } = this.putJson(plan);
+      const stored = this.get('SELECT plan_artifact_id FROM execution_plans WHERE id = ? AND plan_revision_id = ?', plan.planId, plan.planRevisionId);
+      if (stored) {
+        if (stored.plan_artifact_id !== artifactId) {
+          throw new Error(`Execution plan revision ${plan.planRevisionId} is already stored with different content.`);
+        }
+        return { planId: plan.planId, planRevisionId: plan.planRevisionId, artifactId, replayed: true };
+      }
+      if (status === 'active') {
+        this.run(`UPDATE execution_plans SET status = 'superseded' WHERE id = ? AND status = 'active' AND plan_revision_id <> ?`, plan.planId, plan.planRevisionId);
+      }
+      this.run(
+        `INSERT INTO execution_plans(id, plan_revision_id, assessment_id, execution_run_id, policy_version, delivery_boundary, plan_fingerprint, plan_artifact_id, status, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        plan.planId,
+        plan.planRevisionId,
+        assessmentId,
+        plan.executionRunId ?? null,
+        plan.policyVersion,
+        plan.deliveryBoundary,
+        plan.planFingerprint,
+        artifactId,
+        status,
+        plan.createdAt || nowIso()
+      );
+      return { planId: plan.planId, planRevisionId: plan.planRevisionId, artifactId, replayed: false };
+    });
+  }
+
+  recordAcceptanceRecord(record, runId) {
+    const { artifactId } = this.putJson(record);
+    this.run(
+      `INSERT INTO acceptance_records(id, run_id, boundary, subject_id, candidate_digest, overall_status, record_artifact_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      record.recordId,
+      runId,
+      record.deliveryBoundary,
+      record.subjectId,
+      record.candidateDigest,
+      record.overallStatus,
+      artifactId,
+      record.evaluatedAt || nowIso()
+    );
+    return { recordId: record.recordId, artifactId };
+  }
+
+  recordBranchDelivery(result, runId) {
+    const { artifactId } = this.putJson(result);
+    this.run(
+      `INSERT INTO branch_deliveries(id, run_id, delivery_plan_id, target_branch_ref, commit_id, status, result_artifact_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      result.deliveryResultId,
+      runId,
+      result.deliveryPlanId,
+      result.targetBranchRef,
+      result.verifiedCommitId ?? null,
+      result.status,
+      artifactId,
+      result.completedAt || nowIso()
+    );
+    return { deliveryResultId: result.deliveryResultId, artifactId };
   }
 
   close() { this.db.close(); }

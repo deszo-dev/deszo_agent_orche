@@ -31,6 +31,45 @@ if (scenario === 'quota') { event({ type: 'error', message: 'Usage limit reached
 if (scenario === 'no-terminal') { answer('{"message":"partial"}'); process.exit(0); }
 if (scenario === 'bad-json') { answer('{"wrong": 42}'); done(); process.exit(0); }
 if (scenario === 'not-json') { answer('plain words'); done(); process.exit(0); }
+if (scenario === 'managed-task') {
+  const input = JSON.parse(/MANAGED_TASK_INPUT_BEGIN\n(.*)\nMANAGED_TASK_INPUT_END/.exec(prompt)[1]);
+  const envelope = { status: 'COMPLETED', reason: '', requestedPaths: [], assessment: null, review: null, triage: null };
+  if (input.request.includes('SLOW_DEFINE') && input.phase === 'define') await sleep(60000);
+  if (input.request.includes('SLOW_SMOKE') && input.phase === 'implement') await sleep(50);
+  if (['define', 'discovery'].includes(input.phase)) envelope.assessment = {
+    schemaVersion: 1, kind: 'TaskAssessment', assessmentId: 'ASSESS-FIXTURE', assessmentRunId: input.runId, businessRequestId: input.businessRequestId,
+    authorRole: 'analyst', sourceSnapshotHash: input.sourceSnapshotHash, intendedOutcome: 'Return the requested feature value.', constraints: [],
+    requirements: [{ id: 'REQ-1', title: 'Requested value', acceptanceCriteria: [{ id: 'AC-1', description: 'The feature returns 42.', requiredEvidence: input.request.includes('MANUAL_ACCEPTANCE') ? 'Final business observation' : 'Passing engine check', evidenceProducer: input.request.includes('MANUAL_ACCEPTANCE') ? 'analyst' : 'testRunner' }] }],
+    scope: { affectedComponents: ['src/feature.mjs'] }, sourceDerivedFacts: { criticalPaths: [], publicContracts: [], dependencyFanOut: 1 },
+    assessmentAxes: { scopeCoupling: 'local', technicalDifficulty: 'low', failureImpact: 'limited', uncertainty: input.request.includes('UNCERTAIN') && input.phase === 'define' ? 'high' : 'low', verifiability: 'clear' },
+    grounds: { references: ['src/feature.mjs'], assumptions: [], confidence: 'Fixture', unresolvedQuestions: [] }, planningAdvice: { recommendedStages: [] }, createdAt: new Date().toISOString(),
+  };
+  else if (input.phase === 'write-tests') {
+    mkdirSync('tests', { recursive: true });
+    writeFileSync('tests/feature.test.mjs', "import assert from 'node:assert/strict'; import {feature} from '../src/feature.mjs'; assert.equal(feature(),42);\n");
+  } else if (input.phase === 'implement') {
+    const value = input.request.includes('REPAIR_CHECK') && !input.feedback.some(item => item.phase === 'triage') ? 41 : 42;
+    mkdirSync('src', { recursive: true }); writeFileSync('src/feature.mjs', `export const feature=()=>${value};\n`);
+    if (input.request.includes('CRITICAL_ACTUAL')) { mkdirSync('docs/storage', { recursive: true }); writeFileSync('docs/storage/m12.sql', '-- fixture critical change\n'); }
+    if (input.request.includes('SCOPE_VIOLATION')) writeFileSync('unapproved.txt', 'outside allowed scope');
+  } else if (input.phase === 'triage') {
+    envelope.triage = { cause: input.request.includes('ENVIRONMENT_FAILURE') ? 'environment' : 'implementation', reason: 'The captured check output identifies the cause.' };
+  } else if (input.phase === 'review-code' && input.request.includes('REVIEW_INCOMPLETE')) {
+    envelope.status = 'REVIEW_INCOMPLETE'; envelope.reason = 'The business requirement cannot be verified with the captured inputs.';
+  } else if (input.phase === 'review-code' && input.request.includes('MISSING_CONTEXT')) {
+    envelope.status = 'CONTEXT_NEEDED'; envelope.requestedPaths = ['missing-contract.md']; envelope.reason = 'Need a contract absent from the snapshot.';
+  } else if (input.phase === 'review-code' && input.request.includes('CONTEXT_EXPANSION') && !input.expandedPaths.includes('README.md')) {
+    envelope.status = 'CONTEXT_NEEDED'; envelope.requestedPaths = ['README.md']; envelope.reason = 'Need the captured project contract.';
+  } else if (input.phase === 'review-code' && input.request.includes('EVIDENCE_EXPANSION') && !input.expandedPaths.some(path => path.startsWith('evidence:'))) {
+    envelope.status = 'CONTEXT_NEEDED'; envelope.requestedPaths = [input.evidenceCatalog.find(item => item.kind === 'ExecutionEvidence').streams.stdout.chunks[0].requestPath]; envelope.reason = 'Need the exact captured check output chunk.';
+  } else {
+    if (input.phase === 'review-code' && input.request.includes('REVIEW_MUTATION')) writeFileSync('src/feature.mjs', 'export const feature=()=>99;\n');
+    const repair = input.request.includes('REPAIR_REVIEW') && input.phase === 'review-code' && !input.feedback.some(item => item.phase === 'review-code');
+    const readiness = ['confirm-plan', 'readiness-code', 'readiness-tests', 'review-test-source'].includes(input.phase);
+    envelope.review = { verdict: repair ? 'CHANGES_REQUESTED' : 'APPROVED', reason: repair ? 'A source defect requires one repair.' : 'Captured source and checks satisfy the criteria.', criteria: input.criteria.map(c => ({ criterionId: c.id, status: repair ? 'unsatisfied' : readiness ? 'unverified' : 'satisfied', reason: readiness ? 'Ready for implementation; the business outcome is not asserted yet.' : 'Verified from the supplied source and evidence.' })) };
+  }
+  answer(JSON.stringify(envelope)); done(); process.exit(0);
+}
 const approve = /^checker-approve-(\d+)$/.exec(scenario);
 if (approve) {
   // Approves once the reviewed draft reports writer turn >= N.

@@ -78,6 +78,8 @@ Migration scripts are versioned and hashed. Back up the database before applying
 
 ## Restart, retention, and export
 
+Migrations [9](storage/m9.sql) and [10](storage/m10.sql) add immutable assessments, composite-keyed plan revisions, acceptance records and delivery results. [Migration 11](storage/m11.sql) adds managed task state, aggregate work (reservations and actual launches), evidence bound to a plan revision, and durable delivery operations. It preserves existing branch receipts while admitting `publication_uncertain`. Runtime restart interrupts active task state and marks unfinished delivery operations for reconciliation; it never resumes a ref update. Private audit exports include these records and their transitive immutable artifact closure. See [the managed task contract](MANAGED_TASKS.md).
+
 On restart, validate referenced records and reconcile PID/start/supervisor identities under [the containment policy](M1_CONTRACTS.md#process-containment). Nonterminal runs, including draining, become interrupted. In Tauri mode Rust has terminated the previous Job; confirm that cleanup before releasing reservations. Standalone development blocks on any surviving/uncertain owned tree until termination is resolved. Neither mode adopts surviving work or issues a model call automatically. Ambiguous native bindings become needs_review. List endpoints make these interrupted runs discoverable after frontend state is lost.
 
 Keep run journals and referenced objects by default. Deletion is a separate explicit user operation: protect live runs, Context references, Cache pins, carried approvals, and selected results. Retention/garbage-collection commands are deferred until their reference accounting is specified.

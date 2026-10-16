@@ -1,0 +1,131 @@
+{
+  "capturedAt": "2026-10-16T17:29:47.287Z",
+  "checkout": "C:\\my\\2026\\deszo_agent_orche",
+  "head": "7178032a9c8b4ce1f7a97590e57ab10c7af05fcf",
+  "scratch": "C:\\Users\\jusse\\AppData\\Local\\Temp\\deszo-resolution-audit-UbhE1P",
+  "inputDigests": {
+    "runtime/core/branchDelivery.mjs": "340ae6a4ac0e21cd7171e3b1b34660baf0821b449b98f9e59621b95429515ce6",
+    "runtime/core/contextPackage.mjs": "1b13325f4fb3fcded2f98528b5a3a200cee0e3f6a0f6c5da65a6efc7f1b55fca",
+    "runtime/core/taskAssessment.mjs": "823cf684d66c4c4e08eb12c535dfcfcfa227c8d52f6547b5b7b623abe23b7f86",
+    "runtime/core/store.mjs": "848c05fa9327992f4357bd7be79543f089b68e8d56a484cc328674b5ccdba0ab",
+    "docs/storage/m9.sql": "74179d9176d004169de4dfeefaf95dbf89331d95318923c29f7d58c25624d432"
+  },
+  "changedInputs": [],
+  "summary": {
+    "total": 8,
+    "passed": 8,
+    "failed": 0
+  },
+  "results": [
+    {
+      "name": "control_callback_must_run_before_smoke_ends_and_ref_is_published",
+      "passed": true,
+      "observed": {
+        "status": "READY_FOR_MERGE",
+        "startedAt": 1792171775306,
+        "returnedAt": 1792171775345,
+        "smokeEndedAt": 1792171777653,
+        "callbackAt": 1792171775476,
+        "publishedAtCallback": false,
+        "refPublishedBeforeAwait": false,
+        "synchronousCallMs": 39
+      }
+    },
+    {
+      "name": "hooks_none_must_also_cover_host_ref_publication",
+      "passed": true,
+      "observed": {
+        "status": "READY_FOR_MERGE",
+        "hookExecution": {
+          "status": "none",
+          "journal": "Hooks policy: none; host ref publication runs with hooks disabled"
+        },
+        "hostHookRan": false,
+        "marker": null
+      }
+    },
+    {
+      "name": "checked_out_target_must_be_rechecked_after_smoke",
+      "passed": true,
+      "observed": {
+        "status": "precondition_failed",
+        "beforeRef": "refs/heads/main",
+        "afterRef": "refs/heads/codex/audit",
+        "hostStatus": ""
+      }
+    },
+    {
+      "name": "structural_validation_without_trusted_inputs_cannot_open_gate",
+      "passed": true,
+      "observed": {
+        "valid": true,
+        "canOpenGate": false,
+        "reason": "Structural validation only; no Gate opened. Authoritative evaluation requires: expectedCriteria, expectedBoundary, expectedSubjectId, expectedCandidateDigest, resolveEvidence."
+      }
+    },
+    {
+      "name": "evidence_id_membership_cannot_replace_digest_verification",
+      "passed": true,
+      "observed": {
+        "valid": true,
+        "canOpenGate": false,
+        "reason": "Structural validation only; no Gate opened. Authoritative evaluation requires: resolveEvidence.",
+        "incomplete": {
+          "valid": true,
+          "canOpenGate": false,
+          "reason": "Evidence not verified against immutable engine records: AC-1 check-1: incomplete or malformed engine record."
+        }
+      }
+    },
+    {
+      "name": "resolved_evidence_must_match_kind_source_and_success",
+      "passed": true,
+      "observed": {
+        "valid": true,
+        "canOpenGate": false,
+        "reason": "Evidence not verified against immutable engine records: AC-1 check-1: record kind \"artifact\" differs from referenced kind \"check\".",
+        "resolvedRecord": {
+          "id": "check-1",
+          "kind": "artifact",
+          "digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "subjectId": "OTHER-SUBJECT",
+          "candidateDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "boundary": "candidate",
+          "source": "engine",
+          "outcome": "failed",
+          "appliesToCriteria": [
+            "AC-1"
+          ],
+          "recordedAt": "2026-10-16T12:00:00.000Z"
+        }
+      }
+    },
+    {
+      "name": "failed_revision_retry_must_preserve_the_active_revision",
+      "passed": true,
+      "observed": {
+        "revisions": [
+          {
+            "id": "PLAN-6f2570a7630c",
+            "plan_revision_id": "REV-2026-10-16T17-29-47-037Z",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "name": "opening_an_existing_m9_store_must_upgrade_the_plan_revision_key",
+      "passed": true,
+      "observed": {
+        "legacyPrimaryKeyColumns": [
+          "id"
+        ],
+        "version": 11,
+        "primaryKeyColumns": [
+          "id",
+          "plan_revision_id"
+        ]
+      }
+    }
+  ]
+}

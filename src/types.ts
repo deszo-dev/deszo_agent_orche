@@ -11,6 +11,22 @@ export const VALUE_TYPES: ValueType[] = ['Text', 'JsonValue', 'ArtifactSet'];
 export type OutputContract = { format: 'text' } | { format: 'json'; schema?: Record<string, unknown> };
 export type FieldSource = { input: string; pointer?: string } | { literal: unknown };
 export type TextSource = { literal: string } | { pointer: string };
+export interface ManagedTaskConfig {
+  roles: Record<string, { role: string; provider: Provider; model: string; effort: Effort; timeoutSeconds: number }>;
+  scope: { production: string[]; tests: string[]; documentation: string[]; excludedOutputs: string[] };
+  projectPolicy: { criticalAreas: string[]; publicContracts: string[]; requireIndependentAcceptance: boolean; independentAcceptanceOnHighUncertainty?: boolean; independentAcceptanceOnHighConsequence?: boolean };
+  bounds: { maxAttempts: number; maxElapsedSeconds: number; maxContextTurns: number; maxRepairIterations: number; maxDiscoveryTurns: number };
+  checks: { id: string; command: string; args: string[]; expectedExitCode: number; timeoutMs: number; criteria: string[] }[];
+  delivery: { boundary: 'candidate' | 'verified_branch'; baseCommit?: string; targetBranchRef?: string; expectedOldValue?: string | null; commitPolicy?: { authorName: string; authorEmail: string; message: string }; installHooks?: boolean; hookSource?: string | null };
+}
+
+export interface ManagedTaskNavigator {
+  taskExecutionId: string; state: string; current: string | null; phase: string | null;
+  plan: { planRevisionId: string; classification: { winningClassification: string; reason: string }; selectedStages: string[] } | null;
+  work: { attempts: number; processes: number; outputBytes: number; elapsedMilliseconds: number; remainingMilliseconds: number; repairs: number };
+  incompleteReason: string | null; acceptanceRecordIds: string[]; delivery: { status: string; targetBranchRef: string; verifiedCommitId: string | null } | null;
+  deliveryOperation: { phase: string } | null; stateArtifact: ArtifactRef;
+}
 
 export interface LoopConfig {
   valueType: ValueType; stateSchema?: Record<string, unknown>; fixedInputs: { id: string; type: ValueType }[];
@@ -19,6 +35,7 @@ export interface LoopConfig {
 }
 
 export type WorkflowNode =
+  | { id: string; type: 'task'; config: ManagedTaskConfig }
   | { id: string; type: 'text'; config: { value: string } }
   | { id: string; type: 'prompt-template'; config: { template: string; slots: { id: string; description?: string }[] } }
   | { id: string; type: 'agent'; config: { provider: Provider; model: string; effort?: Effort; contextId?: string; timeoutSeconds: number; output: OutputContract; attachFiles?: boolean; captures?: string[] } }
@@ -46,7 +63,7 @@ export interface GatePolicy { slots: { id: string; role: string; view: 'full' | 
 export type NodeType = WorkflowNode['type'];
 
 export interface WorkflowEdge { id: string; source: { nodeId: string; port: string }; target: { nodeId: string; port: string } }
-export type Capability = 'core-v1' | 'loops-v1' | 'cache-v1' | 'pipeline-v1' | 'delivery-v1' | 'revisions-v1';
+export type Capability = 'core-v1' | 'loops-v1' | 'cache-v1' | 'pipeline-v1' | 'delivery-v1' | 'revisions-v1' | 'task-planning-v1';
 export interface Workflow {
   schemaVersion: 1; workflowId: string; capabilities: Capability[];
   settings: { nativeConfiguration: 'restricted' | 'inherit' };

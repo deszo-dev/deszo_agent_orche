@@ -11,6 +11,7 @@ const BOUNDARY_PORTS = ['value', 'iteration', 'feedback'];
 export function nodePorts(node) {
   const { type, config } = node;
   switch (type) {
+    case 'task': return { inputs: { request: 'Text', source: 'ArtifactSet' }, outputs: { candidate: 'ArtifactSet', summary: 'JsonValue' } };
     case 'text': return { inputs: {}, outputs: { text: 'Text' } };
     case 'prompt-template': return { inputs: Object.fromEntries(config.slots.map(slot => [slot.id, 'Text'])), outputs: { text: 'Text' } };
     case 'agent': return {
@@ -96,6 +97,17 @@ export function semanticIssues(workflow, { maximumAgentTimeoutSeconds = M1_MAXIM
       if ((['gate', 'route'].includes(node.type) || (node.type === 'merge' && node.config.mode === 'selected') || (node.type === 'loop' && depth > 0)) && !caps.has('pipeline-v1'))
         add('capability.pipeline', `${at}/type`, `"${node.id}" needs the pipeline-v1 capability.`);
       if (node.type === 'map' && !caps.has('delivery-v1')) add('capability.delivery', `${at}/type`, `"${node.id}" needs the delivery-v1 capability.`);
+      if (node.type === 'task' && !caps.has('task-planning-v1')) add('capability.task', `${at}/type`, `"${node.id}" needs the task-planning-v1 capability.`);
+      if (node.type === 'task') {
+        for (const [key, role] of Object.entries(node.config.roles)) {
+          if (role.role !== key) add('task.role', `${at}/config/roles/${key}`, 'The binding identity must match its role key.');
+          if (role.model.trim() !== role.model || !role.model.trim() || role.model.startsWith('-')) add('task.model', `${at}/config/roles/${key}/model`, 'Use an explicit nonempty model ID without leading options or surrounding whitespace.');
+          if (role.timeoutSeconds > maximumAgentTimeoutSeconds) add('timeout.capability', `${at}/config/roles/${key}`, 'The role timeout exceeds the runtime maximum.');
+        }
+        if (node.config.projectPolicy.requireIndependentAcceptance && !node.config.roles.businessAccepter) add('task.accepter', `${at}/config/roles`, 'Policy requires an explicit independent businessAccepter binding.');
+        if (new Set(node.config.checks.map(item => item.id)).size !== node.config.checks.length) add('task.checks', `${at}/config/checks`, 'Check IDs must be unique.');
+        for (const [domain, patterns] of Object.entries(node.config.scope)) for (const pattern of patterns) if (!pattern || pattern.startsWith('/') || pattern.includes('\\') || pattern.includes(':') || pattern.split('/').some(part => !part || part === '.' || part === '..' || part.toLowerCase() === '.git')) add('task.scope', `${at}/config/scope/${domain}`, 'Use normalized relative source patterns without traversal or Git metadata.');
+      }
       if (node.type === 'gate' && node.config.subject === 'delivery' && !caps.has('delivery-v1')) add('capability.delivery', `${at}/config/subject`, `"${node.id}" prepares a delivery subject; declare the delivery-v1 capability.`);
       if (((node.type === 'gate' && node.config.carry) || (node.type === 'map' && node.config.carryAcrossRevisions)) && !caps.has('revisions-v1'))
         add('capability.revisions', `${at}/config`, `"${node.id}" carries verified results across revisions; declare the revisions-v1 capability.`);
@@ -343,7 +355,7 @@ export function capabilityIssues(capabilities) {
 const NODE_DEFS = {
   text: 'textNode', 'prompt-template': 'promptTemplateNode', agent: 'agentNode', context: 'contextNode', 'result-viewer': 'resultViewerNode',
   'file-input': 'fileInputNode', merge: 'mergeNode', 'json-select': 'jsonSelectNode', condition: 'conditionNode', loop: 'loopNode',
-  cache: 'cacheNode', route: 'routeNode', gate: 'gateNode', map: 'mapNode',
+  cache: 'cacheNode', route: 'routeNode', gate: 'gateNode', map: 'mapNode', task: 'taskNode',
 };
 const CORE = ['text', 'prompt-template', 'agent', 'context', 'result-viewer'];
 const definitions = new Map();

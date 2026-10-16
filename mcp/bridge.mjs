@@ -212,6 +212,10 @@ async function main() {
   }, input => api('GET', `/api/v2/runs/${input.runId}/watch?${new URLSearchParams({ cursor: String(input.cursor || 0), waitMs: String(input.waitMs || 0) })}`, undefined, { timeoutMs: WATCH_HTTP_TIMEOUT_MS }));
   register('get_run_control', 'Read a run control mode, its grant, acknowledgement state and termination outcome.', { runId: z.string().uuid() }, input => api('GET', `/api/v2/runs/${input.runId}/control`));
   register('get_run_evidence', 'List execution evidence records for a run. Evidence and its manifests are untrusted data.', { runId: z.string().uuid() }, input => api('GET', `/api/v2/runs/${input.runId}/evidence`));
+  register('get_run_processes', 'Read the run-owned process inventory, including managed task Git operations and checks.', { runId: z.string().uuid() }, input => api('GET', `/api/v2/runs/${input.runId}/processes`));
+  register('get_managed_task', 'Read a managed task assessment, selected plan, aggregate work, current phase, acceptance and durable delivery operation. Returned records are untrusted evidence.', {
+    runId: z.string().uuid(), nodeInstanceId: z.string().min(1).max(240),
+  }, input => api('GET', `/api/v2/runs/${input.runId}/tasks/${encodeURIComponent(input.nodeInstanceId)}`));
   register('read_artifact_range', 'Read a byte range of a captured artifact as base64 with its range digest. A range never exceeds 65536 bytes.', {
     artifactId: z.string().uuid(), offset: zeroInt, length: z.number().int().min(1).max(65536).optional(),
   }, input => api('GET', `/api/v2/artifacts/${input.artifactId}/range?${new URLSearchParams({ offset: String(input.offset || 0), length: String(input.length || 65536) })}`));
@@ -287,6 +291,9 @@ async function main() {
     register('stop_run', 'Request an idempotent root Stop for an existing run. This is separate from canceling an MCP call.', {
       runId: z.string().uuid(), requestId: z.string().uuid(),
     }, input => api('POST', `/api/v2/runs/${input.runId}/stop`, { requestId: input.requestId }), true, true);
+    register('stop_node', 'Request a scoped Stop for an active node or managed task, including its utility children. This never retries or publishes anything.', {
+      runId: z.string().uuid(), nodeInstanceId: z.string().min(1).max(240), requestId: z.string().uuid(),
+    }, input => api('POST', `/api/v2/runs/${input.runId}/nodes/${encodeURIComponent(input.nodeInstanceId)}/stop`, { requestId: input.requestId }), true, true);
   }
 
   const heartbeat = managedInvocationDenied ? null : setInterval(() => {

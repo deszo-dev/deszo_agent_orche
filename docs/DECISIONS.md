@@ -1,10 +1,10 @@
 # Decision Register
 
-Version: 0.9
-Status: confirmed requirements, accepted ADR-0001 and ADR-0002, and milestone baseline
+Version: 0.13
+Status: confirmed requirements, accepted ADR-0001 through ADR-0005, and milestone baseline
 Updated: 2026-10-16
 
-This is the sole register of requirement/proposal acceptance. The current request authorizes documentation corrections, not application implementation. No proposed default is silently marked human-confirmed.
+This is the sole register of requirement/proposal acceptance. The current request authorizes implementation of ADR-0003, ADR-0004, and ADR-0005 through Stage 3. No proposed default is silently marked human-confirmed.
 
 ## Confirmed decisions
 
@@ -33,6 +33,9 @@ This is the sole register of requirement/proposal acceptance. The current reques
 | D20 | Preserve the maximum available execution information for complete post-run analysis, with explicit capture gaps and provider availability limits. | The 2026-10-16 request to plan further Deszo improvements and create an ADR. |
 | D21 | The user will launch the shadcn/ui implementation through the external assistant, which must observe/control the run and stop all work belonging to it when a Deszo bug is detected. | Explicit 2026-10-16 supervision and Stop requirement. |
 | D22 | Record a detected Deszo bug in Deszo with execution evidence. Prepare the design/ADR now; implementation and pilot execution remain pending. | Explicit 2026-10-16 reporting requirement and documentation-only instruction. |
+| D23 | Specify a general effective development workflow, including how task assessment affects its stages and how effectiveness will be tested across different task classes. | The 2026-10-16 discussion explicitly broadened the scope beyond shadcn/ui and requested a new ADR; detailed mechanisms remain proposed. |
+| D24 | Specify agent communication and context-management contracts, covering structured results, controlled technical prose, relevant inputs and measured efficiency while preserving available audit. | The 2026-10-16 supplied communication proposal, discussion and request for a second new ADR; detailed mechanisms and savings remain unaccepted hypotheses. |
+| D25 | Specify verified local feature-branch delivery as a separate ADR/reference stage, preserving exact candidate identity through source assertion, apply, environment verification and commit. | The 2026-10-16 agreement to the six review refinements and a separate ADR-0005; implementation and Git execution are not requested. |
 
 ## Inherited requirements
 
@@ -53,7 +56,7 @@ These are carried forward from the original architecture draft. Changing them re
 
 ## Proposed resolutions
 
-P01–P22 remain **Proposed** and answer the corresponding Q IDs. P23 and P24 are listed under accepted proposals below. Detailed behavior lives at the linked home; [MILESTONES.md](MILESTONES.md#m1-baseline-for-an-implementation-request) identifies the concrete M1 baseline.
+P01–P22 remain **Proposed** and answer the corresponding Q IDs. P23–P27 are listed under accepted proposals below. Detailed behavior lives at the linked home; [MILESTONES.md](MILESTONES.md#m1-baseline-for-an-implementation-request) identifies the concrete M1 baseline.
 
 | ID | Proposed selection | Rule home |
 | --- | --- | --- |
@@ -86,6 +89,9 @@ P01–P22 remain **Proposed** and answer the corresponding Q IDs. P23 and P24 ar
 | --- | --- | --- | --- |
 | P23 | One runtime-owned HTTP authoring contract and one stdio MCP bridge shared by Codex, Claude Code, and Antigravity, with guarded saves, durable changes, editor synchronization, and an explicit API migration. | Accepted 2026-10-15 after the sixth review reported no open findings. | [ADR-0001](adr/0001-external-workflow-authoring-api-and-mcp.md) |
 | P24 | Lossless qualified audit, bounded external supervision with a run-specific grant/watchdog, verified per-run Stop, local incidents and offline audit bundles. | Accepted 2026-10-16 after the second review reported no architecture findings; Stage 1/2 contract items remain required. | [ADR-0002](adr/0002-execution-audit-and-supervised-control.md) |
+| P25 | A reference development workflow with evidence-based task assessment, versioned planning rules, explicit role bindings and aggregate limits, evaluated against a diverse corpus with independent outcome checks. | Accepted 2026-10-16 after the second review; Stages 1–3 implemented. | [ADR-0003](adr/0003-task-assessment-and-workflow-planning.md) |
+| P26 | Structured control results, concise technical prose, role-specific immutable context packages, bounded additional reads and measured communication efficiency without reducing available audit. | Accepted 2026-10-16 after the second review; Stages 1–3 implemented. | [ADR-0004](adr/0004-agent-communication-and-context-contracts.md) |
+| P27 | Optional runtime-managed delivery from an accepted candidate to an exact verified local feature-branch commit, with source/ref preconditions, environment evidence, recoverable Git operations and commit-specific readiness. | Accepted 2026-10-16 after the second review; Stages 1–3 implemented. | [ADR-0005](adr/0005-verified-feature-branch-delivery.md) |
 
 ## Open decisions and implementation authorization
 
@@ -96,6 +102,10 @@ Before implementation, record the scope the user has authorized and any correcti
 The 2026-10-15 external authoring request authorized ADR-0001 and its navigation/register updates. D19 is the requested integration scope. P23 and ADR-0001 were accepted on 2026-10-15 after the sixth review reported no open findings. This design acceptance does not authorize implementation, client configuration changes, or live provider tests; those require a separate instruction.
 
 D20–D22 record the user's audit, supervision and local bug-reporting requirements. P24 and ADR-0002 were accepted on 2026-10-16 after the second review reported no architecture findings. Acceptance authorizes the design only: implementation, new control permissions, client configuration changes, live provider calls and shadcn/ui pilot execution each require a separate instruction. ADR2-07 through ADR2-10 remain required Stage 1/2 contract and verification items.
+
+D23–D25 record the general development workflow, agent communication/context contracts, and verified feature branch delivery requirements. Following the resolution of second-review findings, the user explicitly instructed implementing ADR 3, 4, and 5 on 2026-10-16. P25, P26, and P27 are Accepted. Stages 1–3 are implemented locally with deterministic test fixtures and offline schema validation. Stage 4 evaluation with real providers and quota consumption remains gated under its documented planning estimate (~630–2,500 invocations).
+
+The subsequent request to finish the task authorizes the pending domain-to-engine integration and its local verification. The executable bounded [managed-task compiler](MANAGED_TASKS.md) now uses captured node templates, ordinary attempts and the existing authoring/authorization boundary. It does not claim automatic parallel Map decomposition, real-model efficiency results or completion of the separate client supervision acceptance matrix.
 
 ## Superseded assumptions
 

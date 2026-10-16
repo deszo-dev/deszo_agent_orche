@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, GitBranch, Lock, Play, Plus, RefreshCw, Repeat, Square, Trash2, Unlock, X } from 'lucide-react';
 import { DECISION_SCHEMA, MODEL_SUGGESTIONS, NODE_LABELS, syncSlots, validId } from './model';
-import { PROVIDERS, PROVIDER_NAMES, VALUE_TYPES, type CachePin, type ContextBinding, type GatePolicy, type MapHistory, type MapNavigator, type MapRole, type FieldSource, type JournalEvent, type Provider, type TextSource, type ValueType, type WorkflowNode } from './types';
+import { PROVIDERS, PROVIDER_NAMES, VALUE_TYPES, type CachePin, type ContextBinding, type GatePolicy, type MapHistory, type MapNavigator, type ManagedTaskNavigator, type MapRole, type FieldSource, type JournalEvent, type Provider, type TextSource, type ValueType, type WorkflowNode } from './types';
 import type { Client } from './transport';
 import { STATE_LABELS } from './nodes';
 import { DEFAULT_EFFORT, EFFORT_LEVELS, type Effort } from '../shared/effort.mjs';
@@ -51,6 +51,11 @@ export function Inspector(props: Props) {
       {props.onRunNode && <button className="button small ghost" onClick={props.onRunNode} title="Run only this node, reusing current committed inputs"><Play size={12} />Run node</button>}
     </div>}
 
+    {node.type === 'task' && <>
+      <p className="muted">The Analyst assesses this request. The engine selects stages, runs independent reviews and checks, and verifies the chosen delivery boundary. Set an explicit model and effort for every role.</p>
+      <JsonField label="Roles, scope, limits and delivery" hint="Captured with the workflow; no automatic model substitution" value={node.config} readOnly={readOnly} keyId={node.id} objectOnly onChange={value => value && replaceConfig(value)} />
+      {client && props.runId && instanceId && <ManagedTaskView client={client} runId={props.runId} instanceId={instanceId} live={Boolean(props.runActive)} />}
+    </>}
     {node.type === 'text' && <label className="field"><span>Literal text</span>
       <textarea rows={10} value={node.config.value} disabled={readOnly} onChange={event => update({ value: event.target.value })} spellCheck={false} />
     </label>}
@@ -359,6 +364,30 @@ function RolesEditor({ roles, readOnly, contexts, onChange }: { roles: MapRole[]
       <button className="button small ghost" onClick={() => onChange([...roles, { id: `role-${roles.length + 1}`, kind: 'agent', provider: 'codex', model: '', effort: DEFAULT_EFFORT, instructions: 'Describe this role.', timeoutSeconds: 600, context: 'task' }])}><Plus size={12} />Agent role</button>
       {!roles.some(role => role.kind === 'utility') && <button className="button small ghost" onClick={() => onChange([...roles, { id: 'verification', kind: 'utility', template: 'verification', embeddedRoles: { triage: roles.find(role => role.kind === 'agent')?.id || 'analyst' } }])}><Plus size={12} />Verification utility</button>}
     </div>}
+  </div>;
+}
+
+function ManagedTaskView({ client, runId, instanceId, live }: { client: Client; runId: string; instanceId: string; live: boolean }) {
+  const [nav, setNav] = useState<ManagedTaskNavigator | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let canceled = false;
+    const load = () => client.get<ManagedTaskNavigator>(`/runs/${runId}/tasks/${encodeURIComponent(instanceId)}`)
+      .then(value => { if (!canceled) { setNav(value); setError(null); } }).catch(problem => { if (!canceled) setError((problem as Error).message); });
+    void load(); const timer = live ? setInterval(load, 1000) : null;
+    return () => { canceled = true; if (timer) clearInterval(timer); };
+  }, [client, runId, instanceId, live]);
+  if (error) return <p className="muted small">{error}</p>;
+  if (!nav) return null;
+  return <div className="result-section">
+    <h4>Task execution <span className={`state-chip ${nav.state}`}>{nav.state}</span></h4>
+    <p className="small">Current phase: <code>{nav.phase || '—'}</code></p>
+    <p className="muted small">{nav.work.attempts} aggregate attempts · {nav.work.repairs} repairs · {Math.ceil(nav.work.remainingMilliseconds / 1000)} s remaining · {nav.work.outputBytes} captured bytes</p>
+    {nav.plan && <><p className="small">Risk: <strong>{nav.plan.classification.winningClassification}</strong></p><p className="muted small">{nav.plan.classification.reason}</p><p className="small">{nav.plan.selectedStages.join(' → ')}</p></>}
+    {nav.incompleteReason && <p className="field-error">{nav.incompleteReason}</p>}
+    <p className="muted small">Acceptance records: {nav.acceptanceRecordIds.length}</p>
+    {nav.delivery && <p className="small">{nav.delivery.status} · <code>{nav.delivery.targetBranchRef}</code></p>}
+    {nav.deliveryOperation && <p className="muted small">Delivery operation: {nav.deliveryOperation.phase}</p>}
   </div>;
 }
 

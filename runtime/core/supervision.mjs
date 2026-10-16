@@ -665,16 +665,34 @@ export function installSupervision(Engine, { ApiError }) {
     for (const incident of this.store.all('SELECT * FROM incidents WHERE run_id = ?', row.id)) refs.set(incident.initial_artifact_id, null);
     for (const update of this.store.all('SELECT u.body_artifact_id FROM incident_updates u JOIN incidents i ON i.id = u.incident_id WHERE i.run_id = ?', row.id)) refs.set(update.body_artifact_id, null);
 
-    const omittedCategories = new Set();
+    const taskRecords = {
+      tasks: this.store.all('SELECT * FROM managed_tasks WHERE run_id=? ORDER BY created_at', row.id),
+      assessments: this.store.all('SELECT * FROM task_assessments WHERE assessment_run_id=? ORDER BY created_at', row.id),
+      plans: this.store.all('SELECT * FROM execution_plans WHERE execution_run_id=? ORDER BY created_at', row.id),
+      acceptance: this.store.all('SELECT * FROM acceptance_records WHERE run_id=? ORDER BY created_at', row.id),
+      deliveries: this.store.all('SELECT * FROM branch_deliveries WHERE run_id=? ORDER BY created_at', row.id),
+      operations: this.store.all('SELECT * FROM delivery_operations WHERE run_id=? ORDER BY updated_at', row.id),
+      work: this.store.all('SELECT w.* FROM task_work w JOIN managed_tasks t ON t.id=w.task_execution_id WHERE t.run_id=? ORDER BY w.started_at', row.id),
+      evidence: this.store.all('SELECT e.* FROM task_evidence e JOIN managed_tasks t ON t.id=e.task_execution_id WHERE t.run_id=? ORDER BY e.created_at', row.id),
+    };
+    if (taskRecords.tasks.length) {
+      for (const records of Object.values(taskRecords)) for (const record of records) for (const [key, id] of Object.entries(record)) if (key.endsWith('_artifact_id') && id) refs.set(id, null);
+      await write('tasks.json', canonicalBytes(taskRecords), 'evidence', terminal ? 'complete' : 'partial');
+    }
+
+    const omittedCategories = new Set(); let artifactGaps = false;
     for (const artifactId of refs.keys()) {
       const artifact = this.store.artifactRow(artifactId);
-      if (!artifact) { omissions.push({ category: `artifact ${artifactId}`, reason: 'The referenced object is missing from the store.' }); continue; }
+      if (!artifact) { artifactGaps = true; omissions.push({ category: `artifact ${artifactId}`, reason: 'The referenced object is missing from the store.' }); continue; }
+      if (refs.get(artifactId) && refs.get(artifactId) !== artifact.sha256) { artifactGaps = true; omissions.push({ category: `artifact ${artifactId}`, reason: 'The reference digest differs from the stored object identity.' }); continue; }
       if (profile === 'shareable' && artifact.media_type === 'application/octet-stream') { omittedCategories.add('raw-process-streams'); continue; }
       const path = `objects/${artifact.sha256}`;
       if (written.has(path)) continue;
       const source = join(this.store.storeDir, artifact.relative_path);
       // The stored object is verified and copied as a stream, so a large object never blocks the event loop.
-      if (await digestOfFile(source) !== artifact.sha256) { omissions.push({ category: `artifact ${artifactId}`, reason: 'The stored object failed its digest check and was not exported.' }); continue; }
+      if (await digestOfFile(source) !== artifact.sha256) { artifactGaps = true; omissions.push({ category: `artifact ${artifactId}`, reason: 'The stored object failed its digest check and was not exported.' }); continue; }
+      // Follow immutable JSON manifests transitively, including candidate files and check evidence.
+      if (artifact.media_type === 'application/json') collectRefs(this.store.readJson(artifactId), refs);
       await copyFile(source, join(directory, ...path.split('/')));
       members.push({ path, sha256: artifact.sha256, byteSize: artifact.byte_size, role: 'object', completeness: 'complete' });
       written.add(path);
@@ -690,9 +708,10 @@ export function installSupervision(Engine, { ApiError }) {
     const openStreams = this.store.get(`SELECT COUNT(*) AS n FROM (SELECT DISTINCT attempt_id, json_extract(envelope_json, '$.payload.stream') AS stream FROM journal_events
       WHERE run_id = ? AND event_type = 'attempt.log_chunk' AND sequence <= ?) c WHERE NOT EXISTS (SELECT 1 FROM journal_events e WHERE e.run_id = ? AND e.event_type = 'attempt.log_stream_closed'
       AND e.attempt_id = c.attempt_id AND json_extract(e.envelope_json, '$.payload.stream') = c.stream)`, row.id, pinned, row.id).n;
-    const verdict = terminal && openStreams === 0 ? 'complete' : 'partial';
+    const incompleteCaptures = this.store.get("SELECT COUNT(*) AS n FROM journal_events WHERE run_id=? AND sequence<=? AND event_type='attempt.log_stream_closed' AND json_extract(envelope_json,'$.payload.integrity')<>'complete'", row.id, pinned).n;
+    const verdict = terminal && openStreams === 0 && incompleteCaptures === 0 && !artifactGaps ? 'complete' : 'partial';
     const generatedAt = nowIso();
-    const verdictText = verdict === 'complete' ? 'complete' : `partial (${openStreams} open stream(s), run ${row.state})`;
+    const verdictText = verdict === 'complete' ? 'complete' : `partial (${openStreams} open stream(s), ${incompleteCaptures} incomplete capture(s), artifact gaps ${artifactGaps}, run ${row.state})`;
     await write('index.md', Buffer.from([`# Audit bundle ${exportId}`, '', `Run ${row.id}, state ${row.state}, pinned to journal sequence ${pinned}.`,
       `Profile: ${profile}. Verdict: ${verdictText}.`, `Journal events: ${journal.length}. Incidents: ${incidents.length}. Termination proofs: ${proofs.length}.`,
       '', 'Known omissions:', ...(omissions.length ? omissions.map(item => `- ${item.category}: ${item.reason}`) : ['- none']), ''].join('\n'), 'utf8'), 'index', 'complete');
