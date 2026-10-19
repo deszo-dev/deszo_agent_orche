@@ -16,7 +16,7 @@
       "id": "task",
       "type": "text",
       "config": {
-        "value": "Move all Deszo application panels, forms and dialogs to shadcn/ui. Preserve the current capabilities and workflow behavior, including React Flow editing, execution controls, recovery, history, Replay, Context chat and API/MCP authoring synchronization. Use the existing English product language.\r\n\r\nThe result is a separate local feature branch, `codex/shadcn-ui`, with the UI changes, relevant tests and documentation. Its starting point must include the verified explicit-effort change. Record the starting commit and the selected candidate before applying results. Merge and release remain separate actions.\n\nAcceptance scope:\n- The UI inventory covers the palette and application toolbar; workflow overview and node inspector; Map role editor and navigator; run, issue and Context panels; recovery controls; history and Replay; settings, workspace and workflow dialogs; external-run confirmation and Context chat.\r\n- Application-owned buttons, inputs, selectors, dialogs, tabs and status surfaces use the agreed shadcn/ui components and shared theme tokens. Keep the React Flow canvas, port connections, selection, zoom/pan and nested navigation functional.\r\n- Preserve save/load, validation, dirty-state handling, editor synchronization, run/stop/retry, task limits, Context behavior and all current configuration options, including reasoning effort.\r\n- Verify keyboard navigation, labels, visible focus, dialog focus handling, disabled/busy states, error states and small-window overflow on the affected surfaces.\r\n- Run the frontend build, appropriate runtime/contract regression checks and documentation checks. Add meaningful UI interaction coverage for the changed flows using the fixture runtime. Record browser screenshots and a desktop smoke result for behavior that depends on Tauri.\r\n- Produce the final diff, actual check evidence, known limitations and an Analyst verdict linked to the original task. This brief itself does not claim the pilot passed."
+        "value": "Move all Deszo application panels, forms and dialogs to shadcn/ui. Preserve the current capabilities and workflow behavior, including React Flow editing, execution controls, recovery, history, Replay, Context chat and API/MCP authoring synchronization. Use the existing English product language.\r\n\r\nThe result is a separate local feature branch, `codex/shadcn-ui`, with the UI changes, relevant tests and documentation. Because `codex/shadcn-ui` already exists on origin and carries the ADR-0002 implementation commit, the delivery starting point before pilot execution must either:\r\n\r\n1. explicitly accept the current head of `codex/shadcn-ui` (which includes the ADR-0002 commit and explicit-effort baseline) as the captured base commit to advance under an expected-ref condition; or\r\n2. designate a fresh delivery branch from `main` (such as `codex/shadcn-ui-migration`), recording the branch absence condition.\r\n\r\nRecord the starting commit and the selected candidate before applying results. Merge and release remain separate actions.\n\nAcceptance scope:\n- The UI inventory covers the palette and application toolbar; workflow overview and node inspector; Map role editor and navigator; run, issue and Context panels; recovery controls; history and Replay; settings, workspace and workflow dialogs; external-run confirmation and Context chat.\r\n- Application-owned buttons, inputs, selectors, dialogs, tabs and status surfaces use the agreed shadcn/ui components and shared theme tokens. Keep the React Flow canvas, port connections, selection, zoom/pan and nested navigation functional.\r\n- Preserve save/load, validation, dirty-state handling, editor synchronization, run/stop/retry, task limits, Context behavior and all current configuration options, including reasoning effort.\r\n- Verify keyboard navigation, labels, visible focus, dialog focus handling, disabled/busy states, error states and small-window overflow on the affected surfaces.\r\n- Run the frontend build, appropriate runtime/contract regression checks and documentation checks. Add meaningful UI interaction coverage for the changed flows using the fixture runtime. Record browser screenshots and a desktop smoke result for behavior that depends on Tauri.\r\n- Produce the final diff, actual check evidence, known limitations and an Analyst verdict linked to the original task. This brief itself does not claim the pilot passed."
       }
     },
     {
@@ -96,7 +96,7 @@
       "id": "analyst-history",
       "type": "context",
       "config": {
-        "provider": "codex",
+        "provider": "antigravity",
         "mode": "new"
       }
     },
@@ -310,7 +310,7 @@
                       "id": "analysis-prompt",
                       "type": "prompt-template",
                       "config": {
-                        "template": "Business task:\n{{business}}\n\nOpen issues (JSON):\n{{issues}}\n\nWrite or revise SPEC.md, spec-index.json and implementation-map.json in the working directory. Use exact '## ID' headings for every indexed section.\n\nYou are the senior Analyst and the first recipient of the original business task. Inspect the actual pinned Deszo source before specifying the change.\n\nInventory every application panel, form, dialog and owned control. Include the palette/toolbar, inspector, nested Loop navigation, Map roles/navigator, problems/run journal/history/Replay, Contexts/chat, recovery, settings/workspaces/workflows and external-run approvals.\n\nMigrate owned controls to shadcn/ui and shared theme tokens, preserving the React Flow canvas, graph interactions, existing English text, functional contracts and reasoning-effort settings. Preserve the Vite local-runtime connection plugin, Tauri behavior and @xyflow/react styling.\n\nRead docs/IMPLEMENTATION_MAP.md, docs/PIPELINE_EXECUTION.md and both docs/schemas/spec-section-index.schema.json and docs/schemas/implementation-map.schema.json. The round-recovery documents are FORMAT examples only; do not copy their fictional business requirements.\n\nWrite SPEC.md, spec-index.json and implementation-map.json. Use exactly ## ID headings for every indexed section, all headings indexed, stable acyclic IDs, requirementRefs limited to normative REQ-/CONTRACT- IDs. Every task needs its full transitive normative closure as explicit spec inputs AND readScopes, including test-case/check obligations. dependsOn entries are {taskId, milestone:\"accepted\"}, never section IDs or strings.\n\nAllowed executor role IDs: implementer, test-author, junior-analyst, verification. The code-reviewer role reviews code and implementation documentation; test-reviewer independently reviews tests and test evidence. The analyst role owns substantive decisions and verification triage. verification is an engine utility, not a provider.\n\nPlan bounded file groups. Give package.json/package-lock.json, theme/global CSS, Vite/TS setup and each shared source file exactly one owner; order every later task that modifies or consumes those files after its accepted producer. Test author and developer use separate task directories and approved interfaces.\n\nInclude an accepted documentation task owned by junior-analyst after the UI implementation. Its outputs describe the resulting UI and developer commands. Do not delegate requirement meaning to that role.\n\nInclude TASK-UI-EVIDENCE owned by test-author after ALL UI source and test-script outputs have been accepted. It runs node scripts/shadcn-pilot-check.mjs --ui-only --evidence-dir docs/pilots/shadcn-ui-evidence and captures docs/pilots/shadcn-ui-evidence/report.json, main.png, dialogs.png and small-window.png as a declared fileSet reviewed by test-reviewer. These are generated from the complete accepted UI, not hand-authored screenshots. Include this task and its evidence in final verification dependencies/candidate paths. Check-runner scratch directories are deleted; screenshots generated only during CHECK execution would otherwise be lost.\n\nCreate a final TASK-VERIFY utility task that depends on and consumes every accepted output needed in the complete candidate. Its candidate paths must include every changed/new deliverable. Do not include node_modules, dist, reports or temporary files as deliverables.\n\nThe approved final candidate check must run node scripts/shadcn-pilot-check.mjs (source candidate, requiredExitCode 0, timeoutSeconds 600). The wrapper installs pinned dependencies, builds, runs runtime regressions, documentation checks and npm run test:ui, then bundles the runtime. The foundation task must add the required browser-test dependency/script; test-author must provide meaningful fixture-runtime browser interaction coverage and screenshot evidence. Do not create test:ui as an empty stub.\n\ntest:ui must honor DESZO_UI_EVIDENCE_DIR (relative to the project), write report.json with schemaVersion 1, nonempty scenarios [{id,status:\"passed\"}] covering the approved scenario IDs, and screenshots [\"main.png\",\"dialogs.png\",\"small-window.png\"]. Write the three actual browser PNG screenshots in that directory. Include real viewport/interaction/expectation details and source-file digests in the report. The wrapper validates report presence, all scenario statuses and PNG signatures; The test reviewer judges coverage/evidence and the code reviewer judges implementation/visual behavior.\n\nFresh task/check directories have no node_modules. Give tasks that need npm/builds explicit scratch writeScopes for node_modules/**, dist/**, dist-runtime/**, .deszo/** and *.tsbuildinfo. The verification task must allow those NEW scratch paths. npm ci must not modify existing tracked inputs; never change source from a checker. All CHECK commands run independently in fresh directories, so keep full-candidate steps in the one wrapper.\n\nCapture representative browser screenshots and machine-readable assertions for critical UI flows, accessible labels/focus/dialog behavior, busy/disabled/error states, and small-window overflow. A browser result cannot prove a desktop-only behavior. Record the remaining Tauri desktop smoke for the operator after candidate application; do not claim it already happened.\n\nProvider invocations are bounded to 600 seconds. Split implementation into feasible tasks. Allow at most three task attempts and three failed verification cycles. On unknown triage preserve evidence and pause. Do not weaken requirements/checks to pass.\n\nThe source base is pinned by the prepared manifest. During documentation authoring write ONLY SPEC.md, spec-index.json and implementation-map.json. Never edit app source, package files or the pilot tooling in this directory. Return a concise summary of semantic decisions and remaining risks.\n\nBefore returning, run node \"C:\\\\my\\\\2026\\\\deszo_agent_orche\\\\.deszo\\\\pilots\\\\shadcn-ui\\\\validate-documents.mjs\". Correct schema/closure/role errors until it passes. The validator also detects changes to the pinned project; do not modify the validator or its manifest.\n\nIndependent review roles: implementer and junior-analyst tasks require code-reviewer review criteria; test-author tasks, including TASK-UI-EVIDENCE, require test-reviewer criteria. A task that changes both production code and tests requires both reviewers. Use distinct acceptance criterion IDs and the exact role IDs code-reviewer and test-reviewer; the old reviewer role does not exist. The two requirement-review slots and both final technical-review slots must approve independently before advancing.",
+                        "template": "Business task:\n{{business}}\n\nOpen issues (JSON):\n{{issues}}\n\nWrite or revise SPEC.md, spec-index.json and implementation-map.json in the working directory. Use exact '## ID' headings for every indexed section.\n\nYou are the senior Analyst and the first recipient of the original business task. Inspect the actual pinned Deszo source before specifying the change.\n\nInventory every application panel, form, dialog and owned control. Include the palette/toolbar, inspector, nested Loop navigation, Map roles/navigator, problems/run journal/history/Replay, Contexts/chat, recovery, settings/workspaces/workflows and external-run approvals.\n\nMigrate owned controls to shadcn/ui and shared theme tokens, preserving the React Flow canvas, graph interactions, existing English text, functional contracts and reasoning-effort settings. Preserve the Vite local-runtime connection plugin, Tauri behavior and @xyflow/react styling.\n\nRead docs/IMPLEMENTATION_MAP.md, docs/PIPELINE_EXECUTION.md and both docs/schemas/spec-section-index.schema.json and docs/schemas/implementation-map.schema.json. The round-recovery documents are FORMAT examples only; do not copy their fictional business requirements.\n\nWrite SPEC.md, spec-index.json and implementation-map.json. Use exactly ## ID headings for every indexed section, all headings indexed, stable acyclic IDs, requirementRefs limited to normative REQ-/CONTRACT- IDs. Every task needs its full transitive normative closure as explicit spec inputs AND readScopes, including test-case/check obligations. dependsOn entries are {taskId, milestone:\"accepted\"}, never section IDs or strings.\n\nAllowed executor role IDs: implementer, test-author, junior-analyst, verification. The code-reviewer role reviews code and implementation documentation; test-reviewer independently reviews tests and test evidence. The analyst role owns substantive decisions and verification triage. verification is an engine utility, not a provider.\n\nPlan bounded file groups. Give package.json/package-lock.json, theme/global CSS, Vite/TS setup and each shared source file exactly one owner; order every later task that modifies or consumes those files after its accepted producer. Test author and developer use separate task directories and approved interfaces.\n\nInclude an accepted documentation task owned by junior-analyst after the UI implementation. Its outputs describe the resulting UI and developer commands. Do not delegate requirement meaning to that role.\n\nInclude TASK-UI-EVIDENCE owned by test-author after ALL UI source and test-script outputs have been accepted. It runs node scripts/shadcn-pilot-check.mjs --ui-only --evidence-dir docs/pilots/shadcn-ui-evidence and captures docs/pilots/shadcn-ui-evidence/report.json, main.png, dialogs.png and small-window.png as a declared fileSet reviewed by test-reviewer. These are generated from the complete accepted UI, not hand-authored screenshots. Include this task and its evidence in final verification dependencies/candidate paths. Check-runner scratch directories are deleted; screenshots generated only during CHECK execution would otherwise be lost.\n\nCreate a final TASK-VERIFY utility task that depends on and consumes every accepted output needed in the complete candidate. Its candidate paths must include every changed/new deliverable. Do not include node_modules, dist, reports or temporary files as deliverables.\n\nThe approved final candidate check must run node scripts/shadcn-pilot-check.mjs (source candidate, requiredExitCode 0, timeoutSeconds 600). The wrapper installs pinned dependencies, builds, runs runtime regressions, documentation checks and npm run test:ui, then bundles the runtime. The foundation task must add the required browser-test dependency/script; test-author must provide meaningful fixture-runtime browser interaction coverage and screenshot evidence. Do not create test:ui as an empty stub.\n\ntest:ui must honor DESZO_UI_EVIDENCE_DIR (relative to the project), write report.json with schemaVersion 1, nonempty scenarios [{id,status:\"passed\"}] covering the approved scenario IDs, and screenshots [\"main.png\",\"dialogs.png\",\"small-window.png\"]. Write the three actual browser PNG screenshots in that directory. Include real viewport/interaction/expectation details and source-file digests in the report. The wrapper validates report presence, all scenario statuses and PNG signatures; The test reviewer judges coverage/evidence and the code reviewer judges implementation/visual behavior.\n\nFresh task/check directories have no node_modules. Give tasks that need npm/builds explicit scratch writeScopes for node_modules/**, dist/**, dist-runtime/**, .deszo/** and *.tsbuildinfo. The verification task must allow those NEW scratch paths. npm ci must not modify existing tracked inputs; never change source from a checker. All CHECK commands run independently in fresh directories, so keep full-candidate steps in the one wrapper.\n\nCapture representative browser screenshots and machine-readable assertions for critical UI flows, accessible labels/focus/dialog behavior, busy/disabled/error states, and small-window overflow. A browser result cannot prove a desktop-only behavior. Record the remaining Tauri desktop smoke for the operator after candidate application; do not claim it already happened.\n\nProvider invocations are bounded to 600 seconds. Split implementation into feasible tasks. Allow at most three task attempts and three failed verification cycles. On unknown triage preserve evidence and pause. Do not weaken requirements/checks to pass.\n\nThe source base is pinned by the prepared manifest. During documentation authoring write ONLY SPEC.md, spec-index.json and implementation-map.json. Never edit app source, package files or the pilot tooling in this directory. Return a concise summary of semantic decisions and remaining risks.\n\nBefore returning, run node \"C:\\\\Users\\\\jusse\\\\.codex\\\\worktrees\\\\shadcn-ui-pilot\\\\deszo_agent_orche\\\\.deszo\\\\pilots\\\\shadcn-ui\\\\validate-documents.mjs\". Correct schema/closure/role errors until it passes. The validator also detects changes to the pinned project; do not modify the validator or its manifest.\n\nIndependent review roles: implementer and junior-analyst tasks require code-reviewer review criteria; test-author tasks, including TASK-UI-EVIDENCE, require test-reviewer criteria. A task that changes both production code and tests requires both reviewers. Use distinct acceptance criterion IDs and the exact role IDs code-reviewer and test-reviewer; the old reviewer role does not exist. The two requirement-review slots and both final technical-review slots must approve independently before advancing.",
                         "slots": [
                           {
                             "id": "business"
@@ -325,8 +325,8 @@
                       "id": "analyst",
                       "type": "agent",
                       "config": {
-                        "provider": "codex",
-                        "model": "gpt-6.1-sol",
+                        "provider": "antigravity",
+                        "model": "gemini-3.8-flash-high",
                         "contextId": "analyst-history",
                         "timeoutSeconds": 600,
                         "output": {
@@ -669,15 +669,15 @@
                             "id": "decisions"
                           }
                         ],
-                        "template": "Apply documentation corrections to the senior Analyst bundle attached at its supplied paths. Preserve the senior decisions and all requirement, interface, scope and test obligations. Correct headings, schema formatting, cross-references, normative closure declarations and role IDs. Do not edit application source or pilot tooling.\n\nSenior Analyst summary and decisions:\n{{decisions}}\n\nWrite SPEC.md, spec-index.json and implementation-map.json in the working directory and run node \"C:\\\\my\\\\2026\\\\deszo_agent_orche\\\\.deszo\\\\pilots\\\\shadcn-ui\\\\validate-documents.mjs\" before returning.\n\nIf correction needs a new semantic decision, preserve the senior draft and state the exact unresolved point in your summary; do not invent a decision. The appropriate code or test reviewer must reject an unresolved semantic blocker."
+                        "template": "Apply documentation corrections to the senior Analyst bundle attached at its supplied paths. Preserve the senior decisions and all requirement, interface, scope and test obligations. Correct headings, schema formatting, cross-references, normative closure declarations and role IDs. Do not edit application source or pilot tooling.\n\nSenior Analyst summary and decisions:\n{{decisions}}\n\nWrite SPEC.md, spec-index.json and implementation-map.json in the working directory and run node \"C:\\\\Users\\\\jusse\\\\.codex\\\\worktrees\\\\shadcn-ui-pilot\\\\deszo_agent_orche\\\\.deszo\\\\pilots\\\\shadcn-ui\\\\validate-documents.mjs\" before returning.\n\nIf correction needs a new semantic decision, preserve the senior draft and state the exact unresolved point in your summary; do not invent a decision. The appropriate code or test reviewer must reject an unresolved semantic blocker."
                       }
                     },
                     {
                       "id": "junior-analyst",
                       "type": "agent",
                       "config": {
-                        "provider": "codex",
-                        "model": "gpt-6-luna",
+                        "provider": "antigravity",
+                        "model": "gemini-3.8-flash-high",
                         "effort": "max",
                         "contextId": "junior-history",
                         "timeoutSeconds": 600,
@@ -1324,15 +1324,14 @@
                       "y": 0,
                       "label": "Documentation · Luna · max"
                     },
-                    "testability-prompt": {
-                      "x": 2310,
-                      "y": 350,
-                      "label": "Testability review prompt"
-                    },
                     "testability-review": {
                       "x": 2640,
-                      "y": 350,
+                      "y": 175,
                       "label": "Test requirements review · Opus · medium"
+                    },
+                    "testability-prompt": {
+                      "x": 2310,
+                      "y": 175
                     }
                   }
                 }
@@ -1523,8 +1522,8 @@
                   {
                     "id": "analyst",
                     "kind": "agent",
-                    "provider": "codex",
-                    "model": "gpt-6.1-sol",
+                    "provider": "antigravity",
+                    "model": "gemini-3.8-flash-high",
                     "instructions": "Triage the failed verification from the captured evidence.\nUse English. Read the supplied approved specification sections and immutable input files.\nImplement only the task-owned concrete outputs. Never change Git metadata, credentials, the controlling Deszo installation or its data directory.\nDo not delete or rename existing base files: this pilot captures create/replace operations. Preserve compatibility exports if splitting an existing module.\nDependency manifests and shared components have one explicitly ordered owner. Do not run a CLI that rewrites undeclared files.\nUse npm ci only when the approved writeScopes include node_modules/** and required scratch paths. Scratch dependencies/build output must never be declared as captured outputs.\nReturn exactly the supplied Task Return JSON schema. Real blockers must be reported with evidence; never invent successful commands or screenshots.",
                     "timeoutSeconds": 600,
                     "context": {
@@ -1543,8 +1542,8 @@
                   {
                     "id": "junior-analyst",
                     "kind": "agent",
-                    "provider": "codex",
-                    "model": "gpt-6-luna",
+                    "provider": "antigravity",
+                    "model": "gemini-3.8-flash-high",
                     "effort": "max",
                     "timeoutSeconds": 600,
                     "context": "task",
@@ -2014,7 +2013,7 @@
               "id": "final-customer-prompt",
               "type": "prompt-template",
               "config": {
-                "template": "Review the complete business delivery as the senior Analyst, using the full immutable candidate, public requirements, captured UI evidence and engine check summaries.\n\nReview plan (JSON):\n{{plan}}\n\nYou are the same senior Analyst who received the original business task. Accept the complete automated delivery only after mapping every approved business scenario and UI surface to actual evidence. List the operator desktop smoke as a remaining release check; this workflow cannot certify desktop behavior from browser evidence. Reject missing scope or invented results.\n\nOriginal business task:\nMove all Deszo application panels, forms and dialogs to shadcn/ui. Preserve the current capabilities and workflow behavior, including React Flow editing, execution controls, recovery, history, Replay, Context chat and API/MCP authoring synchronization. Use the existing English product language.\r\n\r\nThe result is a separate local feature branch, `codex/shadcn-ui`, with the UI changes, relevant tests and documentation. Its starting point must include the verified explicit-effort change. Record the starting commit and the selected candidate before applying results. Merge and release remain separate actions.\n\nAcceptance scope:\n- The UI inventory covers the palette and application toolbar; workflow overview and node inspector; Map role editor and navigator; run, issue and Context panels; recovery controls; history and Replay; settings, workspace and workflow dialogs; external-run confirmation and Context chat.\r\n- Application-owned buttons, inputs, selectors, dialogs, tabs and status surfaces use the agreed shadcn/ui components and shared theme tokens. Keep the React Flow canvas, port connections, selection, zoom/pan and nested navigation functional.\r\n- Preserve save/load, validation, dirty-state handling, editor synchronization, run/stop/retry, task limits, Context behavior and all current configuration options, including reasoning effort.\r\n- Verify keyboard navigation, labels, visible focus, dialog focus handling, disabled/busy states, error states and small-window overflow on the affected surfaces.\r\n- Run the frontend build, appropriate runtime/contract regression checks and documentation checks. Add meaningful UI interaction coverage for the changed flows using the fixture runtime. Record browser screenshots and a desktop smoke result for behavior that depends on Tauri.\r\n- Produce the final diff, actual check evidence, known limitations and an Analyst verdict linked to the original task. This brief itself does not claim the pilot passed.\n\nRead the attached immutable files at their supplied absolute paths. SUBJECT.json gives the exact subjectId and your role. Return the complete ReviewDecision JSON with scopeRefs, resolvedIssueIds and issues arrays. Resolve only IDs listed as resolvable for your slot. Never modify reviewed files or invent evidence.",
+                "template": "Review the complete business delivery as the senior Analyst, using the full immutable candidate, public requirements, captured UI evidence and engine check summaries.\n\nReview plan (JSON):\n{{plan}}\n\nYou are the same senior Analyst who received the original business task. Accept the complete automated delivery only after mapping every approved business scenario and UI surface to actual evidence. List the operator desktop smoke as a remaining release check; this workflow cannot certify desktop behavior from browser evidence. Reject missing scope or invented results.\n\nOriginal business task:\nMove all Deszo application panels, forms and dialogs to shadcn/ui. Preserve the current capabilities and workflow behavior, including React Flow editing, execution controls, recovery, history, Replay, Context chat and API/MCP authoring synchronization. Use the existing English product language.\r\n\r\nThe result is a separate local feature branch, `codex/shadcn-ui`, with the UI changes, relevant tests and documentation. Because `codex/shadcn-ui` already exists on origin and carries the ADR-0002 implementation commit, the delivery starting point before pilot execution must either:\r\n\r\n1. explicitly accept the current head of `codex/shadcn-ui` (which includes the ADR-0002 commit and explicit-effort baseline) as the captured base commit to advance under an expected-ref condition; or\r\n2. designate a fresh delivery branch from `main` (such as `codex/shadcn-ui-migration`), recording the branch absence condition.\r\n\r\nRecord the starting commit and the selected candidate before applying results. Merge and release remain separate actions.\n\nAcceptance scope:\n- The UI inventory covers the palette and application toolbar; workflow overview and node inspector; Map role editor and navigator; run, issue and Context panels; recovery controls; history and Replay; settings, workspace and workflow dialogs; external-run confirmation and Context chat.\r\n- Application-owned buttons, inputs, selectors, dialogs, tabs and status surfaces use the agreed shadcn/ui components and shared theme tokens. Keep the React Flow canvas, port connections, selection, zoom/pan and nested navigation functional.\r\n- Preserve save/load, validation, dirty-state handling, editor synchronization, run/stop/retry, task limits, Context behavior and all current configuration options, including reasoning effort.\r\n- Verify keyboard navigation, labels, visible focus, dialog focus handling, disabled/busy states, error states and small-window overflow on the affected surfaces.\r\n- Run the frontend build, appropriate runtime/contract regression checks and documentation checks. Add meaningful UI interaction coverage for the changed flows using the fixture runtime. Record browser screenshots and a desktop smoke result for behavior that depends on Tauri.\r\n- Produce the final diff, actual check evidence, known limitations and an Analyst verdict linked to the original task. This brief itself does not claim the pilot passed.\n\nRead the attached immutable files at their supplied absolute paths. SUBJECT.json gives the exact subjectId and your role. Return the complete ReviewDecision JSON with scopeRefs, resolvedIssueIds and issues arrays. Resolve only IDs listed as resolvable for your slot. Never modify reviewed files or invent evidence.",
                 "slots": [
                   {
                     "id": "plan"
@@ -2026,8 +2025,8 @@
               "id": "final-customer",
               "type": "agent",
               "config": {
-                "provider": "codex",
-                "model": "gpt-6.1-sol",
+                "provider": "antigravity",
+                "model": "gemini-3.8-flash-high",
                 "timeoutSeconds": 600,
                 "output": {
                   "format": "json",
@@ -2392,8 +2391,8 @@
               "id": "triage",
               "type": "agent",
               "config": {
-                "provider": "codex",
-                "model": "gpt-6.1-sol",
+                "provider": "antigravity",
+                "model": "gemini-3.8-flash-high",
                 "timeoutSeconds": 600,
                 "output": {
                   "format": "json",
@@ -4079,15 +4078,14 @@
               "x": 10560,
               "y": 0
             },
-            "test-quality-prompt": {
-              "x": 3960,
-              "y": 350,
-              "label": "Test quality review prompt"
-            },
             "test-quality-review": {
               "x": 4290,
-              "y": 350,
+              "y": 175,
               "label": "Test review · Opus · medium"
+            },
+            "test-quality-prompt": {
+              "x": 3960,
+              "y": 175
             }
           }
         }
@@ -4123,7 +4121,7 @@
       "id": "junior-history",
       "type": "context",
       "config": {
-        "provider": "codex",
+        "provider": "antigravity",
         "mode": "new"
       }
     },
@@ -4134,6 +4132,7 @@
         "mode": "files",
         "paths": [
           ".claude/launch.json",
+          ".gitattributes",
           ".gitignore",
           "README.md",
           "docs/ARCHITECTURE.md",
@@ -4145,6 +4144,7 @@
           "docs/M3_M4_CONTRACTS.md",
           "docs/M5_CONTRACTS.md",
           "docs/M6_CONTRACTS.md",
+          "docs/MANAGED_TASKS.md",
           "docs/MILESTONES.md",
           "docs/OPEN_QUESTIONS.md",
           "docs/PIPELINE_EXECUTION.md",
@@ -4156,10 +4156,19 @@
           "docs/TEST_PIPELINE.md",
           "docs/adr/0001-external-workflow-authoring-api-and-mcp.md",
           "docs/adr/0001-implementation-status.md",
+          "docs/adr/0002-execution-audit-and-supervised-control.md",
+          "docs/adr/0002-implementation-status.md",
+          "docs/adr/0003-implementation-status.md",
+          "docs/adr/0003-task-assessment-and-workflow-planning.md",
+          "docs/adr/0004-agent-communication-and-context-contracts.md",
+          "docs/adr/0004-implementation-status.md",
+          "docs/adr/0005-implementation-status.md",
+          "docs/adr/0005-verified-feature-branch-delivery.md",
           "docs/adr/README.md",
           "docs/authoring/ACCEPTANCE_TEST_PLAN.md",
           "docs/authoring/MIGRATION_V3.md",
           "docs/authoring/README.md",
+          "docs/authoring/client-timeouts.json",
           "docs/authoring/mcp-neutralizers.json",
           "docs/examples/m1-context-chain/README.md",
           "docs/examples/m1-context-chain/workflow.json",
@@ -4168,6 +4177,10 @@
           "docs/examples/m4-specification-loop/workflow.json",
           "docs/examples/m5-delivery/workflow.json",
           "docs/examples/m6-selective-delivery/workflow.json",
+          "docs/examples/managed-task/project/README.md",
+          "docs/examples/managed-task/project/docs/usage.md",
+          "docs/examples/managed-task/project/src/feature.mjs",
+          "docs/examples/managed-task/workflow.json",
           "docs/examples/reference-delivery/workflow.json",
           "docs/examples/round-recovery/SPEC.md",
           "docs/examples/round-recovery/implementation-map.json",
@@ -4259,61 +4272,45 @@
           "docs/reviews/2026-10-15-adr-0001-second-review.md",
           "docs/reviews/2026-10-15-adr-0001-sixth-review.md",
           "docs/reviews/2026-10-15-adr-0001-third-review.md",
+          "docs/reviews/2026-10-16-adr-0002-implementation-closure-review.md",
+          "docs/reviews/2026-10-16-adr-0002-implementation-followup-review.md",
+          "docs/reviews/2026-10-16-adr-0002-implementation-review.md",
+          "docs/reviews/2026-10-16-adr-0002-review.md",
+          "docs/reviews/2026-10-16-adr-0002-second-review.md",
+          "docs/reviews/2026-10-16-adr-0003-0005-audit-resolution.md",
+          "docs/reviews/2026-10-16-adr-0003-0005-engine-completion.md",
+          "docs/reviews/2026-10-16-adr-0003-0005-follow-up-implementation-review.md",
+          "docs/reviews/2026-10-16-adr-0003-0005-follow-up-resolution-audit.md",
+          "docs/reviews/2026-10-16-adr-0003-0005-follow-up-review-resolution.md",
+          "docs/reviews/2026-10-16-adr-0003-0005-implementation-review.md",
+          "docs/reviews/2026-10-16-adr-0003-0005-independent-implementation-review.md",
+          "docs/reviews/2026-10-16-adr-0003-0005-independent-review-resolution.md",
+          "docs/reviews/2026-10-16-adr-0003-0005-review.md",
+          "docs/reviews/2026-10-16-adr-0003-0005-second-review.md",
+          "docs/reviews/evidence/2026-10-16-adr-0003-0005-audit-resolution-independent-verification.json",
+          "docs/reviews/evidence/2026-10-16-adr-0003-0005-completion-audit-probes.json",
+          "docs/reviews/evidence/2026-10-16-adr-0003-0005-completion-bundle-smoke.json",
+          "docs/reviews/evidence/2026-10-16-adr-0003-0005-completion-context.tap",
+          "docs/reviews/evidence/2026-10-16-adr-0003-0005-completion-follow-up-probes.json",
+          "docs/reviews/evidence/2026-10-16-adr-0003-0005-completion-full.tap",
+          "docs/reviews/evidence/2026-10-16-adr-0003-0005-completion-managed.tap",
+          "docs/reviews/evidence/2026-10-16-adr-0003-0005-completion-verification.json",
+          "docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes-after-audit-fix.json",
+          "docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes-after-resolution.json",
+          "docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes.json",
+          "docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes.mjs",
+          "docs/reviews/evidence/2026-10-16-adr-0003-0005-negative-probes-after-audit-fix.json",
+          "docs/reviews/evidence/2026-10-16-adr-0003-0005-negative-probes.json",
+          "docs/reviews/evidence/2026-10-16-adr-0003-0005-negative-probes.mjs",
+          "docs/reviews/evidence/2026-10-16-adr-0003-0005-resolution-audit-probes-after-fix.json",
+          "docs/reviews/evidence/2026-10-16-adr-0003-0005-resolution-audit-probes.json",
+          "docs/reviews/evidence/2026-10-16-adr-0003-0005-resolution-audit-probes.mjs",
           "docs/reviews/reproducers/2026-10-13-cli-fixture.mjs",
           "docs/reviews/reproducers/2026-10-13-real-cli-probes.mjs",
           "docs/reviews/reproducers/2026-10-13-real-cli-results.json",
           "docs/reviews/reproducers/2026-10-13-resolution-code-variant.mjs",
           "docs/reviews/reproducers/2026-10-13-resolution-followup-probes.mjs",
-          "docs/reviews/reproducers/2026-10-13-resolution-followup-results.json",
-          "docs/reviews/reproducers/2026-10-13-runtime-probe-results.json",
-          "docs/reviews/reproducers/2026-10-13-runtime-probes.mjs",
-          "docs/reviews/reproducers/2026-10-13-ui-replay.jpg",
-          "docs/reviews/reproducers/2026-10-13-ui-seed.mjs",
-          "docs/schemas/application-settings.schema.json",
-          "docs/schemas/attempt-record.schema.json",
-          "docs/schemas/gate.schema.json",
-          "docs/schemas/implementation-map.schema.json",
-          "docs/schemas/journal-event-v2.schema.json",
-          "docs/schemas/journal-event.schema.json",
-          "docs/schemas/loop-decision.schema.json",
-          "docs/schemas/map.schema.json",
-          "docs/schemas/pipeline-state.schema.json",
-          "docs/schemas/review-decision.schema.json",
-          "docs/schemas/runtime-api-v2.schema.json",
-          "docs/schemas/runtime-api-v3.schema.json",
-          "docs/schemas/runtime-api.schema.json",
-          "docs/schemas/spec-section-index.schema.json",
-          "docs/schemas/value.schema.json",
-          "docs/schemas/workflow.schema.json",
-          "docs/storage/m1.sql",
-          "docs/storage/m2.sql",
-          "docs/storage/m3.sql",
-          "docs/storage/m4.sql",
-          "docs/storage/m5.sql",
-          "docs/storage/m6.sql",
-          "docs/storage/m7.sql",
-          "docs/tools/README.md",
-          "docs/tools/requirements.txt",
-          "docs/tools/validate-docs.mjs",
-          "docs/tools/validate_docs.py",
-          "index.html",
-          "mcp/bridge.mjs",
-          "mcp/managed-invocation.mjs",
-          "mcp/runtime-client.mjs",
-          "package-lock.json",
-          "package.json",
-          "runtime/core/adapters.mjs",
-          "runtime/core/canonical.mjs",
-          "runtime/core/engine.mjs",
-          "runtime/core/gate.mjs",
-          "runtime/core/managed-isolation.mjs",
-          "runtime/core/map.mjs",
-          "runtime/core/mapRuntime.mjs",
-          "runtime/core/planning.mjs",
-          "runtime/core/processes.mjs",
-          "runtime/core/schemas.mjs",
-          "runtime/core/store.mjs",
-          "scripts/shadcn-pilot-reviewers.mjs"
+          "docs/reviews/reproducers/2026-10-13-resolution-followup-results.json"
         ]
       }
     },
@@ -4323,14 +4320,89 @@
       "config": {
         "mode": "files",
         "paths": [
+          "docs/reviews/reproducers/2026-10-13-runtime-probe-results.json",
+          "docs/reviews/reproducers/2026-10-13-runtime-probes.mjs",
+          "docs/reviews/reproducers/2026-10-13-ui-replay.jpg",
+          "docs/reviews/reproducers/2026-10-13-ui-seed.mjs",
+          "docs/schemas/acceptance-record.schema.json",
+          "docs/schemas/application-settings.schema.json",
+          "docs/schemas/attempt-record.schema.json",
+          "docs/schemas/audit-manifest.schema.json",
+          "docs/schemas/context-package.schema.json",
+          "docs/schemas/delivery-plan.schema.json",
+          "docs/schemas/delivery-result.schema.json",
+          "docs/schemas/evaluation-record.schema.json",
+          "docs/schemas/execution-evidence.schema.json",
+          "docs/schemas/execution-plan.schema.json",
+          "docs/schemas/gate.schema.json",
+          "docs/schemas/implementation-map.schema.json",
+          "docs/schemas/incident.schema.json",
+          "docs/schemas/journal-event-v2.schema.json",
+          "docs/schemas/journal-event.schema.json",
+          "docs/schemas/loop-decision.schema.json",
+          "docs/schemas/managed-task.schema.json",
+          "docs/schemas/map.schema.json",
+          "docs/schemas/pipeline-state.schema.json",
+          "docs/schemas/review-decision.schema.json",
+          "docs/schemas/run-control-api.schema.json",
+          "docs/schemas/runtime-api-v2.schema.json",
+          "docs/schemas/runtime-api-v3.schema.json",
+          "docs/schemas/runtime-api.schema.json",
+          "docs/schemas/spec-section-index.schema.json",
+          "docs/schemas/task-assessment.schema.json",
+          "docs/schemas/value.schema.json",
+          "docs/schemas/workflow.schema.json",
+          "docs/storage/m1.sql",
+          "docs/storage/m10.sql",
+          "docs/storage/m11.sql",
+          "docs/storage/m2.sql",
+          "docs/storage/m3.sql",
+          "docs/storage/m4.sql",
+          "docs/storage/m5.sql",
+          "docs/storage/m6.sql",
+          "docs/storage/m7.sql",
+          "docs/storage/m8.sql",
+          "docs/storage/m9.sql",
+          "docs/tools/README.md",
+          "docs/tools/requirements.txt",
+          "docs/tools/validate-docs.mjs",
+          "docs/tools/validate_docs.py",
+          "index.html",
+          "mcp/bridge.mjs",
+          "mcp/managed-invocation.mjs",
+          "mcp/runtime-client.mjs",
+          "mcp/supervisor-pipe.mjs",
+          "package-lock.json",
+          "package.json",
+          "runtime/core/adapters.mjs",
+          "runtime/core/branchDelivery.mjs",
+          "runtime/core/canonical.mjs",
+          "runtime/core/contextPackage.mjs",
+          "runtime/core/engine.mjs",
+          "runtime/core/gate.mjs",
+          "runtime/core/managed-isolation.mjs",
+          "runtime/core/map.mjs",
+          "runtime/core/mapRuntime.mjs",
+          "runtime/core/planning.mjs",
+          "runtime/core/processes.mjs",
+          "runtime/core/schemas.mjs",
+          "runtime/core/store.mjs",
+          "runtime/core/streams.mjs",
+          "runtime/core/supervision.mjs",
+          "runtime/core/supervisor-client.mjs",
+          "runtime/core/taskAssessment.mjs",
+          "runtime/core/taskProcesses.mjs",
+          "runtime/core/taskRuntime.mjs",
           "runtime/core/transport.mjs",
           "runtime/core/utilities.mjs",
           "runtime/core/validate.mjs",
           "runtime/lock.mjs",
           "runtime/runner.mjs",
           "runtime/tests/authoring.test.mjs",
+          "runtime/tests/branch-delivery.test.mjs",
           "runtime/tests/bridge.test.mjs",
           "runtime/tests/code-variant-preload.mjs",
+          "runtime/tests/context-contracts.test.mjs",
           "runtime/tests/contracts.test.mjs",
           "runtime/tests/effort.test.mjs",
           "runtime/tests/engine.test.mjs",
@@ -4339,6 +4411,7 @@
           "runtime/tests/helpers.mjs",
           "runtime/tests/integrity.test.mjs",
           "runtime/tests/loops.test.mjs",
+          "runtime/tests/managed-task.test.mjs",
           "runtime/tests/map.test.mjs",
           "runtime/tests/pilot.test.mjs",
           "runtime/tests/pipeline.test.mjs",
@@ -4346,6 +4419,10 @@
           "runtime/tests/release.test.mjs",
           "runtime/tests/revisions.test.mjs",
           "runtime/tests/stream-fixture.mjs",
+          "runtime/tests/supervision.test.mjs",
+          "runtime/tests/supervisor-client.test.mjs",
+          "runtime/tests/supervisor-pipe.test.mjs",
+          "runtime/tests/task-assessment.test.mjs",
           "runtime/tests/toy/auth-buggy.mjs",
           "runtime/tests/toy/auth.mjs",
           "runtime/tests/toy/auth.test.mjs",
@@ -4360,6 +4437,7 @@
           "scripts/authoring-probe-server.mjs",
           "scripts/authoring-release-check.mjs",
           "scripts/authoring-test-support.mjs",
+          "scripts/build-shim.mjs",
           "scripts/bundle-runtime.mjs",
           "scripts/fixture-runner.mjs",
           "scripts/generate-icon.mjs",
@@ -4374,11 +4452,14 @@
           "scripts/pilot.mjs",
           "scripts/prepare-shadcn-pilot.mjs",
           "scripts/shadcn-pilot-check.mjs",
+          "scripts/shadcn-pilot-reviewers.mjs",
           "scripts/smoke.mjs",
           "shared/effort.d.mts",
           "shared/effort.mjs",
           "shared/replay.d.mts",
           "shared/replay.mjs",
+          "shared/task-config.d.mts",
+          "shared/task-config.mjs",
           "src-tauri/Cargo.lock",
           "src-tauri/Cargo.toml",
           "src-tauri/build.rs",
@@ -4389,7 +4470,9 @@
           "src-tauri/gen/schemas/windows-schema.json",
           "src-tauri/icons/icon.ico",
           "src-tauri/icons/icon.png",
+          "src-tauri/src/bin/launch_shim.rs",
           "src-tauri/src/main.rs",
+          "src-tauri/src/supervisor.rs",
           "src-tauri/tauri.conf.json",
           "src/App.tsx",
           "src/Inspector.tsx",
@@ -4592,13 +4675,11 @@
     },
     "code-reviewer-history": {
       "x": -330,
-      "y": 350,
-      "label": "Code review Context"
+      "y": 350
     },
     "test-reviewer-history": {
       "x": -330,
-      "y": 525,
-      "label": "Test review Context"
+      "y": 525
     }
   }
 }
