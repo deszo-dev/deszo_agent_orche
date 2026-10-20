@@ -9,7 +9,8 @@ ADRs record architecture decisions and their rationale. The [decision register](
 | [ADR-0003](0003-task-assessment-and-workflow-planning.md) | 2026-10-16 | Accepted | General development workflow, task assessment, explainable planning and comparative evaluation |
 | [ADR-0004](0004-agent-communication-and-context-contracts.md) | 2026-10-16 | Accepted | Structured agent results, controlled technical prose, context packages and measured communication efficiency |
 | [ADR-0005](0005-verified-feature-branch-delivery.md) | 2026-10-16 | Accepted | Exact-candidate delivery to a verified local feature-branch commit, environment evidence and recoverable readiness |
+| [ADR-0006](0006-time-bounded-autonomy-and-application-lifecycle.md) | 2026-10-20 | Proposed | Persistent time-bounded approvals and unattended rebuild/restart; Windows LocalService/service-SID and independent interactive-launcher direction accepted, subject to implementation verification |
 
 New records use a stable numbered filename. An accepted record keeps its history; a later architecture change should identify the record it supersedes.
 
-Implementation details and limits: [managed tasks](../MANAGED_TASKS.md), [ADR-0003 status](0003-implementation-status.md), [ADR-0004 status](0004-implementation-status.md), [ADR-0005 status](0005-implementation-status.md).
+Implementation details and limits: [managed tasks](../MANAGED_TASKS.md), [ADR-0003 status](0003-implementation-status.md), [ADR-0004 status](0004-implementation-status.md), [ADR-0005 status](0005-implementation-status.md), [ADR-0006 status: fixture-verified authority core and pending Windows gates](0006-implementation-status.md).

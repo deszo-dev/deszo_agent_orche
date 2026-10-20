@@ -1,0 +1,167 @@
+{
+  "date": "2026-10-20T07:32:47.133Z",
+  "purpose": "Independent negative review probes; violations are defects, not passing safety tests.",
+  "scope": "Temporary fixture stores and local fixture child processes only; no application, service, scheduled task, production store or real provider used.",
+  "head": "c60618987150c3514509a9d17ffacf0f0890cc36",
+  "sourceSha256": {
+    "runtime/host/authority.mjs": "b58a6283115aa697c6ab461dfdbeaec49b18bb1da20ba51a15fa7473e5385283",
+    "runtime/host/ipc.mjs": "c17810c745245bf3887ee8d9397d42be2d79bbc6fa444a3c8c6957c2b03d4bd6",
+    "runtime/host/main.mjs": "c8c2c42e68eb9116413cd1dcff0f8c093803bd55163068a46793ce28a5d49d86",
+    "runtime/host/lifecycle.mjs": "62e124d8f707e5216b1fddefbf3db539d6faee99e98411775cc779d8bde4e09a",
+    "runtime/host/runtimeBinding.mjs": "20a0719eb04ee1343c8818004120f41eb44fbeeb6a1f7901b2cb28cb37045499",
+    "runtime/host/timeSource.mjs": "9e13b6158b45b0788ee17aa757550fbec0dd25702ba9c5ebace0f7d4133cfab5",
+    "runtime/core/hostAutonomy.mjs": "e864bc10eb5bb4044bd01c9922948586b3c5d337d232ee9d6f0cf66a2b394bd8",
+    "runtime/core/engine.mjs": "47b1bace044a241dff22d4ef562a7fb1435919c4d1f593bcb329d6be90bb708e",
+    "runtime/core/adapters.mjs": "d89eba18cb9ea4012fdad3a4870ba35507b00d8351930c6553b133437bcc59fd",
+    "runtime/runner.mjs": "b51cd3db72c87b5b1ca088c542bd216f9a55c5e14f68c7053def1b79a22d15b8",
+    "docs/schemas/autonomy-policy.schema.json": "e20181138d63cf726abf12aa1feaf5ad308d2f78000fcd25b1b5f0b7532b43ca"
+  },
+  "node": "v22.20.0",
+  "platform": "win32",
+  "total": 9,
+  "violated": 9,
+  "satisfied": 0,
+  "harnessErrors": 0,
+  "results": [
+    {
+      "id": "N01",
+      "invariant": "Runtime identifiers alone must not authenticate a connection or authorize permit admission.",
+      "violated": true,
+      "expected": "403 without an independent runtime proof",
+      "observed": {
+        "attached": {
+          "attached": true
+        },
+        "admission": {
+          "admitted": true,
+          "permitId": "3979e220-9313-4909-9021-50cd76b093a7",
+          "enforcementDeadlineMs": 3600000
+        },
+        "controllerAuthenticated": false,
+        "processEvidenceSupplied": false
+      }
+    },
+    {
+      "id": "N02",
+      "invariant": "Revoking a host policy must stop an active run admitted under it.",
+      "violated": true,
+      "expected": "active run canceled, included in Stop scope",
+      "observed": {
+        "before": "running",
+        "permitStateAtRevoke": "settled",
+        "stopScope": [],
+        "after": "succeeded"
+      }
+    },
+    {
+      "id": "N03",
+      "invariant": "The host status CLI must not recover or mutate an independently running host.",
+      "violated": true,
+      "expected": "issued/admitted/in_progress unchanged by status",
+      "observed": {
+        "issued": "invalidated",
+        "admitted": "settled",
+        "effect": "unknown",
+        "operation": "reconciling",
+        "originalHostBlocked": null,
+        "nextDecision": "approved"
+      }
+    },
+    {
+      "id": "N04",
+      "invariant": "Lifecycle must enforce the consented profile, build root and application mode before stopping or launching.",
+      "violated": true,
+      "expected": "blocked without stopping the controlling application or launching another profile",
+      "observed": {
+        "result": {
+          "outcome": "verified",
+          "reason": null,
+          "operationId": "d9266d82-fde9-4136-beae-19d0bc4c26fa",
+          "runtimeGeneration": "c39c0e24-b98b-48d5-a24d-8c872e54bb3b"
+        },
+        "authorizedProfile": "authorized-profile",
+        "requestedProfile": "UNAUTHORIZED-PROFILE",
+        "authorizedBuildRoot": "C:\\Users\\jusse\\AppData\\Local\\Temp\\deszo-adr6-independent-mD8MNN\\authorized-builds",
+        "requestedBuildRoot": "C:\\Users\\jusse\\AppData\\Local\\Temp\\deszo-adr6-independent-mD8MNN\\outside-authorized-build-root",
+        "authorizedMode": "separate_preview",
+        "stoppedPids": [
+          100
+        ],
+        "launches": 1
+      }
+    },
+    {
+      "id": "N05",
+      "invariant": "A launch registration nonce must be consumed once and cannot replace a verified runtime generation by replay.",
+      "violated": true,
+      "expected": "replay refused or reconciled to the original registration receipt",
+      "observed": {
+        "operationOutcome": "verified",
+        "originalGeneration": "3c5f04a2-36a6-4b5d-9ae9-9644fb267088",
+        "replayGeneration": "b9f0fe6d-ded5-4bcd-8a92-3bf83fb022e5",
+        "originalStillRegistered": false
+      }
+    },
+    {
+      "id": "N06",
+      "invariant": "The shared providerInvocations limit must bound actual role invocations, not only the number of runs.",
+      "violated": true,
+      "expected": "at most one provider invocation under a limit of one",
+      "observed": {
+        "run": "succeeded",
+        "completedAgentInvocations": 3,
+        "chargedInvocations": 1,
+        "limit": 1
+      }
+    },
+    {
+      "id": "N07",
+      "invariant": "An exact retry after a lost createRun reply must reconcile to the committed run receipt.",
+      "violated": true,
+      "expected": "the same committed run receipt without another admission or charge",
+      "observed": {
+        "firstStatus": 202,
+        "firstRunId": "943faf84-26fd-424a-8fb2-510895189a60",
+        "retryStatus": 403,
+        "retryCode": "host_refused",
+        "retryMessage": "The Local Control Host refused admission: permit_settled."
+      }
+    },
+    {
+      "id": "N08",
+      "invariant": "Policy expiry must stop active owned work and must not let its run complete successfully.",
+      "violated": true,
+      "expected": "active run stopped at the host deadline",
+      "observed": {
+        "policyValid": false,
+        "policyReason": "expired",
+        "runAfterExpiry": "succeeded",
+        "chargedAttempts": 1
+      }
+    },
+    {
+      "id": "N09",
+      "invariant": "An ambiguous launcher failure must block another restart until the first launch is reconciled.",
+      "violated": true,
+      "expected": "one ambiguous effect, a reconciling/blocked outcome and no second launch",
+      "observed": {
+        "simulatedLaunchEffects": 2,
+        "failures": [
+          "fixture: process created, launch reply lost",
+          "fixture: process created, launch reply lost"
+        ],
+        "operations": [
+          {
+            "phase": "build_verified",
+            "outcome": "in_progress"
+          },
+          {
+            "phase": "build_verified",
+            "outcome": "in_progress"
+          }
+        ],
+        "dispatchBlocked": null
+      }
+    }
+  ]
+}

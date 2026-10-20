@@ -9,6 +9,7 @@ import { ApiError, Engine } from './core/engine.mjs';
 import { ContractError } from './core/schemas.mjs';
 import { CorruptionError } from './core/store.mjs';
 import { supervisorFromEnvironment } from './core/supervisor-client.mjs';
+import { hostFromEnvironment } from './host/runtimeBinding.mjs';
 import { acquireRuntimeLock } from './lock.mjs';
 
 const ORIGINS = new Set(['http://127.0.0.1:1420', 'http://localhost:1420', 'tauri://localhost', 'http://tauri.localhost', 'https://tauri.localhost']);
@@ -64,15 +65,24 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
   const token = randomBytes(32).toString('hex');
   const firstPartyToken = randomBytes(32).toString('hex');
   let engine;
+  let hostBinding = null;
   try {
+    // ADR-0006: a runtime launched or covered by a Local Control Host binds to it before serving requests.
+    hostBinding = await hostFromEnvironment(process.env, { packaged: PACKAGED_RUNTIME });
     if (PACKAGED_RUNTIME && devTestConfirmationOff) throw new Error('The packaged runtime does not support the fixture confirmation policy.');
-    engine = new Engine({ root, adapters, runtimeInstanceId, nodeExecutable, bridgeScript: bridgeFile, supervisor: supervisorFromEnvironment(),
+    engine = new Engine({ root, adapters, runtimeInstanceId, nodeExecutable, bridgeScript: bridgeFile, supervisor: supervisorFromEnvironment(), hostAuthority: hostBinding?.adapter ?? null, hostRuntimeGeneration: hostBinding?.runtimeGeneration ?? null, hostPolicyId: hostBinding?.policyId ?? null,
       externalRunConfirmationOverride: devTestConfirmationOff ? false : null,
       processContainment: supervised ? 'tauri-job' : 'standalone-best-effort', ...(maximumAgentTimeoutSeconds ? { maximumAgentTimeoutSeconds } : {}), ...(loopMinuteMs ? { loopMinuteMs } : {}) });
     await engine.initialize();
     if (devTestConfirmationOff && !engine.store.get('SELECT id FROM workspaces LIMIT 1'))
       engine.putWorkspace('main', { cwd: join(engine.store.workdirs, 'scratch', 'main') });
-  } catch (error) { await releaseLock(); throw error; }
+  } catch (error) { hostBinding?.client.close(); await releaseLock(); throw error; }
+  // The host delivers the native Stop scope of a committed revocation or expiry.
+  // The stop reaches the owned runs; a failure here is reported and never silently dropped.
+  hostBinding?.client.events.on('stop', message => {
+    try { engine.stopHostPermits(message.permits, message.works); }
+    catch (error) { process.stderr.write(`Local Control Host stop failed: ${error.message}\n`); }
+  });
   const streams = new Set();
   let shuttingDown = false;
 
@@ -152,7 +162,12 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
     ['POST', new RegExp(`^/api/v2/context-bindings/(${UUID})/acknowledge$`), async ({ req, match }) => [200, engine.acknowledgeBinding(match[1], parse(await readBody(req)))]],
     ['POST', new RegExp(`^/api/v2/context-bindings/(${UUID})/messages$`), async ({ req, match }) => { const result = engine.sendChat(match[1], parse(await readBody(req))); return [result.status, result.body]; }],
     ['GET', /^\/api\/v2\/runs$/, ({ url }) => [200, engine.listRuns(query(url, ['workspaceId', 'state', 'kind', 'bindingId', 'limit', 'cursor'], ['limit']))]],
-    ['POST', /^\/api\/v2\/runs$/, async ({ req }) => { const result = engine.createRun(parse(await readBody(req)), { role: req.authRole, clientLabel: req.headers['x-deszo-client-label'], controllerToken: controllerTokenOf(req) }); return [result.status, result.body]; }],
+    ['POST', /^\/api\/v2\/runs$/, async ({ req }) => {
+      const body = parse(await readBody(req));
+      const options = { role: req.authRole, clientLabel: req.headers['x-deszo-client-label'], controllerToken: controllerTokenOf(req) };
+      const result = body?.hostPermitId ? await engine.createRunUnderHostPermit(body, options) : engine.createRun(body, options);
+      return [result.status, result.body];
+    }],
     ['GET', /^\/api\/v2\/run-requests$/, ({ url }) => {
       const params = query(url, ['state', 'limit'], ['limit']);
       return [200, engine.listRunRequests(params)];
@@ -179,6 +194,7 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
     ['POST', /^\/api\/v2\/control-grants$/, async ({ req }) => { const result = engine.requestControlGrant(parse(await readBody(req)), { controllerToken: controllerTokenOf(req) }); return [result.status, result.body]; }],
     ['GET', new RegExp(`^/api/v2/control-grants/(${UUID})$`), ({ match }) => [200, engine.getControlGrant(match[1])]],
     ['POST', new RegExp(`^/api/v2/control-grants/(${UUID})/decision$`), async ({ req, match }) => { const result = engine.decideControlGrant(match[1], parse(await readBody(req))); return [result.status, result.body]; }],
+    ['POST', new RegExp(`^/api/v2/control-grants/(${UUID})/host-approval$`), async ({ req, match }) => { const result = await engine.approveControlGrantUnderHostPermit(match[1], parse(await readBody(req))); return [result.status, result.body]; }],
     ['POST', new RegExp(`^/api/v2/control-grants/(${UUID})/revoke$`), async ({ req, match }) => { const result = engine.revokeControlGrant(match[1], parse(await readBody(req))); return [result.status, result.body]; }],
     ['GET', new RegExp(`^/api/v2/runs/(${UUID})/control$`), ({ match }) => [200, engine.getRunControl(match[1])]],
     ['GET', new RegExp(`^/api/v2/runs/(${UUID})/watch$`), async ({ match, url }) => [200, await engine.watchRun(match[1], query(url, ['cursor', 'waitMs'], ['cursor', 'waitMs']))]],
@@ -331,6 +347,7 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
     connection, engine,
     async close() {
       if (shuttingDown) return; shuttingDown = true;
+      hostBinding?.client.close();
       for (const entry of streams) entry.close();
       const serverClosed = new Promise(resolvePromise => server.close(resolvePromise));
       server.closeAllConnections?.();

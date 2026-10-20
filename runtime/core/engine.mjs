@@ -15,6 +15,7 @@ import { allNodesDeep, bodyPrefix, enclosingLoops, fingerprints, parseInstance, 
 import * as gate from './gate.mjs';
 import { installMapRuntime } from './mapRuntime.mjs';
 import { installSupervision } from './supervision.mjs';
+import { installHostAutonomy } from './hostAutonomy.mjs';
 import { installTaskRuntime } from './taskRuntime.mjs';
 import { installTaskProcesses } from './taskProcesses.mjs';
 import { shimFailureOf } from './supervisor-client.mjs';
@@ -84,8 +85,17 @@ export function routeCase(cases, selected) {
 }
 
 export class Engine {
-  constructor({ root, adapters = defaultAdapters, processContainment = 'standalone-best-effort', supervisorGeneration = randomUUID(), runtimeInstanceId = randomUUID(), nodeExecutable = process.execPath, bridgeScript = resolve(import.meta.dirname, '../../mcp/bridge.mjs'), externalRunConfirmationOverride = null, maximumAgentTimeoutSeconds = M1_MAXIMUM_TIMEOUT, detectionTtlMs = 30_000, loopMinuteMs = 60_000, supervisor = null } = {}) {
+  constructor({ root, adapters = defaultAdapters, processContainment = 'standalone-best-effort', supervisorGeneration = randomUUID(), runtimeInstanceId = randomUUID(), nodeExecutable = process.execPath, bridgeScript = resolve(import.meta.dirname, '../../mcp/bridge.mjs'), externalRunConfirmationOverride = null, maximumAgentTimeoutSeconds = M1_MAXIMUM_TIMEOUT, detectionTtlMs = 30_000, loopMinuteMs = 60_000, supervisor = null, hostAuthority = null, hostRuntimeGeneration = null, hostPolicyId = null } = {}) {
     this.store = new Store(root);
+    // ADR-0006: outer authority from a Local Control Host, when this runtime is registered with one.
+    this.hostAuthority = hostAuthority;
+    this.hostRuntimeGeneration = hostRuntimeGeneration;
+    this.hostPolicyId = hostPolicyId;
+    this.hostAdmissions = new WeakSet();
+    this.hostPermitRuns = new Map();
+    this.hostRuns = new Map();
+    this.hostDeadlines = new Map();
+    this.hostReleaseFailures = [];
     this.values = valueHelpers(this.store);
     this.adapters = adapters;
     this.processContainment = processContainment;
@@ -750,7 +760,7 @@ export class Engine {
   }
 
   // ---------- Run creation ----------
-  createRun(body, { role = 'first-party', clientLabel = null, controllerToken = null } = {}) {
+  createRun(body, { role = 'first-party', clientLabel = null, controllerToken = null, hostAdmission = null } = {}) {
     this.validateBody('createRun', body);
     if (this.recoveryBlocked) throw new ApiError(409, 'conflict', this.recoveryBlocked);
     if (this.closing) throw new ApiError(409, 'conflict', 'The runtime is shutting down.');
@@ -764,9 +774,12 @@ export class Engine {
       const snapshot = this.store.artifactRow(workflowRow.snapshot_artifact_id);
       if (snapshot.sha256 !== body.workflowSnapshotSha256) throw new ApiError(409, 'conflict', 'The saved workflow changed; reload it before running.');
       const settings = this.currentSettings().settings;
+      // ADR-0006: a host permit replaces the confirmation pause only with a genuine admission made by this engine.
+      if (body.hostPermitId && !this.isHostAdmission(hostAdmission, body.hostPermitId, 'run.approve')) throw new ApiError(403, 'host_admission_required', 'A run that names a host permit must be admitted by the Local Control Host first.');
+      const hostAdmitted = Boolean(body.hostPermitId);
       // A supervised run must be bound to its approved grant before launch; a confirmation queue cannot hold that binding.
-      if (body.controlGrantId && external && settings.externalRunConfirmation) throw new ApiError(409, 'confirmation_required', 'A supervised run needs its control grant bound at creation. Confirmation is on, so request the supervised run from the Deszo window.');
-      if (external && settings.externalRunConfirmation) {
+      if (body.controlGrantId && external && settings.externalRunConfirmation && !hostAdmitted) throw new ApiError(409, 'confirmation_required', 'A supervised run needs its control grant bound at creation. Confirmation is on, so request the supervised run from the Deszo window.');
+      if (external && settings.externalRunConfirmation && !hostAdmitted) {
         const createdAt = nowIso();
         const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
         this.store.run(`INSERT INTO external_run_requests(request_id,payload_sha256,request_json,workflow_id,workflow_snapshot_sha256,workspace_id,workspace_cwd_identity,client_label,state,created_at,expires_at)
@@ -1233,7 +1246,7 @@ export class Engine {
     if (!to) return;
     this.store.transaction(() => this.store.appendEvents(state.id, [this.runEvent(row, to, reason)]));
     if (row.state === 'stopping') this.recordTerminationProof(state.id).catch(error => process.stderr.write(`Termination proof for run ${state.id} failed: ${error.message}\n`));
-    if (TERMINAL_RUN.has(to)) { this.endControl(state.id); this.forget(state); }
+    if (TERMINAL_RUN.has(to)) { this.endControl(state.id); this.forget(state); this.releaseHostRun(state.id, to); }
   }
 
   forget(state) {
@@ -1814,7 +1827,13 @@ export class Engine {
       }
       this.store.appendEvents(state.id, events);
     });
-    const outcome = await this.runProcess(state, current, node, invocation, record);
+    // ADR-0006: a host-bound runtime charges every provider invocation to the shared ledger before its CLI is launched.
+    const providerPermit = await this.reserveHostProviderInvocation(state.id, attempt.id);
+    if (providerPermit?.refused) return this.failAttempt(state, current, 'host_refused', `The Local Control Host refused this provider invocation: ${providerPermit.reason}.`);
+    let outcome;
+    try { outcome = await this.runProcess(state, current, node, invocation, record); }
+    catch (error) { await this.settleHostProviderInvocation(providerPermit, { launched: true, evidence: `provider invocation ended with an exception: ${error.message}` }); throw error; }
+    await this.settleHostProviderInvocation(providerPermit, { launched: outcome.launched === true, evidence: outcome.launched ? 'provider invocation launched' : `provider invocation did not launch: ${outcome.error || 'no launch'}` });
     rmSync(tmp, { recursive: true, force: true });
     rmSync(join(this.store.workdirs, 'attachments', attempt.id), { recursive: true, force: true });
     current = this.store.get('SELECT * FROM attempts WHERE id = ?', attempt.id);
@@ -2206,6 +2225,7 @@ export class Engine {
 
 installMapRuntime(Engine, { ApiError, UNSTARTED });
 installSupervision(Engine, { ApiError });
+installHostAutonomy(Engine, { ApiError });
 installTaskRuntime(Engine, { ApiError });
 installTaskProcesses(Engine);
 

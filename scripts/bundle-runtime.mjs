@@ -24,6 +24,14 @@ await build({
   bundle: true, platform: 'node', format: 'esm', target: 'node22', legalComments: 'none',
   banner: { js: "import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);" },
 });
+// ADR-0006 Local Control Host: a separate entry with its own store migration, never part of the application store.
+await build({
+  entryPoints: [resolve(root, 'runtime/host/main.mjs')], outfile: resolve(out, 'host.mjs'),
+  bundle: true, platform: 'node', format: 'esm', target: 'node22', legalComments: 'none',
+  banner: { js: "import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);" },
+});
+copyFileSync(resolve(root, 'docs/storage/host-h1.sql'), resolve(out, 'host-h1.sql'));
+copyFileSync(resolve(root, 'docs/storage/host-h2.sql'), resolve(out, 'host-h2.sql'));
 copyFileSync(resolve(root, 'docs/storage/m1.sql'), resolve(out, 'm1.sql'));
 copyFileSync(resolve(root, 'docs/storage/m2.sql'), resolve(out, 'm2.sql'));
 copyFileSync(resolve(root, 'docs/storage/m3.sql'), resolve(out, 'm3.sql'));

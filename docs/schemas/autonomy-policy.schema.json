@@ -1,0 +1,249 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deszo.local/documentation/autonomy-policy.schema.json",
+  "title": "Autonomous development session contracts (ADR-0006)",
+  "description": "Versioned records of the trusted Local Control Host: the immutable proposed policy decision, the decision-bound consent assertion, host decision receipts, lifecycle operations and build manifests. Identifiers are never bearer credentials.",
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "time": { "type": "string", "format": "date-time" },
+    "id": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "operationKind": {
+      "enum": [
+        "run.approve", "supervision.approve", "run.stop_and_report", "run.retry",
+        "check.run", "build.run", "repair.run", "delivery.local",
+        "app.stop", "app.start", "app.restart", "app.rollback",
+        "worker.model_call", "provider.invoke"
+      ]
+    },
+    "budgetKey": {
+      "enum": ["attempts", "providerInvocations", "workerModelCalls", "operations", "restarts", "repairs", "builds"]
+    },
+    "limits": {
+      "type": "object",
+      "properties": {
+        "attempts": { "type": "integer", "minimum": 0 },
+        "providerInvocations": { "type": "integer", "minimum": 0 },
+        "workerModelCalls": { "type": "integer", "minimum": 0 },
+        "operations": { "type": "integer", "minimum": 0 },
+        "restarts": { "type": "integer", "minimum": 0 },
+        "repairs": { "type": "integer", "minimum": 0 },
+        "builds": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["attempts", "providerInvocations", "workerModelCalls", "operations", "restarts", "repairs", "builds"],
+      "additionalProperties": false
+    },
+    "cost": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/budgetKey" },
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    },
+    "allowedCommand": {
+      "type": "object",
+      "properties": {
+        "commandId": { "$ref": "#/$defs/id" },
+        "command": { "type": "string", "minLength": 1 },
+        "args": { "type": "array", "items": { "type": "string" } },
+        "cwdRelative": { "type": "string" },
+        "timeoutMs": { "type": "integer", "minimum": 1000, "maximum": 3600000 }
+      },
+      "required": ["commandId", "command", "args", "cwdRelative", "timeoutMs"],
+      "additionalProperties": false
+    },
+    "workflowRule": {
+      "type": "object",
+      "description": "Permitted revisions are an explicit list; arbitrary future content under the same workflow ID is not authorized.",
+      "properties": {
+        "workflowId": { "$ref": "#/$defs/id" },
+        "baselineSha256": { "$ref": "#/$defs/sha256" },
+        "permittedRevisions": { "type": "array", "items": { "$ref": "#/$defs/sha256" }, "uniqueItems": true }
+      },
+      "required": ["workflowId", "baselineSha256", "permittedRevisions"],
+      "additionalProperties": false
+    },
+    "scope": {
+      "type": "object",
+      "properties": {
+        "dataProfile": { "$ref": "#/$defs/id" },
+        "workspaces": {
+          "type": "array", "minItems": 1,
+          "items": {
+            "type": "object",
+            "properties": { "workspaceId": { "$ref": "#/$defs/id" }, "cwdIdentity": { "$ref": "#/$defs/sha256" } },
+            "required": ["workspaceId", "cwdIdentity"],
+            "additionalProperties": false
+          }
+        },
+        "workflows": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/workflowRule" } },
+        "operations": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/operationKind" } },
+        "commands": { "type": "array", "items": { "$ref": "#/$defs/allowedCommand" } },
+        "desktop": {
+          "type": "object",
+          "properties": { "user": { "type": "string", "minLength": 1 }, "sessionId": { "type": "integer", "minimum": 0 } },
+          "required": ["user", "sessionId"],
+          "additionalProperties": false
+        },
+        "buildRoot": { "type": "string", "minLength": 1 },
+        "applicationMode": { "enum": ["separate_preview", "controlling_switch"] },
+        "deliveryBoundary": { "enum": ["candidate", "verified_branch"] }
+      },
+      "required": ["dataProfile", "workspaces", "workflows", "operations", "commands", "desktop", "buildRoot", "applicationMode", "deliveryBoundary"],
+      "additionalProperties": false
+    },
+    "proposedDecision": {
+      "type": "object",
+      "description": "The exact immutable decision presented for fresh user verification. Its canonical digest is what the consent assertion signs.",
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "kind": { "const": "AutonomyPolicyDecision" },
+        "policyId": { "type": "string", "format": "uuid" },
+        "sessionId": { "type": "string", "format": "uuid" },
+        "decisionType": { "enum": ["create", "extend", "widen", "post_reboot"] },
+        "supersedesPolicyId": { "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }] },
+        "audience": { "$ref": "#/$defs/id" },
+        "controller": {
+          "type": "object",
+          "properties": {
+            "controllerId": { "$ref": "#/$defs/id" },
+            "publicKey": { "type": "string", "minLength": 1 }
+          },
+          "required": ["controllerId", "publicKey"],
+          "additionalProperties": false
+        },
+        "scope": { "$ref": "#/$defs/scope" },
+        "limits": { "$ref": "#/$defs/limits" },
+        "carriedUsage": { "$ref": "#/$defs/cost" },
+        "durationMs": { "type": "integer", "minimum": 60000, "maximum": 86400000 },
+        "issuedAt": { "$ref": "#/$defs/time" },
+        "expiresAt": { "$ref": "#/$defs/time" }
+      },
+      "required": ["schemaVersion", "kind", "policyId", "sessionId", "decisionType", "supersedesPolicyId", "audience", "controller", "scope", "limits", "carriedUsage", "durationMs", "issuedAt", "expiresAt"],
+      "additionalProperties": false
+    },
+    "consentAssertion": {
+      "type": "object",
+      "description": "A signature by an enrolled trusted credential over the challenge-bound client data and the authenticator's user-verification flags. API success alone is not evidence of non-synthetic input.",
+      "properties": {
+        "credentialId": { "$ref": "#/$defs/id" },
+        "clientData": {
+          "type": "object",
+          "properties": {
+            "type": { "const": "deszo.autonomy.consent" },
+            "challengeId": { "type": "string", "format": "uuid" },
+            "nonce": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "decisionDigest": { "$ref": "#/$defs/sha256" },
+            "audience": { "$ref": "#/$defs/id" }
+          },
+          "required": ["type", "challengeId", "nonce", "decisionDigest", "audience"],
+          "additionalProperties": false
+        },
+        "flags": {
+          "type": "object",
+          "properties": { "userPresent": { "type": "boolean" }, "userVerified": { "type": "boolean" } },
+          "required": ["userPresent", "userVerified"],
+          "additionalProperties": false
+        },
+        "signature": { "type": "string", "minLength": 1 }
+      },
+      "required": ["credentialId", "clientData", "flags", "signature"],
+      "additionalProperties": false
+    },
+    "decisionRequest": {
+      "type": "object",
+      "description": "A scoped request from an authenticated controller connection. The engine still applies its own workflow validation.",
+      "properties": {
+        "requestId": { "$ref": "#/$defs/id" },
+        "policyId": { "type": "string", "format": "uuid" },
+        "operation": { "$ref": "#/$defs/operationKind" },
+        "workspaceId": { "$ref": "#/$defs/id" },
+        "workflowId": { "$ref": "#/$defs/id" },
+        "workflowSnapshotSha256": { "$ref": "#/$defs/sha256" },
+        "runtimeGeneration": { "anyOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+        "commandId": { "$ref": "#/$defs/id" },
+        "operationId": { "$ref": "#/$defs/id" },
+        "cost": { "$ref": "#/$defs/cost" },
+        "justification": { "type": "string", "maxLength": 2000 },
+        "target": {
+          "description": "Lifecycle targets are checked against the decided scope before any stop or launch. currentProcess must be a process this host started or registered for the policy.",
+          "type": "object",
+          "properties": {
+            "profile": { "$ref": "#/$defs/id" },
+            "applicationMode": { "enum": ["separate_preview", "controlling_switch"] },
+            "desktop": {
+              "type": "object",
+              "properties": { "user": { "$ref": "#/$defs/id" }, "sessionId": { "type": "integer", "minimum": 0 } },
+              "required": ["user", "sessionId"],
+              "additionalProperties": false
+            },
+            "buildRoot": { "type": "string", "minLength": 1 },
+            "buildDir": { "type": "string", "minLength": 1 },
+            "buildId": { "$ref": "#/$defs/id" },
+            "currentProcess": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": { "pid": { "type": "integer", "minimum": 1 }, "creationTime": { "type": "string", "minLength": 1 }, "imagePath": { "type": "string" }, "imageSha256": { "$ref": "#/$defs/sha256" } },
+                  "required": ["pid", "creationTime"],
+                  "additionalProperties": false
+                },
+                { "type": "null" }
+              ]
+            }
+          },
+          "required": ["profile", "applicationMode", "desktop", "buildRoot", "buildDir", "buildId"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["requestId", "policyId", "operation", "cost"],
+      "additionalProperties": false
+    },
+    "decisionReceipt": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "kind": { "const": "HostDecisionReceipt" },
+        "decisionId": { "type": "string", "format": "uuid" },
+        "requestId": { "$ref": "#/$defs/id" },
+        "policyId": { "type": "string", "format": "uuid" },
+        "policyRevision": { "type": "integer", "minimum": 1 },
+        "revocationGeneration": { "type": "integer", "minimum": 0 },
+        "operation": { "$ref": "#/$defs/operationKind" },
+        "outcome": { "enum": ["approved", "denied", "pending"] },
+        "reason": { "type": "string" },
+        "permitId": { "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }] },
+        "reservation": { "$ref": "#/$defs/cost" },
+        "remaining": { "$ref": "#/$defs/cost" },
+        "requestDigest": { "$ref": "#/$defs/sha256" },
+        "decidedAt": { "$ref": "#/$defs/time" }
+      },
+      "required": ["schemaVersion", "kind", "decisionId", "requestId", "policyId", "policyRevision", "revocationGeneration", "operation", "outcome", "reason", "permitId", "reservation", "remaining", "requestDigest", "decidedAt"],
+      "additionalProperties": false
+    },
+    "operationOutcome": { "enum": ["in_progress", "reconciling", "blocked", "failed", "verified", "interrupted"] },
+    "buildManifest": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "kind": { "const": "BuildManifest" },
+        "buildId": { "$ref": "#/$defs/id" },
+        "sourceCommit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+        "dirtySourceDigest": { "anyOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+        "inputsDigest": { "$ref": "#/$defs/sha256" },
+        "protocolVersion": { "type": "integer", "minimum": 1 },
+        "storeSchemaVersion": { "type": "integer", "minimum": 1 },
+        "launchEntry": { "type": "string", "minLength": 1 },
+        "artifacts": {
+          "type": "array", "minItems": 1,
+          "items": {
+            "type": "object",
+            "properties": { "path": { "type": "string", "minLength": 1 }, "sha256": { "$ref": "#/$defs/sha256" }, "bytes": { "type": "integer", "minimum": 0 } },
+            "required": ["path", "sha256", "bytes"],
+            "additionalProperties": false
+          }
+        },
+        "createdAt": { "$ref": "#/$defs/time" }
+      },
+      "required": ["schemaVersion", "kind", "buildId", "sourceCommit", "dirtySourceDigest", "inputsDigest", "protocolVersion", "storeSchemaVersion", "launchEntry", "artifacts", "createdAt"],
+      "additionalProperties": false
+    }
+  }
+}

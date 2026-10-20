@@ -1,8 +1,8 @@
 # Deszo Orchestrator Documentation
 
-Version: 0.22
-Status: confirmed requirements, verified ADR-0001, accepted ADR-0002 through ADR-0005, and staged contracts
-Updated: 2026-10-16
+Version: 0.25
+Status: confirmed requirements, verified ADR-0001, accepted ADR-0002 through ADR-0005 and ADR-0006 Windows direction, proposed complete ADR-0006, and staged contracts
+Updated: 2026-10-20
 
 Deszo is a personal Tauri/React/React Flow desktop application with an Orange-inspired node workspace. Milestones M1–M6 and the reference delivery pipeline are implemented. ADR-0001 external authoring passed its ordered acceptance campaign with the listed Windows Codex, Claude Code, and Antigravity versions.
 
@@ -26,6 +26,8 @@ Version 0.8 resolves [the third review](reviews/2026-10-13-third-review.md): M1'
 14. [Accepted ADR-0004](adr/0004-agent-communication-and-context-contracts.md): structured results, controlled technical prose, context packages, feedback on changes and measured efficiency with full available audit.
 15. [Accepted ADR-0005](adr/0005-verified-feature-branch-delivery.md): exact candidate application, environment verification and verified commit evidence for a local feature branch.
 16. [Managed tasks](MANAGED_TASKS.md): executable `task-planning-v1` node, reference role bindings, engine dispatch, Context/evidence retrieval, shared limits, Stop/recovery and verified branch delivery.
+17. [Proposed ADR-0006](adr/0006-time-bounded-autonomy-and-application-lifecycle.md): restart-persistent approval and unattended lifecycle, with accepted Windows service/launcher direction, scoped authority/bootstrap, mutual IPC and recovery contracts.
+18. [ADR-0006 implementation status](adr/0006-implementation-status.md): documentation-only scope, branch context and mandatory Windows gates; [historical first review/addendum](reviews/2026-10-20-adr-0006-review.md), [second review](reviews/2026-10-20-adr-0006-second-review.md) and separate [S01–S04 resolution](reviews/2026-10-20-adr-0006-second-review-resolution.md).
 
 ## Rule ownership and precedence
 
@@ -49,6 +51,7 @@ Confirmed user requirements in [DECISIONS.md](DECISIONS.md) take precedence over
 | ADR-0001 verification sequence and evidence requirements | [Acceptance test plan](authoring/ACCEPTANCE_TEST_PLAN.md) |
 | Accepted audit/supervision/incident architecture; current runtime behavior stays unchanged until implementation | [ADR-0002](adr/0002-execution-audit-and-supervised-control.md) |
 | Managed task node/configuration, compiler and run-level contracts | [Managed tasks](MANAGED_TASKS.md) |
+| Proposed autonomous session and accepted Windows direction: trusted authority, scoped bootstrap, IPC, lifecycle and recovery | [ADR-0006](adr/0006-time-bounded-autonomy-and-application-lifecycle.md) |
 
 Product specification describes interactions; architecture describes components. [Proposed baseline](PROPOSED_BASELINE.md) preserves Q01–Q22 navigation without duplicating rules. [Open questions](OPEN_QUESTIONS.md) redirects to the decision register and staged contract prerequisites.
 
@@ -80,6 +83,9 @@ ADR-0001 is implemented and verified within its documented Windows support bound
 
 | Date | Version | Change |
 | --- | --- | --- |
+| 2026-10-20 | 0.25 | Refined ADR6-S01–S04: protected decision-bound user verification/key enrollment, service-owned fail-stop and last-handle gate, initial post-reboot dispatch block, retained task budgets and separate resolution history; runtime mechanisms remain unverified and complete ADR-0006 Proposed, documentation only |
+| 2026-10-20 | 0.24 | Incorporated ADR6-R01–R06 and Windows trust/recovery contracts: accepted narrow D28/P29 service/launcher direction, independent authority, scoped bootstrap, protected TCB, IPC/native ownership, worker limits, compatible rollback/UI and mandatory negative tests; added status and historical review addendum, documentation only |
+| 2026-10-20 | 0.23 | Added proposed ADR-0006 and D26–D27/P28 for restart-persistent time-bounded automatic operational approval, independent application lifecycle control and unattended development continuation in the ADR-0003–0005 completion branch; documentation only |
 | 2026-10-16 | 0.22 | Wired managed tasks into the ordinary engine lifecycle: assessment/plans, isolated role Contexts, evidence retrieval, bounded repair, acceptance resolver, contained Git/check children, durable delivery reconciliation, UI/MCP inspection and offline reference closure; real-provider evaluation remains separate |
 | 2026-10-16 | 0.21 | Implemented ADR-0003, ADR-0004, and ADR-0005 through Stage 3: task assessment, source-derived floors, candidate-time floor checks, structured results, deterministic context packages, fingerprint v2 invalidation, REVIEW_INCOMPLETE loop rules, criterion-to-evidence acceptance, isolated separate-clone branch delivery, environment smoke and verified READY_FOR_MERGE commits; migration m9 and schemas added |
 | 2026-10-16 | 0.20 | Resolved review findings for ADR-0003–0005: source-derived risk floors, lifecycle linkage, evaluation cost estimate, mid-run request-and-resume context, package determinism/invalidation, REVIEW_INCOMPLETE loop rules, separate-clone delivery model, aggregate delivery budget linkage, and pilot branch base clarity; documentation only |

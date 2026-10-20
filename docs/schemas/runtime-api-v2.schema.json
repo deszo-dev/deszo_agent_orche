@@ -72,6 +72,11 @@
           "type": "string",
           "format": "uuid",
           "description": "ADR-0002: an approved supervision grant bound to this run before its first launch."
+        },
+        "hostPermitId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "ADR-0006: a Local Control Host permit for run.approve. The engine admits it with the host before creating the run; the request JSON alone grants nothing."
         }
       },
       "required": [

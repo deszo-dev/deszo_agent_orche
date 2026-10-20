@@ -1,10 +1,10 @@
 # Decision Register
 
-Version: 0.13
-Status: confirmed requirements, accepted ADR-0001 through ADR-0005, and milestone baseline
-Updated: 2026-10-16
+Version: 0.16
+Status: confirmed requirements, accepted ADR-0001 through ADR-0005 and ADR-0006 Windows direction, proposed complete ADR-0006, and milestone baseline
+Updated: 2026-10-20
 
-This is the sole register of requirement/proposal acceptance. The current request authorizes implementation of ADR-0003, ADR-0004, and ADR-0005 through Stage 3. No proposed default is silently marked human-confirmed.
+This is the sole register of requirement/proposal acceptance. ADR-0003, ADR-0004, and ADR-0005 have the implementation authorization recorded below. The latest documentation request refines the still-Proposed ADR-0006 with fresh verified consent, explicit host fail-stop and initial post-reboot dispatch blocking; P29's accepted Windows direction remains unchanged. The user's later 2026-10-20 request "implement ADR 6 in current branch" authorizes code in that branch; it does not accept P28 or the complete ADR, and it does not authorize service/task installation, real authenticator enrollment, an autonomous session or provider invocation. No proposed default is silently marked human-confirmed.
 
 ## Confirmed decisions
 
@@ -36,6 +36,9 @@ This is the sole register of requirement/proposal acceptance. The current reques
 | D23 | Specify a general effective development workflow, including how task assessment affects its stages and how effectiveness will be tested across different task classes. | The 2026-10-16 discussion explicitly broadened the scope beyond shadcn/ui and requested a new ADR; detailed mechanisms remain proposed. |
 | D24 | Specify agent communication and context-management contracts, covering structured results, controlled technical prose, relevant inputs and measured efficiency while preserving available audit. | The 2026-10-16 supplied communication proposal, discussion and request for a second new ADR; detailed mechanisms and savings remain unaccepted hypotheses. |
 | D25 | Specify verified local feature-branch delivery as a separate ADR/reference stage, preserving exact candidate identity through source assertion, apply, environment verification and commit. | The 2026-10-16 agreement to the six review refinements and a separate ADR-0005; implementation and Git execution are not requested. |
+| D26 | Provide user-controlled automatic operational approval for a bounded period, for example twelve hours; approval must survive full application restart, including a rebuilt Deszo, within its original validity period. | The 2026-10-20 request for a new ADR and explicit restart-persistence clarification; detailed authorization mechanisms remain proposed. |
+| D27 | Enable unattended testing, rebuild, full application restart and continuation, and plan the feature in the current branch completing ADR-0003 through ADR-0005. | The 2026-10-20 discussion and documentation request; implementation and a new pilot are not requested by this instruction. |
+| D28 | For the Windows pilot, use an independent LocalService Windows Service with a dedicated service SID/SCM and a protected, separately installed interactive Task Scheduler launcher; enforce autonomous authority outside the candidate, with scoped bootstrap, mutual IPC and verified recovery. | The user's 2026-10-20 accepted Windows architectural direction, supplied trust/recovery contracts and instruction to incorporate all amendments. Acceptance is architectural and subject to implementation verification. |
 
 ## Inherited requirements
 
@@ -56,7 +59,7 @@ These are carried forward from the original architecture draft. Changing them re
 
 ## Proposed resolutions
 
-P01–P22 remain **Proposed** and answer the corresponding Q IDs. P23–P27 are listed under accepted proposals below. Detailed behavior lives at the linked home; [MILESTONES.md](MILESTONES.md#m1-baseline-for-an-implementation-request) identifies the concrete M1 baseline.
+P01–P22 remain **Proposed** and answer the corresponding Q IDs. P23–P27 and the limited Windows direction P29 are listed under accepted proposals below. P28 remains the proposed complete autonomous-development extension. Detailed behavior lives at the linked home; [MILESTONES.md](MILESTONES.md#m1-baseline-for-an-implementation-request) identifies the concrete M1 baseline.
 
 | ID | Proposed selection | Rule home |
 | --- | --- | --- |
@@ -82,6 +85,7 @@ P01–P22 remain **Proposed** and answer the corresponding Q IDs. P23–P27 are 
 | P20 | Distinct roles, exact-subject approvals; cross-revision carry at M6. | [Contract](PIPELINE_EXECUTION.md#review-and-gate) |
 | P21 | Immutable TaskResults, copied directories, conflict-checked assembly and real checks. | [Contract](PIPELINE_EXECUTION.md#task-capture-and-assembly) |
 | P22 | Same-spec task repair and bounded Map verification cycles at M5; selective cross-revision carry at M6. | [Contract](IMPLEMENTATION_MAP.md#revisions-and-carry-forward) |
+| P28 | A durable scoped autonomous-development policy, persistent automatic operational approvals, and an independent local host/worker for bounded tests, builds, verified application restart and continuation. | [ADR-0006](adr/0006-time-bounded-autonomy-and-application-lifecycle.md) |
 
 ## Accepted proposals
 
@@ -92,6 +96,7 @@ P01–P22 remain **Proposed** and answer the corresponding Q IDs. P23–P27 are 
 | P25 | A reference development workflow with evidence-based task assessment, versioned planning rules, explicit role bindings and aggregate limits, evaluated against a diverse corpus with independent outcome checks. | Accepted 2026-10-16 after the second review; Stages 1–3 implemented. | [ADR-0003](adr/0003-task-assessment-and-workflow-planning.md) |
 | P26 | Structured control results, concise technical prose, role-specific immutable context packages, bounded additional reads and measured communication efficiency without reducing available audit. | Accepted 2026-10-16 after the second review; Stages 1–3 implemented. | [ADR-0004](adr/0004-agent-communication-and-context-contracts.md) |
 | P27 | Optional runtime-managed delivery from an accepted candidate to an exact verified local feature-branch commit, with source/ref preconditions, environment evidence, recoverable Git operations and commit-specific readiness. | Accepted 2026-10-16 after the second review; Stages 1–3 implemented. | [ADR-0005](adr/0005-verified-feature-branch-delivery.md) |
+| P29 | Windows autonomous authority in a protected LocalService/service-SID Windows Service managed by SCM, with an independent protected interactive Scheduled Task launcher, trusted consent, scoped runtime bootstrap, mutual local IPC and native ownership/recovery contracts. | Accepted architectural direction on 2026-10-20 by explicit user decision, subject to implementation verification. Does not accept the complete ADR-0006 or authorize implementation/installation. | [ADR-0006 Windows direction](adr/0006-time-bounded-autonomy-and-application-lifecycle.md#accepted-windows-architectural-direction) |
 
 ## Open decisions and implementation authorization
 
@@ -106,6 +111,8 @@ D20–D22 record the user's audit, supervision and local bug-reporting requireme
 D23–D25 record the general development workflow, agent communication/context contracts, and verified feature branch delivery requirements. Following the resolution of second-review findings, the user explicitly instructed implementing ADR 3, 4, and 5 on 2026-10-16. P25, P26, and P27 are Accepted. Stages 1–3 are implemented locally with deterministic test fixtures and offline schema validation. Stage 4 evaluation with real providers and quota consumption remains gated under its documented planning estimate (~630–2,500 invocations).
 
 The subsequent request to finish the task authorizes the pending domain-to-engine integration and its local verification. The executable bounded [managed-task compiler](MANAGED_TASKS.md) now uses captured node templates, ordinary attempts and the existing authoring/authorization boundary. It does not claim automatic parallel Map decomposition, real-model efficiency results or completion of the separate client supervision acceptance matrix.
+
+D26–D28 record the 2026-10-20 persistent automatic-approval, unattended lifecycle and Windows trust requirements. The current request authorizes S01–S04 documentation amendments and the separate [second-review resolution](reviews/2026-10-20-adr-0006-second-review-resolution.md), preserving both historical reviews. Original authority survives supported application/service restart in one OS boot; the initial post-reboot profile requires a new verified first-party decision, with no silent reset of consumed task budgets. P29 accepts only the Windows direction; P28 and the complete ADR-0006 remain Proposed. Temporary branch context and concrete verification gates live in [implementation status](adr/0006-implementation-status.md). Documentation neither changes code/Windows configuration nor installs a service/task, activates a session, invokes providers or switches an application.
 
 ## Superseded assumptions
 
