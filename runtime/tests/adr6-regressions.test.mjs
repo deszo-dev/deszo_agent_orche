@@ -425,6 +425,31 @@ test('ADR6-I08 (N07): an exact retry of a committed create-run request returns t
   assert.equal(otherScope.body.code, 'conflict');
 }));
 
+// ---------- Route guard: no run creation route bypasses the host permit ----------
+
+test('ADR6 route guard: in a host-bound runtime a direct run and an approved request need a host permit; pending requests stay pending', () => {
+  const workflow = singleAgent({ id: 'reg-route', context: null });
+  return withRuntime(workflow, {}, async ctx => {
+    const plain = { workflowId: workflow.workflowId, workflowSnapshotSha256: ctx.saved.snapshotSha256, workspaceId: 'main' };
+    // A first-party direct run without a host permit is refused before anything is created.
+    const direct = await ctx.api.call('POST', '/api/v2/runs', { ...plain, requestId: randomUUID() });
+    assert.equal(direct.status, 403);
+    assert.equal(direct.body.code, 'host_permit_required');
+    // An external request without a permit still waits for the user; it creates no run.
+    const pending = await ctx.api.callExternal('POST', '/api/v2/runs', { ...plain, requestId: randomUUID() });
+    assert.equal(pending.body.outcome, 'confirmation_pending');
+    // Approving that pending request is a run creation route too, and is refused without a permit.
+    const approved = await ctx.api.call('POST', `/api/v2/run-requests/${pending.body.requestId}/decision`, { requestId: randomUUID(), decision: 'approve' });
+    assert.equal(approved.status, 403);
+    assert.equal(approved.body.code, 'host_permit_required');
+    // The permitted route still creates and completes its run.
+    const permit = ctx.decide();
+    const created = await ctx.api.callExternal('POST', '/api/v2/runs', ctx.runBody(permit.permitId));
+    assert.equal(created.body.outcome, 'created', JSON.stringify(created));
+    assert.equal((await ctx.api.waitFor(created.body.run.runId)).run.state, 'succeeded');
+  });
+});
+
 // ---------- Enablement gates (ADR6 section 7) ----------
 
 test('Enablement: a production host refuses to start while capabilities are unverified', () => {

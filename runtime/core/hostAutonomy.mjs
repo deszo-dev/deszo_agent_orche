@@ -26,6 +26,12 @@ export function installHostAutonomy(Engine, { ApiError }) {
     return this.hostAuthority;
   };
 
+  // A host-bound runtime creates a run only under a host permit. Direct, chat and approval routes would otherwise run work
+  // that no host decision admitted; pending confirmation requests create no run and stay available.
+  P.refuseUnpermittedRun = function refuseUnpermittedRun(route) {
+    if (this.hostAuthority) throw new ApiError(403, 'host_permit_required', `${route} needs a Local Control Host permit in this host-bound runtime, so the request is refused.`);
+  };
+
   // Asks the host to admit a permit for exactly this request. The host's own decision is compared field by field;
   // the engine never widens it (another workflow revision, workspace or operation is refused).
   P.admitHostPermit = async function admitHostPermit(permitId, expected) {

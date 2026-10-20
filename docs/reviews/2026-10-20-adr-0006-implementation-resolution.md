@@ -24,6 +24,10 @@ Fixture-level results only. These tests use temporary stores, injected launcher/
 | ADR6-I07 replayable registration nonce | N05: replaying the same proof after `verified` allocated a new generation and removed the live one. | The launch proof is **host-generated**, stored as a digest, and consumed in the same transaction that allocates the generation. Registration also requires the live policy, the `launched` operation phase, the host instance and the expected process (and peer, when given). A replay is refused with `proof_consumed` and changes nothing. | `ADR6-I07 (N05)`, `peer that is not the observed process is refused` | None beyond the peer-verifier gate in I02. |
 | ADR6-I08 exact retry blocked | N07: an identical create-run retry returned 403 `permit_settled`, although its receipt existed. | Before admission, an exact replay of a committed `command_receipts` row returns the stored response, with no admission and no charge. A different payload or a different caller scope (command) is refused with 409, as the engine's idempotency rule already did. | `ADR6-I08 (N07)`: same run, no charge, different payload and other caller refused | None. |
 
+## Additional gap closed during implementation (route guard)
+
+While implementing I05 and I08, the engine was found to create runs on three routes that did not pass a host permit: a first-party direct create, the approval of a pending external request, and chat turns. Provider invocations on those runs were still charged, but no host run decision was made, which ADR-0006 forbids. In a host-bound runtime these routes now refuse with `host_permit_required`. Pending confirmation requests still create nothing. Test: `ADR6 route guard` in `adr6-regressions.test.mjs`. The route/credential matrix (gate `routeCredentialMatrix`) remains unpublished, so production autonomy stays disabled.
+
 ## Enablement gates (ADR6 section 7)
 
 - [`capabilities.mjs`](../../runtime/host/capabilities.mjs) lists ten production capabilities. None is recorded as verified, so a `production` host refuses to start (`autonomy_disabled`). `serve` is production by default.

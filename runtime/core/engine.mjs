@@ -711,6 +711,7 @@ export class Engine {
       const saved = this.putWorkflow(CHAT_WORKFLOW, workflow, { kind: 'system' });
       const snapshot = this.store.artifactRow(this.store.get('SELECT snapshot_artifact_id FROM workflows WHERE id = ?', CHAT_WORKFLOW).snapshot_artifact_id);
       if (snapshot.sha256 !== saved.snapshotSha256) throw new Error('Chat snapshot mismatch.');
+      this.refuseUnpermittedRun('A chat turn');
       return this.captureRun({ workflow, snapshot, workspace: this.requireWorkspace(body.workspaceId), kind: 'chat', options: {}, requestId: body.requestId });
     }, () => queueMicrotask(() => this.startRun()));
   }
@@ -788,6 +789,7 @@ export class Engine {
         return { status: 202, body: { outcome: 'confirmation_pending', requestId: body.requestId, statusPath: `/api/v2/run-requests/${body.requestId}` } };
       }
       const workflow = this.store.readJson(snapshot.id);
+      if (!hostAdmitted) this.refuseUnpermittedRun('A run');
       const result = this.captureRun({ workflow, snapshot, workspace, kind: 'workflow', options: { mode: body.mode || 'workflow', targets: body.targets, refreshCaches: body.refreshCaches || [] }, requestId: body.requestId });
       // The observer is armed here, inside the creating transaction and before the queued start.
       if (body.controlGrantId) this.bindControlGrant(body.controlGrantId, { runId: result.body.run.runId, workflowId: body.workflowId, workspaceId: body.workspaceId,
@@ -855,6 +857,7 @@ export class Engine {
         if (snapshot.sha256 !== request.workflow_snapshot_sha256) throw new ApiError(409, 'conflict', 'The saved workflow changed while this request was pending.');
         const workspace = this.requireWorkspace(request.workspace_id);
         if (workspace.cwd_identity !== request.workspace_cwd_identity) throw new ApiError(409, 'conflict', 'The workspace binding changed while this request was pending.');
+        this.refuseUnpermittedRun('Approving a pending run request');
         const result = this.captureRun({ workflow: this.store.readJson(snapshot.id), snapshot, workspace, kind: 'workflow',
           options: { mode: command.mode || 'workflow', targets: command.targets, refreshCaches: command.refreshCaches || [] }, requestId });
         const runId = result.body.run.runId;
