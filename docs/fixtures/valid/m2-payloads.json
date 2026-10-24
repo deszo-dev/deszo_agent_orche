@@ -294,7 +294,8 @@
     "lastSequence": 40,
     "createdAt": "2026-10-13T12:00:00Z",
     "workspaceId": "main",
-    "kind": "workflow"
+    "kind": "workflow",
+    "publishedVersion": null
   },
   "runSnapshot": {
     "run": {
@@ -309,7 +310,8 @@
       "lastSequence": 40,
       "createdAt": "2026-10-13T12:00:00Z",
       "workspaceId": "main",
-      "kind": "workflow"
+      "kind": "workflow",
+      "publishedVersion": null
     },
     "instances": [
       {

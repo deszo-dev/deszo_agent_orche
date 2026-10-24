@@ -20,12 +20,39 @@ export function installedActions({ host, installation, native, queue, installRoo
     const pair = [...host.runtimeRegistrations.entries()].find(([, r]) => r.policyId === policyId && r.ready && r.endpoint);
     requireValue(pair, 'No ready runtime exists for this policy.'); return { generation: pair[0], ...pair[1] };
   }
-  async function http(registration, method, path, body = null, controllerToken = null) {
-    // Endpoint and the external-only token were received from the independently registered Node process.
+  async function http(registration, method, path, body = null, controllerToken = null, { principal = 'owner' } = {}) {
+    // Both credentials arrive over the authenticated Host registration. Public calls use Owner Token;
+    // internal protocol calls use the separate per-Runtime Host credential.
+    const bearer = principal === 'host' ? registration.endpoint.hostToken : registration.endpoint.token;
+    requireValue(typeof bearer === 'string' && /^[a-f0-9]{64}$/.test(bearer), 'The authenticated Runtime credential is unavailable.');
     const response = await request(`http://127.0.0.1:${registration.endpoint.port}${path}`, { method, redirect: 'error', signal: AbortSignal.timeout(30000),
-      headers: { Authorization: `Bearer ${registration.endpoint.token}`, 'Content-Type': 'application/json', ...(controllerToken ? { 'X-Deszo-Controller-Token': controllerToken } : {}) }, body: body === null ? undefined : JSON.stringify(body) });
+      headers: { Authorization: `Bearer ${bearer}`, 'Content-Type': 'application/json', ...(controllerToken ? { 'X-Deszo-Controller-Token': controllerToken } : {}) }, body: body === null ? undefined : JSON.stringify(body) });
     const result = await boundedRuntimeJson(response);
     if (!response.ok) throw new HostError(response.status, result.code || 'runtime_refused', result.message || 'Runtime refused the action.'); return result;
+  }
+  async function resolveRunnablePublication(registration, { workflowId, workflowSnapshotSha256 }) {
+    let cursor = null, selected = null;
+    const seenCursors = new Set();
+    do {
+      const query = new URLSearchParams({ limit: '200' });
+      if (cursor !== null) query.set('cursor', cursor);
+      const page = await http(registration, 'GET', `/api/v4/workflows/${encodeURIComponent(workflowId)}/versions?${query}`);
+      if (!page || !Array.isArray(page.items) || !(page.nextCursor === null || typeof page.nextCursor === 'string'))
+        throw new HostError(502, 'runtime_protocol', 'The Runtime returned an invalid Published Versions page.');
+      for (const publication of page.items) {
+        if (publication?.workflowId !== workflowId || publication.snapshotSha256 !== workflowSnapshotSha256 || publication.runnable !== true) continue;
+        if (!Number.isSafeInteger(publication.version) || publication.version < 1 || typeof publication.publishedVersionId !== 'string' ||
+            !/^[0-9a-f-]{36}$/i.test(publication.publishedVersionId) || !/^[a-f0-9]{64}$/.test(publication.definitionDigest))
+          throw new HostError(502, 'runtime_protocol', 'The Runtime returned an invalid matching Published Version.');
+        if (!selected || publication.version > selected.version) selected = publication;
+      }
+      const next = page.nextCursor;
+      if (next !== null && (!next || seenCursors.has(next))) throw new HostError(502, 'runtime_protocol', 'The Runtime returned a non-advancing Published Versions cursor.');
+      if (next !== null) seenCursors.add(next);
+      cursor = next;
+    } while (cursor !== null);
+    if (!selected) throw new HostError(409, 'published_version_not_found', 'No Runnable Published Version matches the Host-authorized workflow snapshot.');
+    return { publishedVersionId: selected.publishedVersionId, definitionDigest: selected.definitionDigest };
   }
   async function flushIncidents(policyId) {
     let registration; try { registration = runtime(policyId); } catch { return { pending: true, reason: 'no_registered_runtime' }; }
@@ -112,16 +139,17 @@ export function installedActions({ host, installation, native, queue, installRoo
   async function startWorkflow({ connection, policyId, requestId, step, itemId }) {
     const policy = JSON.parse(host.policyRow(policyId).decision_json), registration = runtime(policyId), binding = step.args;
     workspace(policy, binding.workspaceId);
+    const publication = await resolveRunnablePublication(registration, binding);
     const session = await http(registration, 'POST', '/api/v2/controller-sessions', { requestId: derivedUuid(requestId, 'session'), clientLabel: 'Installed Deszo deterministic controller', clientProvider: 'deszo-worker' });
     requireValue(session.controllerToken, 'A lost controller-session credential requires reconciliation.');
     const grant = await http(registration, 'POST', '/api/v2/control-grants', { requestId: derivedUuid(requestId, 'grant'), controllerSessionId: session.controllerSessionId, ...binding, clientProvider: 'deszo-worker', clientVersion: '1',
       requestedActions: ['observe','acknowledge','stop','stop-and-report'], observationDeadlineMs: 30000, escalationDeadlineMs: 90000 }, session.controllerToken);
     const grantPermit = host.decide({ requestId: derivedUuid(requestId, 'grant-permit'), policyId, operation: 'supervision.approve', ...binding, runtimeGeneration: registration.generation, cost: {} }, { connectionId: connection.controller.connectionId });
     requireValue(grantPermit.outcome === 'approved', grantPermit.reason);
-    await http(registration, 'POST', `/api/v2/control-grants/${grant.grantId}/host-approval`, { requestId: derivedUuid(requestId, 'grant-approval'), hostPermitId: grantPermit.permitId });
+    await http(registration, 'POST', `/api/v2/control-grants/${grant.grantId}/host-approval`, { requestId: derivedUuid(requestId, 'grant-approval'), hostPermitId: grantPermit.permitId }, null, { principal: 'host' });
     const permit = host.decide({ requestId: derivedUuid(requestId, 'run-permit'), policyId, operation: 'run.approve', ...binding, runtimeGeneration: registration.generation, cost: {} }, { connectionId: connection.controller.connectionId });
     requireValue(permit.outcome === 'approved', permit.reason);
-    const created = await http(registration, 'POST', '/api/v2/runs', { requestId, ...binding, controlGrantId: grant.grantId, hostPermitId: permit.permitId }, session.controllerToken);
+    const created = await http(registration, 'POST', '/api/v2/runs', { requestId, ...binding, ...publication, controlGrantId: grant.grantId, hostPermitId: permit.permitId }, session.controllerToken, { principal: 'host' });
     requireValue(created.run?.runId && created.outcome === 'created', 'The engine did not create the supervised run.');
     watches.set(itemId, { registration, runId: created.run.runId, controllerToken: session.controllerToken, controllerSessionId: session.controllerSessionId, cursor: 0, policyId });
     return { waiting: true, runId: created.run.runId, runtimeGeneration: registration.generation, grantId: grant.grantId, cursor: 0 };

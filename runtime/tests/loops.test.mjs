@@ -263,7 +263,7 @@ test('a deterministic Condition loop, files, merges, JSON Select, attachments an
   } finally { await api.close(); }
 });
 
-test('a missing input file fails with input_unavailable and a path escape is rejected before running', async () => {
+test('a missing input file fails with input_unavailable and a path escape is refused before Publication or Run admission', async () => {
   const api = await startTestRunner();
   try {
     await api.workspace();
@@ -272,8 +272,16 @@ test('a missing input file fails with input_unavailable and a path escape is rej
       nodes: [{ id: 'files', type: 'file-input', config: { mode: 'files', paths } }, { id: 'view', type: 'result-viewer', config: {} }],
       edges: [{ id: 'e', source: { nodeId: 'files', port: 'value' }, target: { nodeId: 'view', port: 'value' } }], after: [],
     });
-    const escaped = await api.run(base(['../outside.txt'], 'escape'));
-    assert.equal(escaped.status, 422);
+    const escapedWorkflow = base(['../outside.txt'], 'escape');
+    const escapedDraft = await api.save(escapedWorkflow);
+    const persistedEscapedDraft = await api.call('GET', `/api/v4/workflows/${escapedWorkflow.workflowId}/draft`);
+    assert.equal(escapedDraft.validation.valid, false, 'the unsafe path is rejected by Draft validation');
+    assert.equal(api.publication(escapedWorkflow.workflowId), null, 'an invalid workflow has no Runnable Published Version');
+    const escaped = await api.call('POST', '/api/v2/runs', { requestId: randomUUID(), workflowId: escapedWorkflow.workflowId,
+      workflowSnapshotSha256: escapedDraft.snapshotSha256, publishedVersionId: randomUUID(), definitionDigest: persistedEscapedDraft.body.definitionDigest, workspaceId: 'main' });
+    assert.equal(escaped.status, 404);
+    assert.equal(escaped.body.code, 'published_version_not_found');
+    assert.equal(api.runner.engine.store.get('SELECT COUNT(*) AS count FROM runs').count, 0, 'the unpublished unsafe workflow creates no Run');
     const missing = await api.run(base(['missing.txt'], 'missing'));
     const snapshot = await api.waitFor(missing.body.run.runId);
     assert.equal(snapshot.run.state, 'waiting_for_user');

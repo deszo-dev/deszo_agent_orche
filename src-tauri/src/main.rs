@@ -351,18 +351,44 @@ fn bundled_frontend_loaded(app: &tauri::AppHandle) -> bool {
     let Ok(url) = window.url() else { return false; };
     let bundled_origin = (url.scheme() == "tauri" && url.host_str() == Some("localhost"))
         || ((url.scheme() == "http" || url.scheme() == "https") && url.host_str() == Some("tauri.localhost"));
-    bundled_origin && matches!(url.path(), "/" | "/index.html") && url.query().is_none() && url.fragment().is_none()
+    let development_origin = cfg!(debug_assertions) && url.scheme() == "http" && url.port() == Some(1420)
+        && matches!(url.host_str(), Some("localhost" | "127.0.0.1"));
+    let trusted_origin = bundled_origin || development_origin;
+    trusted_origin && matches!(url.path(), "/" | "/index.html") && url.query().is_none() && url.fragment().is_none()
 }
 
-fn connection_for_window(mut connection: Connection, app: &tauri::AppHandle) -> Connection {
-    if !bundled_frontend_loaded(app) {
-        connection.first_party_token = None;
+fn refresh_runner_connection(runner: &mut Runner) -> Result<(), String> {
+    let Some(path) = runner.connection.connection_file.as_ref() else { return Ok(()); };
+    let bytes = fs::read(path).map_err(|error| format!("The Runtime connection descriptor could not be refreshed: {error}"))?;
+    let latest: Connection = serde_json::from_slice(&bytes).map_err(|_| "The Runtime connection descriptor is invalid.".to_string())?;
+    if latest.port != runner.connection.port || latest.store_id != runner.connection.store_id
+        || latest.runtime_instance_id != runner.connection.runtime_instance_id
+        || latest.connection_file.as_deref() != Some(path.as_str())
+        || latest.token.len() != 64 || !latest.token.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err("The Runtime connection descriptor identity changed unexpectedly.".into());
     }
-    connection
+    if latest.token != runner.connection.token {
+        runner.connection.token = latest.token.clone();
+        if runner.connection.first_party_token.is_some() {
+            runner.connection.first_party_token = Some(latest.token);
+        }
+    }
+    Ok(())
+}
+
+fn connection_for_window(mut connection: Connection, app: &tauri::AppHandle) -> Result<Connection, String> {
+    if !bundled_frontend_loaded(app) {
+        return Err("The Runtime Owner Token is available only to the Deszo frontend.".into());
+    }
+    connection.first_party_token = Some(connection.token.clone());
+    Ok(connection)
 }
 
 #[tauri::command]
 fn get_runner_connection(app: tauri::AppHandle, state: tauri::State<RuntimeState>) -> Result<Connection, String> {
+    if !bundled_frontend_loaded(&app) {
+        return Err("The Runtime Owner Token is available only to the Deszo frontend.".into());
+    }
     let shared = state.0.clone();
     let mut guard = shared.lock().map_err(|e| e.to_string())?;
     if let Some(message) = &guard.uncertain {
@@ -370,7 +396,8 @@ fn get_runner_connection(app: tauri::AppHandle, state: tauri::State<RuntimeState
     }
     if let Some(runner) = guard.runner.as_mut() {
         if runner.child.try_wait().map_err(|e| e.to_string())?.is_none() {
-            return Ok(connection_for_window(runner.connection.clone(), &app));
+            refresh_runner_connection(runner)?;
+            return connection_for_window(runner.connection.clone(), &app);
         }
         // Node exited unexpectedly: terminate its owned descendants before a new generation starts.
         if let Err(error) = runner.contain_exit() {
@@ -524,7 +551,7 @@ fn get_runner_connection(app: tauri::AppHandle, state: tauri::State<RuntimeState
     });
     drop(guard);
     supervise(app.clone(), shared, generation);
-    Ok(connection_for_window(connection, &app))
+    connection_for_window(connection, &app)
 }
 
 /// The native launch shim: the development build output, or the copy bundled with the application's runtime.

@@ -85,22 +85,15 @@ const beginHold = async (connection, workspaceId) => {
   writeFileSync(join(workspace.cwd, 'hold.mjs'), holdSource);
   const workflow = singleAgent({ id: `${workspaceId}-${randomUUID().slice(0, 6)}`, provider: 'codex', model: 'gpt-6-luna', context: 'new', timeoutSeconds: 300 });
   workflow.nodes.find(n => n.id === 'request').config.value = 'This is a disposable process-containment pilot. Execute exactly `node hold.mjs` in the current working directory, using your command tool, and wait for it to finish. Do not background it or edit any file. The prepared script starts a child process and records their PIDs. The test controller will deliberately interrupt the runtime. Do not perform other work. Return a short plain-text completion only if the command actually finishes.';
-  const saved = await call(connection, 'PUT', '/api/v3/workflows/' + workflow.workflowId, {
-    requestId: randomUUID(), expectedEtag: null, workflow,
-  }, { 'If-None-Match': '*' });
-  const created = await call(connection, 'POST', '/runs', { workflowId: workflow.workflowId, workflowSnapshotSha256: saved.snapshotSha256, workspaceId, requestId: randomUUID() });
-  let runId;
-  if (created.outcome === 'confirmation_pending') {
-    console.log(JSON.stringify({ phase: 'approval-pending', requestId: created.requestId, workspaceId }));
-    const approved = await wait('approval in the Deszo window', async () => {
-      const request = await call(connection, 'GET', created.statusPath);
-      if (request.state === 'pending') return false;
-      if (request.state !== 'approved' || !request.runId) throw new Error(`Run request ${request.requestId} is ${request.state}${request.problem ? `: ${request.problem.message}` : ''}.`);
-      return request;
-    }, 180);
-    runId = approved.runId;
-  } else if (created.outcome === 'created' && created.run?.runId) runId = created.run.runId;
-  else throw new Error('The runtime returned an unsupported run outcome.');
+  const draft = await call(connection, 'PUT', `/api/v4/workflows/${workflow.workflowId}/draft`, { requestId: randomUUID(), workflow }, { 'If-None-Match': '*' });
+  const validation = await call(connection, 'POST', `/api/v4/workflows/${workflow.workflowId}/draft/validate`, {}, { 'If-Match': draft.etag });
+  assert.equal(validation.validation.valid, true, JSON.stringify(validation.validation.issues));
+  const published = await call(connection, 'POST', `/api/v4/workflows/${workflow.workflowId}/publish`, { requestId: randomUUID() }, { 'If-Match': draft.etag });
+  const created = await call(connection, 'POST', '/runs', { workflowId: workflow.workflowId, publishedVersionId: published.publishedVersionId,
+    definitionDigest: published.definitionDigest, workflowSnapshotSha256: published.snapshotSha256, workspaceId, requestId: randomUUID() });
+  assert.equal(created.outcome, 'created');
+  const runId = created.run?.runId;
+  assert.ok(runId, 'Owner-authorized Run admission returns the created Run directly.');
   console.log(JSON.stringify({ phase: 'live-cli-started', runId, workspaceId, model: 'gpt-6-luna' }));
   const proof = await wait('the real CLI to launch both prepared Node descendants', async () => {
     if (!existsSync(join(workspace.cwd, 'child-ready.json')) || !existsSync(join(workspace.cwd, 'hold-ready.json'))) return false;

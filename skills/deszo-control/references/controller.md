@@ -4,7 +4,9 @@ The checkout's `mcp/controller-client.mjs` is the reusable caller. The applicati
 
 ## Connection
 
-Use the explicit profile and `doctor --build BUILD --live` result. Pin its `selected.storeId` and `selected.bridgeScript`. Do not print the connection descriptor; it contains an external credential.
+**AMD-19/P34 cutover (2026-10-24):** The connection descriptor contains the Runtime Owner Token. It authorizes public operations and proves bearer possession, not a human decision. Internal Host routes require a separate Host credential; an Owner Token does not provide Host provenance. Use the API v4 Draft/Publication tools for new workflows. The legacy `put_workflow` tool only replays an identical committed v3 save receipt; new or changed writes return `410 api_upgrade_required` and are never mapped to Draft saves.
+
+Use the explicit profile and `doctor --build BUILD --live` result. Pin its `selected.storeId` and `selected.bridgeScript`. Do not print the connection descriptor; it contains the Owner Token.
 
 In one persistent `node_repl` session, with `timeout_ms: 55000`:
 
@@ -26,18 +28,17 @@ Do not close or replace a healthy bridge during an active run: controller creden
 
 ## Exact run
 
-1. Read `get_workflow` and `list_workspaces`. For an authorized task revision, validate then `put_workflow` with the live ETag and one stable request ID. Inspect the resulting diff; preserve bindings and limits.
-2. `create_controller_session` returns a public session ID; the bridge retains its credential. Request supervision with `request_control_grant`, the exact workflow snapshot/workspace, `control.clientVersion`, approved actions and explicit business deadlines.
-3. If approval is required, ask the user for the exact grant in Deszo. Verify with `get_control_grant`; replaying an idempotent request can return the original pending receipt.
-4. Submit `start_run` with the grant ID, session ID, exact snapshot/workspace and one stable request ID. If confirmation is pending, verify that same ID with `get_run_request` or `await_run_start`. Never create a second request because a reply was lost.
-5. `await_run_start` (wait <=20 seconds) returns the actual request, initial observation and emergency-preparation result. Check supervised mode and prepare emergency Stop after the native arm if it is not ready yet.
-6. `observe_run` returns a bounded contiguous receipt. Process it; read any required `detailId` ranges in order. Explicitly call `acknowledge_run_observation` with that `observationId`, run/session, exact cursor and a stable ACK request ID. Never process or ACK an unpresented oversized response.
+1. Read `get_workflow` and `get_latest_published_version`. If there is no Draft, use `derive_workflow_draft` with the selected Published Version. Save edits with `put_workflow_draft` using the exact current ETag (or `expectedEtag: null` for the first Draft), validate with `validate_workflow_draft`, and publish with `publish_workflow` using that same ETag. Publication does not start a Run.
+2. Read `list_workspaces` and select an existing workspace. The bridge cannot create one.
+3. For supervised work, `create_controller_session` returns a public session ID while the bridge retains its credential. Request a grant with `request_control_grant`, bound to the exact snapshot of a Runnable Published Version and to the workspace (an unpublished Draft is refused with `409 conflict`), `control.clientVersion`, requested actions and business deadlines. The Owner Token can use the public grant decision endpoint; verify the final grant using `get_control_grant`.
+4. Submit `start_run` with the selected Published Version's exact `publishedVersionId`, `definitionDigest` and `workflowSnapshotSha256`, plus workspace and one stable request ID. Owner-authorized public Runs return `outcome: created` directly. A Host-bound Runtime still requires a real Host permit; never replace that technical precondition with an Owner Token. Reconcile an uncertain response with the same request ID before creating another Run.
+5. `start_run` returns the Run identity. For supervised runs, prepare emergency Stop after the native arm if it is not ready yet. `observe_run` returns a bounded contiguous receipt. Process it; read any required `detailId` ranges in order. Explicitly call `acknowledge_run_observation` with that `observationId`, run/session, exact cursor and a stable ACK request ID. Never process or ACK an unpresented oversized response.
 
 Use current tool schemas for argument names. Business deadlines belong to the approved grant; a 45-second transport timeout does not change them. Reads and live bridge traffic are not semantic acknowledgement. Fetch the next receipt immediately when there is backlog; otherwise use bounded waits and leave routine Developer/Watcher decisions inside their workflow.
 
 ## Recovery and incidents
 
-With the same bridge alive, `get_controller_state` recovers held public sessions, pending requests, receipt cursors and in-flight operations. Replay a pending observation; retry an uncertain ACK with its recorded request ID. Reconcile uncertain writes with `get_command_status` and their original IDs.
+With the same bridge alive, `get_controller_state` recovers held public sessions, legacy pending requests, receipt cursors and in-flight operations. Cutover-denied legacy requests do not start. Replay a pending observation; retry an uncertain ACK with its recorded request ID. Reconcile uncertain writes with `get_command_status` and their original IDs.
 
 A new bridge cannot take over an old grant from public IDs. Reconcile/Stop through the remaining authorized controller or operator path, verify termination and obtain fresh authority for a new run. Do not disable a watchdog or send an invented ACK to cover context loss.
 

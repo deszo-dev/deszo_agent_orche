@@ -21,7 +21,7 @@ export async function executeJudgeReview({host,queue,connection,policyId,request
   if(permit.outcome!=='approved')return {outcome:'failed',reason:permit.reason};
   let invocation,bridge,started=false;
   try {
-    invocation=await runtime.api('POST','/api/v2/judge-invocations',{requestId,judgeSessionId:profile.judgeSessionId,attentionId:attention.attentionId,ownerGeneration:profile.ownerGeneration,hostPermitId:permit.permitId});
+    invocation=await runtime.api('POST','/api/v2/judge-invocations',{requestId,judgeSessionId:profile.judgeSessionId,attentionId:attention.attentionId,ownerGeneration:profile.ownerGeneration,hostPermitId:permit.permitId},{principal:'host'});
     if(invocation.queued){host.settle(permit.permitId,{effect:'not_executed',evidence:'Engine refused a concurrent Judge admission; no model launched.'});return {outcome:'failed',reason:'queued_behind_active_turn'};}
     held();queue.policy(policyId);
     const prompt=[
@@ -31,21 +31,21 @@ export async function executeJudgeReview({host,queue,connection,policyId,request
       'Return the current JudgeDecision JSON schema. Copy subject/revision/digests from the Engine package and evidenceReadIds from actual tool results. Verdict REVISE requests revision; APPROVE reviews the handoff only and never accepts code or releases it.'
     ].join('\n');
     const result=await runtime.adapter.startTurn({registration,prompt,cwd:runtime.cwd,schemaPath:runtime.schemaPath,env:runtime.modelEnvironment(invocation),timeoutMs:Math.min(600000,Date.parse(attention.responseDueAt)-Date.now()),
-      onStarted:async proof=>{held();queue.policy(policyId);await runtime.api('POST',`/api/v2/judge-invocations/${invocation.invocationId}/started`,proof);started=true;}},{signal:runtime.signal});
+      onStarted:async proof=>{held();queue.policy(policyId);await runtime.api('POST',`/api/v2/judge-invocations/${invocation.invocationId}/started`,proof,{principal:'host'});started=true;}},{signal:runtime.signal});
     held();queue.policy(policyId);
     if(!started)throw Object.assign(new Error('No authoritative started milestone was observed.'),{code:'judge_start_unverified'});
-    const reads=await runtime.api('GET',`/api/v2/judge-invocations/${invocation.invocationId}/reads`);
+    const reads=await runtime.api('GET',`/api/v2/judge-invocations/${invocation.invocationId}/reads`,undefined,{principal:'host'});
     const parsed=runtime.adapter.parseResult(result,{registration,attention,invocationId:invocation.invocationId,requiredReadIds:reads.items.filter(x=>x.kind==='package').map(x=>x.id)});
     bridge=await runtime.bridgeForInvocation(invocation);
     const reply=await bridge.call('submit_judge_decision',{decision:parsed.decision});
     if(reply.isError)throw Object.assign(new Error('Engine refused the Judge proposal.'),reply.structuredContent?.error);
     const receipt=reply.structuredContent.data;
-    held();await runtime.api('POST',`/api/v2/judge-invocations/${invocation.invocationId}/complete`,{outcome:'completed',usage:parsed.usage,qualification:parsed.usageQualification});
+    held();await runtime.api('POST',`/api/v2/judge-invocations/${invocation.invocationId}/complete`,{outcome:'completed',usage:parsed.usage,qualification:parsed.usageQualification},{principal:'host'});
     host.audit('judge.decision_recorded',{attentionId:attention.attentionId,invocationId:invocation.invocationId,receiptDigest:canonicalHash(receipt),fixtureAssurance:host.assurance==='fixture'},{policyId});
     return {outcome:'succeeded',attentionId:attention.attentionId,decision:receipt,qualification:host.assurance==='fixture'?'Production Engine/Bridge/Host classes with software/native fixtures; not native/provider E2E.':'Native evidence still determines production acceptance.'};
   }catch(error){
     if(!invocation){const current=host.permitRequest(permit.permitId);if(current.state==='issued')host.settle(permit.permitId,{effect:'not_executed',evidence:'Engine admission failed before launch.'});}
-    else{try{await runtime.api('POST',`/api/v2/judge-invocations/${invocation.invocationId}/complete`,{outcome:'unknown',qualification:`Worker interruption: ${error.code||'error'}; retain charge and reconcile, never replay.`});}catch{/* Host recovery retains unknown charges; no success is inferred. */}}
+    else{try{await runtime.api('POST',`/api/v2/judge-invocations/${invocation.invocationId}/complete`,{outcome:'unknown',qualification:`Worker interruption: ${error.code||'error'}; retain charge and reconcile, never replay.`},{principal:'host'});}catch{/* Host recovery retains unknown charges; no success is inferred. */}}
     host.audit('judge.delivery_reconciliation_required',{attentionId:attention.attentionId,invocationId:invocation?.invocationId??null,code:error.code||'error',retryAllowed:false},{policyId});
     return {outcome:'reconciling',reason:error.code||'judge_delivery_unknown'};
   }finally{await bridge?.close();}

@@ -18,8 +18,9 @@ export async function stage1WorkerFixture(c,{fault=null,onEvidence=null}={}) {
   await writeFile(handshakeConfig,JSON.stringify({mcpServers:{}}));
   await writeFile(settingsPath,JSON.stringify({useG1Credits:false}));let current=null,launches=0;
   const bridgeFor=async(i,worker=false)=>openBridge({script,args:['--connection-file',c.api.runner.connection.connectionFile,'--client-provider',worker?'other':'antigravity',...(!worker?['--working-directory',authoringDirectory,'--mcp-config-path',handshakeConfig]:[]),'--judge-invocation',i.invocationId],env:{...process.env,DESZO_JUDGE_INVOCATION_TOKEN:i.invocationToken,...(worker?{DESZO_JUDGE_WORKER_TOKEN:c.controller.controllerToken}:{})}});
-  const api=async(method,path,body)=>{
-    const r=await c.api.callExternal(method,path,body,{headers:c.headers});
+  const api=async(method,path,body,options={})=>{
+    const request=options.principal==='host'?c.api.callHost:c.api.callExternal;
+    const r=await request(method,path,body,{headers:c.headers});
     if(r.status>=400)throw Object.assign(new Error(r.body.message),{code:r.body.code,status:r.status});return r.body;
   };
   const runtime={registration,cwd:c.api.root,schemaPath:JSON.stringify(schema.$defs.decision),runtimeGeneration:c.engine.hostRuntimeGeneration,api,

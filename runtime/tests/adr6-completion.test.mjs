@@ -19,6 +19,7 @@ import { boundedRuntimeJson } from '../host/runtimeHttp.mjs';
 import { installedActions } from '../host/serviceActions.mjs';
 import { reconcileStoppedPolicy } from '../host/workerReconciliation.mjs';
 import { Engine } from '../core/engine.mjs';
+import { singleAgent, startTestRunner } from './helpers.mjs';
 
 const keyText = key => key.export({ type: 'spki', format: 'der' }).toString('base64');
 function setup({ allowRecovery = false, restarts = 3, repairs = 0 } = {}) {
@@ -65,6 +66,81 @@ test('ADR6 worker rejects injected commands, model/provider changes and unauthor
     assert.deepEqual(c.host.status(c.policyId).used.workerModelCalls, 0);
     assert.equal(validateControllerPlan(plan([checkStep]), c.decision).steps.length, 1);
   } finally { c.host.close(); }
+});
+
+test('ADR6 installed workflow.run binds the newest Runnable Published Version for the Host-authorized snapshot', async () => {
+  const api = await startTestRunner();
+  try {
+    await api.workspace();
+    const workflow = singleAgent({ id: 'host-service-publication-binding', context: null });
+    const saved = await api.save(workflow);
+    const firstPublication = api.publication(workflow.workflowId);
+    const draft = await api.call('GET', `/api/v4/workflows/${workflow.workflowId}/draft`);
+    const second = await api.call('POST', `/api/v4/workflows/${workflow.workflowId}/publish`, { requestId: randomUUID() }, { headers: { 'If-Match': draft.body.etag } });
+    assert.equal(second.status, 201);
+    assert.equal(second.body.snapshotSha256, saved.snapshotSha256);
+    assert.notEqual(second.body.publishedVersionId, firstPublication.publishedVersionId);
+
+    const policyId = 'test-policy', runtimeGeneration = 'test-generation', ownerToken = 'a'.repeat(64), hostToken = 'b'.repeat(64);
+    const decision = { scope: { dataProfile: 'test', workspaces: [{ workspaceId: 'main', cwdIdentity: api.runner.engine.requireWorkspace('main').cwd_identity }] } };
+    const decisions = [], listCursors = [], calls = [];
+    let runRequest = null;
+    const host = {
+      runtimeRegistrations: new Map([[runtimeGeneration, { policyId, ready: { storeId: 'test-store' }, endpoint: { port: 1, token: ownerToken, hostToken } }]]),
+      run: () => ({ changes: 0 }),
+      policyRow: id => { assert.equal(id, policyId); return { decision_json: JSON.stringify(decision) }; },
+      get: (sql, profileId) => {
+        assert.match(sql, /FROM data_profiles/); assert.equal(profileId, 'test');
+        return { profile_path: api.root };
+      },
+      decide: (request, { connectionId }) => {
+        assert.equal(connectionId, 'test-controller');
+        assert.equal(request.workflowId, workflow.workflowId);
+        assert.equal(request.workflowSnapshotSha256, saved.snapshotSha256);
+        decisions.push(request.operation);
+        return { outcome: 'approved', permitId: randomUUID() };
+      },
+    };
+    const response = body => new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    const publications = [
+      { ...firstPublication, version: firstPublication.version, workflowId: workflow.workflowId, snapshotSha256: saved.snapshotSha256, runnable: true },
+      { ...second.body, workflowId: workflow.workflowId, runnable: true },
+    ];
+    const request = async (urlText, init) => {
+      const url = new URL(urlText), authorization = init.headers.Authorization;
+      calls.push({ path: url.pathname, authorization, controllerToken: init.headers['X-Deszo-Controller-Token'] ?? null });
+      if (url.pathname.endsWith('/versions')) {
+        assert.equal(authorization, `Bearer ${ownerToken}`);
+        listCursors.push(url.searchParams.get('cursor'));
+        if (!url.searchParams.has('cursor')) return response({ items: [publications[1]], nextCursor: 'next-page' });
+        assert.equal(url.searchParams.get('cursor'), 'next-page');
+        return response({ items: [publications[0]], nextCursor: null });
+      }
+      if (url.pathname === '/api/v2/controller-sessions') return response({ controllerSessionId: randomUUID(), controllerToken: 'c'.repeat(64) });
+      if (url.pathname === '/api/v2/control-grants') return response({ grantId: randomUUID() });
+      if (url.pathname.endsWith('/host-approval')) return response({ approved: true });
+      if (url.pathname === '/api/v2/runs') {
+        assert.equal(authorization, `Bearer ${hostToken}`);
+        runRequest = JSON.parse(init.body);
+        return response({ outcome: 'created', run: { runId: randomUUID() } });
+      }
+      throw new Error(`Unexpected Host Runtime request: ${init.method} ${url.pathname}`);
+    };
+    const actions = installedActions({ host, installation: {}, native: async () => ({}), queue: {}, installRoot: api.root, request });
+    const result = await actions.execute({ connection: { controller: { connectionId: 'test-controller' } }, policyId, requestId: randomUUID(), itemId: randomUUID(),
+      step: { type: 'workflow.run', args: { workflowId: workflow.workflowId, workflowSnapshotSha256: saved.snapshotSha256, workspaceId: 'main' } } });
+
+    assert.equal(result.waiting, true);
+    assert.equal(listCursors.length, 2, 'the Host resolves the publication across version-list pages');
+    assert.deepEqual(decisions, ['supervision.approve', 'run.approve']);
+    assert.equal(runRequest.publishedVersionId, second.body.publishedVersionId);
+    assert.equal(runRequest.definitionDigest, second.body.definitionDigest);
+    assert.equal(runRequest.workflowSnapshotSha256, saved.snapshotSha256);
+    assert.equal(runRequest.controlGrantId != null, true);
+    assert.equal(runRequest.hostPermitId != null, true);
+    assert.ok(calls.some(call => call.path.endsWith('/host-approval') && call.authorization === `Bearer ${hostToken}`));
+    assert.ok(calls.every(call => call.path.endsWith('/versions') || call.path.endsWith('/host-approval') || call.path === '/api/v2/runs' ? true : call.authorization === `Bearer ${ownerToken}`));
+  } finally { await api.close(); }
 });
 
 test('ADR6 durable queue fences concurrent workers, preserves receipts and never replays an unknown effect', () => {

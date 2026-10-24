@@ -123,9 +123,12 @@ export function installSupervision(Engine, { ApiError }) {
       if (client.testedVersion && body.clientVersion !== client.testedVersion) throw new ApiError(409, 'supervision_unavailable', 'The controller version does not match the measured tool-timeout matrix.');
       if (!this.store.get('SELECT id FROM controller_sessions WHERE id = ?', body.controllerSessionId)) throw new ApiError(404, 'not_found', 'Controller session not found.');
       this.requireControllerCredential(controllerToken, body.controllerSessionId);
-      const workflow = this.store.get('SELECT w.id, a.sha256 AS sha FROM workflows w JOIN artifacts a ON a.id = w.snapshot_artifact_id WHERE w.id = ?', body.workflowId);
-      if (!workflow) throw new ApiError(404, 'not_found', 'Workflow not found.');
-      if (workflow.sha !== body.workflowSnapshotSha256) throw new ApiError(409, 'conflict', 'The saved workflow changed; request supervision for its current revision.');
+      if (!this.store.get('SELECT id FROM workflows WHERE id = ?', body.workflowId)) throw new ApiError(404, 'not_found', 'Workflow not found.');
+      // A grant names a definition that can run, so it must match an exact Runnable Published Version. The mutable Draft
+      // pointer is not an execution identity: an unpublished edit neither grants nor revokes supervision of a published version.
+      if (!this.store.get(`SELECT p.id FROM workflow_publications p JOIN artifacts a ON a.id = p.snapshot_artifact_id
+        WHERE p.workflow_id = ? AND a.sha256 = ? AND p.runnable = 1 LIMIT 1`, body.workflowId, body.workflowSnapshotSha256))
+        throw new ApiError(409, 'conflict', 'The supervised definition is not a Runnable Published Version of this workflow; publish it before requesting supervision.');
       if (!this.store.get('SELECT id FROM workspaces WHERE id = ?', body.workspaceId)) throw new ApiError(404, 'not_found', 'Workspace not found.');
       const grant = { schemaVersion: 1, kind: 'ControlGrant', controllerSessionId: body.controllerSessionId, workflowId: body.workflowId, workflowSnapshotSha256: body.workflowSnapshotSha256,
         workspaceId: body.workspaceId, clientProvider: body.clientProvider, clientVersion: body.clientVersion ?? null, requestedActions: body.requestedActions,
@@ -139,9 +142,8 @@ export function installSupervision(Engine, { ApiError }) {
     });
   };
 
-  // First-party only (enforced by the route table). Approval makes the grant available to one new run.
+  // Public Owner Token authority makes the grant available to one new run.
   P.decideControlGrant = function decideControlGrant(grantId, body, { hostAdmission = null } = {}) {
-    if (this.hostAuthority && body?.decision === 'approve' && !this.isHostAdmission(hostAdmission, hostAdmission?.permitId, 'supervision.approve')) this.refuseHostMutation('Supervision approval');
     contract('controlGrantDecision', body);
     return this.idempotent(`POST /control-grants/${grantId}/decision`, body.requestId, { grantId, ...body }, () => {
       const grant = this.grantRow(grantId);
@@ -258,10 +260,9 @@ export function installSupervision(Engine, { ApiError }) {
     if (!this.stopRequests.has(runId)) void Promise.resolve().then(() => this.supervisor?.releaseRun?.(runId)).catch(() => {});
   };
 
-  // First-party only (route table). The supervisor confirms the new deadline before the runtime reports success, and the
+  // Public Owner Token authority may request a deadline extension. The supervisor confirms the new deadline before the runtime reports success, and the
   // extension is journaled with its request so a retry replays the same answer.
   P.extendEscalation = async function extendEscalation(runId, body) {
-    this.refuseHostMutation('Supervision deadline extension');
     contract('controlExtensionRequest', body);
     const replay = this.store.get('SELECT response_artifact_id FROM command_receipts WHERE request_id = ?', body.requestId);
     if (replay) return { status: 200, body: this.store.readJson(replay.response_artifact_id) };
@@ -532,8 +533,7 @@ export function installSupervision(Engine, { ApiError }) {
     });
   };
 
-  P.triageIncident = function triageIncident(incidentId, body) {
-    this.refuseHostMutation('Incident resolution');
+  P.triageIncident = function triageIncident(incidentId, body, { authority = 'external' } = {}) {
     contract('incidentTriageRequest', body);
     return this.idempotent(`POST /incidents/${incidentId}/triage`, body.requestId, { incidentId, ...body }, () => {
       const incident = this.store.get('SELECT * FROM incidents WHERE id = ?', incidentId);
@@ -542,7 +542,7 @@ export function installSupervision(Engine, { ApiError }) {
       const causeStatus = body.causeStatus ?? incident.cause_status;
       this.store.run('UPDATE incidents SET state = ?, cause_status = ?, updated_at = ? WHERE id = ?', state, causeStatus, nowIso(), incidentId);
       const kind = body.state === 'closed' ? 'closure' : body.causeStatus ? 'cause' : 'triage';
-      const seq = this.appendIncidentUpdate(incidentId, { kind, authority: 'first-party', body: { state, causeStatus, note: body.note ?? null } });
+      const seq = this.appendIncidentUpdate(incidentId, { kind, authority, body: { state, causeStatus, note: body.note ?? null } });
       return { status: 200, body: { incidentId, state, causeStatus, seq } };
     });
   };

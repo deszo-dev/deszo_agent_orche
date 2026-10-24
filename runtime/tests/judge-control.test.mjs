@@ -32,9 +32,12 @@ test('Judge authenticated Engine refuses identity, revision, candidate, evidence
   }finally{await c.close();}
 });
 
-test('Judge scope cannot be registered by external token or used without its separate credentials',async()=>{
+test('a host-bound runtime refuses Judge re-registration even for the Owner Token, and a registered scope still needs its separate credentials',async()=>{
   const c=await stage1Fixture();try{
-    assert.equal((await c.api.callExternal('POST','/api/v2/judge-sessions',c.registration)).status,403);
+    // The fixture binds the Host after its own registration, so this re-registration meets the host-bound trusted-authority refusal.
+    const registered=await c.api.callExternal('POST','/api/v2/judge-sessions',c.registration);
+    assert.equal(registered.status,403,JSON.stringify(registered.body));
+    assert.equal(registered.body.code,'trusted_authority_required');
     assert.equal((await c.api.callExternal('POST','/api/v2/judge-attention',{requestId:randomUUID(),judgeSessionId:c.sessionId,runId:c.runId})).status,403);
     const r=await ready(c),own={'X-Deszo-Judge-Token':r.i.invocationToken};
     assert.equal((await c.api.callExternal('POST','/api/v2/judge-decisions',r.d,{headers:own})).status,403);
@@ -60,12 +63,31 @@ test('Judge registration is disabled by default even for the first-party HTTP ow
   }finally{await api.close();}
 });
 
-test('Judge superseded workflow revision is refused before admission and cannot spend a new model turn',async()=>{
+test('a saved workflow revision does not supersede an admitted Run, so its Judge attention stays admissible',async()=>{
   const c=await stage1Fixture();try{
     const attention=await c.attention();
+    // A saved revision with no publication is an editing event. The Run stays bound to the Published Version it was admitted with.
     c.engine.store.run('UPDATE workflows SET revision=revision+1 WHERE id=?',c.workflow.workflowId);
-    await assert.rejects(()=>c.admit(attention),/judge_request_unavailable/);
+    c.engine.expireJudgeAttention();
+    assert.equal(c.engine.judgeAttentionView(attention.attentionId).state,'pending');
+    const subject=c.engine.judgeSubject(c.runId);
+    assert.equal(subject.currentSnapshotSha256,subject.workflowSnapshotSha256);
+    const invocation=await c.admit(attention);
+    assert.ok(invocation.invocationId);
+    assert.equal(c.engine.store.get('SELECT COUNT(*) AS n FROM judge_invocations').n,1);
+  }finally{await c.close();}
+});
+
+test('an identity mismatch between a Run and its captured definition is refused before admission and spends no model turn',async()=>{
+  const c=await stage1Fixture();try{
+    const attention=await c.attention();
+    // Isolated fixture: the production binding trigger would refuse this corruption, so this disposable store drops it.
+    c.engine.store.db.exec('DROP TRIGGER runs_published_binding_update');
+    const other=c.engine.store.putJson({schemaVersion:1,kind:'IdentityFixture',note:'a captured definition that no publication names'});
+    c.engine.store.run('UPDATE runs SET workflow_snapshot_artifact_id=? WHERE id=?',other.artifactId,c.runId);
+    c.engine.expireJudgeAttention();
     assert.equal(c.engine.judgeAttentionView(attention.attentionId).state,'stale');
+    await assert.rejects(()=>c.admit(attention),/judge_request_unavailable/);
     assert.equal(c.engine.store.get('SELECT COUNT(*) AS n FROM judge_invocations').n,0);
     assert.equal(c.host.status(c.policyId).used.workerModelCalls,0);
     assert.equal(c.engine.hasJudgeBarrier(c.runId),true);
@@ -101,7 +123,7 @@ test('Judge real Bridge exposes scoped evidence tools and worker-only authentica
 test('Judge queue persists the second request and never charges or launches it behind an active turn',async()=>{
   const c=await stage1Fixture();try{
     const first=await ready(c),a2=await c.attention();
-    const queued=await c.api.callExternal('POST','/api/v2/judge-invocations',{requestId:randomUUID(),judgeSessionId:c.sessionId,attentionId:a2.attentionId,ownerGeneration:1,hostPermitId:randomUUID()},{headers:c.headers});
+    const queued=await c.api.callHost('POST','/api/v2/judge-invocations',{requestId:randomUUID(),judgeSessionId:c.sessionId,attentionId:a2.attentionId,ownerGeneration:1,hostPermitId:randomUUID()},{headers:c.headers});
     assert.equal(queued.status,202);assert.equal(c.engine.judgeAttentionView(a2.attentionId).queueReason,'queued_behind_active_turn');
     const due=c.engine.judgeAttentionView(a2.attentionId).responseDueAt;
     c.engine.store.run('UPDATE judge_attention SET created_at=? WHERE id=?',new Date(Date.now()-40000).toISOString(),a2.attentionId);
@@ -139,7 +161,7 @@ test('Judge terminal handoff review and timeout never change the terminal run st
 test('Judge unknown turn retains its charge and prevents blind replay or owner transfer',async()=>{
   const c=await stage1Fixture();try{
     const a=await c.attention(),i=await c.admit(a);await c.started(i);await c.complete(i,'unknown');
-    const a2=await c.attention(),r=await c.api.callExternal('POST','/api/v2/judge-invocations',{requestId:randomUUID(),judgeSessionId:c.sessionId,attentionId:a2.attentionId,ownerGeneration:1,hostPermitId:randomUUID()},{headers:c.headers});
+    const a2=await c.attention(),r=await c.api.callHost('POST','/api/v2/judge-invocations',{requestId:randomUUID(),judgeSessionId:c.sessionId,attentionId:a2.attentionId,ownerGeneration:1,hostPermitId:randomUUID()},{headers:c.headers});
     assert.equal(r.status,202);assert.equal(c.host.status(c.policyId).used.workerModelCalls,1);
     assert.throws(()=>c.engine.fenceJudgeOwner(c.sessionId,{requestId:randomUUID(),controllerSessionId:c.controller.controllerSessionId},{controllerToken:c.controller.controllerToken}),/cannot be changed|reconciled/);
     assert.equal(c.engine.store.get("SELECT state FROM judge_invocations WHERE id=?",i.invocationId).state,'unknown');

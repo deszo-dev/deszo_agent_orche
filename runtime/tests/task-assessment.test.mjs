@@ -378,10 +378,22 @@ function seedExecutionStore(store) {
   const settings = store.putJson({ fixture: 'settings' }).artifactId;
   store.run('INSERT INTO workspaces(id, cwd, cwd_identity, created_at, updated_at) VALUES (?, ?, ?, ?, ?)', 'ws-1', 'C:/fixture', 'c'.repeat(64), nowIso(), nowIso());
   store.run('INSERT INTO workflows(id, snapshot_artifact_id, created_at, updated_at) VALUES (?, ?, ?, ?)', 'wf-1', snapshot, nowIso(), nowIso());
-  store.run(
-    'INSERT INTO runs(id, workflow_id, workspace_id, workflow_snapshot_artifact_id, settings_artifact_id, execution_hash, state, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    runId, 'wf-1', 'ws-1', snapshot, settings, 'a'.repeat(64), 'running', nowIso()
-  );
+  const hasPublications = Boolean(store.get("SELECT name FROM sqlite_master WHERE type='table' AND name='workflow_publications'"));
+  if (hasPublications) {
+    const definitionDigest = 'd'.repeat(64), publicationId = randomUUID();
+    store.run(`INSERT INTO workflow_publications(id,workflow_id,version,snapshot_artifact_id,definition_digest,execution_hash,
+      authority_policy_version,provenance,runnable,validation_json,source_draft_revision,created_at)
+      VALUES(?,?,1,?,?,?,?, 'owner-publication',1,'{}',1,?)`, publicationId, 'wf-1', snapshot, definitionDigest, 'e'.repeat(64),
+    'designated-judge/1', nowIso());
+    store.run(
+      `INSERT INTO runs(id,workflow_id,workspace_id,workflow_snapshot_artifact_id,settings_artifact_id,execution_hash,state,created_at,published_version_id,definition_digest)
+        VALUES(?,?,?,?,?,?,?,?,?,?)`,
+      runId, 'wf-1', 'ws-1', snapshot, settings, 'a'.repeat(64), 'running', nowIso(), publicationId, definitionDigest
+    );
+  } else {
+    store.run('INSERT INTO runs(id, workflow_id, workspace_id, workflow_snapshot_artifact_id, settings_artifact_id, execution_hash, state, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      runId, 'wf-1', 'ws-1', snapshot, settings, 'a'.repeat(64), 'running', nowIso());
+  }
   const assessment = createSampleAssessment({ assessmentRunId: runId });
   store.recordTaskAssessment(assessment);
   const plan = selectExecutionPlan({

@@ -72,46 +72,44 @@ async function withHostBoundCandidate(body) {
   }
 }
 
-// The first-party credential reaches the engine, which refuses with trusted_authority_required. The external credential is
-// refused earlier, at the HTTP role gate (forbidden), for first-party-only routes; both are refusals, neither is a success.
-const CREDENTIALS = [['first-party', 'call', [REFUSED]], ['external', 'callExternal', [REFUSED, 'forbidden']]];
+// Both descriptor names resolve to the same persisted Owner Token after AMD-19.
+const CREDENTIALS = [['owner', 'call'], ['owner-token-alias', 'callExternal']];
 
-for (const [credential, method, acceptable] of CREDENTIALS) {
-  test(`ADR6 route matrix (${credential} credential): settings, workspace and workflow revisions are refused by a host-bound candidate`, () => withHostBoundCandidate(async ({ api, saved, workflow, cwdIdentity }) => {
+for (const [credential, method] of CREDENTIALS) {
+  test(`AMD-19 route matrix (${credential}): Owner Token can manage settings, workspaces, Drafts and Publications on a host-bound runtime`, () => withHostBoundCandidate(async ({ api, saved, workflow }) => {
     const before = api.runner.engine.currentSettings();
     const settings = await api[method]('PUT', '/api/v2/settings', { requestId: randomUUID(), expectedRevision: before.revision, settings: { ...before.settings, externalRunConfirmation: false } });
-    assert.equal(settings.status, 403, JSON.stringify(settings.body));
-    assert.ok(acceptable.includes(settings.body.code), JSON.stringify(settings.body));
-    assert.equal(api.runner.engine.currentSettings().revision, before.revision, 'The stored settings revision is unchanged.');
-    const workspace = await api[method]('PUT', '/api/v2/workspaces/main', { requestId: randomUUID(), cwd: join(tmpdir(), 'elsewhere') });
-    assert.equal(workspace.status, 403, JSON.stringify(workspace.body));
-    assert.ok(acceptable.includes(workspace.body.code), JSON.stringify(workspace.body));
-    assert.equal(api.runner.engine.requireWorkspace('main').cwd_identity, cwdIdentity, 'The workspace directory is unchanged.');
-    const revision = await api[method]('PUT', `/api/v3/workflows/${workflow.workflowId}`, { requestId: randomUUID(), expectedEtag: null, workflow: { ...workflow, name: 'changed by candidate' } }, { headers: { 'If-None-Match': '*' } });
-    assert.ok(acceptable.includes(revision.body.code), JSON.stringify(revision.body));
+    assert.equal(settings.status, 200, JSON.stringify(settings.body));
+    const workspace = await api[method]('PUT', '/api/v2/workspaces/host-candidate-extra', { cwd: join(api.runner.connection.scratchRoot, 'host-candidate-extra') });
+    assert.equal(workspace.status, 200, JSON.stringify(workspace.body));
+    const currentDraft = await api[method]('GET', `/api/v4/workflows/${workflow.workflowId}/draft`);
+    assert.equal(currentDraft.status, 200, JSON.stringify(currentDraft.body));
+    const draft = await api[method]('PUT', `/api/v4/workflows/${workflow.workflowId}/draft`, { requestId: randomUUID(), workflow }, { headers: { 'If-Match': currentDraft.body.etag } });
+    assert.equal(draft.status, 200, JSON.stringify(draft.body));
+    const published = await api[method]('POST', `/api/v4/workflows/${workflow.workflowId}/publish`, { requestId: randomUUID() }, { headers: { 'If-Match': draft.body.etag } });
+    assert.equal(published.status, 201, JSON.stringify(published.body));
     assert.equal(api.runner.engine.store.get('SELECT COUNT(*) AS n FROM workflows WHERE id = ?', workflow.workflowId).n, 1);
     assert.ok(saved.snapshotSha256);
   }));
 
-  test(`ADR6 route matrix (${credential} credential): context acknowledgement and messages, supervision deadline extension and approval are refused`, () => withHostBoundCandidate(async ({ api, workflow }) => {
+  test(`AMD-19 route matrix (${credential}): public handlers authenticate the Owner Token before operation-specific checks`, () => withHostBoundCandidate(async ({ api }) => {
     const binding = randomUUID();
     const acknowledge = await api[method]('POST', `/api/v2/context-bindings/${binding}/acknowledge`, { requestId: randomUUID(), choice: 'keep' });
-    assert.ok(acceptable.includes(acknowledge.body.code), `acknowledge: ${JSON.stringify(acknowledge.body)}: ${JSON.stringify(acknowledge.body)}`);
+    assert.ok(![401, 403].includes(acknowledge.status), `acknowledge: ${JSON.stringify(acknowledge.body)}`);
     const message = await api[method]('POST', `/api/v2/context-bindings/${binding}/messages`, { requestId: randomUUID(), text: 'candidate-authored message' });
-    assert.ok(acceptable.includes(message.body.code), `message: ${JSON.stringify(message.body)}: ${JSON.stringify(message.body)}`);
+    assert.ok(![401, 403].includes(message.status), `message: ${JSON.stringify(message.body)}`);
     const extension = await api[method]('POST', `/api/v2/runs/${randomUUID()}/control-extension`, { requestId: randomUUID(), extensionMs: 60000 });
-    assert.ok(acceptable.includes(extension.body.code), `extension: ${JSON.stringify(extension.body)}: ${JSON.stringify(extension.body)}`);
+    assert.ok(![401, 403].includes(extension.status), `extension: ${JSON.stringify(extension.body)}`);
     const approval = await api[method]('POST', `/api/v2/control-grants/${randomUUID()}/decision`, { requestId: randomUUID(), decision: 'approve' });
-    assert.ok(acceptable.includes(approval.body.code), `grant approval: ${JSON.stringify(approval.body)}: ${JSON.stringify(approval.body)}`);
-    assert.ok(workflow.workflowId);
+    assert.ok(![401, 403].includes(approval.status), `grant approval: ${JSON.stringify(approval.body)}`);
   }));
 
-  test(`ADR6 route matrix (${credential} credential): incident triage, cache pins and recovery retry are refused`, () => withHostBoundCandidate(async ({ api, workflow }) => {
+  test(`AMD-19 route matrix (${credential}): incident, cache and recovery routes are public API routes`, () => withHostBoundCandidate(async ({ api, workflow }) => {
     const triage = await api[method]('POST', `/api/v2/incidents/${randomUUID()}/triage`, { requestId: randomUUID(), decision: 'close' });
-    assert.ok(acceptable.includes(triage.body.code), `triage: ${JSON.stringify(triage.body)}: ${JSON.stringify(triage.body)}`);
+    assert.ok(![401, 403].includes(triage.status), `triage: ${JSON.stringify(triage.body)}`);
     const pin = await api[method]('PUT', `/api/v2/workflows/${workflow.workflowId}/cache-pins/route-pin`, { requestId: randomUUID(), pinned: true });
-    assert.ok(acceptable.includes(pin.body.code), `cache pin: ${JSON.stringify(pin.body)}: ${JSON.stringify(pin.body)}`);
+    assert.ok(![401, 403].includes(pin.status), `cache pin: ${JSON.stringify(pin.body)}`);
     const recovery = await api[method]('POST', `/api/v2/runs/${randomUUID()}/recovery`, { requestId: randomUUID(), action: 'retry', nodeInstanceId: 'agent' });
-    assert.ok(acceptable.includes(recovery.body.code), `recovery retry: ${JSON.stringify(recovery.body)}: ${JSON.stringify(recovery.body)}`);
+    assert.ok(![401, 403].includes(recovery.status), `recovery retry: ${JSON.stringify(recovery.body)}`);
   }));
 }

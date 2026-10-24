@@ -195,13 +195,41 @@ async function main() {
   register('get_template', 'Retrieve a workflow example. Replace its placeholders and validate it before saving.', { templateId: stringId }, input => api('GET', `/api/v3/authoring/templates/${encodeURIComponent(input.templateId)}`));
   register('get_capabilities', 'Inspect installed provider CLI availability and runtime capabilities.', {}, () => api('GET', '/api/v2/capabilities'));
   register('list_workspaces', 'List registered workspaces and their current directory bindings.', { limit: pageLimit }, input => api('GET', `/api/v2/workspaces?limit=${input.limit || 100}`));
-  register('list_workflows', 'List saved workflow IDs, revisions, snapshot hashes, and update times.', { limit: pageLimit, cursor: z.string().optional() }, input => {
+  register('list_workflows', 'List workflow Draft revisions and latest Published Version identities.', { limit: pageLimit, cursor: z.string().optional() }, input => {
     const query = new URLSearchParams({ limit: String(input.limit || 100) }); if (input.cursor) query.set('cursor', input.cursor);
-    return api('GET', `/api/v3/workflows?${query}`);
+    return api('GET', `/api/v4/workflows?${query}`);
   });
-  register('get_workflow', 'Read a saved workflow and its current strong ETag.', { workflowId: stringId }, input => api('GET', `/api/v3/workflows/${encodeURIComponent(input.workflowId)}`));
+  register('get_workflow', 'Read the current editable Draft and its strong ETag. If no Draft exists, call derive_workflow_draft with the exact Published Version before reading again.', { workflowId: stringId }, input => api('GET', `/api/v4/workflows/${encodeURIComponent(input.workflowId)}/draft`));
   register('validate_workflow', 'Return structural and semantic diagnostics without saving or running the candidate.', { workflow: z.unknown() }, input => api('POST', '/api/v3/workflows/validate', { workflow: input.workflow }));
-  register('put_workflow', 'Save a complete workflow candidate using its base ETag and a stable request ID. Use expectedEtag null only for create-only saves.', {
+  register('put_workflow_draft', 'Create or update a persisted Draft using If-None-Match: * or the exact strong ETag from get_workflow. Semantic issues can be inspected but block Publication.', {
+    workflowId: stringId, requestId: z.string().uuid(), expectedEtag: z.string().min(1).nullable(), workflow: z.unknown(),
+  }, input => api('PUT', `/api/v4/workflows/${encodeURIComponent(input.workflowId)}/draft`, { requestId: input.requestId, workflow: input.workflow }, {
+    headers: input.expectedEtag === null ? { 'If-None-Match': '*' } : { 'If-Match': input.expectedEtag },
+  }), true);
+  register('validate_workflow_draft', 'Validate the exact current Draft revision identified by its If-Match ETag.', {
+    workflowId: stringId, expectedEtag: z.string().min(1),
+  }, input => api('POST', `/api/v4/workflows/${encodeURIComponent(input.workflowId)}/draft/validate`, {}, { headers: { 'If-Match': input.expectedEtag } }));
+  register('publish_workflow', 'Publish the exact validated Draft revision identified by If-Match. Publication is atomic and does not start a Run.', {
+    workflowId: stringId, requestId: z.string().uuid(), expectedEtag: z.string().min(1),
+  }, input => api('POST', `/api/v4/workflows/${encodeURIComponent(input.workflowId)}/publish`, { requestId: input.requestId }, { headers: { 'If-Match': input.expectedEtag } }), true);
+  register('derive_workflow_draft', 'Create or replace a Draft from an exact Published Version, using a Draft precondition.', {
+    workflowId: stringId, version: z.number().int().min(1), requestId: z.string().uuid(), expectedEtag: z.string().min(1).nullable(),
+  }, input => api('POST', `/api/v4/workflows/${encodeURIComponent(input.workflowId)}/draft/from/${input.version}`, { requestId: input.requestId }, {
+    headers: input.expectedEtag === null ? { 'If-None-Match': '*' } : { 'If-Match': input.expectedEtag },
+  }), true);
+  register('list_published_versions', 'List immutable Published Version identities for a workflow.', {
+    workflowId: stringId, limit: pageLimit, cursor: z.string().optional(),
+  }, input => {
+    const query = new URLSearchParams({ limit: String(input.limit || 100) }); if (input.cursor) query.set('cursor', input.cursor);
+    return api('GET', `/api/v4/workflows/${encodeURIComponent(input.workflowId)}/versions?${query}`);
+  });
+  register('get_published_version', 'Read an exact immutable Published Version, including its full definition digest and Runnable status.', {
+    workflowId: stringId, version: z.number().int().min(1),
+  }, input => api('GET', `/api/v4/workflows/${encodeURIComponent(input.workflowId)}/versions/${input.version}`));
+  register('get_latest_published_version', 'Resolve and read the latest immutable Published Version for a workflow.', {
+    workflowId: stringId,
+  }, input => api('GET', `/api/v4/workflows/${encodeURIComponent(input.workflowId)}/versions/latest`));
+  register('put_workflow', 'Retired v3 writer. Only an identical already-committed requestId receipt can be replayed; use put_workflow_draft and publish_workflow for new content.', {
     workflowId: stringId, requestId: z.string().uuid(), expectedEtag: z.string().min(1).nullable(), workflow: z.unknown(),
   }, input => api('PUT', `/api/v3/workflows/${encodeURIComponent(input.workflowId)}`, { requestId: input.requestId, expectedEtag: input.expectedEtag, workflow: input.workflow }, {
     headers: input.expectedEtag === null ? { 'If-None-Match': '*' } : { 'If-Match': input.expectedEtag },
@@ -277,7 +305,7 @@ async function main() {
     register('get_controller_state', 'Recover bridge-held session identities, pending run requests and observation/ACK cursors after context loss. Returns no credentials. A restarted bridge holds no old credentials.', {}, () => ({
       sessions: [...controllerSessions.values()], ...observer.state(),
     }));
-    register('await_run_start', 'Wait at most 20 seconds for a tracked pending approval. When a run appears, return its first bounded observation and prepare emergency Stop. Never acknowledges or starts another run.', {
+    register('await_run_start', 'Wait at most 20 seconds for a tracked run start. When a run appears, return its first bounded observation and prepare emergency Stop. Never acknowledges or starts another run.', {
       requestId: z.string().uuid(), waitMs: z.number().int().min(0).max(MAX_WATCH_WAIT_MS).optional(),
     }, input => observer.awaitStart(input));
     register('observe_run', 'Read the next bounded contiguous journal batch from the acknowledged cursor. Includes watchdog timing and an observationId for a separate explicit ACK. A pending observation is replayed until acknowledged; a later snapshot cannot advance its cursor.', {
@@ -289,8 +317,9 @@ async function main() {
       observationId: z.string().uuid(), detailId: z.string().uuid(), offset: z.number().int().nonnegative().optional(),
       length: z.number().int().min(4).max(2048).optional(),
     }, input => observer.readDetail(input));
-    register('start_run', 'Request execution of the exact saved workflow snapshot in an explicit workspace. This submits an external request; confirmation policy may leave it pending for approval in Deszo. A supervised run needs an approved controlGrantId bound at creation.', {
-      workflowId: stringId, workflowSnapshotSha256: z.string().regex(/^[0-9a-f]{64}$/i), workspaceId: stringId, requestId: z.string().uuid(),
+    register('start_run', 'Start the exact Runnable Published Version in an explicit workspace. Supply its publishedVersionId, full definitionDigest, and snapshot digest. A supervised run needs an approved controlGrantId bound at creation.', {
+      workflowId: stringId, publishedVersionId: z.string().uuid(), definitionDigest: z.string().regex(/^[0-9a-f]{64}$/i),
+      workflowSnapshotSha256: z.string().regex(/^[0-9a-f]{64}$/i), workspaceId: stringId, requestId: z.string().uuid(),
       mode: z.enum(['workflow', 'branch', 'node']).optional(), targets: z.array(stringId).optional(), refreshCaches: z.array(stringId).optional(),
       controlGrantId: z.string().uuid().optional(), controllerSessionId: z.string().uuid().optional(),
     }, async input => {
@@ -311,7 +340,7 @@ async function main() {
       controllerSessions.set(created.controllerSessionId, { ...created, credentialHeldByBridge: controllerTokens.has(created.controllerSessionId) });
       return { ...created, credentialHeldByBridge: Boolean(controllerToken) };
     }, true);
-    register('request_control_grant', 'Request a supervision grant for one workflow revision and workspace. A first-party user approves it in Deszo. Refused with supervision_unavailable where containment or the client matrix is unverified.', {
+    register('request_control_grant', 'Request a supervision grant for one Runnable Published Version snapshot and workspace; an unpublished Draft is refused. The operator approves it in Deszo. Refused with supervision_unavailable where containment or the client matrix is unverified.', {
       requestId: z.string().uuid(), controllerSessionId: z.string().uuid(), workflowId: stringId, workflowSnapshotSha256: z.string().regex(/^[0-9a-f]{64}$/i),
       workspaceId: stringId, clientProvider: z.enum(['codex', 'claude', 'antigravity', 'other']), clientVersion: z.string().min(1).max(80).optional(),
       requestedActions: z.array(z.enum(['observe', 'acknowledge', 'stop', 'stop-and-report', 'scoped-stop', 'retry', 'recover'])).min(1),

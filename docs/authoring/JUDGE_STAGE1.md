@@ -9,7 +9,7 @@ This is an opt-in implementation of a **handoff review**, using the existing Eng
 
 `startRunner({ judgeAttentionEnabled: true })` is an explicit owner-selected runtime option, default `false`. There is no persisted setting, CLI switch or global rollout. Migration [m13](../storage/m13.sql) is append-only; earlier migrations are unchanged by this slice. Having the tables is not invocation authority.
 
-Judge registration uses an existing hashed-credential `controller_sessions` identity. Registration and owner transfer require the first-party HTTP role and are refused in a Host-bound candidate by `refuseHostMutation`. Stage 1 therefore cannot register an installed protected runtime autonomously. The disposable component tests register before attaching their explicit software Host fixture. They do not simulate human consent against an installed Host.
+Judge registration uses an existing hashed-credential `controller_sessions` identity. Registration and owner transfer require the Owner Token on their public routes and are refused in a Host-bound candidate by `refuseHostMutation`. *Superseded wording: the original "first-party HTTP role" requirement was replaced by the AMD-19 Owner Token route (2026-10-24). The host-bound refusal is a retained trusted-authority invariant, not a first-party/external distinction, so it still applies.* Stage 1 therefore cannot register an installed protected runtime autonomously. The disposable component tests register before attaching their explicit software Host fixture. They do not simulate human consent against an installed Host.
 
 The strict [registration and decision schema](../schemas/judge-control.schema.json) captures Antigravity, `gemini-3.8-flash-high`, explicit `high`, a dedicated native conversation, `subscription_only`, finite expiry of at most one hour, and one to three Judge invocations. The Host separately signs `scope.judgeProfile` and owns the shared budgets. IDs identify records; hashed controller and scoped invocation credentials authorize operations. Provider output is always an untrusted proposal.
 
@@ -19,7 +19,7 @@ All routes retain the runtime bearer check. These additional rights are cumulati
 
 | Route | Required additional authority | Result |
 | --- | --- | --- |
-| `POST /api/v2/judge-sessions` | First-party, runtime feature flag, no Host-bound mutation | Registration receipt; `productionDeliveryEnabled: false` |
+| `POST /api/v2/judge-sessions` | Owner Token (public route; first-party wording superseded by AMD-19), runtime feature flag, no Host-bound mutation | Registration receipt; `productionDeliveryEnabled: false`; host-bound refusal `trusted_authority_required` |
 | `POST /api/v2/judge-attention` | Registered controller credential, captured run/revision | Durable pinned request/package and dispatch barrier in one transaction |
 | `GET /api/v2/judge-sessions/:id/attention` | Same controller, current runtime registration | Bounded queue view; expiry is reconciled |
 | `POST /api/v2/judge-sessions/:id/owner` | First-party plus current controller; no Host binding or unreconciled invocation | Explicit generation fence only; no native custody claim |

@@ -111,10 +111,13 @@ try {
   // Prepared pilot tooling, excluded from the project's captured base and every task output.
   const roles = workflow.nodes.find(n => n.id === 'delivery').config.body.nodes.find(n => n.type === 'map').config.roles;
   writeFileSync(join(workspace.cwd, '.pilot-validate.mjs'), pilotValidatorSource(roles));
-  const saved = await api('PUT', '/api/v3/workflows/' + workflow.workflowId, { requestId: randomUUID(), expectedEtag: null, workflow }, { 'If-None-Match': '*' });
-  save('saved-workflow.json', saved);
-  const created = await api('POST', '/api/v2/runs', { workflowId: workflow.workflowId, workflowSnapshotSha256: saved.snapshotSha256, workspaceId: 'pilot', requestId: randomUUID() });
-  if (created.outcome === 'confirmation_pending') throw new Error(`Run request ${created.requestId} is pending; this isolated pilot launcher expected first-party direct execution.`);
+  const draft = await api('PUT', `/api/v4/workflows/${workflow.workflowId}/draft`, { requestId: randomUUID(), workflow }, { 'If-None-Match': '*' });
+  const validation = await api('POST', `/api/v4/workflows/${workflow.workflowId}/draft/validate`, {}, { 'If-Match': draft.etag });
+  if (!validation.validation.valid) throw new Error(`Workflow invalid: ${JSON.stringify(validation.validation.issues)}`);
+  const published = await api('POST', `/api/v4/workflows/${workflow.workflowId}/publish`, { requestId: randomUUID() }, { 'If-Match': draft.etag });
+  save('saved-workflow.json', published);
+  const created = await api('POST', '/api/v2/runs', { workflowId: workflow.workflowId, publishedVersionId: published.publishedVersionId,
+    definitionDigest: published.definitionDigest, workflowSnapshotSha256: published.snapshotSha256, workspaceId: 'pilot', requestId: randomUUID() });
   if (created.outcome !== 'created' || !created.run?.runId) throw new Error('The runtime returned an unsupported run outcome.');
   runId = created.run.runId;
   if (process.argv.includes('--controller-stdin')) {

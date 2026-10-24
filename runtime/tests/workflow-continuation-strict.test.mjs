@@ -8,8 +8,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import net from 'node:net';
 import { join, resolve } from 'node:path';
-import { randomUUID, createHash } from 'node:crypto';
+import { randomUUID, randomBytes, createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
 
@@ -19,10 +20,19 @@ const OBSERVATION_MS = 3_000;
 const CANDIDATE_DIGEST = createHash('sha256').update('deszo-self-repair synthetic candidate v1').digest('hex');
 const CHECKPOINT_ID = 'chk-self-repair-7';
 
-async function startEngine(root, fixtureState) {
+async function startEngine(root, fixtureState, lifecycleHost, generation, buildId) {
   const child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', 'runtime/runner.mjs', '--root', root,
     '--fixture-state', fixtureState, '--first-party-token-stdout', '--dev-test-confirmation-off'],
-  { cwd: repo, stdio: ['pipe', 'pipe', 'inherit'], env: { ...process.env } });
+  { cwd: repo, stdio: ['pipe', 'pipe', 'inherit'], env: { ...process.env,
+    DESZO_LIFECYCLE_HOST_ADDRESS: lifecycleHost.address,
+    DESZO_LIFECYCLE_HOST_CAPABILITY: lifecycleHost.capability,
+    DESZO_LIFECYCLE_INSTALLATION_ID: lifecycleHost.installationId,
+    DESZO_LIFECYCLE_PROFILE_ROOT: root,
+    DESZO_LIFECYCLE_GENERATION: generation,
+    DESZO_APPLICATION_BUILD_ID: buildId,
+    DESZO_LIFECYCLE_APPLICATION_PID: 'self',
+    DESZO_TEST_DUPLICATE_LIFECYCLE_RECEIPT: '0',
+  } });
   const connection = await new Promise((done, fail) => {
     let buffer = '';
     const onData = chunk => {
@@ -51,6 +61,55 @@ async function startEngine(root, fixtureState) {
     try { child.stdin.write(`${JSON.stringify({ command: 'shutdown' })}\n`); } catch { clearTimeout(timer); done(); }
   });
   return { pid: child.pid, connection, call, stop, http, exited: () => child.exitCode !== null };
+}
+
+async function startLifecycleTestHost(profileRoot) {
+  const capability = randomBytes(32).toString('hex');
+  const state = { activationRequest: null, receiptDelivered: false, receiptAcknowledged: false, receipt: null };
+  const server = net.createServer(socket => {
+    let buffer = '';
+    socket.on('data', chunk => {
+      buffer += chunk.toString('utf8');
+      const newline = buffer.indexOf('\n');
+      if (newline < 0) return;
+      let result = {};
+      try {
+        const message = JSON.parse(buffer.slice(0, newline));
+        if (message.capability !== capability) throw new Error('invalid fixture capability');
+        if (message.command === 'lifecycle.activate_candidate') {
+          state.activationRequest = message.payload;
+          result = { accepted: true };
+        } else if (message.command === 'engine.ready' && state.activationRequest && !state.receiptDelivered) {
+          const request = state.activationRequest, ready = message.payload;
+          state.receipt = {
+            operationId: request.operationId, receiptId: randomUUID(), installationId: request.installationId,
+            profileRoot: request.profileRoot, candidateId: request.candidateId, candidateDigest: request.candidateDigest,
+            previousGeneration: request.expectedGeneration, activatedGeneration: ready.generation,
+            enginePid: ready.pid, applicationPid: ready.applicationPid, applicationBuildId: ready.applicationBuildId,
+            runtimeInstanceId: ready.runtimeInstanceId, storeId: ready.storeId, actualActivation: true,
+            applicationResponsive: true, engineReady: true,
+          };
+          state.receiptDelivered = true;
+          result = { receipt: state.receipt };
+        } else if (message.command === 'lifecycle.receipt_ack') {
+          state.receiptAcknowledged = message.payload.receiptId === state.receipt?.receiptId;
+        } else if (message.command !== 'engine.ready') throw new Error(`unexpected fixture command: ${message.command}`);
+        socket.end(`${JSON.stringify({ ok: true, result })}\n`);
+      } catch (error) { socket.end(`${JSON.stringify({ ok: false, error: error.message })}\n`); }
+    });
+  });
+  await new Promise((resolvePromise, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolvePromise); });
+  const address = `127.0.0.1:${server.address().port}`;
+  return {
+    address, capability, installationId: randomUUID(), state,
+    async waitForActivation(timeoutMs = 5_000) {
+      const started = Date.now();
+      while (!state.activationRequest && Date.now() - started < timeoutMs) await new Promise(done => setTimeout(done, 25));
+      assert.ok(state.activationRequest, 'the Engine sent the Judge-authorized lifecycle operation over the private Host channel');
+      return state.activationRequest;
+    },
+    close: () => new Promise(resolvePromise => server.close(resolvePromise)),
+  };
 }
 
 function workflow(workflowId, nodes, edges) {
@@ -115,9 +174,10 @@ async function scenario() {
   const harness = [];
   const mark = (origin, what, detail = {}) => harness.push({ at: new Date().toISOString(), origin, what, ...detail });
   let engineA, engineB, engineC;
+  const lifecycleHost = await startLifecycleTestHost(root);
   try {
     // ---- Phase A: Engine A starts the parent and suspends it for repair through the Engine's own route ----
-    engineA = await startEngine(root, fixtureState);
+    engineA = await startEngine(root, fixtureState, lifecycleHost, 'generation-a', 'build-a');
     mark('HOST_HARNESS', 'engine_a_started', { pid: engineA.pid });
     for (const id of ['main', 'main-repair']) {
       const workspace = await engineA.call('PUT', `/api/v2/workspaces/${id}`, { cwd: join(engineA.connection.scratchRoot, id) });
@@ -126,13 +186,19 @@ async function scenario() {
     // The candidate identity is saved in the repair workspace, where the repair's Judge reads it.
     await writeFile(join(engineA.connection.scratchRoot, 'main-repair', 'candidate.json'), JSON.stringify({ candidateDigest: CANDIDATE_DIGEST, continuationCheckpointId: CHECKPOINT_ID }));
     const save = async wf => {
-      const saved = await engineA.call('PUT', `/api/v3/workflows/${wf.workflowId}`, { requestId: randomUUID(), expectedEtag: null, workflow: wf }, { 'If-None-Match': '*' });
-      assert.equal(saved.status, 200, JSON.stringify(saved.body));
-      return saved.body;
+      const draft = await engineA.call('PUT', `/api/v4/workflows/${wf.workflowId}/draft`, { requestId: randomUUID(), workflow: wf }, { 'If-None-Match': '*' });
+      assert.equal(draft.status, 200, JSON.stringify(draft.body));
+      const validation = await engineA.call('POST', `/api/v4/workflows/${wf.workflowId}/draft/validate`, {}, { 'If-Match': draft.body.etag });
+      assert.equal(validation.status, 200, JSON.stringify(validation.body));
+      assert.equal(validation.body.validation.valid, true, JSON.stringify(validation.body.validation));
+      const published = await engineA.call('POST', `/api/v4/workflows/${wf.workflowId}/publish`, { requestId: randomUUID() }, { 'If-Match': draft.body.etag });
+      assert.equal(published.status, 201, JSON.stringify(published.body));
+      return published.body;
     };
     const parent = await save(parentWorkflow());
     const repair = await save(repairWorkflow());
-    const parentStart = await engineA.call('POST', '/api/v2/runs', { workflowId: parent.workflow.workflowId, workflowSnapshotSha256: parent.snapshotSha256, workspaceId: 'main', requestId: randomUUID() });
+    const parentStart = await engineA.call('POST', '/api/v2/runs', { workflowId: parent.workflow.workflowId, workflowSnapshotSha256: parent.snapshotSha256,
+      publishedVersionId: parent.publishedVersionId, definitionDigest: parent.definitionDigest, workspaceId: 'main', requestId: randomUUID() });
     assert.equal(parentStart.status, 202, JSON.stringify(parentStart.body));
     const parentRunId = parentStart.body.run.runId;
     mark('TEST_HARNESS', 'parent_run_requested', { runId: parentRunId, workspace: 'main' });
@@ -151,13 +217,15 @@ async function scenario() {
     assert.equal(repairAtGate.instances.find(item => item.nodeId === 'finalize').state, 'scheduled', 'the final node waits for the lifecycle receipt');
     // The parent is also suspended, and it still occupies workspace main; the one-active-run index is the authority.
     assert.equal((await engineA.call('GET', `/api/v2/runs/${parentRunId}`)).body.run.state, 'waiting_for_user');
-    const conflict = await engineA.call('POST', '/api/v2/runs', { workflowId: parent.workflow.workflowId, workflowSnapshotSha256: parent.snapshotSha256, workspaceId: 'main', requestId: randomUUID() });
+    const conflict = await engineA.call('POST', '/api/v2/runs', { workflowId: parent.workflow.workflowId, workflowSnapshotSha256: parent.snapshotSha256,
+      publishedVersionId: parent.publishedVersionId, definitionDigest: parent.definitionDigest, workspaceId: 'main', requestId: randomUUID() });
     assert.equal(conflict.status, 409, 'a second run in the suspended parent workspace is refused');
     mark('TEST_HARNESS', 'conflicting_run_in_parent_workspace_refused', { status: conflict.status });
 
     const beforeStop = storeView(dbPath);
     const operation = beforeStop.operations.find(item => item.run_id === repairRunId);
     assert.ok(operation && operation.state === 'intent', 'the Judge proposal is a durable lifecycle intent');
+    await lifecycleHost.waitForActivation();
     mark('ENGINE', 'judge_lifecycle_intent_recorded', { runId: repairRunId, operationId: operation.id, candidateDigest: operation.candidate_digest });
     const invocationsBeforeStop = providerInvocations(beforeStop);
 
@@ -166,7 +234,7 @@ async function scenario() {
     await engineA.stop();
     mark('HOST_HARNESS', 'engine_a_stopped', { pid: pidA });
     assert.ok(engineA.exited(), 'Engine A has terminated');
-    engineB = await startEngine(root, fixtureState);
+    engineB = await startEngine(root, fixtureState, lifecycleHost, 'generation-b', 'build-b');
     mark('HOST_HARNESS', 'engine_b_started', { pid: engineB.pid });
     const afterStartup = storeView(dbPath);
 
@@ -179,13 +247,7 @@ async function scenario() {
       await new Promise(done => setTimeout(done, 250));
     }
     const duringObservation = storeView(dbPath);
-    mark('ENGINE', 'observation_before_receipt', { parent: runState(duringObservation, parentRunId), repair: runState(duringObservation, repairRunId) });
-
-    // ---- Phase D: the Host delivers the verified lifecycle receipt through the Engine's receipt route. This is the only mutation. ----
-    const receiptId = randomUUID();
-    const receipt = await engineB.call('POST', `/api/v2/runs/${repairRunId}/lifecycle-receipt`, { requestId: randomUUID(), operationId: operation.id, candidateDigest: CANDIDATE_DIGEST, outcome: 'verified', receiptId });
-    assert.equal(receipt.status, 200, JSON.stringify(receipt.body));
-    mark('HOST_HARNESS', 'lifecycle_receipt_delivered', { operationId: operation.id, receiptId, status: receipt.status });
+    mark('HOST_FIXTURE', 'authenticated_receipt_delivered_during_engine_ready', { operationId: operation.id, receiptId: lifecycleHost.state.receipt?.receiptId });
 
     // ---- Phase E: observe the Engine finish the repair and resume the parent on its own ----
     const repairDone = await waitFor(engineB, repairRunId, body => body.run.state === 'succeeded', 30_000);
@@ -197,7 +259,7 @@ async function scenario() {
     const beforeSecondRestart = storeView(dbPath);
     await engineB.stop();
     mark('HOST_HARNESS', 'engine_b_stopped', { pid: engineB.pid });
-    engineC = await startEngine(root, fixtureState);
+    engineC = await startEngine(root, fixtureState, lifecycleHost, 'generation-b', 'build-b');
     mark('HOST_HARNESS', 'engine_c_started', { pid: engineC.pid });
     await new Promise(done => setTimeout(done, OBSERVATION_MS));
     const finalView = storeView(dbPath);
@@ -206,12 +268,14 @@ async function scenario() {
     mark('ENGINE', 'final_observation', { parent: finalParent.run.state, repair: finalRepair.run.state });
 
     observation = { root, pids: { a: pidA, b: engineB.pid, c: engineC.pid }, parentRunId, repairRunId, operation, parentPaused, repairAtGate,
-      beforeStop, afterStartup, duringObservation, afterCompletion, beforeSecondRestart, finalView, invocationsBeforeStop, link: link.body, harness, http: [...engineA.http, ...engineB.http, ...engineC.http], receiptHttp: receipt.status };
+      beforeStop, afterStartup, duringObservation, afterCompletion, beforeSecondRestart, finalView, invocationsBeforeStop, link: link.body, harness,
+      http: [...engineA.http, ...engineB.http, ...engineC.http], lifecycleHost: lifecycleHost.state };
     return observation;
   } finally {
     if (engineA) await engineA.stop();
     if (engineB) await engineB.stop();
     if (engineC) await engineC.stop();
+    await lifecycleHost.close();
     if (process.env.DESZO_KEEP_STRICT_TRACE && observation) {
       const journal = observation.finalView.journal.map(event => ({ at: event.at, runId: event.runId, sequence: event.sequence, type: event.type,
         nodeInstanceId: event.nodeInstanceId, attemptId: event.attemptId, origin: event.payload?.origin ?? 'ENGINE', payload: event.payload }));
@@ -238,9 +302,10 @@ test('STRICT-CONT: Engine B completes the linked repair and resumes the parent w
   assert.equal(runState(o.beforeStop, o.parentRunId), 'waiting_for_user');
   assert.ok(o.beforeStop.runs.filter(run => run.workspace_id === 'main' && ['queued', 'running', 'draining', 'waiting_for_user', 'stopping'].includes(run.state)).length === 1);
 
-  // ECONT-05: Engine B discovered the held runs from durable state alone (startup reconciliation), without any harness call.
-  assert.equal(runState(o.duringObservation, o.repairRunId), 'waiting_for_user', 'the repair stays held until the receipt');
-  assert.equal(runState(o.duringObservation, o.parentRunId), 'waiting_for_user', 'the parent stays suspended until the repair completes');
+  // ECONT-05: Engine B discovered the held runs from durable state and consumed the Host receipt at startup.
+  assert.ok(o.lifecycleHost.receiptDelivered && o.lifecycleHost.receiptAcknowledged, 'the private Host channel delivered and acknowledged the receipt');
+  assert.equal(o.afterStartup.operations.find(item => item.id === o.operation.id).state, 'verified');
+  assert.ok(o.afterStartup.journal.some(event => event.type === 'continuation.lifecycle_verified' && event.payload.origin === 'HOST_RECEIPT'), 'the Host receipt is recorded as Host evidence');
   assert.ok(o.afterCompletion.journal.some(event => event.type === 'continuation.reconciled' && event.runId === o.repairRunId && event.payload.origin === 'ENGINE'), 'Engine B reconciled the repair at startup');
   assert.ok(o.afterCompletion.journal.some(event => event.type === 'continuation.reconciled' && event.runId === o.parentRunId && event.payload.origin === 'ENGINE'), 'Engine B reconciled the parent at startup');
 
@@ -272,10 +337,9 @@ test('STRICT-CONT: Engine B completes the linked repair and resumes the parent w
   assert.equal(o.finalView.journal.filter(event => event.type === 'continuation.parent_resumed').length, 1, 'the parent was resumed exactly once');
   assert.equal(o.finalView.links.find(item => item.id === link.id).state, 'resumed');
 
-  // ECONT-13: no external user answer was needed. The only input after restart is the Host receipt, a verified outcome.
+  // ECONT-13: no external user answer or public HTTP mutation was needed after restart; the private Host channel carried the receipt.
   const afterRestartMutations = o.http.filter(entry => entry.pid === o.pids.b || entry.pid === o.pids.c).filter(entry => entry.method !== 'GET');
-  assert.deepEqual(afterRestartMutations.map(entry => `${entry.method} ${entry.path.replace(/[0-9a-f-]{36}/g, '<id>')}`), ['POST /api/v2/runs/<id>/lifecycle-receipt'],
-    'the harness made exactly one mutating call after restart: the Host receipt');
+  assert.deepEqual(afterRestartMutations, [], 'the harness made no mutating HTTP call after restart');
   assert.ok(!o.http.filter(entry => entry.pid === o.pids.b || entry.pid === o.pids.c).some(entry => entry.path.endsWith('/recovery') || entry.path.endsWith('/linked-repair') || (entry.method === 'POST' && entry.path === '/api/v2/runs')),
     'no recovery, linked repair or run creation was called after restart');
 

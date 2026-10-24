@@ -39,15 +39,25 @@ export function installJudgeAttention(Engine, { ApiError }) {
     if (active && (row.state !== 'active' || Date.parse(row.expires_at) <= Date.now())) fail('judge_authority_expired', 'Judge authority is expired or fenced.', 403);
     return row;
   };
+  // Run-scoped identity. A Run is judged against the Published Version it is bound to; a Run that predates the binding
+  // is accepted only when its captured definition exactly equals a Published Version of its own workflow. The mutable
+  // Draft pointer and later publications are never consulted, so editing or publishing cannot make an admitted Run stale.
+  P.runPublicationIdentity = function (run, capturedSha256) {
+    const select = 'SELECT p.id, p.version, p.workflow_id, a.sha256 AS snapshot_sha256 FROM workflow_publications p JOIN artifacts a ON a.id = p.snapshot_artifact_id';
+    if (run.published_version_id) return this.store.get(`${select} WHERE p.id = ? AND p.workflow_id = ?`, run.published_version_id, run.workflow_id) ?? null;
+    return this.store.get(`${select} WHERE p.workflow_id = ? AND a.sha256 = ? ORDER BY p.version DESC LIMIT 1`, run.workflow_id, capturedSha256) ?? null;
+  };
   P.judgeSubject = function (runId) {
     const snapshot = this.runSnapshot(runId), run = this.requireRun(runId);
-    const saved = this.store.get('SELECT revision,snapshot_artifact_id FROM workflows WHERE id=?', run.workflow_id);
     const workflowSnapshotSha256 = this.store.artifactRow(run.workflow_snapshot_artifact_id).sha256;
+    const identity = this.runPublicationIdentity(run, workflowSnapshotSha256);
     return { runId, state:run.state, workflowId:run.workflow_id, workspaceId:run.workspace_id,
-      workflowRevision:saved.revision, workflowSnapshotSha256,
-      currentSnapshotSha256:this.store.artifactRow(saved.snapshot_artifact_id).sha256,
+      workflowRevision:identity?.version ?? null, workflowSnapshotSha256,
+      currentSnapshotSha256:identity?.snapshot_sha256 ?? null,
       outputs:snapshot.instances.map(x=>({nodeInstanceId:x.nodeInstanceId,state:x.state,outputs:x.outputs})), candidateDigest:'' };
   };
+  // A host-bound candidate never establishes Judge authority itself: registration is a trusted procedure (JUDGE_STAGE1.md).
+  // Owner Token authority covers the public route, but this internal check still refuses the mutation in host-bound mode.
   P.registerJudgeSession = function (body) {
     this.requireJudgeEnabled(); this.refuseHostMutation('Judge registration'); contract('registration', body);
     if (Date.parse(body.expiresAt) <= Date.now() || Date.parse(body.expiresAt) > Date.now()+3_600_000) fail('invalid_judge_expiry','Stage 1 authority must end within one hour.',400);
@@ -278,8 +288,10 @@ export function installJudgeAttention(Engine, { ApiError }) {
     await this.settleHostPermit(row.host_permit_id,result.outcome==='unknown'?'unknown':'consumed',`Judge invocation ${invocationId}: ${result.outcome}`);
     return {invocationId,outcome:result.outcome};
   };
+  // Owner transfer is the same trusted-authority boundary as registration: refused in host-bound mode before any state changes.
   P.fenceJudgeOwner = function (sessionId,{requestId,controllerSessionId}, {controllerToken}={}) {
-    this.refuseHostMutation('Judge owner transfer');const session=this.judgeSession(sessionId,controllerToken);
+    this.refuseHostMutation('Judge owner transfer');
+    const session=this.judgeSession(sessionId,controllerToken);
     if(this.store.get(`SELECT id FROM judge_invocations WHERE session_id=? AND state IN ${ACTIVE}`,sessionId))fail('judge_turn_unreconciled','A live or unknown turn must be reconciled before transfer.');
     if(!this.store.get('SELECT id FROM controller_sessions WHERE id=?',controllerSessionId))fail('not_found','New controller session not found.',404);
     return this.idempotent('POST /judge-owner-transfer',requestId,{sessionId,controllerSessionId},()=>{

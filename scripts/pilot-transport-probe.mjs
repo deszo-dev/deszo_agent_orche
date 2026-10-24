@@ -12,7 +12,8 @@ assert.ok(!existsSync(join(root,'store/state.sqlite')),'Use a fresh probe root.'
 mkdirSync(root,{recursive:true});
 const runner=await startRunner({root});
 const api=async(method,path,body,extraHeaders={})=>{
-  const response=await fetch(`http://127.0.0.1:${runner.connection.port}/api/v2${path}`,{
+  const endpoint=path.startsWith('/api/')?path:`/api/v2${path}`;
+  const response=await fetch(`http://127.0.0.1:${runner.connection.port}${endpoint}`,{
     method,headers:{Authorization:`Bearer ${runner.connection.firstPartyToken}`,...(body?{'Content-Type':'application/json'}:{}),...extraHeaders},body:body?JSON.stringify(body):undefined
   });
   const result=await response.json();
@@ -24,13 +25,12 @@ try{
   const workflow=singleAgent({id:'task-return-probe',provider:'antigravity',model:'gemini-3.8-flash-low',context:null,timeoutSeconds:90,
     output:{format:'json',schema:outputSchema('taskReturn')}});
   workflow.nodes.find(n=>n.id==='request').config.value='This is only an output-encoding probe; no tools or file changes are needed. Return a TaskReturn with kind candidate and summary OK. Encode fields forbidden by the candidate branch as null in the native finish object. Return the identical encoded object as the final response. Do not report specification_revision_required or invent any issues.';
-  const saveResponse=await fetch(`http://127.0.0.1:${runner.connection.port}/api/v3/workflows/${workflow.workflowId}`,{
-    method:'PUT',headers:{Authorization:`Bearer ${runner.connection.firstPartyToken}`,'Content-Type':'application/json','If-None-Match':'*'},
-    body:JSON.stringify({requestId:randomUUID(),expectedEtag:null,workflow})
-  });
-  const saved=await saveResponse.json();assert.ok(saveResponse.ok,`workflow save: ${saveResponse.status} ${JSON.stringify(saved)}`);
-  const created=await api('POST','/runs',{workflowId:workflow.workflowId,workflowSnapshotSha256:saved.snapshotSha256,workspaceId:'main',requestId:randomUUID()});
-  if(created.outcome==='confirmation_pending')throw new Error(`Run request ${created.requestId} is pending; the isolated probe expected first-party direct execution.`);
+  const draft=await api('PUT',`/api/v4/workflows/${workflow.workflowId}/draft`,{requestId:randomUUID(),workflow},{'If-None-Match':'*'});
+  const validation=await api('POST',`/api/v4/workflows/${workflow.workflowId}/draft/validate`,{},{'If-Match':draft.etag});
+  assert.ok(validation.validation.valid,JSON.stringify(validation.validation.issues));
+  const published=await api('POST',`/api/v4/workflows/${workflow.workflowId}/publish`,{requestId:randomUUID()},{'If-Match':draft.etag});
+  const created=await api('POST','/runs',{workflowId:workflow.workflowId,publishedVersionId:published.publishedVersionId,
+    definitionDigest:published.definitionDigest,workflowSnapshotSha256:published.snapshotSha256,workspaceId:'main',requestId:randomUUID()});
   if(created.outcome!=='created'||!created.run?.runId)throw new Error('The runtime returned an unsupported run outcome.');
   let snapshot;
   const stop=Date.now()+120_000;

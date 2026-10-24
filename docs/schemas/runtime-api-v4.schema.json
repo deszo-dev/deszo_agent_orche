@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deszo.local/documentation/runtime-api-v4.schema.json",
+  "title": "Draft and immutable workflow Publication API",
+  "$defs": {
+    "writeDraft": {
+      "type": "object",
+      "properties": {
+        "requestId": { "type": "string", "format": "uuid" },
+        "workflow": { "$ref": "workflow.schema.json" }
+      },
+      "required": ["requestId", "workflow"],
+      "additionalProperties": false
+    },
+    "publishDraft": {
+      "type": "object",
+      "properties": { "requestId": { "type": "string", "format": "uuid" } },
+      "required": ["requestId"],
+      "additionalProperties": false
+    },
+    "deriveDraft": {
+      "type": "object",
+      "properties": { "requestId": { "type": "string", "format": "uuid" } },
+      "required": ["requestId"],
+      "additionalProperties": false
+    }
+  }
+}

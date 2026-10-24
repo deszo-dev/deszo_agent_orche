@@ -39,7 +39,7 @@ test('stdio incident reads and updates accept the stable hash identity returned 
   } finally { await bridge?.close(); await api.close(); }
 });
 
-test('real stdio bridge discovers its runtime, hides execution tools, and conditionally saves with durable retry identity', async () => {
+test('real stdio bridge discovers its runtime and only replays an identical committed v3 save receipt', async () => {
   const api = await startTestRunner(); let bridge;
   try {
     bridge = await bridgeFor(api);
@@ -50,15 +50,49 @@ test('real stdio bridge discovers its runtime, hides execution tools, and condit
     assert.equal(contract.storeId, api.runner.connection.storeId);
     const workflow = singleAgent({ id: 'bridge-conditional-save', context: null });
     const body = { workflowId: workflow.workflowId, requestId: randomUUID(), expectedEtag: null, workflow };
+    const saved = api.runner.engine.saveWorkflowV3(workflow.workflowId, { requestId: body.requestId, expectedEtag: body.expectedEtag, workflow: body.workflow });
     const first = data(await bridge.call('put_workflow', body));
-    assert.equal(first.revision, 1);
+    assert.deepEqual(first, saved, 'the bridge can replay the committed legacy receipt');
     assert.deepEqual(data(await bridge.call('put_workflow', body)), first);
-    const conflict = await bridge.call('put_workflow', { ...body, requestId: randomUUID() });
+    const changedWorkflow = structuredClone(workflow);
+    changedWorkflow.nodes[0].config.value = 'changed content';
+    const conflict = await bridge.call('put_workflow', { ...body, workflow: changedWorkflow });
     assert.equal(conflict.isError, true);
-    assert.equal(conflict.structuredContent.error.status, 412);
+    assert.equal(conflict.structuredContent.error.status, 409);
+    const newWrite = await bridge.call('put_workflow', { ...body, requestId: randomUUID() });
+    assert.equal(newWrite.isError, true);
+    assert.equal(newWrite.structuredContent.error.status, 410);
+    assert.equal(newWrite.structuredContent.error.code, 'api_upgrade_required');
     assert.equal(api.runner.engine.getWorkflowV3(workflow.workflowId).revision, 1);
-    const results = JSON.stringify({ tools, contract, first, conflict });
+    assert.equal(api.runner.engine.workflowChanges({ after: 0 }).items.length, 1, 'rejected new writes do not append workflow changes');
+    const results = JSON.stringify({ tools, contract, first, conflict, newWrite });
     for (const token of [api.runner.connection.token, api.runner.connection.firstPartyToken]) assert.ok(!results.includes(token));
+  } finally { await bridge?.close(); await api.close(); }
+});
+
+test('real stdio bridge creates, validates, publishes, reads, and launches an exact Published Version', async () => {
+  const api = await startTestRunner(); let bridge;
+  try {
+    await api.workspace();
+    bridge = await bridgeFor(api, { execution: true });
+    const available = (await bridge.request('tools/list')).tools.map(tool => tool.name);
+    for (const name of ['put_workflow_draft', 'validate_workflow_draft', 'publish_workflow', 'get_published_version', 'start_run']) assert.ok(available.includes(name));
+    const workflow = singleAgent({ id: `mcp-p34-${randomUUID().slice(0, 8)}`, context: null });
+    const draft = data(await bridge.call('put_workflow_draft', { workflowId: workflow.workflowId, requestId: randomUUID(), expectedEtag: null, workflow }));
+    assert.equal(draft.revision, 1);
+    const validation = data(await bridge.call('validate_workflow_draft', { workflowId: workflow.workflowId, expectedEtag: draft.etag }));
+    assert.equal(validation.validation.valid, true);
+    const publishInput = { workflowId: workflow.workflowId, requestId: randomUUID(), expectedEtag: draft.etag };
+    const publication = data(await bridge.call('publish_workflow', publishInput));
+    assert.equal(publication.version, 1);
+    assert.deepEqual(data(await bridge.call('publish_workflow', publishInput)), publication, 'MCP retry returns the durable Publication receipt');
+    const read = data(await bridge.call('get_published_version', { workflowId: workflow.workflowId, version: 1 }));
+    assert.equal(read.definitionDigest, publication.definitionDigest);
+    const run = data(await bridge.call('start_run', { workflowId: workflow.workflowId, publishedVersionId: publication.publishedVersionId,
+      definitionDigest: publication.definitionDigest, workflowSnapshotSha256: publication.snapshotSha256, workspaceId: 'main', requestId: randomUUID() }));
+    assert.equal(run.outcome, 'created');
+    assert.equal(run.run.publishedVersion.publishedVersionId, publication.publishedVersionId);
+    assert.equal((await api.waitFor(run.run.runId)).run.state, 'succeeded');
   } finally { await bridge?.close(); await api.close(); }
 });
 
@@ -81,7 +115,7 @@ test('real stdio bridge refuses every management call with a same-runtime or for
   } finally { await api.close(); }
 });
 
-test('execution-enabled stdio bridge submits a pending request and cannot dispatch before a first-party decision', async () => {
+test('execution-enabled stdio bridge starts the Owner-authorized Run directly without the retired approval queue', async () => {
   const api = await startTestRunner(); let bridge;
   try {
     await api.workspace();
@@ -90,31 +124,32 @@ test('execution-enabled stdio bridge submits a pending request and cannot dispat
       settings: { ...settings.settings, externalRunConfirmation: true } });
     const workflow = singleAgent({ id: 'bridge-approved-run', context: null });
     const saved = await api.save(workflow);
+    const publication = api.publication(workflow.workflowId);
     bridge = await bridgeFor(api, { execution: true });
     const tools = (await bridge.request('tools/list')).tools;
     assert.ok(tools.find(tool => tool.name === 'stop_run').annotations.destructiveHint);
     const requestId = randomUUID();
-    const input = { requestId, workflowId: workflow.workflowId, workflowSnapshotSha256: saved.snapshotSha256, workspaceId: 'main' };
-    const pending = data(await bridge.call('start_run', input));
-    assert.equal(pending.outcome, 'confirmation_pending');
-    assert.equal(api.runner.engine.store.get('SELECT COUNT(*) AS n FROM runs').n, 0);
-    const approved = await api.call('POST', `/api/v2/run-requests/${requestId}/decision`, { requestId: randomUUID(), decision: 'approve' });
-    assert.equal(approved.status, 202);
-    assert.equal((await api.waitFor(approved.body.run.runId)).run.state, 'succeeded');
-    assert.deepEqual(data(await bridge.call('start_run', input)), pending);
-    assert.equal(data(await bridge.call('get_run_request', { requestId })).state, 'approved');
+    const input = { requestId, workflowId: workflow.workflowId, publishedVersionId: publication.publishedVersionId,
+      definitionDigest: publication.definitionDigest, workflowSnapshotSha256: saved.snapshotSha256, workspaceId: 'main' };
+    const started = data(await bridge.call('start_run', input));
+    assert.equal(started.outcome, 'created');
+    assert.equal(api.runner.engine.store.get('SELECT COUNT(*) AS n FROM runs').n, 1);
+    assert.deepEqual(data(await bridge.call('start_run', input)), started);
+    assert.equal((await api.call('GET', `/api/v2/run-requests/${requestId}`)).status, 404);
+    assert.equal((await api.waitFor(started.run.runId)).run.state, 'succeeded');
     assert.equal(api.runner.engine.store.get('SELECT COUNT(*) AS n FROM runs').n, 1);
   } finally { await bridge?.close(); await api.close(); }
 });
 
-test('an open stdio bridge reconnects to the same store after restart and preserves save receipts', async () => {
+test('an open stdio bridge reconnects to the same store after restart and preserves Publication receipts', async () => {
   let api = await startTestRunner(); let bridge;
   const root = api.root;
   try {
     bridge = await bridgeFor(api);
     const workflow = singleAgent({ id: 'bridge-restart', context: null });
-    const body = { workflowId: workflow.workflowId, requestId: randomUUID(), expectedEtag: null, workflow };
-    const saved = data(await bridge.call('put_workflow', body));
+    const saved = data(await bridge.call('put_workflow_draft', { workflowId: workflow.workflowId, requestId: randomUUID(), expectedEtag: null, workflow }));
+    const publicationRequest = { workflowId: workflow.workflowId, requestId: randomUUID(), expectedEtag: saved.etag };
+    const publication = data(await bridge.call('publish_workflow', publicationRequest));
     const oldRuntime = data(await bridge.call('get_authoring_contract')).runtimeInstanceId;
     await api.close();
     const unavailable = await bridge.call('get_authoring_contract');
@@ -123,8 +158,10 @@ test('an open stdio bridge reconnects to the same store after restart and preser
     const contract = data(await bridge.call('get_authoring_contract'));
     assert.notEqual(contract.runtimeInstanceId, oldRuntime);
     assert.equal(contract.storeId, api.runner.connection.storeId);
-    assert.deepEqual(data(await bridge.call('put_workflow', body)), saved);
+    assert.deepEqual(data(await bridge.call('publish_workflow', publicationRequest)), publication);
+    assert.equal(data(await bridge.call('get_workflow', { workflowId: workflow.workflowId })).revision, 1);
     assert.equal(api.runner.engine.getWorkflowV3(workflow.workflowId).revision, 1);
+    assert.equal(api.runner.engine.store.get('SELECT COUNT(*) AS n FROM workflow_publications WHERE workflow_id = ?', workflow.workflowId).n, 1);
     assert.equal(api.runner.engine.store.get('SELECT COUNT(*) AS n FROM bridge_registrations').n, 1);
   } finally { await bridge?.close(); await api.close(); }
 });
@@ -163,6 +200,7 @@ test('supervised stdio observations recover after context loss, drain bounded pa
       settings: { ...settings.settings, externalRunConfirmation: true } });
     const workflow = singleAgent({ id: 'bounded-supervised-observer', context: null, model: 'fixture-slow-30' });
     const saved = await api.save(workflow);
+    const publication = api.publication(workflow.workflowId);
     bridge = await bridgeFor(api, { execution: true });
     const tools = (await bridge.request('tools/list')).tools.map(tool => tool.name);
     for (const tool of ['observe_run', 'read_observation_detail', 'get_controller_state', 'await_run_start']) assert.ok(tools.includes(tool));
@@ -175,20 +213,15 @@ test('supervised stdio observations recover after context loss, drain bounded pa
       requestedActions: ['observe', 'acknowledge', 'stop'], observationDeadlineMs: 5000, escalationDeadlineMs: 20000 }));
     assert.equal((await api.call('POST', `/api/v2/control-grants/${grant.grantId}/decision`, { requestId: randomUUID(), decision: 'approve' })).status, 200);
     const requestId = randomUUID();
-    const input = { requestId, workflowId: workflow.workflowId, workspaceId: 'main', workflowSnapshotSha256: saved.snapshotSha256,
+    const input = { requestId, workflowId: workflow.workflowId, publishedVersionId: publication.publishedVersionId,
+      definitionDigest: publication.definitionDigest, workspaceId: 'main', workflowSnapshotSha256: saved.snapshotSha256,
       controlGrantId: grant.grantId, controllerSessionId: session.controllerSessionId };
-    assert.equal(data(await bridge.call('start_run', input)).outcome, 'confirmation_pending');
-    const before = data(await bridge.call('get_controller_state'));
-    assert.equal(before.pendingRequests[0].requestId, requestId);
-    assert.equal(data(await bridge.call('await_run_start', { requestId, waitMs: 0 })).request.state, 'pending');
-    assert.equal(api.runner.engine.store.get('SELECT COUNT(*) AS n FROM runs').n, 0);
-    const approved = await api.call('POST', `/api/v2/run-requests/${requestId}/decision`, { requestId: randomUUID(), decision: 'approve' });
-    assert.equal(approved.status, 202, JSON.stringify(approved.body));
-    runId = approved.body.run.runId;
-    const started = data(await bridge.call('await_run_start', { requestId, waitMs: 0 }));
-    assert.equal(started.request.runId, runId);
-    assert.equal(started.emergencyPrepared, true);
-    let observation = started.observation;
+    const created = data(await bridge.call('start_run', input));
+    assert.equal(created.outcome, 'created');
+    runId = created.run.runId;
+    const emergency = await bridge.call('prepare_emergency_stop', { runId, controllerSessionId: session.controllerSessionId });
+    assert.equal(data(emergency).prepared, true);
+    let observation = data(await bridge.call('observe_run', { runId, controllerSessionId: session.controllerSessionId }));
     const state = data(await bridge.call('get_controller_state'));
     assert.equal(state.runs[0].pendingObservationId, observation.observationId);
     assert.equal(state.sessions[0].controllerSessionId, session.controllerSessionId);

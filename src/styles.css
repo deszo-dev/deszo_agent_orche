@@ -12,6 +12,7 @@ code,pre{font-family:'IBM Plex Mono',Consolas,monospace}pre{white-space:pre-wrap
 .brand{font-size:22px;font-weight:800;letter-spacing:-2px;margin-right:10px}.brand span{color:var(--accent)}.spacer{flex:1}
 .chip-button{display:flex;align-items:center;gap:7px;border:1px solid #33354a;background:#1b1c26;border-radius:6px;padding:6px 10px;font-size:12px;color:#cfd2df}
 .chip-button:hover{border-color:#57557a}.dirty-dot{width:6px;height:6px;border-radius:50%;background:var(--warn);display:inline-block}
+.published-version-picker{display:flex;align-items:center;gap:6px;color:#aeb1c0;font-size:11px;white-space:nowrap}.published-version-picker select{width:auto;max-width:170px;padding:6px 8px}
 .button{display:inline-flex;align-items:center;gap:7px;border:1px solid transparent;border-radius:6px;padding:7px 12px;font-size:12px;font-weight:700;white-space:nowrap}
 .button.primary{background:var(--accent);color:var(--accent-ink)}.button.primary:hover{background:#c3baff}
 .button.secondary{background:#20212c;border-color:#363848;color:#d1d4e0}.button.secondary:hover{background:#2a2b39}

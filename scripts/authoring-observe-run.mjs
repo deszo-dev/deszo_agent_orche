@@ -1,4 +1,4 @@
-// Audit an approval-gated real run without first-party authority or provider retries.
+// Audit a real Owner-authorized Run pinned to the exact Published Version selected by the MCP client.
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
@@ -19,19 +19,18 @@ const readRef = async ref => {
   assert.equal(createHash('sha256').update(bytes).digest('hex'), ref.sha256);
   return bytes;
 };
+const runId = requestReport.request?.runId || requestReport.runId;
+assert.ok(runId, 'The authoring request report must contain the directly admitted Run ID.');
 const deadline = Date.now() + 300_000;
-let request, snapshot;
+let snapshot;
 while (Date.now() < deadline) {
-  request = await get(`/api/v2/run-requests/${requestReport.requestId}`);
-  assert.ok(['pending', 'approved'].includes(request.state), `Unexpected request state ${request.state}.`);
-  if (request.runId) {
-    snapshot = await get(`/api/v2/runs/${request.runId}`);
-    if (snapshot.run.state === 'succeeded') break;
-    assert.ok(['created', 'queued', 'running'].includes(snapshot.run.state), `Run ${request.runId} ended or paused as ${snapshot.run.state}.`);
-  }
+  snapshot = await get(`/api/v2/runs/${runId}`);
+  if (snapshot.run.state === 'succeeded') break;
+  assert.ok(['queued', 'running'].includes(snapshot.run.state), `Run ${runId} ended or paused as ${snapshot.run.state}.`);
   await new Promise(done => setTimeout(done, 1000));
 }
-assert.equal(snapshot?.run.state, 'succeeded', 'The approved real run did not complete in five minutes.');
+assert.equal(snapshot?.run.state, 'succeeded', 'The Owner-authorized real Run did not complete in five minutes.');
+assert.equal(snapshot.run.publishedVersion.publishedVersionId, requestReport.request.publishedVersionId);
 const events = []; let after = 0;
 for (;;) {
   const page = await get(`/api/v2/runs/${request.runId}/events/page?afterSequence=${after}&limit=200`);
@@ -51,7 +50,7 @@ for (const event of events.filter(e => e.type === 'attempt.invocation_committed'
 assert.deepEqual(invocations.map(i => i.provider).sort(), ['antigravity', 'claude', 'codex']);
 assert.equal(snapshot.instances.length, 5);
 assert.ok(snapshot.instances.every(i => i.state === 'succeeded'));
-const workflow = await get(`/api/v3/workflows/${requestReport.workflowId}`);
+const workflow = await get(`/api/v4/workflows/${requestReport.workflowId}/versions/${requestReport.request.version}`);
 const viewerId = workflow.workflow.nodes.find(n => n.type === 'result-viewer').id;
 const viewer = snapshot.instances.find(i => i.nodeId === viewerId);
 await readRef(viewer.outputs);
@@ -76,7 +75,7 @@ for (const invocation of invocations) {
 const runs = await get('/api/v2/runs?limit=200');
 assert.equal(runs.items.filter(r => r.workflowId === requestReport.workflowId).length, 1);
 const report = { passed: true, at: new Date().toISOString(), provider, workflowId: requestReport.workflowId,
-  requestId: request.requestId, runId: request.runId, state: snapshot.run.state, eventCount: events.length,
+  requestId: requestReport.requestId, runId, publishedVersionId: requestReport.request.publishedVersionId, state: snapshot.run.state, eventCount: events.length,
   contiguousJournal: true, exactlyOneRun: true, invocations, providerOutputs, viewerArtifact: viewer.outputs, finalArtifact: finalValue.artifact, finalText };
 writeFileSync(join(root, `${provider}-run-result.json`), JSON.stringify(report, null, 2));
 console.log(JSON.stringify({ passed: true, provider, runId: request.runId, events: events.length, providers: invocations.map(i => i.provider) }));

@@ -152,10 +152,9 @@ export function installLinkedRepair(Engine, { ApiError }) {
     return state;
   };
 
-  // Suspend a parent and create its linked repair (ADR-0008 Suspend and Repair). First-party only; the Judge decision path that
+  // Suspend a parent and create its linked repair (ADR-0008 Suspend and Repair). The public owner requests this transition.
   // would request it is not implemented here.
   P.linkRepair = function (parentRunId, body) {
-    this.refuseHostMutation('Linked repair');
     this.validateBody('linkRepairRequest', body);
     return this.idempotent(`POST /runs/${parentRunId}/linked-repair`, body.requestId, body, () => {
       const parent = this.requireRun(parentRunId);
@@ -167,14 +166,17 @@ export function installLinkedRepair(Engine, { ApiError }) {
       const parentWorkspace = this.requireWorkspace(parent.workspace_id);
       const isolationIssue = this.linkedRepairWorkspaceIssue(parentWorkspace, repairWorkspace);
       if (isolationIssue) fail(422, isolationIssue.code, isolationIssue.message);
-      const workflowRow = this.store.get("SELECT * FROM workflows WHERE id = ? AND kind = 'user'", body.repairWorkflowId);
-      if (!workflowRow) fail(404, 'not_found', `Workflow "${body.repairWorkflowId}" does not exist.`);
-      const snapshot = this.store.artifactRow(workflowRow.snapshot_artifact_id);
-      if (snapshot.sha256 !== body.repairWorkflowSnapshotSha256) fail(409, 'conflict', 'The repair workflow changed; reload it before linking.');
+      const publication = this.store.get(`SELECT p.*, a.sha256 AS snapshot_sha256 FROM workflow_publications p
+        JOIN artifacts a ON a.id = p.snapshot_artifact_id
+        WHERE p.workflow_id = ? AND p.definition_digest = ? AND p.runnable = 1 ORDER BY p.version DESC LIMIT 1`, body.repairWorkflowId, body.repairWorkflowSnapshotSha256);
+      if (!publication) fail(409, 'published_version_not_runnable', 'Linked Repair requires an exact Runnable Published Version with the requested definition digest.');
+      const snapshot = this.store.artifactRow(publication.snapshot_artifact_id);
+      if (snapshot.sha256 !== body.repairWorkflowSnapshotSha256 || publication.snapshot_sha256 !== body.repairWorkflowSnapshotSha256) fail(409, 'conflict', 'The repair workflow changed; reload it before linking.');
       const workflow = this.store.readJson(snapshot.id);
       const judges = allNodesDeep(workflow.nodes).filter(node => node.type === 'agent' && node.config.role === 'judge');
       if (judges.length !== 1) fail(422, 'validation_failed', 'A repair workflow must declare exactly one designated Judge.');
-      const captured = this.captureRun({ workflow, snapshot, workspace: repairWorkspace, kind: 'workflow', options: { mode: 'workflow', targets: [], refreshCaches: [] }, requestId: body.requestId });
+      const captured = this.captureRun({ workflow, snapshot, workspace: repairWorkspace, kind: 'workflow', publication,
+        options: { mode: 'workflow', targets: [], refreshCaches: [] }, requestId: body.requestId });
       const repairRunId = captured.body.run.runId;
       const createdAt = now();
       const checkpoint = this.store.putJson({ schemaVersion: 1, kind: 'LinkedRepairCheckpoint', parentRunId, parentWorkflowId: parent.workflow_id,
@@ -265,11 +267,10 @@ export function installLinkedRepair(Engine, { ApiError }) {
   };
 
   // Lifecycle receipt (ADR-0008 Step D). Accepted only for the operation's own candidate, while the repair is at its gate.
+  // Only the authenticated Lifecycle Host channel (applyHostLifecycleReceipt) may verify a receipt, in every runtime state.
+  // An Owner Token, a candidate runtime or an unbound runtime has no path here.
   P.applyLifecycleReceipt = function (runId, body, { hostAuthenticated = false, receiptEvidence = null } = {}) {
-    if (!hostAuthenticated) {
-      this.refuseHostMutation('Lifecycle receipt');
-      if (this.lifecycleHost) fail(403, 'trusted_host_channel_required', 'Lifecycle receipts must arrive through the authenticated Lifecycle Host channel.');
-    }
+    if (!hostAuthenticated) fail(403, 'trusted_host_channel_required', 'Lifecycle receipts must arrive through the authenticated Lifecycle Host channel.');
     this.validateBody('lifecycleReceiptRequest', body);
     const pendingOperation = this.lifecycleOfRun(runId);
     const pendingLink = this.openLinkOfRepair(runId);

@@ -276,7 +276,8 @@ test('manual chat continues a ready binding as a chat run hidden from workflow l
     const reserved = await api.call('PUT', '/api/v3/workflows/context-chat', {
       requestId: randomUUID(), expectedEtag: null, workflow: { ...singleAgent(), workflowId: 'context-chat' },
     }, { headers: { 'If-None-Match': '*' } });
-    assert.equal(reserved.status, 409);
+    assert.equal(reserved.status, 410);
+    assert.equal(reserved.body.code, 'api_upgrade_required');
     const unknown = await api.call('POST', `/api/v2/context-bindings/${randomUUID()}/messages`, { requestId: randomUUID(), workspaceId: 'main', model: 'fixture-echo', prompt: 'x' });
     assert.equal(unknown.status, 404);
   } finally { await api.close(); }

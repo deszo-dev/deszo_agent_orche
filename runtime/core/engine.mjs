@@ -45,7 +45,9 @@ const LIST_DEFAULT = 50;
 const STARTUP_TOLERANCE_MS = 5_000;
 const API = 'runtime-api-v2.schema.json';
 const API_V3 = 'runtime-api-v3.schema.json';
+const API_V4 = 'runtime-api-v4.schema.json';
 const CHAT_WORKFLOW = 'context-chat';
+const LEGACY_AUTHORITY_POLICY = 'designated-judge/1';
 
 export function canonicalPath(path) {
   const real = realpathSync.native(resolve(path));
@@ -143,8 +145,12 @@ export class Engine {
     }
     if (!this.store.get('SELECT * FROM runtime_identity WHERE singleton = 1'))
       this.store.run('INSERT INTO runtime_identity(singleton, store_id, created_at) VALUES (1, ?, ?)', randomUUID(), nowIso());
+    this.migrateLegacyWorkflowPublications();
     this.store.transaction(() => {
-      for (const row of this.store.all("SELECT * FROM workflows WHERE kind = 'user'")) this.syncCacheNodeIncarnations(row.id, this.store.readJson(row.snapshot_artifact_id));
+      for (const row of this.store.all("SELECT * FROM workflows WHERE kind = 'user'")) {
+        const executable = this.latestExecutableWorkflow(row.id);
+        if (executable) this.syncCacheNodeIncarnations(row.id, executable);
+      }
       for (const pin of this.store.all('SELECT * FROM cache_pins WHERE incarnation_id IS NULL')) {
         const current = this.store.get('SELECT incarnation_id FROM cache_node_incarnations WHERE workflow_id = ? AND node_id = ? AND active = 1', pin.workflow_id, pin.node_id);
         const incarnationId = current?.incarnation_id || randomUUID();
@@ -158,6 +164,27 @@ export class Engine {
     // completes any transition whose durable precondition already holds.
     this.reconcileContinuations();
     this.initializeJudgeAttention();
+  }
+
+  migrateLegacyWorkflowPublications() {
+    const state = this.store.get('SELECT legacy_import_complete FROM workflow_publication_state WHERE singleton = 1');
+    if (!state || state.legacy_import_complete) return;
+    this.store.transaction(() => {
+      for (const row of this.store.all("SELECT * FROM workflows WHERE kind = 'user' ORDER BY id")) {
+        if (this.store.get('SELECT id FROM workflow_publications WHERE workflow_id = ? LIMIT 1', row.id)) continue;
+        const snapshot = this.store.artifactRow(row.snapshot_artifact_id);
+        const workflow = this.store.readJson(row.snapshot_artifact_id);
+        const { view, ...executionDefinition } = workflow;
+        const validation = this.validateWorkflow(workflow);
+        this.store.run(`INSERT INTO workflow_publications(
+          id,workflow_id,version,snapshot_artifact_id,definition_digest,execution_hash,authority_policy_version,
+          provenance,runnable,validation_json,source_draft_revision,created_at
+        ) VALUES(?,?,1,?,?,?,?, 'legacy-migration',?,?,NULL,?)`, randomUUID(), row.id, row.snapshot_artifact_id,
+        snapshot.sha256, canonicalHash(executionDefinition), LEGACY_AUTHORITY_POLICY, validation.valid ? 1 : 0,
+        canonicalize(validation), row.created_at);
+      }
+      this.store.run('UPDATE workflow_publication_state SET legacy_import_complete = 1 WHERE singleton = 1');
+    });
   }
 
   // ---------- Restart recovery ----------
@@ -236,7 +263,6 @@ export class Engine {
   settingsBody() { const { revision, sha256: digest, settings } = this.currentSettings(); return { revision, sha256: digest, settings }; }
 
   updateSettings(body) {
-    this.refuseHostMutation('Settings');
     this.validateBody('updateApplicationSettings', body);
     return this.idempotent('PUT /settings', body.requestId, body, () => {
       const current = this.currentSettings();
@@ -275,6 +301,30 @@ export class Engine {
     return result.response;
   }
 
+  replayCommittedReceipt(command, requestId, payload, { ignoreDifferentCommand = false } = {}) {
+    const receipt = this.store.get('SELECT * FROM command_receipts WHERE request_id = ?', requestId);
+    if (!receipt) return { found: false };
+    if (receipt.command !== command) {
+      if (ignoreDifferentCommand) return { found: false };
+      throw new ApiError(409, 'conflict', 'This requestId was already used for a different command or payload.');
+    }
+    const digest = canonicalHash({ command, payload });
+    if (receipt.payload_sha256 !== digest) throw new ApiError(409, 'conflict', 'This requestId was already used for a different command or payload.');
+    return { found: true, response: this.store.readJson(receipt.response_artifact_id) };
+  }
+
+  closePendingRunRequestsAtOwnerCutover() {
+    const problem = canonicalize({
+      code: 'policy_cutover',
+      message: 'This pending Run request was denied when the Runtime Owner authorization policy changed. Submit a new Run request.',
+      details: [],
+    });
+    return this.store.transaction(() => this.store.run(
+      "UPDATE external_run_requests SET state = 'denied', problem_json = ? WHERE state = 'pending'",
+      problem,
+    ).changes);
+  }
+
   encodeCursor(data) {
     const body = Buffer.from(canonicalize(data)).toString('base64url');
     return `${body}.${createHmac('sha256', this.cursorSecret).update(body).digest('base64url')}`;
@@ -310,7 +360,6 @@ export class Engine {
   workspaceBody(row) { return { workspaceId: row.id, cwd: row.cwd, cwdIdentity: row.cwd_identity, createdAt: row.created_at, updatedAt: row.updated_at }; }
 
   putWorkspace(workspaceId, body) {
-    this.refuseHostMutation('Workspace registration');
     if (!/^[a-z][a-z0-9-]{0,63}$/.test(workspaceId)) throw new ApiError(400, 'invalid_request', 'Workspace ID must match the workflow ID grammar.');
     this.validateBody('workspaceRequest', body);
     const scratch = canonicalPath(join(this.store.workdirs, 'scratch'));
@@ -378,7 +427,7 @@ export class Engine {
     const identity = this.runtimeIdentity();
     const workflowSchema = SCHEMAS['workflow.schema.json'];
     return {
-      descriptorVersion: 1, contractVersion: '3.0', apiVersions: ['v2', 'v3'], ...identity,
+      descriptorVersion: 1, contractVersion: '4.0', apiVersions: ['v2', 'v3', 'v4'], ...identity,
       workflowSchemaId: 'workflow.schema.json', workflowSchemaSha256: sha256(canonicalBytes(workflowSchema)),
       capabilities: ['core-v1', 'loops-v1', 'cache-v1', 'pipeline-v1', 'delivery-v1', 'revisions-v1', 'task-planning-v1'],
       limits: { maxRequestBytes: 4 * 1024 * 1024, maxResponseBytes: 4 * 1024 * 1024, maxPageSize: 200, maxEventPageSize: 200 },
@@ -490,6 +539,182 @@ export class Engine {
     return this.savedWorkflowV3(row);
   }
 
+  draftEtag(row, digest = this.store.artifactRow(row.snapshot_artifact_id).sha256) { return `"draft-${row.revision}-${digest}"`; }
+
+  draftBody(row) {
+    const workflow = this.store.readJson(row.snapshot_artifact_id);
+    const snapshot = this.store.artifactRow(row.snapshot_artifact_id);
+    const { view, ...executionDefinition } = workflow;
+    return { workflowId: row.workflow_id, workflow, revision: row.revision, etag: this.draftEtag(row, snapshot.sha256),
+      snapshotSha256: snapshot.sha256, definitionDigest: snapshot.sha256, executionHash: canonicalHash(executionDefinition),
+      sourcePublishedVersionId: row.source_published_version_id, validation: this.validateWorkflow(workflow), updatedAt: row.updated_at };
+  }
+
+  getWorkflowDraft(workflowId) {
+    const row = this.store.get('SELECT * FROM workflow_drafts WHERE workflow_id = ?', workflowId);
+    if (!row) throw new ApiError(404, 'draft_not_found', `Workflow "${workflowId}" has no editable Draft.`);
+    return this.draftBody(row);
+  }
+
+  assertDraftPrecondition(workflowId, expectedEtag) {
+    if (expectedEtag === null) {
+      if (this.store.get('SELECT workflow_id FROM workflow_drafts WHERE workflow_id = ?', workflowId))
+        throw new ApiError(412, 'precondition_failed', 'A Draft already exists.', [{ path: '/If-None-Match', message: 'Read the Draft and supply its current If-Match ETag.' }]);
+      return;
+    }
+    if (typeof expectedEtag !== 'string') throw new ApiError(428, 'precondition_required', 'Supply If-None-Match: * to create a Draft or If-Match with the exact Draft ETag.');
+    const current = this.store.get('SELECT * FROM workflow_drafts WHERE workflow_id = ?', workflowId);
+    if (!current || this.draftEtag(current) !== expectedEtag)
+      throw new ApiError(412, 'precondition_failed', current ? 'The Draft changed; reload it before saving or publishing.' : 'The Draft no longer exists.', current ? [{ path: '/If-Match', message: `Current Draft revision is ${current.revision}.` }] : []);
+  }
+
+  saveWorkflowDraft(workflowId, body, expectedEtag) {
+    const issues = check(API_V4, 'writeDraft', body);
+    if (issues.length) throw new ApiError(400, 'invalid_request', 'Request does not match writeDraft.', issues);
+    if (body.workflow.workflowId !== workflowId) throw new ApiError(400, 'invalid_request', 'workflowId in the body must match the path.');
+    const structural = structuralIssues(body.workflow);
+    if (structural.length) throw new ApiError(422, 'validation_failed', 'The Draft does not match workflow.schema.json.', structural);
+    if (expectedEtag !== null && typeof expectedEtag !== 'string') throw new ApiError(428, 'precondition_required', 'Supply If-None-Match: * to create a Draft or If-Match with the exact Draft ETag.');
+    const payload = { workflowId, expectedEtag, workflow: body.workflow };
+    return this.idempotent(`PUT /api/v4/workflows/${workflowId}/draft`, body.requestId, payload, () => {
+      const logical = this.store.get('SELECT * FROM workflows WHERE id = ?', workflowId);
+      if (logical?.kind === 'system') throw new ApiError(409, 'conflict', `Workflow ID "${workflowId}" is reserved.`);
+      this.assertDraftPrecondition(workflowId, expectedEtag);
+      const draft = this.store.get('SELECT * FROM workflow_drafts WHERE workflow_id = ?', workflowId);
+      const artifact = this.store.putBytes(canonicalBytes(body.workflow), 'application/json');
+      const now = nowIso();
+      const revision = draft ? draft.revision + 1 : logical ? logical.revision + 1 : 1;
+      if (logical) this.store.run('UPDATE workflows SET snapshot_artifact_id = ?, revision = ?, updated_at = ? WHERE id = ?', artifact.artifactId, revision, now, workflowId);
+      else this.store.run("INSERT INTO workflows(id,snapshot_artifact_id,created_at,updated_at,kind,revision) VALUES(?,?,?,?,'user',?)", workflowId, artifact.artifactId, now, now, revision);
+      if (draft) this.store.run('UPDATE workflow_drafts SET revision = ?, snapshot_artifact_id = ?, updated_at = ? WHERE workflow_id = ?', revision, artifact.artifactId, now, workflowId);
+      else this.store.run('INSERT INTO workflow_drafts(workflow_id,revision,snapshot_artifact_id,source_published_version_id,created_at,updated_at) VALUES(?,?,?,NULL,?,?)', workflowId, revision, artifact.artifactId, now, now);
+      const eventId = randomUUID();
+      this.store.run('INSERT INTO workflow_changes(event_id,workflow_id,revision,snapshot_sha256,request_id,created_at) VALUES(?,?,?,?,?,?)', eventId, workflowId, revision, artifact.sha256, body.requestId, now);
+      return this.draftBody(this.store.get('SELECT * FROM workflow_drafts WHERE workflow_id = ?', workflowId));
+    }, () => {
+      const row = this.store.get('SELECT * FROM workflow_changes WHERE request_id = ?', body.requestId);
+      if (row) queueMicrotask(() => this.store.emit('workflow-change', this.workflowChangeBody(row)));
+    });
+  }
+
+  deriveWorkflowDraft(workflowId, version, body, expectedEtag) {
+    const issues = check(API_V4, 'deriveDraft', body);
+    if (issues.length) throw new ApiError(400, 'invalid_request', 'Request does not match deriveDraft.', issues);
+    const payload = { workflowId, version, expectedEtag };
+    return this.idempotent(`POST /api/v4/workflows/${workflowId}/draft/from/${version}`, body.requestId, payload, () => {
+      const logical = this.store.get('SELECT * FROM workflows WHERE id = ? AND kind = \'user\'', workflowId);
+      if (!logical) throw new ApiError(404, 'not_found', `Workflow "${workflowId}" does not exist.`);
+      const publication = this.workflowPublicationRow(workflowId, version);
+      this.assertDraftPrecondition(workflowId, expectedEtag);
+      const draft = this.store.get('SELECT * FROM workflow_drafts WHERE workflow_id = ?', workflowId);
+      const now = nowIso();
+      const revision = draft ? draft.revision + 1 : logical.revision + 1;
+      const workflow = this.store.readJson(publication.snapshot_artifact_id);
+      if (draft) this.store.run('UPDATE workflow_drafts SET revision = ?, snapshot_artifact_id = ?, source_published_version_id = ?, updated_at = ? WHERE workflow_id = ?', revision, publication.snapshot_artifact_id, publication.id, now, workflowId);
+      else this.store.run('INSERT INTO workflow_drafts(workflow_id,revision,snapshot_artifact_id,source_published_version_id,created_at,updated_at) VALUES(?,?,?,?,?,?)', workflowId, revision, publication.snapshot_artifact_id, publication.id, now, now);
+      this.store.run('UPDATE workflows SET snapshot_artifact_id = ?, revision = ?, updated_at = ? WHERE id = ?', publication.snapshot_artifact_id, revision, now, workflowId);
+      const eventId = randomUUID();
+      this.store.run('INSERT INTO workflow_changes(event_id,workflow_id,revision,snapshot_sha256,request_id,created_at) VALUES(?,?,?,?,?,?)', eventId, workflowId, revision, publication.definition_digest, body.requestId, now);
+      return this.draftBody(this.store.get('SELECT * FROM workflow_drafts WHERE workflow_id = ?', workflowId));
+    }, () => {
+      const row = this.store.get('SELECT * FROM workflow_changes WHERE request_id = ?', body.requestId);
+      if (row) queueMicrotask(() => this.store.emit('workflow-change', this.workflowChangeBody(row)));
+    });
+  }
+
+  validateWorkflowDraft(workflowId, expectedEtag) {
+    if (typeof expectedEtag !== 'string') throw new ApiError(428, 'precondition_required', 'Supply If-Match with the exact Draft ETag to validate a Draft revision.');
+    const saved = this.getWorkflowDraft(workflowId);
+    if (saved.etag !== expectedEtag) throw new ApiError(412, 'precondition_failed', 'The Draft changed; reload it before validating.', [{ path: '/If-Match', message: `Current Draft revision is ${saved.revision}.` }]);
+    return { workflowId, revision: saved.revision, etag: saved.etag, definitionDigest: saved.definitionDigest, validation: saved.validation };
+  }
+
+  publishWorkflowDraft(workflowId, body, expectedEtag) {
+    const issues = check(API_V4, 'publishDraft', body);
+    if (issues.length) throw new ApiError(400, 'invalid_request', 'Request does not match publishDraft.', issues);
+    if (typeof expectedEtag !== 'string') throw new ApiError(428, 'precondition_required', 'Supply If-Match with the exact Draft ETag to publish.');
+    const payload = { workflowId, expectedEtag };
+    return this.idempotent(`POST /api/v4/workflows/${workflowId}/publish`, body.requestId, payload, () => {
+      const draftRow = this.store.get('SELECT * FROM workflow_drafts WHERE workflow_id = ?', workflowId);
+      if (!draftRow) throw new ApiError(404, 'draft_not_found', `Workflow "${workflowId}" has no editable Draft.`);
+      if (this.draftEtag(draftRow) !== expectedEtag) throw new ApiError(412, 'precondition_failed', 'The Draft changed; reload and validate the current revision before publishing.', [{ path: '/If-Match', message: `Current Draft revision is ${draftRow.revision}.` }]);
+      const workflow = this.store.readJson(draftRow.snapshot_artifact_id);
+      const validation = this.validateWorkflow(workflow);
+      if (!validation.valid) throw new ApiError(422, 'validation_failed', 'The Draft is not suitable for Publication.', validation.issues);
+      const snapshot = this.store.artifactRow(draftRow.snapshot_artifact_id);
+      const { view, ...executionDefinition } = workflow;
+      const latest = this.store.get('SELECT MAX(version) AS version FROM workflow_publications WHERE workflow_id = ?', workflowId).version || 0;
+      const version = latest + 1, publishedAt = nowIso(), publicationId = randomUUID();
+      this.store.run(`INSERT INTO workflow_publications(
+        id,workflow_id,version,snapshot_artifact_id,definition_digest,execution_hash,authority_policy_version,
+        provenance,runnable,validation_json,source_draft_revision,created_at
+      ) VALUES(?,?,?,?,?,?,?,'owner-publication',1,?,?,?)`, publicationId, workflowId, version, snapshot.id, snapshot.sha256,
+      canonicalHash(executionDefinition), LEGACY_AUTHORITY_POLICY, canonicalize(validation), draftRow.revision, publishedAt);
+      this.store.run('UPDATE workflows SET snapshot_artifact_id = ?, revision = ?, updated_at = ? WHERE id = ?', snapshot.id, draftRow.revision, publishedAt, workflowId);
+      // Cache identity follows the executable definition: publication, not editing, retires or adds Cache incarnations.
+      this.syncCacheNodeIncarnations(workflowId, workflow);
+      this.store.run('UPDATE workflow_drafts SET source_published_version_id = ? WHERE workflow_id = ?', publicationId, workflowId);
+      const eventId = randomUUID();
+      this.store.run('INSERT INTO workflow_changes(event_id,workflow_id,revision,snapshot_sha256,request_id,created_at) VALUES(?,?,?,?,?,?)', eventId, workflowId, draftRow.revision, snapshot.sha256, body.requestId, publishedAt);
+      const result = this.workflowPublicationBody(this.store.get('SELECT * FROM workflow_publications WHERE id = ?', publicationId));
+      return result;
+    }, () => {
+      const row = this.store.get('SELECT * FROM workflow_changes WHERE request_id = ?', body.requestId);
+      if (row) queueMicrotask(() => this.store.emit('workflow-change', this.workflowChangeBody(row)));
+    });
+  }
+
+  workflowPublicationRow(workflowId, version) {
+    if (!Number.isInteger(version) || version < 1) throw new ApiError(404, 'published_version_not_found', 'The Published Version does not exist.');
+    const row = this.store.get('SELECT * FROM workflow_publications WHERE workflow_id = ? AND version = ?', workflowId, version);
+    if (!row) throw new ApiError(404, 'published_version_not_found', `Published Version ${version} of "${workflowId}" does not exist.`);
+    return row;
+  }
+
+  workflowPublicationBody(row) {
+    const workflow = this.store.readJson(row.snapshot_artifact_id);
+    return { workflowId: row.workflow_id, publishedVersionId: row.id, version: row.version, workflow,
+      definitionDigest: row.definition_digest, snapshotSha256: this.store.artifactRow(row.snapshot_artifact_id).sha256,
+      executionHash: row.execution_hash, authorityPolicyVersion: row.authority_policy_version, provenance: row.provenance,
+      runnable: Boolean(row.runnable), validation: parseStrictJson(row.validation_json), sourceDraftRevision: row.source_draft_revision,
+      publishedAt: row.created_at, etag: `"publication-${row.version}-${row.definition_digest}"` };
+  }
+
+  listWorkflowPublications(workflowId, { limit, cursor } = {}) {
+    if (!this.store.get("SELECT id FROM workflows WHERE id = ? AND kind = 'user'", workflowId)) throw new ApiError(404, 'not_found', `Workflow "${workflowId}" does not exist.`);
+    return this.page({ collection: `workflow-publications:${workflowId}`, table: 'workflow_publications', filters: { workflowId },
+      where: ['workflow_id = ?'], params: [workflowId], limit, cursor, map: row => {
+        const { workflow, ...summary } = this.workflowPublicationBody(row); return summary;
+      } });
+  }
+
+  getWorkflowPublication(workflowId, version) { return this.workflowPublicationBody(this.workflowPublicationRow(workflowId, version)); }
+
+  getLatestWorkflowPublication(workflowId) {
+    const row = this.store.get('SELECT * FROM workflow_publications WHERE workflow_id = ? ORDER BY version DESC LIMIT 1', workflowId);
+    if (!row) throw new ApiError(404, 'published_version_not_found', `Workflow "${workflowId}" has no Published Version.`);
+    return this.workflowPublicationBody(row);
+  }
+
+  resolveRunnablePublicationBySnapshot(workflowId, snapshotSha256) {
+    const row = this.store.get(`SELECT p.* FROM workflow_publications p
+      JOIN artifacts a ON a.id = p.snapshot_artifact_id
+      WHERE p.workflow_id = ? AND a.sha256 = ? AND p.runnable = 1
+      ORDER BY p.version DESC LIMIT 1`, workflowId, snapshotSha256);
+    if (!row) throw new ApiError(404, 'published_version_not_found', 'No Runnable Published Version matches the Host-authorized workflow snapshot.');
+    return row;
+  }
+
+  listWorkflowLifecycle({ limit, cursor } = {}) {
+    return this.page({ collection: 'workflow-lifecycle', table: 'workflows', filters: {}, where: ["kind = 'user'"], limit, cursor, map: row => {
+      const draft = this.store.get('SELECT revision FROM workflow_drafts WHERE workflow_id = ?', row.id);
+      const latest = this.store.get('SELECT id,version,definition_digest,runnable FROM workflow_publications WHERE workflow_id = ? ORDER BY version DESC LIMIT 1', row.id);
+      return { workflowId: row.id, draftRevision: draft?.revision ?? null, publishedVersionId: latest?.id ?? null,
+        latestPublishedVersion: latest?.version ?? null, definitionDigest: latest?.definition_digest ?? null,
+        runnable: latest ? Boolean(latest.runnable) : false, createdAt: row.created_at, updatedAt: row.updated_at };
+    } });
+  }
+
   listWorkflowsV3({ limit, cursor } = {}) {
     return this.page({ collection: 'workflows-v3', table: 'workflows', filters: {}, where: ["kind = 'user'"], limit, cursor, map: row => {
       const saved = this.savedWorkflow(row);
@@ -594,6 +819,13 @@ export class Engine {
   }
 
   // ---------- Cache pins ----------
+  // The executable definition of a user workflow is its latest Published Version. Drafts are never executed, so cache
+  // identity and pins are defined by publications only.
+  latestExecutableWorkflow(workflowId) {
+    const row = this.store.get('SELECT snapshot_artifact_id FROM workflow_publications WHERE workflow_id = ? ORDER BY version DESC LIMIT 1', workflowId);
+    return row ? this.store.readJson(row.snapshot_artifact_id) : null;
+  }
+
   pinsFor(workflowId) {
     return Object.fromEntries(this.store.all(`SELECT p.* FROM cache_pins p JOIN cache_node_incarnations c
       ON c.workflow_id = p.workflow_id AND c.node_id = p.node_id AND c.incarnation_id = p.incarnation_id AND c.active = 1
@@ -602,8 +834,9 @@ export class Engine {
   }
 
   listPins(workflowId) {
-    const saved = this.getWorkflow(workflowId);
-    const current = this.cacheFingerprints(saved.workflow, this.pinsFor(workflowId));
+    this.getWorkflow(workflowId);
+    const executable = this.latestExecutableWorkflow(workflowId);
+    const current = executable ? this.cacheFingerprints(executable, this.pinsFor(workflowId)) : {};
     const active = this.pinsFor(workflowId);
     const rows = this.store.all('SELECT * FROM cache_pins WHERE workflow_id = ?', workflowId);
     return { pins: rows.map(row => {
@@ -629,10 +862,10 @@ export class Engine {
   }
 
   freezeCache(workflowId, nodeId, body) {
-    this.refuseHostMutation('Cache pin');
     this.validateBody('freezeCacheRequest', body);
-    const saved = this.getWorkflow(workflowId);
-    const node = allNodesDeep(saved.workflow.nodes).find(item => item.id === nodeId);
+    const executable = this.latestExecutableWorkflow(workflowId);
+    if (!executable) throw new ApiError(404, 'published_version_not_found', `Workflow "${workflowId}" has no Published Version to pin against.`);
+    const node = allNodesDeep(executable.nodes).find(item => item.id === nodeId);
     if (node?.type !== 'cache') throw new ApiError(404, 'not_found', `"${nodeId}" is not a Cache node of "${workflowId}".`);
     const run = this.requireRun(body.runId);
     if (run.workflow_id !== workflowId) throw new ApiError(409, 'conflict', 'The run belongs to another workflow.');
@@ -640,7 +873,7 @@ export class Engine {
     const attempt = this.latestAttempt(run.id, body.nodeInstanceId);
     if (!attempt || attempt.state !== 'succeeded' || !attempt.outputs_artifact_id) throw new ApiError(409, 'conflict', 'Only a succeeded Cache attempt can be pinned.');
     const value = this.store.readJson(attempt.outputs_artifact_id).values.value;
-    this.storePin(saved.workflow, nodeId, value, run.id, attempt.id);
+    this.storePin(executable, nodeId, value, run.id, attempt.id);
     return this.listPins(workflowId);
   }
 
@@ -656,7 +889,6 @@ export class Engine {
   }
 
   deleteCachePin(workflowId, nodeId) {
-    this.refuseHostMutation('Cache pin');
     this.getWorkflow(workflowId);
     this.store.run('DELETE FROM cache_pins WHERE workflow_id = ? AND node_id = ?', workflowId, nodeId);
     return this.listPins(workflowId);
@@ -694,7 +926,6 @@ export class Engine {
   }
 
   acknowledgeBinding(bindingId, body) {
-    this.refuseHostMutation('Context compatibility');
     this.validateBody('acknowledgeContext', body);
     return this.idempotent(`POST /context-bindings/${bindingId}/acknowledge`, body.requestId, body, () => this.store.transaction(() => {
       const row = this.store.get('SELECT * FROM context_bindings WHERE id = ?', bindingId);
@@ -710,7 +941,6 @@ export class Engine {
 
   // Manual Context chat: a run of kind "chat" over a generated core-v1 workflow.
   sendChat(bindingId, body) {
-    this.refuseHostMutation('Context message');
     this.validateBody('chatRequest', body);
     return this.idempotent(`POST /context-bindings/${bindingId}/messages`, body.requestId, body, () => {
       const binding = this.store.get('SELECT * FROM context_bindings WHERE id = ?', bindingId);
@@ -741,8 +971,10 @@ export class Engine {
 
   // ---------- Run queries ----------
   runBody(row) {
+    const publication = row.published_version_id ? this.store.get('SELECT id,version,definition_digest,authority_policy_version FROM workflow_publications WHERE id = ?', row.published_version_id) : null;
     return { runId: row.id, workflowId: row.workflow_id, workflowSnapshot: { artifactId: row.workflow_snapshot_artifact_id, sha256: this.store.artifactRow(row.workflow_snapshot_artifact_id).sha256 },
       executionHash: row.execution_hash, state: row.state, lastSequence: row.last_sequence, createdAt: row.created_at, workspaceId: row.workspace_id, kind: row.kind,
+      publishedVersion: publication ? { publishedVersionId: publication.id, version: publication.version, definitionDigest: publication.definition_digest, authorityPolicyVersion: publication.authority_policy_version } : null,
       controlMode: this.controlModeOf(row.id) };
   }
   requireRun(runId) {
@@ -786,18 +1018,31 @@ export class Engine {
 
   // ---------- Run creation ----------
   createRun(body, { role = 'first-party', clientLabel = null, controllerToken = null, hostAdmission = null } = {}) {
+    // Replay exact commands committed before the Published-Version request shape existed.
+    if (!hostAdmission && typeof body?.requestId === 'string') {
+      const priorDirect = this.replayCommittedReceipt('POST /runs/direct', body.requestId, body, { ignoreDifferentCommand: true });
+      if (priorDirect.found) return priorDirect.response;
+      const priorExternal = this.replayCommittedReceipt('POST /runs/external', body.requestId, body, { ignoreDifferentCommand: true });
+      if (priorExternal.found) return priorExternal.response;
+    }
     this.validateBody('createRun', body);
+    const external = role === 'external';
     if (this.recoveryBlocked) throw new ApiError(409, 'conflict', this.recoveryBlocked);
     if (this.closing) throw new ApiError(409, 'conflict', 'The runtime is shutting down.');
-    const external = role === 'external';
     if (external && !this.store.get('SELECT id FROM workspaces LIMIT 1')) throw new ApiError(409, 'workspace_required', 'Create a workspace in the Deszo window before requesting a run.');
     const command = external ? 'POST /runs/external' : 'POST /runs/direct';
     return this.idempotent(command, body.requestId, body, () => {
-      const workflowRow = this.store.get(`SELECT * FROM workflows WHERE id = ? AND kind = 'user'`, body.workflowId);
-      if (!workflowRow) throw new ApiError(404, 'not_found', `Workflow "${body.workflowId}" does not exist.`);
+      const publication = this.store.get(`SELECT p.*, a.sha256 AS snapshot_sha256 FROM workflow_publications p
+        JOIN artifacts a ON a.id = p.snapshot_artifact_id WHERE p.id = ? AND p.workflow_id = ?`, body.publishedVersionId, body.workflowId);
+      if (!publication) throw new ApiError(404, 'published_version_not_found', 'The requested Published Version does not exist for this workflow.');
+      if (publication.definition_digest !== body.definitionDigest || publication.snapshot_sha256 !== body.workflowSnapshotSha256)
+        throw new ApiError(409, 'conflict', 'The requested Published Version digest does not match the Run request.');
+      if (!publication.runnable) throw new ApiError(409, 'published_version_not_runnable', 'This Published Version failed semantic validation and cannot start a Run.', parseStrictJson(publication.validation_json).issues || []);
       const workspace = this.requireWorkspace(body.workspaceId);
-      const snapshot = this.store.artifactRow(workflowRow.snapshot_artifact_id);
-      if (snapshot.sha256 !== body.workflowSnapshotSha256) throw new ApiError(409, 'conflict', 'The saved workflow changed; reload it before running.');
+      const snapshot = this.store.artifactRow(publication.snapshot_artifact_id);
+      const workflow = this.store.readJson(snapshot.id);
+      const currentValidation = this.validateWorkflow(workflow);
+      if (!currentValidation.valid) throw new ApiError(409, 'published_version_not_runnable', 'The Published Version is no longer suitable for execution under current runtime conditions.', currentValidation.issues);
       const settings = this.currentSettings().settings;
       // ADR-0006: a host permit replaces the confirmation pause only with a genuine admission made by this engine.
       if (body.hostPermitId && !this.isHostAdmission(hostAdmission, body.hostPermitId, 'run.approve')) throw new ApiError(403, 'host_admission_required', 'A run that names a host permit must be admitted by the Local Control Host first.');
@@ -813,9 +1058,9 @@ export class Engine {
         if (controlGrant) this.store.run('INSERT INTO run_request_controls(request_id, grant_id, controller_session_id) VALUES(?,?,?)', body.requestId, controlGrant.id, controlGrant.controller_session_id);
         return { status: 202, body: { outcome: 'confirmation_pending', requestId: body.requestId, statusPath: `/api/v2/run-requests/${body.requestId}` } };
       }
-      const workflow = this.store.readJson(snapshot.id);
       if (!hostAdmitted) this.refuseUnpermittedRun('A run');
-      const result = this.captureRun({ workflow, snapshot, workspace, kind: 'workflow', options: { mode: body.mode || 'workflow', targets: body.targets, refreshCaches: body.refreshCaches || [] }, requestId: body.requestId });
+      const result = this.captureRun({ workflow, snapshot, workspace, kind: 'workflow', publication,
+        options: { mode: body.mode || 'workflow', targets: body.targets, refreshCaches: body.refreshCaches || [] }, requestId: body.requestId });
       // The observer is armed here, inside the creating transaction and before the queued start.
       if (body.controlGrantId) this.bindControlGrant(body.controlGrantId, { runId: result.body.run.runId, workflowId: body.workflowId, workspaceId: body.workspaceId,
         snapshotSha256: body.workflowSnapshotSha256, controllerToken });
@@ -862,51 +1107,6 @@ export class Engine {
     const row = this.store.get('SELECT * FROM external_run_requests WHERE request_id = ?', requestId);
     if (!row) throw new ApiError(404, 'not_found', `Run request "${requestId}" does not exist.`);
     return this.runRequestBody(row);
-  }
-
-  decideRunRequest(requestId, body) {
-    if (!body || typeof body.requestId !== 'string' || !/^[0-9a-fA-F-]{36}$/.test(body.requestId) || !['approve', 'deny'].includes(body.decision))
-      throw new ApiError(400, 'invalid_request', 'A decision request requires a UUID requestId and approve or deny decision.');
-    const payload = { runRequestId: requestId, decision: body.decision };
-    return this.idempotent(`POST /run-requests/${requestId}/decision`, body.requestId, payload, () => {
-      this.expireRunRequests();
-      const request = this.store.get('SELECT * FROM external_run_requests WHERE request_id = ?', requestId);
-      if (!request) return { status: 404, body: { code: 'not_found', message: `Run request "${requestId}" does not exist.`, details: [] } };
-      if (request.state !== 'pending') return { status: 409, body: { code: 'conflict', message: `Run request is already ${request.state}.`, details: [] } };
-      if (body.decision === 'deny') {
-        this.store.run("UPDATE external_run_requests SET state = 'denied' WHERE request_id = ?", requestId);
-        return { status: 200, body: this.runRequestBody(this.store.get('SELECT * FROM external_run_requests WHERE request_id = ?', requestId)) };
-      }
-      const command = parseStrictJson(request.request_json);
-      try {
-        const workflowRow = this.store.get("SELECT * FROM workflows WHERE id = ? AND kind = 'user'", request.workflow_id);
-        if (!workflowRow) throw new ApiError(404, 'not_found', `Workflow "${request.workflow_id}" does not exist.`);
-        const snapshot = this.store.artifactRow(workflowRow.snapshot_artifact_id);
-        if (snapshot.sha256 !== request.workflow_snapshot_sha256) throw new ApiError(409, 'conflict', 'The saved workflow changed while this request was pending.');
-        const workspace = this.requireWorkspace(request.workspace_id);
-        if (workspace.cwd_identity !== request.workspace_cwd_identity) throw new ApiError(409, 'conflict', 'The workspace binding changed while this request was pending.');
-        this.refuseUnpermittedRun('Approving a pending run request');
-        const control = this.store.get('SELECT * FROM run_request_controls WHERE request_id = ?', requestId);
-        if (Boolean(command.controlGrantId) !== Boolean(control) || (control && control.grant_id !== command.controlGrantId))
-          throw new ApiError(403, 'controller_credential_required', 'The pending run control binding is missing or inconsistent.');
-        if (control) this.assertControlGrantForRun(control.grant_id, { workflowId: request.workflow_id, workspaceId: request.workspace_id,
-          snapshotSha256: request.workflow_snapshot_sha256, approvedRequestId: requestId });
-        const result = this.captureRun({ workflow: this.store.readJson(snapshot.id), snapshot, workspace, kind: 'workflow',
-          options: { mode: command.mode || 'workflow', targets: command.targets, refreshCaches: command.refreshCaches || [] }, requestId });
-        const runId = result.body.run.runId;
-        if (control) this.bindControlGrant(control.grant_id, { runId, workflowId: request.workflow_id, workspaceId: request.workspace_id,
-          snapshotSha256: request.workflow_snapshot_sha256, approvedRequestId: requestId });
-        this.store.run("UPDATE external_run_requests SET state = 'approved', run_id = ? WHERE request_id = ?", runId, requestId);
-        return { status: 202, body: { request: this.runRequestBody(this.store.get('SELECT * FROM external_run_requests WHERE request_id = ?', requestId)), run: this.runBody(this.store.get('SELECT * FROM runs WHERE id = ?', runId)) } };
-      } catch (error) {
-        if (!(error instanceof ApiError)) throw error;
-        const problem = { code: error.code, message: error.message, details: error.details || [] };
-        this.store.run("UPDATE external_run_requests SET state = 'denied', problem_json = ? WHERE request_id = ?", canonicalize(problem), requestId);
-        return { status: error.status, body: problem };
-      }
-    }, () => {
-      if (body.decision === 'approve') queueMicrotask(() => this.startRun());
-    });
   }
 
   listRunEvents(runId, { afterSequence = 0, limit = 100 } = {}) {
@@ -972,7 +1172,7 @@ export class Engine {
       if (frozen.has(target)) predecessors.clear();
       const current = fingerprints(workflow, pins);
       for (const id of predecessors) {
-        const source = this.reuseSource(workflow.workflowId, workspace.id, id, current[id]);
+        const source = this.reuseSource(workflow, workspace.id, id, current[id]);
         if (!source) throw new ApiError(422, 'validation_failed', `Run Node needs a committed, current output of "${id}"; none matches the current definition. Run the branch instead.`, [{ path: `/nodes/${id}`, message: 'missing or stale input' }]);
         reused.set(id, source);
       }
@@ -997,10 +1197,10 @@ export class Engine {
   }
 
   // Most recent succeeded attempt of `nodeId` whose captured fingerprint equals the current one.
-  reuseSource(workflowId, workspaceId, nodeId, fingerprint) {
-    const saved = this.store.get('SELECT snapshot_artifact_id FROM workflows WHERE id=?', workflowId);
-    if (saved && allNodesDeep(this.store.readJson(saved.snapshot_artifact_id).nodes).some(node => node.id === nodeId && node.type === 'task')) return null;
-    const runs = this.store.all(`SELECT * FROM runs WHERE workflow_id = ? AND workspace_id = ? AND kind = 'workflow' ORDER BY created_at DESC LIMIT 50`, workflowId, workspaceId);
+  // The admitted definition being planned decides whether a task node may be reused; a later Draft cannot change that decision.
+  reuseSource(workflow, workspaceId, nodeId, fingerprint) {
+    if (allNodesDeep(workflow.nodes).some(node => node.id === nodeId && node.type === 'task')) return null;
+    const runs = this.store.all(`SELECT * FROM runs WHERE workflow_id = ? AND workspace_id = ? AND kind = 'workflow' ORDER BY created_at DESC LIMIT 50`, workflow.workflowId, workspaceId);
     for (const run of runs) {
       const attempt = this.latestAttempt(run.id, nodeId);
       if (!attempt || !DONE_OK.has(attempt.state) || !attempt.outputs_artifact_id) continue;
@@ -1013,7 +1213,7 @@ export class Engine {
     return null;
   }
 
-  captureRun({ workflow, snapshot, workspace, kind, options, requestId }) {
+  captureRun({ workflow, snapshot, workspace, kind, options, requestId, publication = null }) {
     const active = this.activeRun(workspace.id);
     if (active) throw new ApiError(409, 'conflict', active.state === 'waiting_for_user' ? 'The previous run in this workspace is waiting for recovery; close or stop it first.' : 'Another run is active in this workspace.');
     const validation = this.validateWorkflow(workflow);
@@ -1046,10 +1246,13 @@ export class Engine {
         reused: Object.fromEntries([...plan.reused].map(([id, source]) => [id, { runId: source.runId, attemptId: source.attemptId }])) };
       const planArtifact = this.store.putJson(planRecord);
       const createdAt = nowIso();
-      this.store.run(`INSERT INTO runs(id, workflow_id, workspace_id, workflow_snapshot_artifact_id, settings_artifact_id, execution_hash, state, last_sequence, created_at, kind, plan_artifact_id) VALUES (?, ?, ?, ?, ?, ?, 'queued', 0, ?, ?, ?)`,
-        runId, workflow.workflowId, workspace.id, snapshot.id, settingsArtifact.artifactId, canonicalHash(definition), createdAt, kind, planArtifact.artifactId);
+      this.store.run(`INSERT INTO runs(id, workflow_id, workspace_id, workflow_snapshot_artifact_id, settings_artifact_id, execution_hash, state, last_sequence, created_at, kind, plan_artifact_id, published_version_id, definition_digest)
+        VALUES (?, ?, ?, ?, ?, ?, 'queued', 0, ?, ?, ?, ?, ?)`,
+        runId, workflow.workflowId, workspace.id, snapshot.id, settingsArtifact.artifactId, canonicalHash(definition), createdAt, kind, planArtifact.artifactId,
+        publication?.id ?? null, publication?.definition_digest ?? null);
       const events = [
-        { type: 'run.created', payload: { workflowSnapshot: { artifactId: snapshot.id, sha256: snapshot.sha256 }, executionHash: canonicalHash(definition), settingsSnapshot: ref(settingsArtifact) } },
+        { type: 'run.created', payload: { workflowSnapshot: { artifactId: snapshot.id, sha256: snapshot.sha256 }, executionHash: canonicalHash(definition), settingsSnapshot: ref(settingsArtifact),
+          ...(publication ? { publishedVersion: { publishedVersionId: publication.id, version: publication.version, definitionDigest: publication.definition_digest, authorityPolicyVersion: publication.authority_policy_version } } : {}) } },
         { type: 'run.state_changed', payload: { from: null, to: 'queued', reason: 'Run captured.' } },
         { type: 'run.planned', payload: { plan: ref(planArtifact), mode: plan.mode, targets: plan.targets } },
       ];
@@ -2182,7 +2385,6 @@ export class Engine {
   // ---------- Recovery ----------
   recoverRun(runId, body) {
     if (this.judgeAttentionEnabled && this.hasJudgeBarrier(runId) && body?.action !== 'close') throw new ApiError(409,'judge_attention_pending','An independent Judge attention barrier blocks recovery. Stop or explicitly close remains available.');
-    if (body?.action !== 'close') this.refuseHostMutation('Recovery dispatch');
     this.validateBody('recoveryRequest', body);
     return this.idempotent(`POST /runs/${runId}/recovery`, body.requestId, body, () => {
       const row = this.requireRun(runId);

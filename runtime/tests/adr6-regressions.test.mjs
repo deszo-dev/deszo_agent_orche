@@ -63,12 +63,17 @@ function setup({ scope: scopeOverrides = {}, limits: limitOverrides = {}, durati
 async function withRuntime(workflow, options, body) {
   const root = mkdtempSync(join(tmpdir(), 'deszo-adr6-runtime-'));
   let api = await startTestRunner({ root });
-  await api.workspace();
-  const cwdIdentity = api.runner.engine.requireWorkspace('main').cwd_identity;
-  const settings = api.runner.engine.currentSettings();
-  await api.call('PUT', '/api/v2/settings', { requestId: randomUUID(), expectedRevision: settings.revision, settings: { ...settings.settings, externalRunConfirmation: true } });
-  const saved = await api.save(workflow);
-  await api.close();
+  let cwdIdentity, saved;
+  try {
+    await api.workspace();
+    cwdIdentity = api.runner.engine.requireWorkspace('main').cwd_identity;
+    const settings = api.runner.engine.currentSettings();
+    await api.call('PUT', '/api/v2/settings', { requestId: randomUUID(), expectedRevision: settings.revision, settings: { ...settings.settings, externalRunConfirmation: true } });
+    saved = await api.save(workflow);
+  } finally {
+    await api.close();
+    api = null;
+  }
   const ctx = setup({ ...options, root, scope: { workspaces: [{ workspaceId: 'main', cwdIdentity }], workflows: [{ workflowId: workflow.workflowId, baselineSha256: saved.snapshotSha256, permittedRevisions: [] }], ...(options?.scope ?? {}) } });
   const pipeName = pipeFor(root);
   const server = await startHostServer({ host: ctx.host, pipeName });
@@ -420,15 +425,16 @@ test('ADR6-I08 (N07): an exact retry of a committed create-run request returns t
   assert.deepEqual(ctx.host.status(ctx.policyId).used, usedBefore, 'The retry charged nothing.');
   const changed = await ctx.api.callExternal('POST', '/api/v2/runs', { ...body, workflowSnapshotSha256: 'f'.repeat(64) });
   assert.equal(changed.status, 409, 'A different payload with the same request ID is refused.');
-  // The same request through another caller scope is a different command: refused, and nothing is admitted for it.
-  const otherScope = await ctx.api.call('POST', '/api/v2/runs', body);
-  assert.equal(otherScope.status, 409, 'A retry through another caller scope is refused.');
-  assert.equal(otherScope.body.code, 'conflict');
+  // firstPartyToken is a compatibility alias of Owner Token, so every public client replays this receipt.
+  const ownerAliasRetry = await ctx.api.call('POST', '/api/v2/runs', body);
+  assert.equal(ownerAliasRetry.status, first.status, 'Owner Token aliases share the committed receipt.');
+  assert.equal(ownerAliasRetry.body.run.runId, first.body.run.runId);
+  assert.deepEqual(ctx.host.status(ctx.policyId).used, usedBefore, 'The alias retry charged nothing.');
 }));
 
 // ---------- Route guard: no run creation route bypasses the host permit ----------
 
-test('ADR6 route guard: in a host-bound runtime a direct run and an approved request need a host permit; pending requests stay pending', () => {
+test('ADR6 route guard: Owner Run admission needs a Host permit; the obsolete pending approval route is retired', () => {
   const workflow = singleAgent({ id: 'reg-route', context: null });
   return withRuntime(workflow, {}, async ctx => {
     const plain = { workflowId: workflow.workflowId, workflowSnapshotSha256: ctx.saved.snapshotSha256, workspaceId: 'main' };
@@ -436,13 +442,15 @@ test('ADR6 route guard: in a host-bound runtime a direct run and an approved req
     const direct = await ctx.api.call('POST', '/api/v2/runs', { ...plain, requestId: randomUUID() });
     assert.equal(direct.status, 403);
     assert.equal(direct.body.code, 'host_permit_required');
-    // An external request without a permit still waits for the user; it creates no run.
-    const pending = await ctx.api.callExternal('POST', '/api/v2/runs', { ...plain, requestId: randomUUID() });
-    assert.equal(pending.body.outcome, 'confirmation_pending');
-    // Approving that pending request is a run creation route too, and is refused without a permit.
-    const approved = await ctx.api.call('POST', `/api/v2/run-requests/${pending.body.requestId}/decision`, { requestId: randomUUID(), decision: 'approve' });
-    assert.equal(approved.status, 403);
-    assert.equal(approved.body.code, 'host_permit_required');
+    // The former external client alias is the same Owner Token and cannot bypass Host admission.
+    const ownerAlias = await ctx.api.callExternal('POST', '/api/v2/runs', { ...plain, requestId: randomUUID() });
+    assert.equal(ownerAlias.status, 403);
+    assert.equal(ownerAlias.body.code, 'host_permit_required');
+    const requests = await ctx.api.call('GET', '/api/v2/run-requests?state=all&limit=10');
+    assert.deepEqual(requests.body.items, [], 'No confirmation request is created for the Owner alias.');
+    const retiredDecision = await ctx.api.call('POST', `/api/v2/run-requests/${randomUUID()}/decision`, { requestId: randomUUID(), decision: 'approve' });
+    assert.equal(retiredDecision.status, 410);
+    assert.equal(retiredDecision.body.code, 'operation_retired');
     // The permitted route still creates and completes its run.
     const permit = ctx.decide();
     const created = await ctx.api.callExternal('POST', '/api/v2/runs', ctx.runBody(permit.permitId));

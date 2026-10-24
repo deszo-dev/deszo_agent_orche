@@ -395,8 +395,8 @@ test('PDE-R10-12, 13: a disjoint Repair completes and continues the original Par
     await api.waitFor(repairRunId, run => run.state === 'waiting_for_user');
     const operation = api.runner.engine.store.get('SELECT id FROM lifecycle_operations WHERE run_id = ?', repairRunId);
     assert.ok(operation, 'the Repair reached its lifecycle gate');
-    const receipt = await api.call('POST', `/api/v2/runs/${repairRunId}/lifecycle-receipt`, { requestId: randomUUID(), operationId: operation.id,
-      candidateDigest: CANDIDATE, outcome: 'verified', receiptId: randomUUID() });
+    const receipt = api.runner.engine.applyLifecycleReceipt(repairRunId, { requestId: randomUUID(), operationId: operation.id,
+      candidateDigest: CANDIDATE, outcome: 'verified', receiptId: randomUUID() }, { hostAuthenticated: true, receiptEvidence: { fixtureHost: true } });
     assert.equal(receipt.status, 200, JSON.stringify(receipt.body));
     await api.waitFor(parentRunId, run => run.state === 'succeeded');
     assert.equal(api.runner.engine.store.get('SELECT state FROM run_links WHERE id = ?', linked.body.linkId).state, 'resumed');

@@ -77,13 +77,16 @@ async function spawnEngineProcess({ root, fixtureState }) {
     async saveWorkflow(workflow) {
       const expectedEtag = workflowEtags.get(workflow.workflowId) ?? null;
       const requestId = randomUUID();
-      const result = await call('PUT', `/api/v3/workflows/${workflow.workflowId}`, { requestId, expectedEtag, workflow }, {
+      const result = await call('PUT', `/api/v4/workflows/${workflow.workflowId}/draft`, { requestId, workflow }, {
         headers: expectedEtag === null ? { 'If-None-Match': '*' } : { 'If-Match': expectedEtag },
       });
       if (result.status !== 200) throw new Error(JSON.stringify(result.body));
       workflowEtags.set(workflow.workflowId, result.body.etag);
-      const { etag, revision, ...saved } = result.body;
-      return saved;
+      const validation = await call('POST', `/api/v4/workflows/${workflow.workflowId}/draft/validate`, {}, { headers: { 'If-Match': result.body.etag } });
+      if (validation.status !== 200 || !validation.body.validation.valid) throw new Error(JSON.stringify(validation.body));
+      const publication = await call('POST', `/api/v4/workflows/${workflow.workflowId}/publish`, { requestId: randomUUID() }, { headers: { 'If-Match': result.body.etag } });
+      if (publication.status !== 201) throw new Error(JSON.stringify(publication.body));
+      return publication.body;
     },
     async waitFor(runId, predicate = run => ['succeeded', 'failed', 'canceled', 'interrupted', 'waiting_for_user'].includes(run.state), timeout = 30_000) {
       const started = Date.now();
@@ -198,6 +201,8 @@ test('CONT (harness-driven): committed outputs survive a real restart and are re
     const initialRunRes = await engine1.call('POST', '/api/v2/runs', {
       workflowId: 'parent-delivery',
       workflowSnapshotSha256: savedParent.snapshotSha256,
+      publishedVersionId: savedParent.publishedVersionId,
+      definitionDigest: savedParent.definitionDigest,
       workspaceId: 'main',
       requestId: randomUUID(),
       mode: 'branch',
@@ -262,6 +267,8 @@ test('CONT (harness-driven): committed outputs survive a real restart and are re
     const repairDevRes = await engine1.call('POST', '/api/v2/runs', {
       workflowId: 'deszo-self-repair',
       workflowSnapshotSha256: savedRepair.snapshotSha256,
+      publishedVersionId: savedRepair.publishedVersionId,
+      definitionDigest: savedRepair.definitionDigest,
       workspaceId: 'main-repair',
       requestId: randomUUID(),
       mode: 'branch',
@@ -275,6 +282,8 @@ test('CONT (harness-driven): committed outputs survive a real restart and are re
     const repairWatchRes = await engine1.call('POST', '/api/v2/runs', {
       workflowId: 'deszo-self-repair',
       workflowSnapshotSha256: savedRepair.snapshotSha256,
+      publishedVersionId: savedRepair.publishedVersionId,
+      definitionDigest: savedRepair.definitionDigest,
       workspaceId: 'main-repair',
       requestId: randomUUID(),
       mode: 'node',
@@ -388,6 +397,8 @@ test('CONT (harness-driven): committed outputs survive a real restart and are re
     const repairJudgeRes = await engine2.call('POST', '/api/v2/runs', {
       workflowId: 'deszo-self-repair',
       workflowSnapshotSha256: savedRepair.snapshotSha256,
+      publishedVersionId: savedRepair.publishedVersionId,
+      definitionDigest: savedRepair.definitionDigest,
       workspaceId: 'main-repair',
       requestId: randomUUID(),
       mode: 'node',
@@ -414,6 +425,8 @@ test('CONT (harness-driven): committed outputs survive a real restart and are re
     const parentWatcherRes = await engine2.call('POST', '/api/v2/runs', {
       workflowId: 'parent-delivery',
       workflowSnapshotSha256: savedParent.snapshotSha256,
+      publishedVersionId: savedParent.publishedVersionId,
+      definitionDigest: savedParent.definitionDigest,
       workspaceId: 'main',
       requestId: randomUUID(),
       mode: 'node',
@@ -433,6 +446,8 @@ test('CONT (harness-driven): committed outputs survive a real restart and are re
     const parentJudgeRes = await engine2.call('POST', '/api/v2/runs', {
       workflowId: 'parent-delivery',
       workflowSnapshotSha256: savedParent.snapshotSha256,
+      publishedVersionId: savedParent.publishedVersionId,
+      definitionDigest: savedParent.definitionDigest,
       workspaceId: 'main',
       requestId: randomUUID(),
       mode: 'node',
@@ -501,6 +516,8 @@ test('CONT: Interrupted effectful operation is not blindly re-executed after res
     const runRes = await engine1.call('POST', '/api/v2/runs', {
       workflowId: 'slow-work',
       workflowSnapshotSha256: saved.snapshotSha256,
+      publishedVersionId: saved.publishedVersionId,
+      definitionDigest: saved.definitionDigest,
       workspaceId: 'main',
       requestId: randomUUID(),
       mode: 'workflow',
@@ -543,6 +560,8 @@ test('CONT: Interrupted effectful operation is not blindly re-executed after res
     const continuationRes = await engine2.call('POST', '/api/v2/runs', {
       workflowId: 'slow-work',
       workflowSnapshotSha256: saved.snapshotSha256,
+      publishedVersionId: saved.publishedVersionId,
+      definitionDigest: saved.definitionDigest,
       workspaceId: 'main',
       requestId: randomUUID(),
       mode: 'node',

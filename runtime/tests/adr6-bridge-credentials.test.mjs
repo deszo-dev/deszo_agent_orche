@@ -26,7 +26,10 @@ test('ADR6 bridge credentials: a bridge that did not create a controller session
     assert.equal(JSON.stringify(session).includes('controllerToken'), false, 'The credential is never returned to the model.');
 
     stranger = await bridgeFor(api);
-    const refused = await stranger.call('start_run', { requestId: randomUUID(), workflowId: workflow.workflowId, workflowSnapshotSha256: saved.snapshotSha256, workspaceId: 'main', controllerSessionId: session.controllerSessionId });
+    const publication = api.runner.engine.getLatestWorkflowPublication(workflow.workflowId);
+    const refused = await stranger.call('start_run', { requestId: randomUUID(), workflowId: workflow.workflowId,
+      workflowSnapshotSha256: saved.snapshotSha256, publishedVersionId: publication.publishedVersionId,
+      definitionDigest: publication.definitionDigest, workspaceId: 'main', controllerSessionId: session.controllerSessionId });
     assert.equal(refused.isError, true);
     assert.equal(refused.structuredContent.error.code, 'controller_credential_required');
     assert.equal(api.runner.engine.store.get('SELECT COUNT(*) AS n FROM runs').n, 0, 'No run was created by the bridge that lacks the credential.');

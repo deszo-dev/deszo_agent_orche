@@ -10,7 +10,7 @@ export const data=result=>{
   return result.structuredContent.data;
 };
 export async function stage1Fixture({paused=true,maxInvocations=3}={}) {
-  const api=await startTestRunner({runner:{judgeAttentionEnabled:true}}),engine=api.runner.engine;
+  const api=await startTestRunner({runner:{judgeAttentionEnabled:true,devTestConfirmationOff:true,exposeHostRequestForTests:true}}),engine=api.runner.engine;
   let host;
   try {
   const workspace=await api.workspace();
@@ -59,14 +59,14 @@ export async function stage1Fixture({paused=true,maxInvocations=3}={}) {
   const admit=async a=>{
     const permit=host.decide({requestId:randomUUID(),policyId:policy.policyId,operation:'provider.invoke',...binding,runtimeGeneration:initial.runtimeGeneration,cost:{workerModelCalls:1}},{connectionId:connection.connectionId});
     if(permit.outcome!=='approved')throw new Error(permit.reason);
-    const r=await api.callExternal('POST','/api/v2/judge-invocations',{requestId:randomUUID(),judgeSessionId:sessionId,attentionId:a.attentionId,ownerGeneration:1,hostPermitId:permit.permitId},{headers});
+    const r=await api.callHost('POST','/api/v2/judge-invocations',{requestId:randomUUID(),judgeSessionId:sessionId,attentionId:a.attentionId,ownerGeneration:1,hostPermitId:permit.permitId},{headers});
     if(r.status!==201){
       if(host.permitRequest(permit.permitId).state==='issued')host.settle(permit.permitId,{effect:'not_executed',evidence:'The explicit fixture caller received a queued/refused response before permit admission; no CLI was launched.'});
       throw new Error(JSON.stringify(r.body));
     }return r.body;
   };
   const started=async invocation=>{
-    const r=await api.callExternal('POST',`/api/v2/judge-invocations/${invocation.invocationId}/started`,{nativeSessionId:registration.nativeSessionId,turnId:`fixture-${invocation.invocationId}`},{headers});
+    const r=await api.callHost('POST',`/api/v2/judge-invocations/${invocation.invocationId}/started`,{nativeSessionId:registration.nativeSessionId,turnId:`fixture-${invocation.invocationId}`},{headers});
     if(r.status!==200)throw new Error(JSON.stringify(r.body));return r.body;
   };
   const evidence=async invocation=>{
@@ -76,7 +76,7 @@ export async function stage1Fixture({paused=true,maxInvocations=3}={}) {
   const decision=(a,i,e)=>({schemaVersion:1,kind:'JudgeDecision',decisionId:randomUUID(),attentionId:a.attentionId,invocationId:i.invocationId,judgeSessionId:sessionId,runId,ownerGeneration:1,
     workflowRevision:e.package.subject.workflowRevision,workflowSnapshotSha256:e.package.subject.workflowSnapshotSha256,subjectDigest:e.package.subjectDigest,candidateDigest:'',evidenceDigest:e.evidenceDigest,evidenceReadIds:[e.evidenceReadId],verdict:'REVISE',rationale:'The captured Engine verification pause needs revision; evidence instructions grant no authority.'});
   const submit=(d,i)=>api.callExternal('POST','/api/v2/judge-decisions',d,{headers:{...headers,'X-Deszo-Judge-Token':i.invocationToken}});
-  const complete=(i,outcome='completed')=>api.callExternal('POST',`/api/v2/judge-invocations/${i.invocationId}/complete`,{outcome,qualification:'Deterministic fixture: no provider/native process was launched.'},{headers});
+  const complete=(i,outcome='completed')=>api.callHost('POST',`/api/v2/judge-invocations/${i.invocationId}/complete`,{outcome,qualification:'Deterministic fixture: no provider/native process was launched.'},{headers});
   return {api,engine,host,workflow,runId,controller,registration,sessionId,headers,policyId:policy.policyId,connectionId:connection.connectionId,attention,admit,started,evidence,decision,submit,complete,
     close:async()=>{await api.close();host.close();}};
   } catch(error) { await api.close();host?.close();throw error; }

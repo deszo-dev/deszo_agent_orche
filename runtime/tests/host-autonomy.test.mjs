@@ -29,6 +29,12 @@ test('ADR6-01/07: a host permit admits an external run without the confirmation 
   const settings = api.runner.engine.currentSettings();
   await api.call('PUT', '/api/v2/settings', { requestId: randomUUID(), expectedRevision: settings.revision, settings: { ...settings.settings, externalRunConfirmation: true } });
   const saved = await api.save(workflow);
+  const draft = await api.call('GET', `/api/v4/workflows/${workflow.workflowId}/draft`);
+  const sameContentVersion = await api.call('POST', `/api/v4/workflows/${workflow.workflowId}/publish`, { requestId: randomUUID() }, { headers: { 'If-Match': draft.body.etag } });
+  assert.equal(sameContentVersion.status, 201);
+  assert.equal(sameContentVersion.body.version, 2);
+  assert.equal(sameContentVersion.body.snapshotSha256, saved.snapshotSha256, 'both Published Versions have identical content bytes');
+  const selectedPublication = api.runner.engine.getWorkflowPublication(workflow.workflowId, 1);
   await api.close();
 
   // The trusted host, its enrolled authenticator and a verified policy for exactly this workflow revision.
@@ -64,11 +70,16 @@ test('ADR6-01/07: a host permit admits an external run without the confirmation 
     for (const key of HOST_ENV) assert.equal(process.env[key], undefined, `${key} leaked into the runtime environment.`);
     const decide = overrides => controller.call('decide', { request: { requestId: randomUUID(), policyId: policy.policyId, operation: 'run.approve', workspaceId: 'main', workflowId: workflow.workflowId,
       workflowSnapshotSha256: saved.snapshotSha256, runtimeGeneration, cost: {}, ...overrides } });
-    const runBody = permitId => ({ workflowId: workflow.workflowId, workflowSnapshotSha256: saved.snapshotSha256, workspaceId: 'main', requestId: randomUUID(), hostPermitId: permitId });
+    const publication = selectedPublication;
+    const runBody = permitId => ({ workflowId: workflow.workflowId, workflowSnapshotSha256: saved.snapshotSha256,
+      publishedVersionId: publication.publishedVersionId, definitionDigest: publication.definitionDigest,
+      workspaceId: 'main', requestId: randomUUID(), hostPermitId: permitId });
 
-    // Without a permit the ordinary path still waits for the user.
+    // Owner Token is public API authority, but a host-bound Engine still requires its exact Host admission.
     const ordinary = await api.callExternal('POST', '/api/v2/runs', { ...runBody(randomUUID()), hostPermitId: undefined });
-    assert.equal(ordinary.body.outcome, 'confirmation_pending');
+    assert.equal(ordinary.status, 403);
+    assert.equal(ordinary.body.code, 'host_permit_required');
+    assert.equal(api.runner.engine.store.get('SELECT COUNT(*) AS count FROM runs').count, 0);
 
     const permitted = await decide({});
     assert.equal(permitted.outcome, 'approved');
@@ -77,6 +88,7 @@ test('ADR6-01/07: a host permit admits an external run without the confirmation 
     assert.equal(created.body.outcome, 'created');
     const finished = await api.waitFor(created.body.run.runId);
     assert.equal(finished.run.state, 'succeeded');
+    assert.equal(finished.run.publishedVersion.publishedVersionId, publication.publishedVersionId, 'Host admission preserves the exact requested version when another version has identical bytes');
 
     // The permit is single-use, a forged permit ID grants nothing, and a permit for another workspace is refused.
     const reused = await api.callExternal('POST', '/api/v2/runs', runBody(permitted.permitId));

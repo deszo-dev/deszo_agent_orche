@@ -30,6 +30,7 @@ import deliveryResult from '../../docs/schemas/delivery-result.schema.json' with
 import managedTask from '../../docs/schemas/managed-task.schema.json' with { type: 'json' };
 import autonomyPolicy from '../../docs/schemas/autonomy-policy.schema.json' with { type: 'json' };
 import judgeControl from '../../docs/schemas/judge-control.schema.json' with { type: 'json' };
+import apiV4 from '../../docs/schemas/runtime-api-v4.schema.json' with { type: 'json' };
 
 export const SCHEMAS = {
   'workflow.schema.json': workflow,
@@ -45,6 +46,7 @@ export const SCHEMAS = {
   'journal-event-v2.schema.json': journalV2,
   'runtime-api-v2.schema.json': apiV2,
   'runtime-api-v3.schema.json': apiV3,
+  'runtime-api-v4.schema.json': apiV4,
   'review-decision.schema.json': reviewDecision,
   'gate.schema.json': gate,
   'map.schema.json': mapSchema,

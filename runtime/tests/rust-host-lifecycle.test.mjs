@@ -204,13 +204,19 @@ async function startLinkedLifecycle(connection, profile, candidateDigest) {
   }
   await writeFile(join(connection.scratchRoot, 'main-repair/candidate.json'), JSON.stringify({ candidateId: 'build-b', candidateDigest, continuationCheckpointId: CHECKPOINT_ID }));
   const save = async definition => {
-    const response = await setupCall('PUT', `/api/v3/workflows/${definition.workflowId}`, { requestId: randomUUID(), expectedEtag: null, workflow: definition }, { headers: { 'If-None-Match': '*' } });
-    assert.equal(response.status, 200, JSON.stringify(response.body));
-    return response.body;
+    const draft = await setupCall('PUT', `/api/v4/workflows/${definition.workflowId}/draft`, { requestId: randomUUID(), workflow: definition }, { headers: { 'If-None-Match': '*' } });
+    assert.equal(draft.status, 200, JSON.stringify(draft.body));
+    const validation = await setupCall('POST', `/api/v4/workflows/${definition.workflowId}/draft/validate`, {}, { headers: { 'If-Match': draft.body.etag } });
+    assert.equal(validation.status, 200, JSON.stringify(validation.body));
+    assert.equal(validation.body.validation.valid, true, JSON.stringify(validation.body.validation));
+    const publication = await setupCall('POST', `/api/v4/workflows/${definition.workflowId}/publish`, { requestId: randomUUID() }, { headers: { 'If-Match': draft.body.etag } });
+    assert.equal(publication.status, 201, JSON.stringify(publication.body));
+    return publication.body;
   };
   const parent = await save(parentWorkflow());
   const repair = await save(repairWorkflow());
-  const parentStart = await setupCall('POST', '/api/v2/runs', { workflowId: parent.workflow.workflowId, workflowSnapshotSha256: parent.snapshotSha256, workspaceId: 'main', requestId: randomUUID() });
+  const parentStart = await setupCall('POST', '/api/v2/runs', { workflowId: parent.workflow.workflowId, workflowSnapshotSha256: parent.snapshotSha256,
+    publishedVersionId: parent.publishedVersionId, definitionDigest: parent.definitionDigest, workspaceId: 'main', requestId: randomUUID() });
   assert.equal(parentStart.status, 202, JSON.stringify(parentStart.body));
   const parentRunId = parentStart.body.run.runId;
   await waitFor(connection, parentRunId, body => body.run.state === 'waiting_for_user');
@@ -437,11 +443,18 @@ test('negative Rust Host case: shutdown terminates an active provider and its su
     const slowWorkflow = workflow('slow-provider-shutdown', [agent('slow', 'codex', 'fixture-slow-60')], [
       edge('request-slow', 'request', 'text', 'slow', 'prompt'), edge('slow-result', 'slow', 'text', 'result', 'value'),
     ]);
-    const saved = await call(connection, 'PUT', `/api/v3/workflows/${slowWorkflow.workflowId}`,
-      { requestId: randomUUID(), expectedEtag: null, workflow: slowWorkflow }, { headers: { 'If-None-Match': '*' } });
-    assert.equal(saved.status, 200, JSON.stringify(saved.body));
+    const draft = await call(connection, 'PUT', `/api/v4/workflows/${slowWorkflow.workflowId}/draft`,
+      { requestId: randomUUID(), workflow: slowWorkflow }, { headers: { 'If-None-Match': '*' } });
+    assert.equal(draft.status, 200, JSON.stringify(draft.body));
+    const validation = await call(connection, 'POST', `/api/v4/workflows/${slowWorkflow.workflowId}/draft/validate`, {}, { headers: { 'If-Match': draft.body.etag } });
+    assert.equal(validation.status, 200, JSON.stringify(validation.body));
+    assert.equal(validation.body.validation.valid, true, JSON.stringify(validation.body.validation));
+    const saved = await call(connection, 'POST', `/api/v4/workflows/${slowWorkflow.workflowId}/publish`,
+      { requestId: randomUUID() }, { headers: { 'If-Match': draft.body.etag } });
+    assert.equal(saved.status, 201, JSON.stringify(saved.body));
     const started = await call(connection, 'POST', '/api/v2/runs', { workflowId: saved.body.workflow.workflowId,
-      workflowSnapshotSha256: saved.body.snapshotSha256, workspaceId: 'main', requestId: randomUUID() });
+      workflowSnapshotSha256: saved.body.snapshotSha256, publishedVersionId: saved.body.publishedVersionId,
+      definitionDigest: saved.body.definitionDigest, workspaceId: 'main', requestId: randomUUID() });
     assert.equal(started.status, 202, JSON.stringify(started.body));
     const runId = started.body.run.runId;
     await waitFor(connection, runId, body => body.run.state === 'running');

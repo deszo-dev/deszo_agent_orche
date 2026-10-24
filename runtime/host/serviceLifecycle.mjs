@@ -36,12 +36,20 @@ export function installedLifecycle({ host, installation, native, installRoot }) 
     const registration = host.requireRuntimeParty(connection.runtime, connection.runtime?.policyId, p.runtimeGeneration);
     required(sameProcess(registration.processEvidence, connection.peer.parent), 'Health belongs to a different OS process.');
     const intent = JSON.parse(host.operationRow(registration.operationId).intent_json), build = builds.get(intent.buildId), profile = host.get('SELECT * FROM data_profiles WHERE profile_id=?', intent.profile);
-    required(Number.isInteger(p.port) && p.port > 0 && p.port < 65536 && /^[a-f0-9]{64}$/.test(p.token), 'Invalid runtime endpoint.');
+    required(Number.isInteger(p.port) && p.port > 0 && p.port < 65536 && /^[a-f0-9]{64}$/.test(p.token) && /^[a-f0-9]{64}$/.test(p.hostToken), 'Invalid runtime endpoint.');
     required(p.buildId === intent.buildId && p.protocolVersion === build.manifest.protocolVersion && p.storeSchemaVersion === build.manifest.storeSchemaVersion && samePath(p.applicationRoot, profile.profile_path), 'Build, protocol or store profile health differs.');
     required(!registration.ready, 'Runtime readiness was already registered.');
     registration.ready = { ok: true, buildId: p.buildId, protocolVersion: p.protocolVersion, storeSchemaVersion: p.storeSchemaVersion, storeId: p.storeId, runtimeInstanceId: p.runtimeInstanceId, applicationRoot: profile.profile_path };
-    registration.endpoint = { port: p.port, token: p.token };
+    registration.endpoint = { port: p.port, token: p.token, hostToken: p.hostToken };
     host.audit('runtime.ready', { runtimeGeneration: p.runtimeGeneration, ...registration.ready }, { policyId: connection.runtime.policyId }); return { recorded: true };
+  }
+  function updateOwnerToken(p, connection) {
+    const registration = host.requireRuntimeParty(connection.runtime, connection.runtime?.policyId, p.runtimeGeneration);
+    required(sameProcess(registration.processEvidence, connection.peer.parent), 'Owner Token rotation belongs to a different Runtime process.');
+    required(registration.ready && registration.endpoint && /^[a-f0-9]{64}$/.test(p.token), 'Invalid Owner Token rotation.');
+    registration.endpoint.token = p.token;
+    host.audit('runtime.owner_token_rotated', { runtimeGeneration: p.runtimeGeneration }, { policyId: connection.runtime.policyId });
+    return { recorded: true };
   }
   async function restart({ connection, policyId, requestId, buildId, operation = 'app.restart' }) {
     host.requireController(connection.controller?.connectionId, policyId);
@@ -80,5 +88,5 @@ export function installedLifecycle({ host, installation, native, installRoot }) 
   }
   const stopping = new ApplicationStop({ host, native });
   const stop = (request, connectionId, options) => stopping.stop(request, connectionId, options);
-  return { builds, profiles, registerProfile, validateRuntimeSource, recordReady, restart, stop };
+  return { builds, profiles, registerProfile, validateRuntimeSource, recordReady, updateOwnerToken, restart, stop };
 }

@@ -43,8 +43,15 @@ async function suspendedParent(api, { repair = repairWorkflow(), candidateOnFile
   return { parentRunId, repairRunId: link.body.repairRunId, linkId: link.body.linkId };
 }
 
-const receipt = (api, repairRunId, operationId, candidateDigest = GOOD) => api.call('POST', `/api/v2/runs/${repairRunId}/lifecycle-receipt`,
-  { requestId: randomUUID(), operationId, candidateDigest, outcome: 'verified', receiptId: randomUUID() });
+const receipt = (api, repairRunId, operationId, candidateDigest = GOOD) => {
+  try {
+    return api.runner.engine.applyLifecycleReceipt(repairRunId,
+      { requestId: randomUUID(), operationId, candidateDigest, outcome: 'verified', receiptId: randomUUID() },
+      { hostAuthenticated: true, receiptEvidence: { fixtureHost: true } });
+  } catch (error) {
+    return { status: error.status ?? 500, body: { code: error.code ?? 'internal_error', message: error.message } };
+  }
+};
 
 function view(root) {
   const db = new DatabaseSync(join(root, 'store', 'state.sqlite'), { readOnly: true });

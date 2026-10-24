@@ -182,6 +182,7 @@ async function route(connection, message) {
       const result = host.attachRuntime(p); connection.runtime = { policyId: p.policyId, runtimeGeneration: p.runtimeGeneration }; return result;
     }
     case 'runtime.ready': return lifecycle.recordReady(p, connection);
+    case 'runtime.owner_token_rotated': return lifecycle.updateOwnerToken(p, connection);
     case 'application.launcher_identity': {
       required(peer.verifiedByService&&peer.nativeMode==='client'&&Object.keys(p).length===1&&host.launchedByHost(p.policyId,peer.parent),'Only the actual host-launched application may select the trusted launcher for foreground handoff.');
       const desktop=JSON.parse(host.policyRow(p.policyId).decision_json).scope.desktop;

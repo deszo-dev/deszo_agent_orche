@@ -85,7 +85,12 @@ export function installHostAutonomy(Engine, { ApiError }) {
       operation: 'run.approve', workflowId: body.workflowId, workflowSnapshotSha256: body.workflowSnapshotSha256, workspaceId: body.workspaceId,
     });
     let result;
-    try { result = this.createRun(body, { ...options, hostAdmission: admission }); }
+    try {
+      // Host policy bindings pin definition bytes by their immutable snapshot hash. The caller still
+      // selects the exact Published Version; createRun verifies that version's digest and snapshot
+      // against both the request and the admitted Host scope before it captures the Run.
+      result = this.createRun(body, { ...options, hostAdmission: admission });
+    }
     catch (error) {
       await this.settleHostPermit(admission.permitId, 'not_executed', `engine refused the run: ${error.code || 'error'}: ${error.message}`);
       throw error;

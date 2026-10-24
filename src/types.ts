@@ -72,14 +72,16 @@ export interface Workflow {
 }
 
 export interface Issue { path: string; message: string }
-export interface SavedWorkflow { workflow: Workflow; snapshotSha256: string; executionHash: string; revision: number; etag: string; validation: { valid: boolean; issues: Issue[] } }
-export interface WorkflowSummary { workflowId: string; snapshotSha256: string; executionHash: string; revision: number; createdAt: string; updatedAt: string }
+export interface SavedWorkflow { workflow: Workflow; workflowId?: string; snapshotSha256: string; definitionDigest?: string; executionHash: string; revision: number; etag: string; sourcePublishedVersionId?: string | null; updatedAt?: string; validation: { valid: boolean; issues: Issue[] } }
+export interface PublishedWorkflow { workflowId: string; publishedVersionId: string; version: number; workflow: Workflow; definitionDigest: string; snapshotSha256: string; executionHash: string; authorityPolicyVersion: string; provenance: 'legacy-migration' | 'owner-publication'; runnable: boolean; validation: { valid: boolean; issues: Issue[] }; sourceDraftRevision: number | null; publishedAt: string; etag: string }
+export interface PublishedVersionSummary { workflowId: string; publishedVersionId: string; version: number; definitionDigest: string; snapshotSha256: string; executionHash: string; authorityPolicyVersion: string; provenance: 'legacy-migration' | 'owner-publication'; runnable: boolean; validation: { valid: boolean; issues: Issue[] }; sourceDraftRevision: number | null; publishedAt: string }
+export interface WorkflowSummary { workflowId: string; draftRevision: number | null; publishedVersionId: string | null; latestPublishedVersion: number | null; definitionDigest: string | null; runnable: boolean; createdAt: string; updatedAt: string }
 export interface Workspace { workspaceId: string; cwd: string; cwdIdentity: string; createdAt: string; updatedAt: string }
 
 export type RunState = 'queued' | 'running' | 'draining' | 'waiting_for_user' | 'stopping' | 'succeeded' | 'failed' | 'canceled' | 'interrupted';
 export type AttemptState = 'scheduled' | 'waiting' | 'running' | 'succeeded' | 'failed' | 'canceled' | 'blocked' | 'interrupted' | 'reused' | 'skipped';
 export const TERMINAL_RUN: RunState[] = ['succeeded', 'failed', 'canceled', 'interrupted'];
-export interface Run { runId: string; workflowId: string; workflowSnapshot: ArtifactRef; executionHash: string; state: RunState; lastSequence: number; createdAt: string; workspaceId: string; kind: 'workflow' | 'chat'; controlMode?: 'supervised' | 'unsupervised' }
+export interface Run { runId: string; workflowId: string; workflowSnapshot: ArtifactRef; executionHash: string; state: RunState; lastSequence: number; createdAt: string; workspaceId: string; kind: 'workflow' | 'chat'; publishedVersion: { publishedVersionId: string; version: number; definitionDigest: string; authorityPolicyVersion: string } | null; controlMode?: 'supervised' | 'unsupervised' }
 export interface CachePin { nodeId: string; value: { type: ValueType; artifact: ArtifactRef }; sourceRunId: string; sourceAttemptId: string; fingerprint: string; sourceChanged: boolean; orphaned?: boolean; pinnedAt: string }
 export interface LoopExecution { loopNodeId: string; state: 'running' | 'paused' | 'finished' | 'failed' | 'canceled' | 'interrupted'; iteration: number; maxIterations: number; maxActiveMinutes: number; activeMs: number; pauseReason: string | null }
 export interface RunSnapshot {

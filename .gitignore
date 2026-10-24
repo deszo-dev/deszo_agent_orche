@@ -8,6 +8,7 @@ lifecycle-host/target/
 .env.local
 *.log
 !docs/reviews/evidence/2026-10-21-antigravity-stage1/*.log
+!docs/reviews/evidence/2026-10-22-engine-native-continuation/*.log
 *.tsbuildinfo
 .deszo/
 .deszo-fixture/

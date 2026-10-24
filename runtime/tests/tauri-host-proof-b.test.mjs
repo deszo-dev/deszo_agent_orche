@@ -189,9 +189,9 @@ async function stopHost(host, timeoutMs = 25_000) {
   if (host.child.exitCode === null) host.child.kill();
 }
 
-async function apiCall(connection, method, path, body, token = connection.firstPartyToken) {
+async function apiCall(connection, method, path, body, token = connection.firstPartyToken, extraHeaders = {}) {
   const response = await fetch(`http://127.0.0.1:${connection.port}${path}`, { method,
-    headers: { Authorization: `Bearer ${token}`, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
+    headers: { Authorization: `Bearer ${token}`, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...extraHeaders },
     body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(12_000) });
   const text = await response.text();
   return { status: response.status, body: text ? JSON.parse(text) : null };
@@ -292,16 +292,24 @@ async function waitForRun(connection, runId, predicate, timeoutMs = 60_000, toke
 }
 
 async function saveWorkflow(connection, definition) {
-  const response = await apiCall(connection, 'PUT', `/api/v3/workflows/${definition.workflowId}`, {
-    requestId: randomUUID(), expectedEtag: null, workflow: definition,
-  }, connection.firstPartyToken);
-  assert.equal(response.status, 200, JSON.stringify(response.body));
-  return response.body;
+  const draft = await apiCall(connection, 'PUT', `/api/v4/workflows/${definition.workflowId}/draft`, {
+    requestId: randomUUID(), workflow: definition,
+  }, connection.firstPartyToken, { 'If-None-Match': '*' });
+  assert.equal(draft.status, 200, JSON.stringify(draft.body));
+  const validation = await apiCall(connection, 'POST', `/api/v4/workflows/${definition.workflowId}/draft/validate`, {},
+    connection.firstPartyToken, { 'If-Match': draft.body.etag });
+  assert.equal(validation.status, 200, JSON.stringify(validation.body));
+  assert.equal(validation.body.validation.valid, true, JSON.stringify(validation.body.validation));
+  const publication = await apiCall(connection, 'POST', `/api/v4/workflows/${definition.workflowId}/publish`, { requestId: randomUUID() },
+    connection.firstPartyToken, { 'If-Match': draft.body.etag });
+  assert.equal(publication.status, 201, JSON.stringify(publication.body));
+  return publication.body;
 }
 
 async function runWorkflow(connection, saved, workspaceId) {
   const response = await apiCall(connection, 'POST', '/api/v2/runs', {
-    workflowId: saved.workflow.workflowId, workflowSnapshotSha256: saved.snapshotSha256, workspaceId, requestId: randomUUID(),
+    workflowId: saved.workflow.workflowId, workflowSnapshotSha256: saved.snapshotSha256,
+    publishedVersionId: saved.publishedVersionId, definitionDigest: saved.definitionDigest, workspaceId, requestId: randomUUID(),
   }, connection.firstPartyToken);
   assert.equal(response.status, 202, JSON.stringify(response.body));
   return response.body.run.runId;

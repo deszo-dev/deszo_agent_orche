@@ -112,6 +112,17 @@
                 "sha256"
               ],
               "additionalProperties": false
+            },
+            "publishedVersion": {
+              "type": "object",
+              "properties": {
+                "publishedVersionId": { "type": "string", "format": "uuid" },
+                "version": { "type": "integer", "minimum": 1 },
+                "definitionDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+                "authorityPolicyVersion": { "type": "string", "minLength": 1 }
+              },
+              "required": ["publishedVersionId", "version", "definitionDigest", "authorityPolicyVersion"],
+              "additionalProperties": false
             }
           },
           "required": [
