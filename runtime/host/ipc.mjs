@@ -15,6 +15,7 @@ import { createConnection, createServer } from 'node:net';
 import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { HostError } from './authority.mjs';
+import { INSTALLED_HOST_PIPE, nativeHostSocket } from './nativeClient.mjs';
 
 const MAX_LINE = 1024 * 1024;
 
@@ -50,6 +51,7 @@ export function startHostServer({ host, pipeName, peerVerifier = null }) {
       return result;
     },
     'permit.request': (socket, p) => requireParty(socket, host.permitRequest(p.permitId)),
+    'permit.validate': (socket,p) => { requireParty(socket,host.permitRequest(p.permitId));return host.validatePermit(p.permitId); },
     admit: (socket, p) => { requireParty(socket, host.permitRequest(p.permitId)); return host.admit(p.permitId); },
     settle: (socket, p) => { requireParty(socket, host.permitRequest(p.permitId)); return host.settle(p.permitId, p); },
     'work.release': (socket, p) => { requireParty(socket, host.permitRequest(p.permitId)); return host.releaseWork(p.permitId, p.workRef, { evidence: p.evidence }); },
@@ -113,15 +115,20 @@ export function connectHost(pipeName, { timeoutMs = 10_000 } = {}) {
   const events = new EventEmitter();
   const pending = new Map();
   let buffer = '';
-  const socket = createConnection(pipeName);
+  const socket = process.platform === 'win32' && pipeName === INSTALLED_HOST_PIPE ? nativeHostSocket() : createConnection(pipeName);
   socket.setEncoding('utf8');
-  const ready = new Promise((resolvePromise, reject) => { socket.once('connect', resolvePromise); socket.once('error', reject); });
+  const ready = new Promise((resolvePromise, reject) => {
+    const timer = setTimeout(() => { reject(new HostError(504, 'host_timeout', 'The installed host connection did not become ready.')); socket.destroy(); }, timeoutMs);
+    const done = fn => value => { clearTimeout(timer); fn(value); };
+    socket.once('connect', done(resolvePromise)); socket.once('error', done(reject)); socket.once('close', done(() => reject(new HostError(503, 'host_unavailable', 'The installed host closed before registration.'))));
+  });
   ready.catch(() => {});
   socket.on('data', chunk => {
     buffer += chunk;
+    if (Buffer.byteLength(buffer) > MAX_LINE) { socket.destroy(); return; }
     let index;
     while ((index = buffer.indexOf('\n')) >= 0) {
-      const message = JSON.parse(buffer.slice(0, index));
+      let message; try { message = JSON.parse(buffer.slice(0, index)); } catch { socket.destroy(); return; }
       buffer = buffer.slice(index + 1);
       if (message.event) { events.emit(message.event, message); continue; }
       const entry = pending.get(message.id);
@@ -152,6 +159,7 @@ export function connectHost(pipeName, { timeoutMs = 10_000 } = {}) {
     // The engine-facing adapter: the calls a host-bound runtime makes for its own permits and provider charges.
     engineAdapter: () => ({
       permitRequest: permitId => call('permit.request', { permitId }),
+      validatePermit: permitId => call('permit.validate', { permitId }),
       admit: permitId => call('admit', { permitId }),
       settle: (permitId, { effect, evidence, workRef = null }) => call('settle', { permitId, effect, evidence, workRef }),
       releaseWork: (permitId, workRef, evidence) => call('work.release', { permitId, workRef, evidence }),

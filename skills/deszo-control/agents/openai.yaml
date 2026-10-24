@@ -1,0 +1,4 @@
+interface:
+  display_name: "Deszo Control"
+  short_description: "Efficient Deszo MCP supervision and recovery"
+  default_prompt: "Use $deszo-control to check the current Deszo state and continue the authorized workflow efficiently."

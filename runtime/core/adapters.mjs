@@ -7,7 +7,7 @@ import { canonicalHash, parseStrictJson } from './canonical.mjs';
 import { transportSchema } from './transport.mjs';
 import { resolveEffort } from '../../shared/effort.mjs';
 
-export const ADAPTER_VERSION = 2;
+export const ADAPTER_VERSION = 3;
 
 // Child environments never carry API credentials or third-party Claude routing variables.
 export function subscriptionEnvironment(source = process.env) {
@@ -103,8 +103,16 @@ export async function detectProvider(provider) {
 
 // The prompt carries the complete contract; the native flag carries only its transport form.
 export const outputContractText = output => output.format === 'json'
-  ? `\n\nOutput contract: return only one JSON value${output.schema ? ` that validates against this complete JSON Schema after native transport decoding:\n${JSON.stringify(output.schema)}\nNative transport encoding: choose exactly one allowed object shape from the complete contract. The native finish schema can merge alternative shapes and require nullable fields. Set every field absent or forbidden in your chosen shape to null, never an empty array, empty string, invented issue or extra explanation. Supply the contract values for the fields your shape requires. Use the same encoded JSON object in your final response and native finish tool; do not add a separate reason or commentary to either.\n` : '. '}Do not wrap it in a code fence or add commentary.`
+  ? `\n\nOutput contract: return only one JSON value${output.schema ? ` that validates against this complete JSON Schema after native transport decoding:\n${JSON.stringify(output.schema)}\nNative transport encoding: choose exactly one allowed object shape from the complete contract. Every required field must have its declared type. For a required non-nullable string or array with no applicable content, use an empty string or empty array only if the contract permits it; never substitute null. Null is allowed only when the native schema explicitly permits it. Native transport can merge alternative shapes and add nullable fields: use null for fields absent or forbidden in your chosen contract shape, and do not invent content for those fields. Use the same encoded JSON object in your final response and native finish tool; do not add a separate reason or commentary to either. If finish reports a validation error, correct the named fields before calling finish again; repeating the rejected object does not complete the task.\n` : '. '}Do not wrap it in a code fence or add commentary.`
   : '';
+
+function antigravityPrintTimeout(timeoutSeconds) {
+  if (!Number.isFinite(timeoutSeconds) || timeoutSeconds <= 0) throw new Error('Antigravity requires a positive process timeout.');
+  const processMs = timeoutSeconds * 1000;
+  // Let the CLI publish its terminal timeout result before the engine kills the process tree.
+  const graceMs = Math.min(30_000, Math.max(1000, Math.ceil(processMs / 10)), processMs / 2);
+  return `${Math.max(1, Math.floor(processMs - graceMs))}ms`;
+}
 
 export function buildInvocation({ provider, cliPath, model, effort, prompt, cwd, nativeSessionId, output, nativeConfiguration, timeoutSeconds, schemaPath }) {
   const requestedEffort = resolveEffort(effort);
@@ -132,11 +140,12 @@ export function buildInvocation({ provider, cliPath, model, effort, prompt, cwd,
     stdin = prompt;
   } else {
     args = [
-      '--print', prompt, '--output-format', 'stream-json', '--model', model,
+      '--input-format', 'text', '--output-format', 'stream-json', '--model', model,
       '--effort', requestedEffort,
       ...(schema ? ['--json-schema', JSON.stringify(schema)] : []), '--dangerously-skip-permissions',
-      '--print-timeout', `${timeoutSeconds}s`, ...(nativeSessionId ? ['--conversation', nativeSessionId] : []),
+      '--print-timeout', antigravityPrintTimeout(timeoutSeconds), ...(nativeSessionId ? ['--conversation', nativeSessionId] : []),
     ];
+    stdin = prompt;
   }
   return { command: cliPath, args, stdin, cwd, env: subscriptionEnvironment() };
 }
@@ -203,14 +212,19 @@ export function createParser(provider, { output = { format: 'text' } } = {}) {
   const expectedTransport = provider === 'antigravity' && output.format === 'json' && output.schema ? transportSchema(output.schema) : null;
   const expectedNativeSchema = expectedTransport?.schema;
   // error: a provider/process failure; formatError: an answer that violates the output contract.
-  const state = { sessionId: null, finalText: null, error: null, formatError: null, terminal: false, model: null, usage: null };
+  const state = { sessionId: null, finalText: null, error: null, formatError: null, terminal: false, model: null, usage: null, diagnostics: [] };
   const feed = event => {
     const normalized = { sessionId: null, text: '', model: null };
     if (provider === 'codex') {
       if (event.type === 'thread.started') normalized.sessionId = event.thread_id;
       if (event.type === 'item.completed' && event.item?.type === 'agent_message') { normalized.text = event.item.text || ''; state.finalText = event.item.text ?? ''; }
       if (event.type === 'turn.completed') { state.usage = event.usage ?? null; state.terminal = true; }
-      if (event.type === 'turn.failed' || event.type === 'error') state.error = event.error?.message || event.message || JSON.stringify(event);
+      if (event.type === 'turn.failed' || event.type === 'error') {
+        const message = event.error?.message || event.message || JSON.stringify(event);
+        // Retry progress remains diagnostic. A successful terminal event is still required.
+        if (event.type === 'error' && /^Reconnecting\.\.\.\s+[1-9]\d*\/[1-9]\d*\s+\(stream disconnected before completion:[\s\S]+\)$/.test(message)) normalized.diagnostic = message;
+        else state.error = message;
+      }
     } else if (provider === 'claude') {
       normalized.sessionId = event.session_id || null;
       if (event.type === 'system' && event.subtype === 'init') normalized.model = event.model || null;
@@ -226,7 +240,23 @@ export function createParser(provider, { output = { format: 'text' } } = {}) {
     } else {
       normalized.sessionId = event.conversation_id || event.init?.conversation_id || event.result?.conversation_id || null;
       if (event.event === 'init') normalized.model = event.init?.model || null;
-      if (event.event === 'step_update') normalized.text = event.step_update?.text_delta || '';
+      if (event.event === 'step_update') {
+        const step = event.step_update || {};
+        normalized.text = step.text_delta || '';
+        if (step.step_type === 'tool' && step.state === 'ERROR') {
+          const error = step.tool_info?.error ?? step.error;
+          const message = typeof error?.message === 'string' ? error.message : structuredText(error) || 'Tool execution failed.';
+          const tool = String(step.tool_name || step.tool_info?.name || 'tool').slice(0, 120);
+          const diagnostic = `Antigravity ${tool} step ${step.step_index ?? '?'}: ${message}`.slice(0, 2000);
+          // Tool errors can be repaired within the same CLI turn; retain evidence without
+          // marking the invocation terminal or turning a later valid result into a failure.
+          if (!state.diagnostics.includes(diagnostic)) {
+            state.diagnostics.push(diagnostic);
+            if (state.diagnostics.length > 8) state.diagnostics.shift();
+            normalized.diagnostic = diagnostic;
+          }
+        }
+      }
       if (event.event === 'result') {
         const result = event.result || {};
         // Antigravity can repeat an earlier turn's structured output on a later text turn.

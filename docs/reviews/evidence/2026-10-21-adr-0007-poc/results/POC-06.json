@@ -1,0 +1,92 @@
+{
+  "experiment": "POC-06",
+  "title": "Takeover, fencing and ambiguous turn start",
+  "status": "FAIL",
+  "checks": [
+    {
+      "name": "a takeover cannot move the session file out from under a live owner",
+      "pass": false,
+      "detail": "the move succeeded while the owner was alive"
+    },
+    {
+      "name": "a live owner cannot write the session after its file was moved away",
+      "pass": false,
+      "detail": null
+    },
+    {
+      "name": "the successor resumes the same session identity after the owner is fenced and the file moved",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "the successor can write after takeover",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "the source home no longer holds the moved session",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "the old home cannot resume the moved session",
+      "pass": true,
+      "detail": "no rollout found for thread id 01a15e56-bff0-7f20-a8fb-33717f4bff79"
+    },
+    {
+      "name": "after a kill in flight, the turn is reconcilable by its identifier",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "a restart does not start a duplicate turn automatically",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "a session created with no items survives a kill immediately after creation",
+      "pass": false,
+      "detail": "no rollout found for thread id 01a15e57-0c23-7821-b3ec-75194082fb2e"
+    },
+    {
+      "name": "a session with one seed item survives a kill immediately after creation",
+      "pass": true,
+      "detail": null
+    }
+  ],
+  "measurements": {
+    "moveWhileOwnerAlive": {
+      "succeeded": true,
+      "error": null
+    },
+    "staleWriteAfterMove": {
+      "accepted": true,
+      "landedInMovedFile": true
+    },
+    "sourceHomeStillHoldsSession": false,
+    "inFlightKill": {
+      "turnStartedBeforeKill": true,
+      "turnId": "01a15e56-cbd5-7fc1-a49d-34f27d91380a",
+      "recordFoundAfterRestart": true,
+      "recordStatus": "interrupted",
+      "duplicateStartAfterRestart": false
+    },
+    "earlyKill": {
+      "turnsRecordedAfterRestart": 0,
+      "listingOk": false,
+      "listingError": "thread not loaded: 01a15e57-0c23-7821-b3ec-75194082fb2e",
+      "threadResumeAfterKillOk": false,
+      "threadResumeError": "no rollout found for thread id 01a15e57-0c23-7821-b3ec-75194082fb2e"
+    },
+    "seededCreateKill": {
+      "seedWriteOk": true,
+      "resumeAfterKillOk": true,
+      "resumeError": null
+    }
+  },
+  "notes": [
+    "Takeover is decided by a physical move. A live owner holds the session file, so the move is refused until the owner is stopped (fenced).",
+    "The in-flight kill shows whether the App Server exposes the started turn after a restart and whether it starts a duplicate on its own.",
+    "The early kill can leave no record; the intent must be reconciled by Deszo, not inferred from absence."
+  ]
+}

@@ -1,15 +1,23 @@
 {
   "version": 1,
-  "status": "unverified",
-  "updatedAt": "2026-10-16",
+  "status": "partially-verified",
+  "updatedAt": "2026-10-21",
   "notes": "ADR-0002 section 2 and Stage 1: exact watch and acknowledgement timing is published only after each client's MCP tool-call timeout is measured. Until an entry is verified, supervision grants are refused with supervision_unavailable.",
   "entries": [
     {
-      "provider": "codex",
+      "provider": "deszo-worker",
       "status": "unverified",
       "testedVersion": null,
       "maxToolTimeoutSeconds": null,
-      "notes": "No measured per-server MCP tool timeout. Generated configurations must pin it above maxWatchWait once measured."
+      "notes": "Installed deterministic HTTP/IPC controller: 30 s HTTP, 3650 s worker IPC calls, 20 s native service replies; these are configured bounds, not measured client evidence. Native timing verification is required before grants are enabled. This is not a Codex/Claude/Antigravity MCP measurement."
+    },
+    {
+      "provider": "codex",
+      "status": "verified",
+      "testedVersion": "deszo-stdio-controller/1",
+      "maxToolTimeoutSeconds": 45,
+      "notes": "Only the reusable mcp/stdio-client.mjs driver on the recorded platform and Node major, with enclosing node_repl timeout >=55s. Check the saved transport fingerprint; application restarts and rebuilds do not invalidate it. Desktop default MCP and autonomous workers are not certified.",
+      "evidence": "controller-transport.json"
     },
     {
       "provider": "claude",

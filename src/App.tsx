@@ -14,6 +14,8 @@ import { nodeTypes, STATE_LABELS } from './nodes';
 import { EffortField, Inspector } from './Inspector';
 import { DEFAULT_EFFORT, type Effort } from '../shared/effort.mjs';
 import { Replay } from './Replay';
+import { AutonomyModal } from './Autonomy';
+import { RunControlPanel, type ControlGrant } from './Supervision';
 import { contextChainTemplate, deliveryTemplate, referenceDeliveryTemplate, reviewLoopTemplate, selectiveDeliveryTemplate, specificationLoopTemplate } from './templates';
 import {
   PROVIDERS, PROVIDER_NAMES, TERMINAL_RUN,
@@ -52,12 +54,13 @@ function Workspace() {
   const [run, setRun] = useState<RunSnapshot | null>(null);
   const [events, setEvents] = useState<JournalEvent[]>([]);
   const [panel, setPanel] = useState<Panel>('problems');
-  const [modal, setModal] = useState<'settings' | 'workspace' | 'workflow' | 'approvals' | null>(null);
+  const [modal, setModal] = useState<'settings' | 'workspace' | 'workflow' | 'approvals' | 'autonomy' | 'control' | null>(null);
   const [chatBinding, setChatBinding] = useState<ContextBinding | null>(null);
   const [pins, setPins] = useState<CachePin[]>([]);
   const [replayRunId, setReplayRunId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [pendingRunRequests, setPendingRunRequests] = useState<RunRequest[]>([]);
+  const [pendingControlGrants, setPendingControlGrants] = useState<ControlGrant[]>([]);
   const [authoringChange, setAuthoringChange] = useState(0);
   const flow = useReactFlow();
   const streamAbort = useRef<AbortController | null>(null);
@@ -201,8 +204,11 @@ function Workspace() {
   }, [authoringChange, client, dirty, report, saved?.revision, workflow.workflowId]);
 
   const refreshRunRequests = useCallback(async () => {
-    if (!client?.hasFirstParty) { setPendingRunRequests([]); return; }
-    try { setPendingRunRequests((await client.get<{ items: RunRequest[] }>('/run-requests?state=pending&limit=100')).items); }
+    if (!client?.hasFirstParty) { setPendingRunRequests([]); setPendingControlGrants([]); return; }
+    try {
+      const [requests, grants] = await Promise.all([client.get<{ items: RunRequest[] }>('/run-requests?state=pending&limit=100'), client.get<{ items: ControlGrant[] }>('/control-grants?state=pending&limit=100')]);
+      setPendingRunRequests(requests.items); setPendingControlGrants(grants.items);
+    }
     catch (error) { report(error, 'Approval queue: '); }
   }, [client, report]);
   useEffect(() => {
@@ -518,7 +524,7 @@ function Workspace() {
       <div className="brand">de<span>s</span>zo</div>
       <button className="chip-button" onClick={() => setModal('workspace')} title="Workspace and working directory"><FolderOpen size={14} />{workspaceId || 'Choose workspace'}</button>
       <button className="chip-button" onClick={() => setModal('workflow')} title="Open or create a workflow"><WorkflowIcon size={14} />{workflow.workflowId}{dirty && <i className="dirty-dot" title="Unsaved changes" />}</button>
-      {client?.hasFirstParty && <button className="chip-button" onClick={() => setModal('approvals')} title="Review external run requests"><ShieldCheck size={14} />Approvals{pendingRunRequests.length > 0 && <span className="approval-count">{pendingRunRequests.length}</span>}</button>}
+      {client?.hasFirstParty && <button className="chip-button" onClick={() => setModal('approvals')} title="Review external run requests and supervision grants"><ShieldCheck size={14} />Approvals{pendingRunRequests.length + pendingControlGrants.length > 0 && <span className="approval-count">{pendingRunRequests.length + pendingControlGrants.length}</span>}</button>}
       {scope && <span className="crumbs"><button className="chip-button" onClick={() => enterScope(null)}><ArrowLeft size={13} />Workflow</button>
         {path.map((id, index) => <span key={id} className="crumbs">
           <span className="muted">›</span>
@@ -526,10 +532,12 @@ function Workspace() {
         </span>)}</span>}
       <div className="spacer" />
       {run && <span className={`run-pill ${run.run.state}`}>{RUN_LABELS[run.run.state]}</span>}
+      {run && <button className="chip-button" onClick={() => setModal('control')}><ShieldCheck size={14} />{run.run.controlMode === 'supervised' ? 'Supervised' : 'Run control'}</button>}
       <button className="button secondary" onClick={() => save()} disabled={!client}><Save size={14} />Save</button>
       {active && run.run.state !== 'waiting_for_user' ? <button className="button danger" onClick={stop} disabled={run.run.state === 'stopping'}><Square size={14} />Stop run</button>
         : <button className="button primary" onClick={() => start()} disabled={!client || busy}><Play size={14} />Run workflow</button>}
       <button className="icon-button" onClick={() => setModal('settings')} title="Settings and providers"><Settings size={16} /></button>
+      <button className="chip-button" onClick={() => setModal('autonomy')} title="Time-bounded development autonomy"><ShieldCheck size={14} />Autonomy</button>
     </header>
     {notice && <div className={`notice ${notice.kind}`}><div><strong>{notice.text}</strong>{notice.details?.length ? <ul>{notice.details.slice(0, 8).map(item => <li key={item}>{item}</li>)}</ul> : null}</div><button onClick={() => setNotice(null)}>×</button></div>}
     <div className="main-grid">
@@ -632,8 +640,10 @@ function Workspace() {
         setTimeout(() => setSelected(nodeId), 80);
       }} />
     {chatBinding && client && <ChatModal client={client} binding={chatBinding} workspaceId={workspaceId} onClose={() => { setChatBinding(null); refreshBindings().catch(() => {}); }} report={report} />}
-    {modal === 'approvals' && client?.hasFirstParty && <ApprovalModal client={client} requests={pendingRunRequests} onClose={() => setModal(null)} onChanged={refreshRunRequests} report={report} />}
+    {modal === 'approvals' && client?.hasFirstParty && <ApprovalModal client={client} requests={pendingRunRequests} grants={pendingControlGrants} onClose={() => setModal(null)} onChanged={refreshRunRequests} report={report} />}
     {modal === 'settings' && client && <SettingsModal client={client} capabilities={capabilities} onCapabilities={setCapabilities} onClose={() => setModal(null)} report={report} />}
+    {modal === 'control' && client && run && <Modal title="Run control" onClose={() => setModal(null)}><RunControlPanel client={client} runId={run.run.runId} report={report} /></Modal>}
+    {modal === 'autonomy' && client && <AutonomyModal client={client} workspace={workspaces.find(item => item.workspaceId === workspaceId)} saved={dirty ? null : saved} onClose={() => setModal(null)} report={report} />}
     {modal === 'workspace' && client && <WorkspaceModal client={client} workspaces={workspaces} current={workspaceId} onSelect={id => { setWorkspaceId(id); setModal(null); }}
       onCreated={async id => { await refreshLists(); setWorkspaceId(id); setModal(null); }} onClose={() => setModal(null)} report={report} />}
     {modal === 'workflow' && client && <WorkflowModal workflows={workflows} onClose={() => setModal(null)} report={report}
@@ -905,22 +915,38 @@ function WorkflowModal({ workflows, onOpen, onCreate, onClose, report }: { workf
   </Modal>;
 }
 
-function ApprovalModal({ client, requests, onClose, onChanged, report }: { client: Client; requests: RunRequest[]; onClose: () => void; onChanged: () => Promise<void>; report: (error: unknown, prefix?: string) => void }) {
+function ApprovalModal({ client, requests, grants, onClose, onChanged, report }: { client: Client; requests: RunRequest[]; grants: ControlGrant[]; onClose: () => void; onChanged: () => Promise<void>; report: (error: unknown, prefix?: string) => void }) {
   const [busyRequest, setBusyRequest] = useState<string | null>(null);
-  const decide = async (requestId: string, decision: 'approve' | 'deny') => {
+  const decide = async (requestId: string, decision: 'approve' | 'deny', kind: 'run-requests' | 'control-grants' = 'run-requests') => {
     setBusyRequest(requestId);
     try {
-      await client.post(`/run-requests/${requestId}/decision`, { requestId: crypto.randomUUID(), decision });
+      await client.post(`/${kind}/${requestId}/decision`, { requestId: crypto.randomUUID(), decision });
     } catch (error) { report(error, `Could not ${decision} run request: `); }
     finally { await onChanged(); setBusyRequest(null); }
   };
-  return <Modal title={`External run requests · ${requests.length} pending`} onClose={onClose}>
+  return <Modal title={`Approvals · ${requests.length + grants.length} pending`} onClose={onClose}>
+    {grants.map(item => <article className="approval-item" key={item.grantId}>
+      <div className="approval-heading"><strong>Supervision · {item.workflowId}</strong><span className="state-chip waiting_for_user">Pending</span></div>
+      <dl className="approval-facts">
+        <div><dt>Workspace</dt><dd>{item.workspaceId}</dd></div>
+        <div><dt>Controller</dt><dd>{item.clientLabel || item.clientProvider} <em>(unverified client claim)</em></dd></div>
+        <div><dt>Client version</dt><dd>{item.clientVersion || 'Not supplied'}</dd></div>
+        <div><dt>Snapshot</dt><dd><code>{item.workflowSnapshotSha256.slice(0, 16)}…</code></dd></div>
+        <div><dt>Actions</dt><dd>{item.requestedActions.join(', ')}</dd></div>
+        <div><dt>Observation / Stop</dt><dd>{item.observationDeadlineMs / 1000}s / {item.escalationDeadlineMs / 1000}s</dd></div>
+      </dl>
+      <div className="modal-actions">
+        <button className="button secondary" disabled={busyRequest === item.grantId} onClick={() => decide(item.grantId, 'deny', 'control-grants')}>Deny supervision</button>
+        <button className="button primary" disabled={busyRequest === item.grantId} onClick={() => decide(item.grantId, 'approve', 'control-grants')}>Approve supervision</button>
+      </div>
+    </article>)}
     {requests.length === 0 ? <div className="empty">No pending run requests.</div> : <div className="approval-list">{requests.map(item => <article className="approval-item" key={item.requestId}>
       <div className="approval-heading"><strong>{item.workflowId}</strong><span className="state-chip waiting_for_user">Pending</span></div>
       <dl className="approval-facts">
         <div><dt>Workspace</dt><dd>{item.workspaceId}</dd></div>
         <div><dt>Requested by</dt><dd>{item.clientLabel || 'Unlabelled client'} <em>(unverified client claim)</em></dd></div>
         <div><dt>Snapshot</dt><dd><code>{item.workflowSnapshotSha256.slice(0, 16)}…</code></dd></div>
+        <div><dt>Control</dt><dd>{item.controlModeRequested || 'unsupervised'}</dd></div>
         <div><dt>Expires</dt><dd>{new Date(item.expiresAt).toLocaleString()}</dd></div>
       </dl>
       <div className="modal-actions">

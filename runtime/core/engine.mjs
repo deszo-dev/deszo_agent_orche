@@ -18,6 +18,8 @@ import { installSupervision } from './supervision.mjs';
 import { installHostAutonomy } from './hostAutonomy.mjs';
 import { installTaskRuntime } from './taskRuntime.mjs';
 import { installTaskProcesses } from './taskProcesses.mjs';
+import { installJudgeAttention } from './judgeAttention.mjs';
+import { installLinkedRepair } from './linkedRepair.mjs';
 import { shimFailureOf } from './supervisor-client.mjs';
 import { StreamRecorder } from './streams.mjs';
 import { prepareManagedToolIsolation } from './managed-isolation.mjs';
@@ -85,12 +87,15 @@ export function routeCase(cases, selected) {
 }
 
 export class Engine {
-  constructor({ root, adapters = defaultAdapters, processContainment = 'standalone-best-effort', supervisorGeneration = randomUUID(), runtimeInstanceId = randomUUID(), nodeExecutable = process.execPath, bridgeScript = resolve(import.meta.dirname, '../../mcp/bridge.mjs'), externalRunConfirmationOverride = null, maximumAgentTimeoutSeconds = M1_MAXIMUM_TIMEOUT, detectionTtlMs = 30_000, loopMinuteMs = 60_000, supervisor = null, hostAuthority = null, hostRuntimeGeneration = null, hostPolicyId = null } = {}) {
+  constructor({ root, adapters = defaultAdapters, processContainment = 'standalone-best-effort', supervisorGeneration = randomUUID(), runtimeInstanceId = randomUUID(), nodeExecutable = process.execPath, bridgeScript = resolve(import.meta.dirname, '../../mcp/bridge.mjs'), externalRunConfirmationOverride = null, maximumAgentTimeoutSeconds = M1_MAXIMUM_TIMEOUT, detectionTtlMs = 30_000, loopMinuteMs = 60_000, supervisor = null, hostAuthority = null, hostRuntimeGeneration = null, hostPolicyId = null,hostVerificationOnly=false, judgeAttentionEnabled=false, lifecycleHost = null } = {}) {
+    this.judgeAttentionEnabled = judgeAttentionEnabled === true;
     this.store = new Store(root);
     // ADR-0006: outer authority from a Local Control Host, when this runtime is registered with one.
     this.hostAuthority = hostAuthority;
     this.hostRuntimeGeneration = hostRuntimeGeneration;
+    this.hostVerificationOnly=hostVerificationOnly;
     this.hostPolicyId = hostPolicyId;
+    this.lifecycleHost = lifecycleHost;
     this.hostAdmissions = new WeakSet();
     this.hostPermitRuns = new Map();
     this.hostRuns = new Map();
@@ -128,6 +133,7 @@ export class Engine {
   get root() { return this.store.root; }
   on(...args) { return this.store.on(...args); }
   off(...args) { return this.store.off(...args); }
+  emit(...args) { return this.store.emit(...args); }
 
   async initialize() {
     this.reconcileIncidentSpool();
@@ -148,6 +154,10 @@ export class Engine {
     });
     this.expireRunRequests();
     await this.recover();
+    // ADR-0008: held runs keep their durable state through recover(); reconciliation rebuilds their scheduler state and
+    // completes any transition whose durable precondition already holds.
+    this.reconcileContinuations();
+    this.initializeJudgeAttention();
   }
 
   // ---------- Restart recovery ----------
@@ -155,6 +165,8 @@ export class Engine {
     const open = this.store.all(`SELECT * FROM runs WHERE state IN ${ACTIVE_SQL} ORDER BY created_at`);
     const uncertain = [];
     for (const run of open) {
+      // A run suspended for a linked repair, or waiting at a lifecycle gate, is not interrupted: nothing is executing in it.
+      if (this.isContinuationHeld(run)) continue;
       for (const attempt of this.store.all(`SELECT * FROM attempts WHERE run_id = ? AND state = 'running' AND process_id IS NOT NULL`, run.id)) {
         if (this.processContainment === 'standalone-best-effort' && isAlive(attempt.process_id)) {
           const started = await processStartTime(attempt.process_id);
@@ -182,12 +194,16 @@ export class Engine {
         this.store.appendEvents(run.id, events);
       });
     }
+    // Reconcile terminal runs whose grant cleanup was interrupted by a crash.
+    for (const grant of this.store.all(`SELECT g.run_id FROM control_grants g JOIN runs r ON r.id = g.run_id
+      WHERE g.state = 'active' AND r.state IN ('succeeded','failed','canceled','interrupted')`)) this.endControl(grant.run_id);
     this.store.run('DELETE FROM resource_locks');
     this.recoveryBlocked = uncertain.length ? `Owned processes could not be confirmed terminated: ${uncertain.join(', ')}. Close them, then restart the runtime.` : null;
   }
 
   // ---------- Capabilities and settings ----------
   async detect(provider, { fresh = false } = {}) {
+    if(this.hostVerificationOnly)return{provider,available:false,cliVersion:null,supportsNew:false,supportsResume:false,supportsJson:false,supportsInheritedConfiguration:false,reason:'Provider operations are unavailable during native verification.'};
     const cached = this.detections.get(provider);
     if (!fresh && cached && Date.now() - cached.at < this.detectionTtlMs) return cached.value;
     const value = await this.adapters.detect(provider);
@@ -220,6 +236,7 @@ export class Engine {
   settingsBody() { const { revision, sha256: digest, settings } = this.currentSettings(); return { revision, sha256: digest, settings }; }
 
   updateSettings(body) {
+    this.refuseHostMutation('Settings');
     this.validateBody('updateApplicationSettings', body);
     return this.idempotent('PUT /settings', body.requestId, body, () => {
       const current = this.currentSettings();
@@ -293,6 +310,7 @@ export class Engine {
   workspaceBody(row) { return { workspaceId: row.id, cwd: row.cwd, cwdIdentity: row.cwd_identity, createdAt: row.created_at, updatedAt: row.updated_at }; }
 
   putWorkspace(workspaceId, body) {
+    this.refuseHostMutation('Workspace registration');
     if (!/^[a-z][a-z0-9-]{0,63}$/.test(workspaceId)) throw new ApiError(400, 'invalid_request', 'Workspace ID must match the workflow ID grammar.');
     this.validateBody('workspaceRequest', body);
     const scratch = canonicalPath(join(this.store.workdirs, 'scratch'));
@@ -491,6 +509,7 @@ export class Engine {
   }
 
   saveWorkflowV3(workflowId, body) {
+    this.refuseHostMutation('Workflow revision');
     if (!body || !Object.hasOwn(body, 'expectedEtag') || body.expectedEtag === undefined)
       throw new ApiError(428, 'precondition_required', 'Supply expectedEtag from a workflow read, or null for create-only.');
     const issues = check(API_V3, 'saveWorkflow', body);
@@ -610,6 +629,7 @@ export class Engine {
   }
 
   freezeCache(workflowId, nodeId, body) {
+    this.refuseHostMutation('Cache pin');
     this.validateBody('freezeCacheRequest', body);
     const saved = this.getWorkflow(workflowId);
     const node = allNodesDeep(saved.workflow.nodes).find(item => item.id === nodeId);
@@ -636,6 +656,7 @@ export class Engine {
   }
 
   deleteCachePin(workflowId, nodeId) {
+    this.refuseHostMutation('Cache pin');
     this.getWorkflow(workflowId);
     this.store.run('DELETE FROM cache_pins WHERE workflow_id = ? AND node_id = ?', workflowId, nodeId);
     return this.listPins(workflowId);
@@ -673,6 +694,7 @@ export class Engine {
   }
 
   acknowledgeBinding(bindingId, body) {
+    this.refuseHostMutation('Context compatibility');
     this.validateBody('acknowledgeContext', body);
     return this.idempotent(`POST /context-bindings/${bindingId}/acknowledge`, body.requestId, body, () => this.store.transaction(() => {
       const row = this.store.get('SELECT * FROM context_bindings WHERE id = ?', bindingId);
@@ -688,6 +710,7 @@ export class Engine {
 
   // Manual Context chat: a run of kind "chat" over a generated core-v1 workflow.
   sendChat(bindingId, body) {
+    this.refuseHostMutation('Context message');
     this.validateBody('chatRequest', body);
     return this.idempotent(`POST /context-bindings/${bindingId}/messages`, body.requestId, body, () => {
       const binding = this.store.get('SELECT * FROM context_bindings WHERE id = ?', bindingId);
@@ -719,7 +742,8 @@ export class Engine {
   // ---------- Run queries ----------
   runBody(row) {
     return { runId: row.id, workflowId: row.workflow_id, workflowSnapshot: { artifactId: row.workflow_snapshot_artifact_id, sha256: this.store.artifactRow(row.workflow_snapshot_artifact_id).sha256 },
-      executionHash: row.execution_hash, state: row.state, lastSequence: row.last_sequence, createdAt: row.created_at, workspaceId: row.workspace_id, kind: row.kind };
+      executionHash: row.execution_hash, state: row.state, lastSequence: row.last_sequence, createdAt: row.created_at, workspaceId: row.workspace_id, kind: row.kind,
+      controlMode: this.controlModeOf(row.id) };
   }
   requireRun(runId) {
     const row = this.store.get('SELECT * FROM runs WHERE id = ?', runId);
@@ -778,14 +802,15 @@ export class Engine {
       // ADR-0006: a host permit replaces the confirmation pause only with a genuine admission made by this engine.
       if (body.hostPermitId && !this.isHostAdmission(hostAdmission, body.hostPermitId, 'run.approve')) throw new ApiError(403, 'host_admission_required', 'A run that names a host permit must be admitted by the Local Control Host first.');
       const hostAdmitted = Boolean(body.hostPermitId);
-      // A supervised run must be bound to its approved grant before launch; a confirmation queue cannot hold that binding.
-      if (body.controlGrantId && external && settings.externalRunConfirmation && !hostAdmitted) throw new ApiError(409, 'confirmation_required', 'A supervised run needs its control grant bound at creation. Confirmation is on, so request the supervised run from the Deszo window.');
+      const controlGrant = body.controlGrantId ? this.assertControlGrantForRun(body.controlGrantId, { workflowId: body.workflowId, workspaceId: body.workspaceId,
+        snapshotSha256: body.workflowSnapshotSha256, controllerToken }) : null;
       if (external && settings.externalRunConfirmation && !hostAdmitted) {
         const createdAt = nowIso();
         const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
         this.store.run(`INSERT INTO external_run_requests(request_id,payload_sha256,request_json,workflow_id,workflow_snapshot_sha256,workspace_id,workspace_cwd_identity,client_label,state,created_at,expires_at)
           VALUES(?,?,?,?,?,?,?,?,'pending',?,?)`, body.requestId, canonicalHash(body), canonicalize(body), body.workflowId, body.workflowSnapshotSha256, workspace.id, workspace.cwd_identity,
         typeof clientLabel === 'string' ? clientLabel.slice(0, 120) : null, createdAt, expiresAt);
+        if (controlGrant) this.store.run('INSERT INTO run_request_controls(request_id, grant_id, controller_session_id) VALUES(?,?,?)', body.requestId, controlGrant.id, controlGrant.controller_session_id);
         return { status: 202, body: { outcome: 'confirmation_pending', requestId: body.requestId, statusPath: `/api/v2/run-requests/${body.requestId}` } };
       }
       const workflow = this.store.readJson(snapshot.id);
@@ -794,6 +819,7 @@ export class Engine {
       // The observer is armed here, inside the creating transaction and before the queued start.
       if (body.controlGrantId) this.bindControlGrant(body.controlGrantId, { runId: result.body.run.runId, workflowId: body.workflowId, workspaceId: body.workspaceId,
         snapshotSha256: body.workflowSnapshotSha256, controllerToken });
+      if (body.controlGrantId) result.body.run = this.runBody(this.store.get('SELECT * FROM runs WHERE id = ?', result.body.run.runId));
       if (external) {
         const createdAt = nowIso();
         const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
@@ -811,11 +837,13 @@ export class Engine {
   }
 
   runRequestBody(row) {
+    const control = this.store.get('SELECT grant_id FROM run_request_controls WHERE request_id = ?', row.request_id);
     return {
       requestId: row.request_id, workflowId: row.workflow_id, workspaceId: row.workspace_id,
       workflowSnapshotSha256: row.workflow_snapshot_sha256, clientLabel: row.client_label,
       state: row.state, createdAt: row.created_at, expiresAt: row.expires_at, runId: row.run_id,
       problem: row.problem_json ? parseStrictJson(row.problem_json) : null,
+      controlGrantId: control?.grant_id ?? null, controlModeRequested: control ? 'supervised' : 'unsupervised',
     };
   }
 
@@ -858,11 +886,18 @@ export class Engine {
         const workspace = this.requireWorkspace(request.workspace_id);
         if (workspace.cwd_identity !== request.workspace_cwd_identity) throw new ApiError(409, 'conflict', 'The workspace binding changed while this request was pending.');
         this.refuseUnpermittedRun('Approving a pending run request');
+        const control = this.store.get('SELECT * FROM run_request_controls WHERE request_id = ?', requestId);
+        if (Boolean(command.controlGrantId) !== Boolean(control) || (control && control.grant_id !== command.controlGrantId))
+          throw new ApiError(403, 'controller_credential_required', 'The pending run control binding is missing or inconsistent.');
+        if (control) this.assertControlGrantForRun(control.grant_id, { workflowId: request.workflow_id, workspaceId: request.workspace_id,
+          snapshotSha256: request.workflow_snapshot_sha256, approvedRequestId: requestId });
         const result = this.captureRun({ workflow: this.store.readJson(snapshot.id), snapshot, workspace, kind: 'workflow',
           options: { mode: command.mode || 'workflow', targets: command.targets, refreshCaches: command.refreshCaches || [] }, requestId });
         const runId = result.body.run.runId;
+        if (control) this.bindControlGrant(control.grant_id, { runId, workflowId: request.workflow_id, workspaceId: request.workspace_id,
+          snapshotSha256: request.workflow_snapshot_sha256, approvedRequestId: requestId });
         this.store.run("UPDATE external_run_requests SET state = 'approved', run_id = ? WHERE request_id = ?", runId, requestId);
-        return { status: 202, body: { request: this.runRequestBody(this.store.get('SELECT * FROM external_run_requests WHERE request_id = ?', requestId)), run: result.body.run } };
+        return { status: 202, body: { request: this.runRequestBody(this.store.get('SELECT * FROM external_run_requests WHERE request_id = ?', requestId)), run: this.runBody(this.store.get('SELECT * FROM runs WHERE id = ?', runId)) } };
       } catch (error) {
         if (!(error instanceof ApiError)) throw error;
         const problem = { code: error.code, message: error.message, details: error.details || [] };
@@ -1055,14 +1090,20 @@ export class Engine {
     return scope;
   }
 
+  // The in-memory scheduling state of one nonterminal run, rebuilt from its captured snapshot and plan.
+  loadRunState(row) {
+    const workflow = this.store.readJson(row.workflow_snapshot_artifact_id);
+    const plan = row.plan_artifact_id ? this.store.readJson(row.plan_artifact_id) : { frozen: [], pins: {}, refreshCaches: [] };
+    const state = { id: row.id, kind: row.kind, workflow, plan, frozen: new Set(plan.frozen), scopes: new Map(), loops: new Map() };
+    state.scopes.set('', this.buildScope(workflow, state.frozen));
+    return state;
+  }
+
   startRun() {
     if (this.closing) return;
     for (const row of this.store.all(`SELECT * FROM runs WHERE state = 'queued' ORDER BY created_at`)) {
       if (this.runs.has(row.id)) continue;
-      const workflow = this.store.readJson(row.workflow_snapshot_artifact_id);
-      const plan = row.plan_artifact_id ? this.store.readJson(row.plan_artifact_id) : { frozen: [], pins: {}, refreshCaches: [] };
-      const state = { id: row.id, kind: row.kind, workflow, plan, frozen: new Set(plan.frozen), scopes: new Map(), loops: new Map() };
-      state.scopes.set('', this.buildScope(workflow, state.frozen));
+      const state = this.loadRunState(row);
       this.runs.set(row.id, state);
       this.store.transaction(() => this.store.appendEvents(row.id, [this.runEvent(row, 'running', 'Scheduler started.')]));
     }
@@ -1195,9 +1236,18 @@ export class Engine {
 
   pumpRun(state) {
     if (this.closing) return;
+    const linkedRepairIssue = this.linkedRepairWorkspaceIssueForRun(state.id);
+    if (linkedRepairIssue) {
+      if (this.runState(state.id) === 'stopping') { this.finishRunIfDone(state); return; }
+      if (!state.linkedRepairIsolationFailure) this.refuseLinkedRepairExecution(state, linkedRepairIssue);
+      else this.finishRunIfDone(state);
+      return;
+    }
     // A missed controller acknowledgement pauses new dispatch only; work already running keeps its own timeouts.
     // Nothing launches for a supervised run until its observer is armed, and a paused controller stops new dispatch.
-    if (this.dispatchPaused.has(state.id) || this.awaitingArm.has(state.id)) return;
+    // A controller pause must not prevent Root Stop from completing.
+    if (this.awaitingArm.has(state.id) || (this.dispatchPaused.has(state.id) && this.runState(state.id) !== 'stopping')) return;
+    if (this.judgeAttentionEnabled && this.runState(state.id) !== 'stopping' && this.hasJudgeBarrier(state.id)) return;
     if (this.runState(state.id) === 'running') {
       for (const attempt of this.latestAttempts(state.id)) {
         const ready = this.readiness(state, attempt);
@@ -1235,8 +1285,8 @@ export class Engine {
     let to = null, reason = '';
     if (row.state === 'stopping') { to = 'canceled'; reason = 'Root Stop completed after every child process exited.'; }
     else if (row.state === 'draining') {
-      to = state.kind === 'chat' ? 'failed' : 'waiting_for_user';
-      reason = state.kind === 'chat' ? 'The chat turn failed.' : 'Running attempts finished after a failure; recovery is needed.';
+      to = state.linkedRepairIsolationFailure || state.kind === 'chat' ? 'failed' : 'waiting_for_user';
+      reason = state.linkedRepairIsolationFailure?.message || (state.kind === 'chat' ? 'The chat turn failed.' : 'Running attempts finished after a failure; recovery is needed.');
     } else if (row.state === 'running') {
       const latest = this.latestAttempts(state.id);
       const outer = latest.filter(attempt => !attempt.node_instance_id.includes('/'));
@@ -1247,9 +1297,13 @@ export class Engine {
       }
     }
     if (!to) return;
-    this.store.transaction(() => this.store.appendEvents(state.id, [this.runEvent(row, to, reason)]));
+    // ADR-0008: a linked repair's outcome is recorded in the same transaction as its terminal state.
+    this.store.transaction(() => {
+      this.store.appendEvents(state.id, [this.runEvent(row, to, reason)]);
+      if (TERMINAL_RUN.has(to)) this.recordRepairOutcome(state.id, to);
+    });
     if (row.state === 'stopping') this.recordTerminationProof(state.id).catch(error => process.stderr.write(`Termination proof for run ${state.id} failed: ${error.message}\n`));
-    if (TERMINAL_RUN.has(to)) { this.endControl(state.id); this.forget(state); this.releaseHostRun(state.id, to); }
+    if (TERMINAL_RUN.has(to)) { this.endControl(state.id); this.forget(state); this.releaseHostRun(state.id, to); this.afterRepairRunTerminal(state.id, to); }
   }
 
   forget(state) {
@@ -1830,6 +1884,14 @@ export class Engine {
       }
       this.store.appendEvents(state.id, events);
     });
+    const isolationIssue = this.linkedRepairWorkspaceIssueForRun(state.id);
+    if (isolationIssue) {
+      this.refuseLinkedRepairExecution(state, isolationIssue);
+      this.restoreBindingBeforeLaunch(state, binding);
+      rmSync(tmp, { recursive: true, force: true });
+      rmSync(join(this.store.workdirs, 'attachments', attempt.id), { recursive: true, force: true });
+      return;
+    }
     // ADR-0006: a host-bound runtime charges every provider invocation to the shared ledger before its CLI is launched.
     const providerPermit = await this.reserveHostProviderInvocation(state.id, attempt.id);
     if (providerPermit?.refused) return this.failAttempt(state, current, 'host_refused', `The Local Control Host refused this provider invocation: ${providerPermit.reason}.`);
@@ -1842,6 +1904,7 @@ export class Engine {
     current = this.store.get('SELECT * FROM attempts WHERE id = ?', attempt.id);
     if (!outcome.launched) {
       this.restoreBindingBeforeLaunch(state, binding);
+      if (state.linkedRepairIsolationFailure) return;
       return this.failAttempt(state, current, 'provider_unavailable', `The CLI could not be started: ${outcome.error}`);
     }
     const parser = outcome.parser.state;
@@ -1851,20 +1914,25 @@ export class Engine {
         return this.failAttempt(state, current, 'capture_failed', reason, binding ? { binding, bindingTo: 'needs_review', bindingReason: 'Output capture failed; native history may have advanced.' } : {});
       } catch (error) { return this.storageUnavailable(error); }
     }
-    const evidence = () => ref(this.store.putJson({ exitCode: outcome.code, signal: outcome.signal ?? null, providerError: parser.error, stderrTail: outcome.stderrTail }));
+    const evidence = () => ref(this.store.putJson({ exitCode: outcome.code, signal: outcome.signal ?? null, providerError: parser.error, stderrTail: outcome.stderrTail,
+      ...(parser.diagnostics?.length ? { providerDiagnostics: parser.diagnostics } : {}) }));
     const reported = parser.sessionId && binding && !this.bindingRecord(binding).nativeSessionId ? { nativeSessionId: parser.sessionId } : {};
     const native = binding ? { binding, bindingTo: 'needs_review', bindingReason: 'The invocation did not complete normally; native history may have advanced.', bindingChanges: reported } : {};
     const succeeded = outcome.code === 0 && !parser.error && parser.terminal && parser.finalText !== null;
     if (record.stopRequested && !succeeded) {
+      // A managed runtime shutdown is not a user Stop: the attempt's outcome is unknown, so it is interrupted, not canceled.
       return this.store.transaction(() => {
-        const events = this.attemptTransition(current, 'canceled', record.stopReason || 'Stopped by the user.');
+        const events = record.runtimeShutdown
+          ? this.attemptTransition(current, 'interrupted', 'Runtime shutdown; the attempt outcome is unknown.')
+          : this.attemptTransition(current, 'canceled', record.stopReason || 'Stopped by the user.');
         if (binding) events.push(this.bindingTransition(binding, 'needs_review', native.bindingReason, reported)[0]);
         this.store.appendEvents(state.id, events);
       });
     }
-    if (record.timedOut) return this.failAttempt(state, current, 'timeout', `The attempt exceeded ${config.timeoutSeconds} seconds of active process time.`, { evidence: evidence(), ...native });
+    const lastDiagnostic = parser.diagnostics?.at(-1);
+    if (record.timedOut) return this.failAttempt(state, current, 'timeout', `The attempt exceeded ${config.timeoutSeconds} seconds of active process time.${lastDiagnostic ? ` Last provider diagnostic: ${lastDiagnostic}` : ''}`, { evidence: evidence(), ...native });
     if (!succeeded) {
-      const text = [parser.error, outcome.stderrTail].filter(Boolean).join('\n');
+      const text = [parser.error, outcome.stderrTail, lastDiagnostic].filter(Boolean).join('\n');
       if (outcome.code === 0 && !parser.error) return this.failAttempt(state, current, 'output_contract', parser.formatError || (parser.terminal ? 'The CLI reported no final answer.' : 'The CLI exited without a terminal event.'), { evidence: evidence(), ...native });
       return this.failAttempt(state, current, this.adapters.classifyFailure(text), text.trim().slice(0, 4000) || `The CLI exited with code ${outcome.code}.`, { evidence: evidence(), ...native });
     }
@@ -1888,6 +1956,9 @@ export class Engine {
       try { captured = this.values.putSet(captureFiles(this.store, workspace.cwd, config.captures, 'output_contract')); }
       catch (error) { return this.failAttempt(state, current, 'output_contract', `Declared output capture failed: ${error.message}`, { evidence: evidence(), ...native }); }
     }
+    // ADR-0008: a linked repair's Judge proposal is validated before anything commits; a refused proposal fails the attempt.
+    const lifecycle = this.lifecycleProposalFor(state, node, parser.finalText);
+    if (lifecycle.kind === 'refuse') return this.failAttempt(state, current, lifecycle.code, lifecycle.message, { evidence: evidence(), ...native });
     this.store.transaction(() => {
       const textArtifact = this.store.putText(parser.finalText);
       const outputValues = { text: textValue(textArtifact), ...(jsonArtifact ? { json: jsonValue(jsonArtifact) } : {}), ...(captured ? { files: captured } : {}) };
@@ -1902,8 +1973,13 @@ export class Engine {
       }
       spec?.commit?.(parsed, events, current, { provider: config.provider, requestedModel: config.model, observedModel: parser.model });
       events.push(...this.attemptTransition(current, 'succeeded', 'Outputs committed after a successful terminal event and process exit.'));
+      if (lifecycle.kind === 'intent') events.push(...this.openLifecycleIntent(state, current, current.node_instance_id, lifecycle.proposal));
       this.store.appendEvents(state.id, events);
     });
+    if (lifecycle.kind === 'intent' && this.lifecycleHost) {
+      const request = this.lifecycleHostRequest(state.id);
+      if (request) this.emit('lifecycle.operation_requested', request);
+    }
   }
 
   restoreBindingBeforeLaunch(state, binding) {
@@ -2005,7 +2081,8 @@ export class Engine {
     let event;
     try { event = JSON.parse(line); } catch { return; }
     const normalized = parser.feed(event);
-    const observation = { sessionId: normalized.sessionId || undefined, text: normalized.text || undefined, model: normalized.model || undefined, terminal: parser.state.terminal || undefined, error: parser.state.error || undefined };
+    const observation = { sessionId: normalized.sessionId || undefined, text: normalized.text || undefined, model: normalized.model || undefined,
+      diagnostic: normalized.diagnostic || undefined, terminal: parser.state.terminal || undefined, error: parser.state.error || undefined };
     if (Object.values(observation).some(value => value !== undefined)) normalizedBatch.add(Buffer.from(JSON.stringify(observation) + '\n'));
   }
 
@@ -2104,11 +2181,18 @@ export class Engine {
 
   // ---------- Recovery ----------
   recoverRun(runId, body) {
+    if (this.judgeAttentionEnabled && this.hasJudgeBarrier(runId) && body?.action !== 'close') throw new ApiError(409,'judge_attention_pending','An independent Judge attention barrier blocks recovery. Stop or explicitly close remains available.');
+    if (body?.action !== 'close') this.refuseHostMutation('Recovery dispatch');
     this.validateBody('recoveryRequest', body);
     return this.idempotent(`POST /runs/${runId}/recovery`, body.requestId, body, () => {
       const row = this.requireRun(runId);
       const state = this.runs.get(runId);
       if (row.state !== 'waiting_for_user' || !state) throw new ApiError(409, 'conflict', `Recovery needs a run that is waiting for the user (state is ${row.state}).`);
+      if (body.action !== 'close') {
+        const link = this.openLinkOfRepair(runId);
+        const isolationIssue = link ? this.linkedRepairWorkspaceIssueForLink(link) : null;
+        if (isolationIssue) throw new ApiError(409, isolationIssue.code, isolationIssue.message);
+      }
       const target = body.nodeInstanceId ?? body.loopNodeId ?? null;
       const options = Object.fromEntries(Object.entries(body).filter(([key]) => !['requestId', 'action', 'nodeInstanceId', 'loopNodeId'].includes(key)));
       return this.store.transaction(() => {
@@ -2122,6 +2206,8 @@ export class Engine {
           this.cancelManagedTasks(runId, events, 'Managed task canceled when the run was closed.');
           events.push(this.runEvent(row, 'failed', 'Closed by the user after a failure or pause.'));
           this.store.appendEvents(runId, events);
+          // ADR-0008: closing a linked repair is a terminal failure of the repair; its parent must not resume.
+          this.recordRepairOutcome(runId, 'failed');
           this.forget(state);
           return { status: 200, body: { runId, state: 'failed', requestId: body.requestId } };
         }
@@ -2168,7 +2254,8 @@ export class Engine {
         events.push({ type: 'context.remapped', payload: { contextNodeId: key, fromBindingId: binding.id, toBindingId: fresh, reason: 'Fresh binding selected for retry.' } });
       }
     } else if (body.binding) throw new ApiError(409, 'conflict', 'binding applies only to Agents that use a Context.');
-    this.planAttempt(state, body.nodeInstanceId, node.id, node.type, loopInstance ? { loopNodeId: loopInstance, iteration } : null, events, 'Retry requested by the user.');
+    // The reason is internal: the HTTP recovery schema forbids extra fields, so only an Engine continuation sets it.
+    this.planAttempt(state, body.nodeInstanceId, node.id, node.type, loopInstance ? { loopNodeId: loopInstance, iteration } : null, events, body.reason || 'Retry requested by the user.');
     if (loopInstance && this.loopRow(state, loopInstance).state === 'paused') this.resumeLoop(state, loopInstance, 'A body node was retried.', events);
   }
 
@@ -2217,7 +2304,7 @@ export class Engine {
   async shutdown() {
     this.closing = true;
     const live = [...this.processes.values()];
-    for (const record of live) { record.stopRequested = true; record.abortController?.abort(); if (record.child?.pid && record.launched) await killTree(record.child.pid); }
+    for (const record of live) { record.stopRequested = true; record.runtimeShutdown = true; record.abortController?.abort(); if (record.child?.pid && record.launched) await killTree(record.child.pid); }
     await Promise.all(live.map(record => record.exited).filter(Boolean));
     for (const state of this.runs.values()) for (const loop of state.loops.values()) clearInterval(loop.timer);
     await new Promise(done => setTimeout(done, 50));
@@ -2231,4 +2318,6 @@ installSupervision(Engine, { ApiError });
 installHostAutonomy(Engine, { ApiError });
 installTaskRuntime(Engine, { ApiError });
 installTaskProcesses(Engine);
+installJudgeAttention(Engine, { ApiError });
+installLinkedRepair(Engine, { ApiError });
 

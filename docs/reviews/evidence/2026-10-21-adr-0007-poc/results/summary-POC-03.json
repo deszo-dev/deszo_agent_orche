@@ -1,0 +1,13 @@
+{
+  "runRoot": "<POC_ROOT>",
+  "generatedBy": "run-poc.mjs",
+  "experiments": [
+    {
+      "id": "POC-03",
+      "status": "BLOCKED",
+      "failedChecks": [],
+      "elapsedMs": 258,
+      "exitCode": 0
+    }
+  ]
+}

@@ -4,7 +4,7 @@
 - Status: Proposed
 - Windows architectural direction: Accepted, subject to implementation verification; see P29 in the [decision register](../DECISIONS.md#accepted-proposals)
 - Requirements: D26–D28 in the [decision register](../DECISIONS.md#confirmed-decisions)
-- Implementation: Stage 1 authority core, contracts and engine/runtime integration are fixture-verified; the Windows service, launcher, consent broker and native fail-stop gates remain open and autonomy stays disabled. Details and gates live in the [implementation status](0006-implementation-status.md).
+- Implementation: the protected Windows service, launcher, consent broker, native containment and a diagnostic application lifecycle are demonstrated on the installed host. The criteria remain open, production autonomy stays disabled, and no criterion is closed. Executable completion plan: [completion plan](0006-completion-plan.md). Dispositions: [acceptance matrix](0006-acceptance-matrix.md). Details and gates: [implementation status](0006-implementation-status.md).
 - Scope: A user-authorized autonomous development session, including persistent automatic operational approvals, tests, builds, application restarts and bounded continuation
 - Related: [ADR-0001](0001-external-workflow-authoring-api-and-mcp.md) owns external authorization; [ADR-0002](0002-execution-audit-and-supervised-control.md) owns supervision, Stop and incidents; [ADR-0003](0003-task-assessment-and-workflow-planning.md) owns planning and aggregate limits; [ADR-0004](0004-agent-communication-and-context-contracts.md) owns review/acceptance evidence; [ADR-0005](0005-verified-feature-branch-delivery.md) owns verified local delivery
 

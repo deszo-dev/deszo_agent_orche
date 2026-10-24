@@ -10,6 +10,8 @@ import { ContractError } from './core/schemas.mjs';
 import { CorruptionError } from './core/store.mjs';
 import { supervisorFromEnvironment } from './core/supervisor-client.mjs';
 import { hostFromEnvironment } from './host/runtimeBinding.mjs';
+import { lifecycleBridgeFromEnvironment } from './host/lifecycleBridge.mjs';
+import { autonomyGateway } from './host/uiGateway.mjs';
 import { acquireRuntimeLock } from './lock.mjs';
 
 const ORIGINS = new Set(['http://127.0.0.1:1420', 'http://localhost:1420', 'tauri://localhost', 'http://tauri.localhost', 'https://tauri.localhost']);
@@ -52,7 +54,7 @@ function query(url, allowed, integers = []) {
   return result;
 }
 
-export async function startRunner({ root, connectionFile, bridgeFile, port = 0, supervised = false, adapters, maximumAgentTimeoutSeconds, loopMinuteMs, extraOrigins = [], runtimeInstanceId = randomUUID(), nodeExecutable = process.execPath, devTestConfirmationOff = false } = {}) {
+export async function startRunner({ root, connectionFile, bridgeFile, port = 0, supervised = false, adapters, maximumAgentTimeoutSeconds, loopMinuteMs, extraOrigins = [], runtimeInstanceId = randomUUID(), nodeExecutable = process.execPath, devTestConfirmationOff = false, judgeAttentionEnabled = false } = {}) {
   const origins = new Set([...ORIGINS, ...extraOrigins]);
   const defaultRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '.deszo');
   root = resolve(root || defaultRoot);
@@ -66,17 +68,40 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
   const firstPartyToken = randomBytes(32).toString('hex');
   let engine;
   let hostBinding = null;
+  let lifecycleHost = null;
   try {
+    lifecycleHost = lifecycleBridgeFromEnvironment(process.env);
     // ADR-0006: a runtime launched or covered by a Local Control Host binds to it before serving requests.
     hostBinding = await hostFromEnvironment(process.env, { packaged: PACKAGED_RUNTIME });
     if (PACKAGED_RUNTIME && devTestConfirmationOff) throw new Error('The packaged runtime does not support the fixture confirmation policy.');
-    engine = new Engine({ root, adapters, runtimeInstanceId, nodeExecutable, bridgeScript: bridgeFile, supervisor: supervisorFromEnvironment(), hostAuthority: hostBinding?.adapter ?? null, hostRuntimeGeneration: hostBinding?.runtimeGeneration ?? null, hostPolicyId: hostBinding?.policyId ?? null,
+    engine = new Engine({ root, adapters, runtimeInstanceId, nodeExecutable, bridgeScript: bridgeFile, supervisor: supervisorFromEnvironment(), hostAuthority: hostBinding?.adapter ?? null, hostRuntimeGeneration: hostBinding?.runtimeGeneration ?? null, hostPolicyId: hostBinding?.policyId ?? null,hostVerificationOnly:hostBinding?.verificationOnly===true,judgeAttentionEnabled,
       externalRunConfirmationOverride: devTestConfirmationOff ? false : null,
+      lifecycleHost: lifecycleHost?.context ?? null,
       processContainment: supervised ? 'tauri-job' : 'standalone-best-effort', ...(maximumAgentTimeoutSeconds ? { maximumAgentTimeoutSeconds } : {}), ...(loopMinuteMs ? { loopMinuteMs } : {}) });
     await engine.initialize();
+    if (lifecycleHost) {
+      const identity = engine.runtimeIdentity();
+      const ready = await lifecycleHost.ready({ pid: process.pid, storeId: identity.storeId, runtimeInstanceId: identity.runtimeInstanceId });
+      if (ready?.receipt) {
+        await engine.applyHostLifecycleReceipt(ready.receipt);
+        if (lifecycleHost.context.testDuplicateReceiptDelivery) {
+          const replay = await lifecycleHost.ready({ pid: process.pid, storeId: identity.storeId, runtimeInstanceId: identity.runtimeInstanceId });
+          if (replay?.receipt) await engine.applyHostLifecycleReceipt(replay.receipt);
+        }
+        await lifecycleHost.acknowledgeReceipt(ready.receipt.receiptId);
+      }
+      engine.on('lifecycle.operation_requested', request => {
+        void lifecycleHost.activateCandidate(request).catch(error => engine.recordLifecycleHostDeliveryFailure(request, error));
+      });
+    }
     if (devTestConfirmationOff && !engine.store.get('SELECT id FROM workspaces LIMIT 1'))
       engine.putWorkspace('main', { cwd: join(engine.store.workdirs, 'scratch', 'main') });
-  } catch (error) { hostBinding?.client.close(); await releaseLock(); throw error; }
+  } catch (error) {
+    hostBinding?.client.close();
+    if (engine) { try { await engine.shutdown(); } catch { engine.store.close(); } }
+    await releaseLock();
+    throw error;
+  }
   // The host delivers the native Stop scope of a committed revocation or expiry.
   // The stop reaches the owned runs; a failure here is reported and never silently dropped.
   hostBinding?.client.events.on('stop', message => {
@@ -106,6 +131,14 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
     return { authority: req.authRole === 'first-party' ? 'first-party' : 'external', sessionId: session?.id ?? null };
   };
   const routes = [
+    ['GET', /^\/api\/v2\/autonomy$/, async () => {
+      try { return [200, await autonomyGateway('status', null, hostBinding?.client)]; }
+      catch (error) { return [200, { available: false, autonomyEnabled: false, reason: error.message }]; }
+    }],
+    ...[['proposals','propose'],['open-consent','open'],['revoke','revoke']].map(([path, operation]) => ['POST', new RegExp(`^/api/v2/autonomy/${path}$`), async ({ req }) => {
+      try { return [200, await autonomyGateway(operation, parse(await readBody(req)), hostBinding?.client)]; }
+      catch (error) { throw new ApiError(error.status || 503, error.code || 'autonomy_unavailable', error.message); }
+    }]),
     ['GET', /^\/api\/v3\/authoring\/contract$/, async () => [200, engine.authoringContract()]],
     ['GET', new RegExp(`^/api/v3/authoring/schemas/([^/]+)$`), ({ match }) => [200, engine.authoringSchema(decodeURIComponent(match[1]))]],
     ['GET', /^\/api\/v3\/authoring\/node-types$/, () => [200, engine.authoringNodeTypes()]],
@@ -184,15 +217,31 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
     ['GET', new RegExp(`^/api/v2/runs/(${UUID})$`), ({ match }) => [200, engine.runSnapshot(match[1])]],
     ['POST', new RegExp(`^/api/v2/runs/(${UUID})/stop$`), async ({ req, match }) => { const result = engine.stopRun(match[1], parse(await readBody(req))); return [result.status, result.body]; }],
     ['POST', new RegExp(`^/api/v2/runs/(${UUID})/recovery$`), async ({ req, match }) => { const result = engine.recoverRun(match[1], parse(await readBody(req))); return [result.status, result.body]; }],
+    ['POST', new RegExp(`^/api/v2/runs/(${UUID})/linked-repair$`), async ({ req, match }) => { const result = engine.linkRepair(match[1], parse(await readBody(req))); return [result.status, result.body]; }],
+    ['POST', new RegExp(`^/api/v2/runs/(${UUID})/lifecycle-receipt$`), async ({ req, match }) => { const result = engine.applyLifecycleReceipt(match[1], parse(await readBody(req))); return [result.status, result.body]; }],
     ['GET', new RegExp(`^/api/v2/runs/(${UUID})/maps/([^/]+)$`), ({ match }) => [200, engine.mapNavigator(match[1], decodeURIComponent(match[2]))]],
     ['GET', new RegExp(`^/api/v2/runs/(${UUID})/tasks/([^/]+)$`), ({ match }) => [200, engine.managedTaskNavigator(match[1], decodeURIComponent(match[2]))]],
     ['GET', new RegExp(`^/api/v2/runs/(${UUID})/maps/([^/]+)/executions$`), ({ match }) => [200, engine.mapHistory(match[1], decodeURIComponent(match[2]))]],
     ['GET', new RegExp(`^/api/v2/map-executions/(${UUID})$`), ({ match }) => [200, engine.mapExecutionNavigator(match[1])]],
     ['GET', new RegExp(`^/api/v2/artifacts/(${UUID})/provenance$`), ({ match }) => [200, engine.artifactProvenance(match[1])]],
+    // ADR-0007 is opt-in. Worker credentials and scoped invocation credentials have different rights.
+    ['POST', /^\/api\/v2\/judge-sessions$/, async ({req}) => { const r=engine.registerJudgeSession(parse(await readBody(req)));return[r.status,r.body]; }],
+    ['POST', /^\/api\/v2\/judge-attention$/, async ({req}) => { const r=engine.createJudgeAttention(parse(await readBody(req)),{controllerToken:controllerTokenOf(req)});return[r.status,r.body]; }],
+    ['GET', new RegExp(`^/api/v2/judge-sessions/(${UUID})/attention$`), ({req,match}) => [200,engine.listJudgeAttention(match[1],{controllerToken:controllerTokenOf(req)})]],
+    ['POST', new RegExp(`^/api/v2/judge-sessions/(${UUID})/owner$`), async ({req,match}) => { const r=engine.fenceJudgeOwner(match[1],parse(await readBody(req)),{controllerToken:controllerTokenOf(req)});return[r.status,r.body]; }],
+    ['POST', /^\/api\/v2\/judge-invocations$/, async ({req}) => { const r=await engine.admitJudgeInvocation(parse(await readBody(req)),{controllerToken:controllerTokenOf(req)});return[r.status,r.body]; }],
+    ['POST', new RegExp(`^/api/v2/judge-invocations/(${UUID})/started$`), async ({req,match}) => [200,engine.recordJudgeStarted(match[1],parse(await readBody(req)),{controllerToken:controllerTokenOf(req)})]],
+    ['POST', new RegExp(`^/api/v2/judge-invocations/(${UUID})/complete$`), async ({req,match}) => [200,await engine.completeJudgeInvocation(match[1],parse(await readBody(req)),{controllerToken:controllerTokenOf(req)})]],
+    ['GET', new RegExp(`^/api/v2/judge-invocations/(${UUID})/evidence$`), async ({req,match}) => [200,await engine.readJudgeEvidence(match[1],{invocationToken:req.headers['x-deszo-judge-token']})]],
+    ['GET', new RegExp(`^/api/v2/judge-invocations/(${UUID})/reads$`), ({req,match}) => [200,engine.listJudgeReads(match[1],{controllerToken:controllerTokenOf(req)})]],
+    ['GET', new RegExp(`^/api/v2/judge-invocations/(${UUID})/artifacts/(${UUID})$`), async ({req,match,url}) => [200,await engine.readJudgeArtifact(match[1],match[2],{invocationToken:req.headers['x-deszo-judge-token'],...query(url,['offset','length'],['offset','length'])})]],
+    ['POST', /^\/api\/v2\/judge-decisions$/, async ({req}) => { const r=await engine.submitJudgeDecision(parse(await readBody(req)),{controllerToken:controllerTokenOf(req),invocationToken:req.headers['x-deszo-judge-token']});return[r.status,r.body]; }],
+    ['GET', new RegExp(`^/api/v2/judge-decisions/(${UUID})$`), ({req,match}) => [200,engine.getJudgeDecision(match[1],{controllerToken:controllerTokenOf(req)})]],
     // ADR-0002 observation, supervision, incidents and audit. Grants, incident triage and revocation are first-party only.
     ['POST', /^\/api\/v2\/controller-sessions$/, async ({ req }) => { const result = engine.createControllerSession(parse(await readBody(req))); return [result.status, result.body]; }],
     ['POST', /^\/api\/v2\/control-grants$/, async ({ req }) => { const result = engine.requestControlGrant(parse(await readBody(req)), { controllerToken: controllerTokenOf(req) }); return [result.status, result.body]; }],
     ['GET', new RegExp(`^/api/v2/control-grants/(${UUID})$`), ({ match }) => [200, engine.getControlGrant(match[1])]],
+    ['GET', /^\/api\/v2\/control-grants$/, ({ url }) => [200, engine.listControlGrants(query(url, ['state', 'limit'], ['limit']))]],
     ['POST', new RegExp(`^/api/v2/control-grants/(${UUID})/decision$`), async ({ req, match }) => { const result = engine.decideControlGrant(match[1], parse(await readBody(req))); return [result.status, result.body]; }],
     ['POST', new RegExp(`^/api/v2/control-grants/(${UUID})/host-approval$`), async ({ req, match }) => { const result = await engine.approveControlGrantUnderHostPermit(match[1], parse(await readBody(req))); return [result.status, result.body]; }],
     ['POST', new RegExp(`^/api/v2/control-grants/(${UUID})/revoke$`), async ({ req, match }) => { const result = engine.revokeControlGrant(match[1], parse(await readBody(req))); return [result.status, result.body]; }],
@@ -279,11 +328,14 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
     if (method === 'DELETE' && /^\/api\/v2\/workflows\/[^/]+\/cache-pins\//.test(pathname)) return true;
     if (method === 'POST' && /^\/api\/v2\/context-bindings\/[^/]+\/(acknowledge|messages)$/.test(pathname)) return true;
     if (method === 'POST' && /^\/api\/v2\/runs\/[^/]+\/recovery$/.test(pathname)) return true;
+    if (method === 'POST' && /^\/api\/v2\/runs\/[^/]+\/(linked-repair|lifecycle-receipt)$/.test(pathname)) return true;
     if (method === 'GET' && /^\/api\/v2\/run-requests$/.test(pathname)) return true;
+    if (method === 'GET' && /^\/api\/v2\/control-grants$/.test(pathname)) return true;
     if (method === 'POST' && /^\/api\/v2\/run-requests\/[^/]+\/decision$/.test(pathname)) return true;
     if (method === 'POST' && /^\/api\/v2\/control-grants\/[^/]+\/(decision|revoke)$/.test(pathname)) return true;
     if (method === 'POST' && /^\/api\/v2\/incidents\/[^/]+\/triage$/.test(pathname)) return true;
     if (method === 'POST' && /^\/api\/v2\/runs\/[^/]+\/control-extension$/.test(pathname)) return true;
+    if (method === 'POST' && (pathname === '/api/v2/judge-sessions' || /^\/api\/v2\/judge-sessions\/[^/]+\/owner$/.test(pathname))) return true;
     return false;
   };
 
@@ -336,12 +388,24 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
   try { await new Promise((resolvePromise, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolvePromise); }); }
   catch (error) { engine.store.close(); await releaseLock(); throw error; }
   const identity = engine.runtimeIdentity();
+  if (hostBinding?.assurance === 'production'||hostBinding?.verificationOnly) {
+    try {
+      await hostBinding.client.call('runtime.ready', { runtimeGeneration: hostBinding.runtimeGeneration, port: server.address().port, token,
+        buildId: hostBinding.buildId, protocolVersion: hostBinding.protocolVersion,
+        storeSchemaVersion: engine.store.get('SELECT MAX(version) AS version FROM schema_migrations').version, ...identity });
+    } catch (error) { server.close(); engine.store.close(); await releaseLock(); hostBinding.client.close(); throw error; }
+  }
   const descriptor = { descriptorVersion: 1, apiVersions: ['v2', 'v3'], storeId: identity.storeId, runtimeInstanceId, applicationRoot: identity.applicationRoot,
     nodeExecutable: identity.nodeExecutable, bridgeScript: bridgeFile, connectionFile, port: server.address().port, token, root: identity.applicationRoot,
-    scratchRoot: join(engine.store.workdirs, 'scratch'), processContainment: engine.processContainment };
+    scratchRoot: join(engine.store.workdirs, 'scratch'), processContainment: engine.processContainment,
+    ...(lifecycleHost ? { applicationBuildId: lifecycleHost.context.buildId, applicationGeneration: lifecycleHost.context.generation,
+      applicationPid: lifecycleHost.context.applicationPid } : {}) };
   const temporary = `${connectionFile}.${process.pid}.tmp`;
   writeFileSync(temporary, JSON.stringify(descriptor), { mode: 0o600 }); renameSync(temporary, connectionFile);
-  const connection = { ...descriptor, firstPartyToken };
+  // Candidate generations receive the ordinary external credential only. The trusted host's exact approvals
+  // use separate scoped endpoints; the manual first-party bootstrap is never forwarded into autonomous builds.
+  const fixtureAuthority = !PACKAGED_RUNTIME && hostBinding?.assurance === 'fixture';
+  const connection = { ...descriptor, ...(!hostBinding || fixtureAuthority ? { firstPartyToken } : {}) };
   queueMicrotask(() => engine.startRun());
   return {
     connection, engine,
@@ -363,15 +427,22 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const supervised = process.argv.includes('--supervised');
   const firstPartyTokenStdout = process.argv.includes('--first-party-token-stdout') && !process.stdout.isTTY;
   const devTestConfirmationOff = !PACKAGED_RUNTIME && process.argv.includes('--dev-test-confirmation-off');
-  if (PACKAGED_RUNTIME && process.argv.some(argument => argument.startsWith('--') && !['--disable-warning=ExperimentalWarning', '--root', '--connection-file', '--bridge-file', '--supervised', '--first-party-token-stdout'].includes(argument))) {
+  const fixtureState = !PACKAGED_RUNTIME && option('--fixture-state');
+  let adapters;
+  if (fixtureState) {
+    const { fixtureAdapters } = await import('./tests/fixture-adapters.mjs');
+    adapters = fixtureAdapters(fixtureState);
+  }
+  if (PACKAGED_RUNTIME && process.argv.some(argument => argument.startsWith('--') && !['--disable-warning=ExperimentalWarning', '--root', '--connection-file', '--bridge-file', '--supervised', '--host-contained', '--first-party-token-stdout'].includes(argument))) {
     throw new Error('The packaged runtime was given an unsupported option.');
   }
   const lines = createInterface({ input: process.stdin });
+  const hostContained = process.argv.includes('--host-contained');
   // In Tauri mode the Rust supervisor confirms Job Object membership before any CLI can start.
-  if (supervised) await new Promise(resolvePromise => lines.on('line', function waitForContainment(line) {
+  if (supervised || hostContained) await new Promise(resolvePromise => lines.on('line', function waitForContainment(line) {
     try { if (JSON.parse(line).command === 'contained') { lines.off('line', waitForContainment); resolvePromise(); } } catch { /* Ignore other input. */ }
   }));
-  const runner = await startRunner({ root: option('--root'), connectionFile: option('--connection-file'), bridgeFile: option('--bridge-file'), supervised, firstPartyTokenStdout, devTestConfirmationOff });
+  const runner = await startRunner({ root: option('--root'), connectionFile: option('--connection-file'), bridgeFile: option('--bridge-file'), supervised, firstPartyTokenStdout, devTestConfirmationOff, adapters });
   const startup = { ...runner.connection };
   if (!firstPartyTokenStdout) delete startup.firstPartyToken;
   process.stdout.write(JSON.stringify(startup) + '\n');

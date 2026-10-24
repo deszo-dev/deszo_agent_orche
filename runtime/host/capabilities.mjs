@@ -26,4 +26,5 @@ export function missingProductionCapabilities(verified = VERIFIED_CAPABILITIES) 
   return CAPABILITIES.filter(capability => !verified[capability.id]).map(capability => capability.id);
 }
 
-export const ASSURANCE_LEVELS = Object.freeze(['fixture', 'production']);
+// Bootstrap opens only the protected installation/consent surface; it never admits autonomous effects.
+export const ASSURANCE_LEVELS = Object.freeze(['fixture', 'bootstrap', 'production']);

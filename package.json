@@ -9,7 +9,7 @@
     "preview": "vite preview --host 127.0.0.1 --port 1421",
     "tauri": "tauri",
     "desktop": "npm run shim:dev && tauri dev",
-    "desktop:build": "npm run runtime:bundle && npm run shim:build && tauri build --no-bundle",
+    "desktop:build": "node scripts/deszo-control.mjs build-begin && npm run runtime:bundle && npm run shim:build && node scripts/tauri-build.mjs && node scripts/deszo-control.mjs build-finish",
     "shim:dev": "node scripts/build-shim.mjs",
     "shim:build": "node scripts/build-shim.mjs --release",
     "runner": "node --disable-warning=ExperimentalWarning runtime/runner.mjs",
@@ -19,7 +19,10 @@
     "docs:check": "node docs/tools/validate-docs.mjs",
     "runtime:bundle": "node scripts/bundle-runtime.mjs",
     "mcp:bundle": "node scripts/bundle-runtime.mjs",
-    "runner:fixtures": "node --disable-warning=ExperimentalWarning scripts/fixture-runner.mjs"
+    "runner:fixtures": "node --disable-warning=ExperimentalWarning scripts/fixture-runner.mjs",
+    "control:doctor": "node --disable-warning=ExperimentalWarning scripts/deszo-control.mjs doctor",
+    "control:prepare": "node --disable-warning=ExperimentalWarning scripts/deszo-control.mjs prepare",
+    "control:transport": "node scripts/deszo-transport.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.3.1",

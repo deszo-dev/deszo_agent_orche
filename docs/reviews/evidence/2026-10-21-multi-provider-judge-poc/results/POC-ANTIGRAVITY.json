@@ -1,0 +1,194 @@
+{
+  "provider": "antigravity",
+  "version": "1.4.4",
+  "capabilities": {
+    "provider": "antigravity",
+    "exactClientVersion": "1.4.4",
+    "cliPath": "C:/Users/jusse/AppData/Local/agy/bin/agy.exe",
+    "binaryAvailable": true,
+    "authenticationModes": [
+      "consumer_google_account_oauth",
+      "gcp_service_account",
+      "gemini_api_key"
+    ],
+    "permittedBillingModes": [
+      "subscription",
+      "api",
+      "credits"
+    ],
+    "subscriptionEligibility": {
+      "supportedForConsumerOAuth": true,
+      "supportedForHeadlessCli": true,
+      "evidence": "VERIFIED",
+      "officialSource": "https://antigravity.google/docs/plans"
+    },
+    "sessionPersistence": {
+      "supported": true,
+      "format": "central SQLite and JSON transcripts (~/.gemini/antigravity-cli/conversations/)",
+      "evidence": "VERIFIED"
+    },
+    "sessionResumeSupport": {
+      "byConversationId": true,
+      "byContinueFlag": true,
+      "evidence": "VERIFIED"
+    },
+    "dedicatedSessionFeasibility": {
+      "supportedViaConversationId": true,
+      "evidence": "VERIFIED"
+    },
+    "exclusiveTurnAdmissionSupport": {
+      "nativeCliFileLock": false,
+      "hostLevelFencingRequired": true,
+      "evidence": "VERIFIED"
+    },
+    "structuredCompletionEvidence": {
+      "structuredJsonOutput": true,
+      "streamingNdjson": true,
+      "usageTelemetryIncluded": true,
+      "deniedActionsReported": true,
+      "evidence": "VERIFIED"
+    },
+    "toolSupport": {
+      "scopedMcpRegistration": true,
+      "headlessPermissionModel": "auto-denies unapproved command tools without pre-configured allow-rule or --dangerously-skip-permissions",
+      "evidence": "VERIFIED"
+    },
+    "concurrencyHandling": {
+      "serializedTurnsRequired": true,
+      "evidence": "VERIFIED"
+    },
+    "usageTelemetryAvailability": {
+      "inputTokens": true,
+      "outputTokens": true,
+      "thinkingTokens": true,
+      "cacheReadTokens": true,
+      "totalTokens": true,
+      "evidence": "VERIFIED"
+    },
+    "knownUnsupportedCapabilities": [
+      "Native CLI multi-writer process locking (requires Deszo host serialization)",
+      "Interactive permission prompts in headless print mode (auto-denied)",
+      "Implicit fallback to paid AI credits without explicit settings toggle"
+    ]
+  },
+  "auth": {
+    "isLoggedIn": true,
+    "authMethod": "consumer_google_account_oauth",
+    "quotaProject": null,
+    "status": "PASS",
+    "reason": null
+  },
+  "billing": {
+    "billingMode": "subscription",
+    "eligible": true,
+    "paidCreditsDisabled": true,
+    "quotaProjectDisabled": true,
+    "status": "PASS",
+    "officialSource": "https://antigravity.google/docs/plans"
+  },
+  "headlessTurn1": {
+    "exitCode": 0,
+    "elapsedMs": 15303,
+    "rawStdout": "{\"conversation_id\":\"d74ebd97-5503-43c5-b797-ee64f93bac70\",\"status\":\"SUCCESS\",\"response\":\"{\\\"judge\\\":\\\"active\\\",\\\"provider\\\":\\\"antigravity\\\",\\\"decision\\\":\\\"PROCEED\\\"}\\n\",\"duration_seconds\":3.1590293,\"num_turns\":1,\"usage\":{\"input_tokens\":6635,\"output_tokens\":97,\"thinking_tokens\":81,\"cache_read_tokens\":0,\"total_tokens\":6732}}\n",
+    "rawStderr": "",
+    "parsedJson": {
+      "conversation_id": "d74ebd97-5503-43c5-b797-ee64f93bac70",
+      "status": "SUCCESS",
+      "response": "{\"judge\":\"active\",\"provider\":\"antigravity\",\"decision\":\"PROCEED\"}\n",
+      "duration_seconds": 3.1590293,
+      "num_turns": 1,
+      "usage": {
+        "input_tokens": 6635,
+        "output_tokens": 97,
+        "thinking_tokens": 81,
+        "cache_read_tokens": 0,
+        "total_tokens": 6732
+      }
+    },
+    "jsonError": null,
+    "hasPermissionDenial": false,
+    "deniedActions": [],
+    "tokenUsage": {
+      "input_tokens": 6635,
+      "output_tokens": 97,
+      "thinking_tokens": 81,
+      "cache_read_tokens": 0,
+      "total_tokens": 6732
+    },
+    "status": "PASS"
+  },
+  "headlessTurn2Resume": {
+    "exitCode": 0,
+    "elapsedMs": 10617,
+    "rawStdout": "{\"conversation_id\":\"d74ebd97-5503-43c5-b797-ee64f93bac70\",\"status\":\"SUCCESS\",\"response\":\"{\\\"judge\\\":\\\"turn_2\\\",\\\"resumed\\\":true}\\n\",\"duration_seconds\":17.0687908,\"num_turns\":2,\"usage\":{\"input_tokens\":13591,\"output_tokens\":209,\"thinking_tokens\":181,\"cache_read_tokens\":0,\"total_tokens\":13800}}\n",
+    "rawStderr": "",
+    "parsedJson": {
+      "conversation_id": "d74ebd97-5503-43c5-b797-ee64f93bac70",
+      "status": "SUCCESS",
+      "response": "{\"judge\":\"turn_2\",\"resumed\":true}\n",
+      "duration_seconds": 17.0687908,
+      "num_turns": 2,
+      "usage": {
+        "input_tokens": 13591,
+        "output_tokens": 209,
+        "thinking_tokens": 181,
+        "cache_read_tokens": 0,
+        "total_tokens": 13800
+      }
+    },
+    "jsonError": null,
+    "hasPermissionDenial": false,
+    "deniedActions": [],
+    "tokenUsage": {
+      "input_tokens": 13591,
+      "output_tokens": 209,
+      "thinking_tokens": 181,
+      "cache_read_tokens": 0,
+      "total_tokens": 13800
+    },
+    "status": "PASS"
+  },
+  "headlessPermissionDenialTest": {
+    "exitCode": 0,
+    "elapsedMs": 16225,
+    "rawStdout": "{\"conversation_id\":\"d74ebd97-5503-43c5-b797-ee64f93bac70\",\"status\":\"SUCCESS\",\"response\":\"\",\"duration_seconds\":33.8432502,\"num_turns\":3,\"usage\":{\"input_tokens\":20880,\"output_tokens\":1144,\"thinking_tokens\":1078,\"cache_read_tokens\":0,\"total_tokens\":22024},\"denied_actions\":[{\"action\":\"command\",\"display_name\":\"RunCommand\"}]}\n",
+    "rawStderr": "jetski: no output produced — a tool required the \"command\" permission that headless mode cannot prompt for, so it was auto-denied. Add an allow-rule under permissions.allow in settings.json (e.g. command(<target>)). Alternatively, re-run with --dangerously-skip-permissions to auto-approve all tools.\n",
+    "parsedJson": {
+      "conversation_id": "d74ebd97-5503-43c5-b797-ee64f93bac70",
+      "status": "SUCCESS",
+      "response": "",
+      "duration_seconds": 33.8432502,
+      "num_turns": 3,
+      "usage": {
+        "input_tokens": 20880,
+        "output_tokens": 1144,
+        "thinking_tokens": 1078,
+        "cache_read_tokens": 0,
+        "total_tokens": 22024
+      },
+      "denied_actions": [
+        {
+          "action": "command",
+          "display_name": "RunCommand"
+        }
+      ]
+    },
+    "jsonError": null,
+    "hasPermissionDenial": true,
+    "deniedActions": [
+      {
+        "action": "command",
+        "display_name": "RunCommand"
+      }
+    ],
+    "tokenUsage": {
+      "input_tokens": 20880,
+      "output_tokens": 1144,
+      "thinking_tokens": 1078,
+      "cache_read_tokens": 0,
+      "total_tokens": 22024
+    },
+    "status": "FAIL"
+  },
+  "overallStatus": "PASS"
+}

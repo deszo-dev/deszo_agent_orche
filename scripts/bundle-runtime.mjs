@@ -2,6 +2,9 @@
 import { build } from 'esbuild';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { MIGRATION_FILES } from '../runtime/core/migrations.mjs';
+import { writeRuntimeManifest } from './deszo-artifacts.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const out = resolve(root, 'dist-runtime');
@@ -32,15 +35,23 @@ await build({
 });
 copyFileSync(resolve(root, 'docs/storage/host-h1.sql'), resolve(out, 'host-h1.sql'));
 copyFileSync(resolve(root, 'docs/storage/host-h2.sql'), resolve(out, 'host-h2.sql'));
-copyFileSync(resolve(root, 'docs/storage/m1.sql'), resolve(out, 'm1.sql'));
-copyFileSync(resolve(root, 'docs/storage/m2.sql'), resolve(out, 'm2.sql'));
-copyFileSync(resolve(root, 'docs/storage/m3.sql'), resolve(out, 'm3.sql'));
-copyFileSync(resolve(root, 'docs/storage/m4.sql'), resolve(out, 'm4.sql'));
-copyFileSync(resolve(root, 'docs/storage/m5.sql'), resolve(out, 'm5.sql'));
-copyFileSync(resolve(root, 'docs/storage/m6.sql'), resolve(out, 'm6.sql'));
-copyFileSync(resolve(root, 'docs/storage/m7.sql'), resolve(out, 'm7.sql'));
-copyFileSync(resolve(root, 'docs/storage/m8.sql'), resolve(out, 'm8.sql'));
-copyFileSync(resolve(root, 'docs/storage/m9.sql'), resolve(out, 'm9.sql'));
-copyFileSync(resolve(root, 'docs/storage/m10.sql'), resolve(out, 'm10.sql'));
-copyFileSync(resolve(root, 'docs/storage/m11.sql'), resolve(out, 'm11.sql'));
+copyFileSync(resolve(root, 'docs/storage/host-h3.sql'), resolve(out, 'host-h3.sql'));
+copyFileSync(resolve(root, 'docs/storage/host-h4.sql'), resolve(out, 'host-h4.sql'));
+copyFileSync(resolve(root, 'docs/storage/host-h5.sql'), resolve(out, 'host-h5.sql'));
+await build({
+  entryPoints: [resolve(root, 'runtime/host/worker.mjs')], outfile: resolve(out, 'worker.mjs'),
+  bundle: true, platform: 'node', format: 'esm', target: 'node22', legalComments: 'none',
+  banner: { js: "import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);" },
+});
+await build({
+  entryPoints: [resolve(root, 'runtime/host/serviceRuntime.mjs')], outfile: resolve(out, 'service-runtime.mjs'),
+  bundle: true, platform: 'node', format: 'esm', target: 'node22', legalComments: 'none',
+  banner: { js: "import { createRequire as __createRequire } from 'node:module'; import {fileURLToPath as __hostFileURLToPath} from 'node:url'; import {dirname as __hostDirname} from 'node:path'; const require = __createRequire(import.meta.url); const __filename=__hostFileURLToPath(import.meta.url), __dirname=__hostDirname(__filename);" },
+});
+for (const file of MIGRATION_FILES) copyFileSync(resolve(root, 'docs/storage', file), resolve(out, file));
+// Importing the private backend with EOF initializes no installation/store. This catches bundled dependency/ESM
+// failures before an updater can replace the working authority with a non-starting artifact.
+const serviceImport=spawnSync(process.execPath,['--disable-warning=ExperimentalWarning',resolve(out,'service-runtime.mjs')],{input:'',encoding:'utf8',windowsHide:true,timeout:15000});
+if(serviceImport.status!==0)throw new Error(`The bundled protected backend cannot initialize: ${serviceImport.stderr}`);
 console.log(`Runtime bundled into ${out}`);
+writeRuntimeManifest(out);

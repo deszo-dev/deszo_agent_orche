@@ -3,6 +3,7 @@
 import { spawnSync } from 'node:child_process';
 import { copyFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { writeRuntimeManifest } from './deszo-artifacts.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const release = process.argv.includes('--release');
@@ -15,5 +16,6 @@ if (result.status !== 0) process.exit(result.status ?? 1);
 if (release) {
   mkdirSync(resolve(root, 'dist-runtime'), { recursive: true });
   copyFileSync(built, resolve(root, 'dist-runtime/deszo-launch-shim.exe'));
+  writeRuntimeManifest(resolve(root, 'dist-runtime'));
 }
 console.log(`Launch shim built at ${built}${release ? ' and copied to dist-runtime' : ''}`);

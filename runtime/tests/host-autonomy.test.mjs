@@ -24,6 +24,8 @@ test('ADR6-01/07: a host permit admits an external run without the confirmation 
   // A first runtime saves the workflow and workspace and turns confirmation on, as the user would.
   let api = await startTestRunner({ root });
   await api.workspace();
+  // The policy names the directory this workspace really runs in; provider charges are refused in any other directory.
+  const cwdIdentity = api.runner.engine.requireWorkspace('main').cwd_identity;
   const settings = api.runner.engine.currentSettings();
   await api.call('PUT', '/api/v2/settings', { requestId: randomUUID(), expectedRevision: settings.revision, settings: { ...settings.settings, externalRunConfirmation: true } });
   const saved = await api.save(workflow);
@@ -39,7 +41,7 @@ test('ADR6-01/07: a host permit admits an external run without the confirmation 
   const controller = connectHost(pipeName);
   const proposal = await controller.call('policy.propose', {
     controller: { controllerId: 'worker', publicKey: der(controllerKeys.publicKey) },
-    scope: { dataProfile: 'test', workspaces: [{ workspaceId: 'main', cwdIdentity: 'b'.repeat(64) }], workflows: [{ workflowId: workflow.workflowId, baselineSha256: saved.snapshotSha256, permittedRevisions: [] }],
+    scope: { dataProfile: 'test', workspaces: [{ workspaceId: 'main', cwdIdentity }], workflows: [{ workflowId: workflow.workflowId, baselineSha256: saved.snapshotSha256, permittedRevisions: [] }],
       operations: ['run.approve', 'provider.invoke'], commands: [], desktop: { user: 'u', sessionId: 1 }, buildRoot: 'C:/builds', applicationMode: 'separate_preview', deliveryBoundary: 'candidate' },
     limits: { attempts: 5, providerInvocations: 5, workerModelCalls: 0, operations: 10, restarts: 0, repairs: 0, builds: 0 }, durationMs: 3_600_000,
   });

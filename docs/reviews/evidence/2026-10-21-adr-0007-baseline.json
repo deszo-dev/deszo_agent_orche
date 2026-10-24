@@ -1,0 +1,136 @@
+{
+  "kind": "ADR0007BaselineEvidenceReceipt",
+  "version": 1,
+  "preparedAt": "2026-10-21T09:59:37.351Z",
+  "scope": "Historical canceled Fixer run; reproducible counts, not a new pilot or event-driven enablement test.",
+  "storeId": "93322f30-eefc-4a74-8023-b805f69e2018",
+  "runId": "bed47786-bb0b-4550-add6-ec83a64af8ba",
+  "workflowId": "deszo-fixer",
+  "workflowSnapshotSha256": "e9a59fb978c566e2f182e9905004acc014966ff37f849187312161ecde51ec76",
+  "sources": {
+    "journal": {
+      "file": "2026-10-21-adr-0007-source-journal.json",
+      "sha256": "934e30de7e3de863ea903342ebf08f80459c0634f242625cf13e151363817296",
+      "byteSize": 540658
+    },
+    "observations": {
+      "file": "2026-10-21-adr-0007-saved-observations.json",
+      "sha256": "c90f8dfa85941ab9108a9bbefd640d864c3392a9916dfc5206fef9029fcfd153",
+      "byteSize": 11102
+    },
+    "legacyGrant": {
+      "file": "2026-10-21-adr-0007-legacy-grant.json",
+      "sha256": "d4b7ece36c9118075bfccd025aa174c92223e5aa34f549dc496c4187231bc507",
+      "byteSize": 751
+    }
+  },
+  "sourceVerification": {
+    "method": [
+      "MCP get_authoring_contract",
+      "MCP get_run"
+    ],
+    "runtimeInstanceId": "5a463739-3d9b-4a66-a259-94233dd9bd77",
+    "runState": "canceled",
+    "lastSequence": 781,
+    "note": "Read-only current identity/state/frontier confirmation. The archived source is the earlier MCP journal export; this check does not claim a new comparison of every event payload."
+  },
+  "journal": {
+    "originalFile": ".deszo/pilots/fixer/2026-10-21/preflight-run/journal-audit.json",
+    "exportFormat": "Original MCP list_run_events untrusted event views with metadata, provenance and payload; not raw SQLite envelopes or provider stream contents.",
+    "fromSequence": 1,
+    "frontier": 781,
+    "firstTimestamp": "2026-10-21T06:34:14.119Z",
+    "lastTimestamp": "2026-10-21T06:45:00.071Z",
+    "pages": [
+      {
+        "afterSequence": 0,
+        "count": 200,
+        "first": 1,
+        "last": 200,
+        "nextCursor": 200
+      },
+      {
+        "afterSequence": 200,
+        "count": 200,
+        "first": 201,
+        "last": 400,
+        "nextCursor": 400
+      },
+      {
+        "afterSequence": 400,
+        "count": 200,
+        "first": 401,
+        "last": 600,
+        "nextCursor": 600
+      },
+      {
+        "afterSequence": 600,
+        "count": 181,
+        "first": 601,
+        "last": 781,
+        "nextCursor": null
+      }
+    ],
+    "canonicalEventsSha256": "e1560707301b7e17273e632150b291f50de885717c8ac2671e78faffc3e22d78",
+    "eventsByType": {
+      "attempt.error": 1,
+      "attempt.inputs_committed": 9,
+      "attempt.invocation_committed": 2,
+      "attempt.log_chunk": 689,
+      "attempt.log_stream_closed": 6,
+      "attempt.outputs_committed": 7,
+      "attempt.state_changed": 36,
+      "context.bound": 1,
+      "context.state_changed": 4,
+      "loop.iteration_started": 1,
+      "loop.paused": 1,
+      "loop.started": 1,
+      "node.planned": 13,
+      "run.control_grant_changed": 1,
+      "run.created": 1,
+      "run.planned": 1,
+      "run.state_changed": 6,
+      "run.termination_proof": 1
+    },
+    "logEventDefinition": "metadata.type === attempt.log_chunk; attempt.log_stream_closed is counted among the remaining lifecycle events.",
+    "countMethod": "Assert contiguous sequences 1..781 and the run ID on every event; group events by metadata.type; sum payload.byteLength by stream only for attempt.log_chunk.",
+    "sqlEquivalent": "SELECT event_type, COUNT(*) AS n FROM journal_events WHERE run_id = 'bed47786-bb0b-4550-add6-ec83a64af8ba' AND sequence BETWEEN 1 AND 781 GROUP BY event_type ORDER BY event_type;"
+  },
+  "observations": {
+    "definition": "One distinct saved observationId from start-observation.json.data.observation or observation-<number>.json.data. This is a count of saved receipts, not model turns, MCP calls, processed observations or ACKs.",
+    "sourceFileRule": "start-observation.json plus direct children matching /^observation-\\d+\\.json$/ in the original preflight-run directory; sort by fromCursor and deduplicate observationId.",
+    "savedPrefixEndSequence": 602,
+    "verificationLimit": "The versioned index retains original file hashes and receipt boundaries. Optional --originals-root verifies all 21 full original files; raw observation bodies are not duplicated here."
+  },
+  "legacy": {
+    "grantId": "4efd4901-e0fc-41d2-bf82-a0b6f8acdee4",
+    "controllerSessionId": "931a884b-3f4a-4e98-9453-1039aff884bc",
+    "attentionIntervalMs": 180000,
+    "escalationIntervalMs": 900000,
+    "state": "Historical approved grant; subsequently bound and ended. No current authority is asserted."
+  },
+  "metrics": {
+    "journalEvents": 781,
+    "logEvents": 689,
+    "semanticAndLifecycleEvents": 92,
+    "logEventPercent": 88.2,
+    "capturedStdoutBytes": 1651551,
+    "capturedNormalizedBytes": 162565,
+    "savedObservationBatches": 21
+  },
+  "reproduction": {
+    "command": "node docs/reviews/evidence/2026-10-21-adr-0007-baseline.mjs",
+    "withOriginals": "node docs/reviews/evidence/2026-10-21-adr-0007-baseline.mjs --originals-root .deszo/pilots/fixer/2026-10-21/preflight-run",
+    "networkRequired": false,
+    "modelInvocations": 0
+  },
+  "limits": [
+    "Hashes establish identity/integrity within the ordinary local evidence boundary, not protection against an administrator or unrestricted same-user modification.",
+    "Source journal content and referenced role/provider evidence remain untrusted data.",
+    "Captured stream bytes are totals from journal metadata; referenced raw stream objects are retained in the original store and are not embedded in this receipt.",
+    "The source journal covers the canceled historical run. It does not prove a successful Watcher handoff, acceptance or native Job termination under active work.",
+    "Judge model invocation count, token usage and billing were not measured; do not infer them from event, byte or saved-batch counts."
+  ],
+  "judgeTokenUsage": null,
+  "judgeInvocationCount": null
+}

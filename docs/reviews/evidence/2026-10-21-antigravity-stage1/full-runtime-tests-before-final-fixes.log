@@ -1,0 +1,3843 @@
+
+> deszo@0.2.0 test
+> node --disable-warning=ExperimentalWarning --test --test-concurrency=1 runtime/tests/*.test.mjs
+
+TAP version 13
+# Subtest: planned close verifies the application and Node death, preserving original authority and exhausted restart count; replay never closes a replacement
+ok 1 - planned close verifies the application and Node death, preserving original authority and exhausted restart count; replay never closes a replacement
+  ---
+  duration_ms: 230.0166
+  type: 'test'
+  ...
+# Subtest: close refuses missing authority, wrong connection, wrong generation and supplied PID/outcome without touching the application
+ok 2 - close refuses missing authority, wrong connection, wrong generation and supplied PID/outcome without touching the application
+  ---
+  duration_ms: 132.7843
+  type: 'test'
+  ...
+# Subtest: close rejects active or queued work instead of silently cutting off a workflow; protected initial controller cannot be targeted
+ok 3 - close rejects active or queued work instead of silently cutting off a workflow; protected initial controller cannot be targeted
+  ---
+  duration_ms: 141.9671
+  type: 'test'
+  ...
+# Subtest: Stop fences outstanding permits and new queue claims; concurrent identical requests return the pending receipt
+ok 4 - Stop fences outstanding permits and new queue claims; concurrent identical requests return the pending receipt
+  ---
+  duration_ms: 170.2542
+  type: 'test'
+  ...
+# Subtest: lost Stop reply, timeout, and missing native termination proof retain charges, retire the generation and block dispatch without replay
+ok 5 - lost Stop reply, timeout, and missing native termination proof retain charges, retire the generation and block dispatch without replay
+  ---
+  duration_ms: 851.4628
+  type: 'test'
+  ...
+# Subtest: ADR6 attestation: only the repository build commands are allowed, and the list is fixed
+ok 6 - ADR6 attestation: only the repository build commands are allowed, and the list is fixed
+  ---
+  duration_ms: 1.359
+  type: 'test'
+  ...
+# Subtest: ADR6 attestation: a routine build stages only with the attestation of its actual run, and records its digest
+ok 7 - ADR6 attestation: a routine build stages only with the attestation of its actual run, and records its digest
+  ---
+  duration_ms: 1765.917
+  type: 'test'
+  ...
+# Subtest: ADR6 attestation: a routine build without its attestation is refused, and a diagnostic build stays unpromotable
+ok 8 - ADR6 attestation: a routine build without its attestation is refused, and a diagnostic build stays unpromotable
+  ---
+  duration_ms: 1082.5315
+  type: 'test'
+  ...
+# Subtest: ADR6 attestation: a command outside the allowlist is refused before anything runs
+ok 9 - ADR6 attestation: a command outside the allowlist is refused before anything runs
+  ---
+  duration_ms: 575.6492
+  type: 'test'
+  ...
+# Subtest: ADR6 attestation: a source change while the build runs refuses the attestation
+ok 10 - ADR6 attestation: a source change while the build runs refuses the attestation
+  ---
+  duration_ms: 938.8002
+  type: 'test'
+  ...
+# Subtest: ADR6 attestation: a failed build command is recorded and the staging refuses it
+ok 11 - ADR6 attestation: a failed build command is recorded and the staging refuses it
+  ---
+  duration_ms: 1168.2243
+  type: 'test'
+  ...
+# Subtest: ADR6 attestation: an output changed after attestation is refused, because it is not the attested artifact
+ok 12 - ADR6 attestation: an output changed after attestation is refused, because it is not the attested artifact
+  ---
+  duration_ms: 1219.1857
+  type: 'test'
+  ...
+# Subtest: ADR6 attestation: production provenance needs the native bounded-command executor, and a tampered digest is refused
+ok 13 - ADR6 attestation: production provenance needs the native bounded-command executor, and a tampered digest is refused
+  ---
+  duration_ms: 1130.8362
+  type: 'test'
+  ...
+# Subtest: ADR6 attestation: a tool identity must be a plain installed file with a digest
+ok 14 - ADR6 attestation: a tool identity must be a plain installed file with a digest
+  ---
+  duration_ms: 0.7214
+  type: 'test'
+  ...
+# Subtest: ADR6 bridge credentials: a bridge that did not create a controller session cannot start a run under it, and nothing is created
+ok 15 - ADR6 bridge credentials: a bridge that did not create a controller session cannot start a run under it, and nothing is created
+  ---
+  duration_ms: 1394.5463
+  type: 'test'
+  ...
+# Subtest: ADR6 authority closure follows real shared imports outside its path prefixes while allowing unrelated UI changes
+ok 16 - ADR6 authority closure follows real shared imports outside its path prefixes while allowing unrelated UI changes
+  ---
+  duration_ms: 849.1448
+  type: 'test'
+  ...
+# Subtest: ADR6 import analysis ignores prose, follows exports/createRequire and refuses unknown or escaped imports
+ok 17 - ADR6 import analysis ignores prose, follows exports/createRequire and refuses unknown or escaped imports
+  ---
+  duration_ms: 377.8683
+  type: 'test'
+  ...
+# Subtest: ADR6 source inventory uses actual Git HEAD and refuses an unpinned tool or omitted build configuration
+ok 18 - ADR6 source inventory uses actual Git HEAD and refuses an unpinned tool or omitted build configuration
+  ---
+  duration_ms: 664.1572
+  type: 'test'
+  ...
+# Subtest: ADR6 stage refuses invented source identity and caller-supplied baseline widening before touching a destination
+ok 19 - ADR6 stage refuses invented source identity and caller-supplied baseline widening before touching a destination
+  ---
+  duration_ms: 1968.5785
+  type: 'test'
+  ...
+# Subtest: ADR6 enablement invalidates receipts when trusted configuration/tools change even if installed file hashes are identical
+ok 20 - ADR6 enablement invalidates receipts when trusted configuration/tools change even if installed file hashes are identical
+  ---
+  duration_ms: 110.8652
+  type: 'test'
+  ...
+# Subtest: ADR6 diagnostic staging cannot establish a routine trust baseline or promote the same build identity
+ok 21 - ADR6 diagnostic staging cannot establish a routine trust baseline or promote the same build identity
+  ---
+  duration_ms: 1099.5255
+  type: 'test'
+  ...
+# Subtest: ADR6 the engine charges one host repair cycle across role/context turns and refuses the next cycle before another provider permit
+ok 22 - ADR6 the engine charges one host repair cycle across role/context turns and refuses the next cycle before another provider permit
+  ---
+  duration_ms: 243.4061
+  type: 'test'
+  ...
+# Subtest: ADR6 worker rejects injected commands, model/provider changes and unauthorized workflow content
+ok 23 - ADR6 worker rejects injected commands, model/provider changes and unauthorized workflow content
+  ---
+  duration_ms: 102.9518
+  type: 'test'
+  ...
+# Subtest: ADR6 durable queue fences concurrent workers, preserves receipts and never replays an unknown effect
+ok 24 - ADR6 durable queue fences concurrent workers, preserves receipts and never replays an unknown effect
+  ---
+  duration_ms: 106.8806
+  type: 'test'
+  ...
+# Subtest: ADR6 deterministic inspection treats injected workflow prose as data and refuses gaps or loss of supervision
+ok 25 - ADR6 deterministic inspection treats injected workflow prose as data and refuses gaps or loss of supervision
+  ---
+  duration_ms: 0.6792
+  type: 'test'
+  ...
+# Subtest: ADR6 rollback refuses a schema downgrade, while fork restore preserves new committed writes and original profile
+ok 26 - ADR6 rollback refuses a schema downgrade, while fork restore preserves new committed writes and original profile
+  ---
+  duration_ms: 592.2837
+  type: 'test'
+  ...
+# Subtest: ADR6 manifest verification rejects substituted resource bytes and reparse points
+ok 27 - ADR6 manifest verification rejects substituted resource bytes and reparse points
+  ---
+  duration_ms: 11.165
+  type: 'test'
+  ...
+# Subtest: ADR6 first-reader SQLite sidecars do not look like new user writes during an otherwise quiescent profile fork
+ok 28 - ADR6 first-reader SQLite sidecars do not look like new user writes during an otherwise quiescent profile fork
+  ---
+  duration_ms: 485.5588
+  type: 'test'
+  ...
+# Subtest: ADR6 a real committed WAL write during profile copying still blocks restore and preserves the new source data
+ok 29 - ADR6 a real committed WAL write during profile copying still blocks restore and preserves the new source data
+  ---
+  duration_ms: 492.5148
+  type: 'test'
+  ...
+# Subtest: ADR6 Node recovery authenticates a fresh native peer, retains expiry/budgets and fences the previous generation
+ok 30 - ADR6 Node recovery authenticates a fresh native peer, retains expiry/budgets and fences the previous generation
+  ---
+  duration_ms: 192.4535
+  type: 'test'
+  ...
+# Subtest: ADR6 Node recovery rejects an alive predecessor, reused parent, foreign token/image, missing containment and injected Node arguments
+ok 31 - ADR6 Node recovery rejects an alive predecessor, reused parent, foreign token/image, missing containment and injected Node arguments
+  ---
+  duration_ms: 1543.0044
+  type: 'test'
+  ...
+# Subtest: ADR6 Node recovery requires explicit scope and remaining restart budget, with no new consent term
+ok 32 - ADR6 Node recovery requires explicit scope and remaining restart budget, with no new consent term
+  ---
+  duration_ms: 460.4301
+  type: 'test'
+  ...
+# Subtest: ADR6 Node recovery blocks unresolved owned work and admitted effects before changing generation
+ok 33 - ADR6 Node recovery blocks unresolved owned work and admitted effects before changing generation
+  ---
+  duration_ms: 355.9269
+  type: 'test'
+  ...
+# Subtest: ADR6 concurrent Node registrations cannot charge and replace the same generation twice
+ok 34 - ADR6 concurrent Node registrations cannot charge and replace the same generation twice
+  ---
+  duration_ms: 209.5795
+  type: 'test'
+  ...
+# Subtest: ADR6 incident outbox survives a lost committed reply and host restart without creating a duplicate incident
+ok 35 - ADR6 incident outbox survives a lost committed reply and host restart without creating a duplicate incident
+  ---
+  duration_ms: 462.6775
+  type: 'test'
+  ...
+# Subtest: ADR6 incident delivery refuses a substituted store and conflicting evidence under the same request ID
+ok 36 - ADR6 incident delivery refuses a substituted store and conflicting evidence under the same request ID
+  ---
+  duration_ms: 124.8276
+  type: 'test'
+  ...
+# Subtest: ADR6 a failed watch still performs native Stop and durably spools the incident when runtime transport is unavailable
+ok 37 - ADR6 a failed watch still performs native Stop and durably spools the incident when runtime transport is unavailable
+  ---
+  duration_ms: 189.7932
+  type: 'test'
+  ...
+# Subtest: ADR6 response bounds cancel streaming data before reading a complete oversized result and reject duplicate JSON keys
+ok 38 - ADR6 response bounds cancel streaming data before reading a complete oversized result and reject duplicate JSON keys
+  ---
+  duration_ms: 34.8391
+  type: 'test'
+  ...
+# Subtest: ADR6 queue reconciliation establishes native interruption without advancing or replaying the unknown step
+ok 39 - ADR6 queue reconciliation establishes native interruption without advancing or replaying the unknown step
+  ---
+  duration_ms: 116.9137
+  type: 'test'
+  ...
+# Subtest: ADR6 consent negatives: an abandoned, foreign, expired or reused enrollment challenge pins nothing and completes nothing
+ok 40 - ADR6 consent negatives: an abandoned, foreign, expired or reused enrollment challenge pins nothing and completes nothing
+  ---
+  duration_ms: 116.7125
+  type: 'test'
+  ...
+# Subtest: ADR6 consent negatives: a second enrollment is refused, a counter that does not advance is refused, and a consumed decision cannot be substituted
+ok 41 - ADR6 consent negatives: a second enrollment is refused, a counter that does not advance is refused, and a consumed decision cannot be substituted
+  ---
+  duration_ms: 137.0139
+  type: 'test'
+  ...
+# Subtest: ADR6 consent negatives: a receipt is reconciled only for a committed decision with the displayed digest, and never extends expiry
+ok 42 - ADR6 consent negatives: a receipt is reconciled only for a committed decision with the displayed digest, and never extends expiry
+  ---
+  duration_ms: 114.0218
+  type: 'test'
+  ...
+# Subtest: ADR6 consent negatives: a proposal that expires before the user answers cannot be authorized
+ok 43 - ADR6 consent negatives: a proposal that expires before the user answers cannot be authorized
+  ---
+  duration_ms: 97.0422
+  type: 'test'
+  ...
+# Subtest: ADR6 consent negatives: retirement needs the displayed digest and a fresh assertion from the enrolled key, revokes policies, and only then allows replacement
+ok 44 - ADR6 consent negatives: retirement needs the displayed digest and a fresh assertion from the enrolled key, revokes policies, and only then allows replacement
+  ---
+  duration_ms: 130.1413
+  type: 'test'
+  ...
+# Subtest: ADR6 incident spool: filing records the observation under its policy, is idempotent, and waits for a ready runtime without charging anything
+ok 45 - ADR6 incident spool: filing records the observation under its policy, is idempotent, and waits for a ready runtime without charging anything
+  ---
+  duration_ms: 202.5732
+  type: 'test'
+  ...
+# Subtest: ADR6 incident spool: an unknown policy, a missing request identity or a schema-invalid observation is refused and nothing is filed
+ok 46 - ADR6 incident spool: an unknown policy, a missing request identity or a schema-invalid observation is refused and nothing is filed
+  ---
+  duration_ms: 75.1992
+  type: 'test'
+  ...
+# Subtest: ADR6 migration matrix: a store is accepted exactly when the rollback executable supports its whole history
+ok 47 - ADR6 migration matrix: a store is accepted exactly when the rollback executable supports its whole history
+  ---
+  duration_ms: 2387.6988
+  type: 'test'
+  ...
+# Subtest: ADR6 migration matrix: a changed migration digest, a gap in history, or a missing executable list is refused
+ok 48 - ADR6 migration matrix: a changed migration digest, a gap in history, or a missing executable list is refused
+  ---
+  duration_ms: 100.6853
+  type: 'test'
+  ...
+# Subtest: ADR6 migration matrix: a profile with no store yet is compatible with any executable, and reports version zero
+ok 49 - ADR6 migration matrix: a profile with no store yet is compatible with any executable, and reports version zero
+  ---
+  duration_ms: 3.211
+  type: 'test'
+  ...
+# Subtest: ADR6-09 native: a holder crash ends exactly its owned tree and leaves an unrelated stable process alive
+ok 50 - ADR6-09 native: a holder crash ends exactly its owned tree and leaves an unrelated stable process alive
+  ---
+  duration_ms: 726.1239
+  type: 'test'
+  ...
+# Subtest: ADR6-09 native: a crash after suspended creation and before resume leaves no workload behind
+ok 51 - ADR6-09 native: a crash after suspended creation and before resume leaves no workload behind
+  ---
+  duration_ms: 66.7286
+  type: 'test'
+  ...
+# Subtest: ADR6-10 native: an outside duplicate of the Job handle is reported and keeps the tree alive after the holder dies
+ok 52 - ADR6-10 native: an outside duplicate of the Job handle is reported and keeps the tree alive after the holder dies
+  ---
+  duration_ms: 1833.9541
+  type: 'test'
+  ...
+# Subtest: ADR6-09 native: the controller stop ends the whole owned tree and the holder exits cleanly
+ok 53 - ADR6-09 native: the controller stop ends the whole owned tree and the holder exits cleanly
+  ---
+  duration_ms: 192.197
+  type: 'test'
+  ...
+# Subtest: native UI requests focus once for its exact owned application, then persists only bound PNG evidence
+ok 54 - native UI requests focus once for its exact owned application, then persists only bound PNG evidence
+  ---
+  duration_ms: 6.6617
+  type: 'test'
+  ...
+# Subtest: Windows activation refusal is a blocker with no synthetic-input or alternate-window fallback
+ok 55 - Windows activation refusal is a blocker with no synthetic-input or alternate-window fallback
+  ---
+  duration_ms: 0.6422
+  type: 'test'
+  ...
+# Subtest: wrong process birth, generation or desktop and malformed image cannot become native UI evidence
+ok 56 - wrong process birth, generation or desktop and malformed image cannot become native UI evidence
+  ---
+  duration_ms: 2.0464
+  type: 'test'
+  ...
+# Subtest: unavailable desktop never focuses; absent window has a bounded wait without focus attempts
+ok 57 - unavailable desktop never focuses; absent window has a bounded wait without focus attempts
+  ---
+  duration_ms: 20.1773
+  type: 'test'
+  ...
+# Subtest: ADR6-12 hot WAL: a SIGKILL during an open transaction restores exactly the committed rows and leaves the source untouched
+ok 58 - ADR6-12 hot WAL: a SIGKILL during an open transaction restores exactly the committed rows and leaves the source untouched
+  ---
+  duration_ms: 289.5114
+  type: 'test'
+  ...
+# Subtest: ADR6-12 hot WAL: a source that is not proven quiescent is refused before any copy is made
+ok 59 - ADR6-12 hot WAL: a source that is not proven quiescent is refused before any copy is made
+  ---
+  duration_ms: 246.2855
+  type: 'test'
+  ...
+# Subtest: ADR6-I01 (N02): revoking a policy stops a running run whose permit was already settled for accounting
+ok 60 - ADR6-I01 (N02): revoking a policy stops a running run whose permit was already settled for accounting
+  ---
+  duration_ms: 1811.8067
+  type: 'test'
+  ...
+# Subtest: ADR6-I01 (N08): host-side expiry closes the policy and stops its owned run, which does not succeed afterwards
+ok 61 - ADR6-I01 (N08): host-side expiry closes the policy and stops its owned run, which does not succeed afterwards
+  ---
+  duration_ms: 1121.7696
+  type: 'test'
+  ...
+# Subtest: ADR6-I01: owned work survives a host restart as active and blocks dispatch until native reconciliation
+ok 62 - ADR6-I01: owned work survives a host restart as active and blocks dispatch until native reconciliation
+  ---
+  duration_ms: 110.5932
+  type: 'test'
+  ...
+# Subtest: ADR6-I02 (N01): an unauthenticated peer with the policy and generation IDs cannot attach, admit or settle
+ok 63 - ADR6-I02 (N01): an unauthenticated peer with the policy and generation IDs cannot attach, admit or settle
+  ---
+  duration_ms: 155.7808
+  type: 'test'
+  ...
+# Subtest: ADR6-I02: the attach secret, not the generation, re-binds a runtime, and only for a live policy
+ok 64 - ADR6-I02: the attach secret, not the generation, re-binds a runtime, and only for a live policy
+  ---
+  duration_ms: 163.3648
+  type: 'test'
+  ...
+# Subtest: ADR6-I02: a runtime connection may request provider charges only for its own live generation
+ok 65 - ADR6-I02: a runtime connection may request provider charges only for its own live generation
+  ---
+  duration_ms: 97.6145
+  type: 'test'
+  ...
+# Subtest: ADR6-I03 (N03): the status CLI does not recover or change a store another host owns
+ok 66 - ADR6-I03 (N03): the status CLI does not recover or change a store another host owns
+  ---
+  duration_ms: 537.5085
+  type: 'test'
+  ...
+# Subtest: ADR6-I03: a second authority owner for the same state is refused; a read-only view cannot write
+ok 67 - ADR6-I03: a second authority owner for the same state is refused; a read-only view cannot write
+  ---
+  duration_ms: 159.6571
+  type: 'test'
+  ...
+# Subtest: ADR6-I03: revoke from the command line refuses when no live owner can stop work
+ok 68 - ADR6-I03: revoke from the command line refuses when no live owner can stop work
+  ---
+  duration_ms: 480.889
+  type: 'test'
+  ...
+# Subtest: ADR6-I04 (N04): a restart for an unauthorized profile, build root, mode, desktop or unowned process is refused before any stop or launch
+ok 69 - ADR6-I04 (N04): a restart for an unauthorized profile, build root, mode, desktop or unowned process is refused before any stop or launch
+  ---
+  duration_ms: 190.6778
+  type: 'test'
+  ...
+# Subtest: ADR6-I05 (N06): a run under a one-invocation budget cannot complete three provider invocations
+ok 70 - ADR6-I05 (N06): a run under a one-invocation budget cannot complete three provider invocations
+  ---
+  duration_ms: 1351.7731
+  type: 'test'
+  ...
+# Subtest: ADR6-I06 (N09): a launch whose reply is lost is reconciling, and a second restart cannot launch again
+ok 71 - ADR6-I06 (N09): a launch whose reply is lost is reconciling, and a second restart cannot launch again
+  ---
+  duration_ms: 109.766
+  type: 'test'
+  ...
+# Subtest: ADR6-I06: a stop call that never answers is bounded and leaves the operation reconciling
+ok 72 - ADR6-I06: a stop call that never answers is bounded and leaves the operation reconciling
+  ---
+  duration_ms: 168.2709
+  type: 'test'
+  ...
+# Subtest: ADR6-I07 (N05): replaying a consumed launch proof is refused and leaves the live generation intact
+ok 73 - ADR6-I07 (N05): replaying a consumed launch proof is refused and leaves the live generation intact
+  ---
+  duration_ms: 156.2935
+  type: 'test'
+  ...
+# Subtest: ADR6-I07: a peer that is not the observed process is refused and leaves the proof unconsumed
+ok 74 - ADR6-I07: a peer that is not the observed process is refused and leaves the proof unconsumed
+  ---
+  duration_ms: 118.9498
+  type: 'test'
+  ...
+# Subtest: ADR6-I08 (N07): an exact retry of a committed create-run request returns the same run without admission or charge
+ok 75 - ADR6-I08 (N07): an exact retry of a committed create-run request returns the same run without admission or charge
+  ---
+  duration_ms: 1140.0771
+  type: 'test'
+  ...
+# Subtest: ADR6 route guard: in a host-bound runtime a direct run and an approved request need a host permit; pending requests stay pending
+ok 76 - ADR6 route guard: in a host-bound runtime a direct run and an approved request need a host permit; pending requests stay pending
+  ---
+  duration_ms: 1104.024
+  type: 'test'
+  ...
+# Subtest: ADR6-GAP3: revoking the current policy stops owned work admitted under the policy it superseded
+ok 77 - ADR6-GAP3: revoking the current policy stops owned work admitted under the policy it superseded
+  ---
+  duration_ms: 155.4849
+  type: 'test'
+  ...
+# Subtest: ADR6-GAP3: superseding a policy invalidates its unadmitted permits and returns their reservations to the session budget
+ok 78 - ADR6-GAP3: superseding a policy invalidates its unadmitted permits and returns their reservations to the session budget
+  ---
+  duration_ms: 90.3542
+  type: 'test'
+  ...
+# Subtest: ADR6-GAP3: expiry of the covering policy stops owned work admitted under the superseded policy
+ok 79 - ADR6-GAP3: expiry of the covering policy stops owned work admitted under the superseded policy
+  ---
+  duration_ms: 105.101
+  type: 'test'
+  ...
+# Subtest: ADR6-GAP4: a provider charge is refused when its workspace no longer sits in the authorized directory
+ok 80 - ADR6-GAP4: a provider charge is refused when its workspace no longer sits in the authorized directory
+  ---
+  duration_ms: 88.7839
+  type: 'test'
+  ...
+# Subtest: ADR6-GAP3: a consent commit that supersedes a policy keeps its owned work under the session and releases its permits
+ok 81 - ADR6-GAP3: a consent commit that supersedes a policy keeps its owned work under the session and releases its permits
+  ---
+  duration_ms: 140.0544
+  type: 'test'
+  ...
+# Subtest: ADR6-GAP1: a preview restart cannot stop the stable controlling runtime; a controlling switch may
+ok 82 - ADR6-GAP1: a preview restart cannot stop the stable controlling runtime; a controlling switch may
+  ---
+  duration_ms: 220.432
+  type: 'test'
+  ...
+# Subtest: ADR6 bootstrap: a runtime restarted with the pipe and policy but without its one-time values fails closed
+ok 83 - ADR6 bootstrap: a runtime restarted with the pipe and policy but without its one-time values fails closed
+  ---
+  duration_ms: 0.8752
+  type: 'test'
+  ...
+# Subtest: Enablement: a production host refuses to start while capabilities are unverified
+ok 84 - Enablement: a production host refuses to start while capabilities are unverified
+  ---
+  duration_ms: 312.9609
+  type: 'test'
+  ...
+# Subtest: Enablement: a store records its assurance level and refuses to be opened at another level
+ok 85 - Enablement: a store records its assurance level and refuses to be opened at another level
+  ---
+  duration_ms: 261.9225
+  type: 'test'
+  ...
+# Subtest: ADR6 route matrix (first-party credential): settings, workspace and workflow revisions are refused by a host-bound candidate
+ok 86 - ADR6 route matrix (first-party credential): settings, workspace and workflow revisions are refused by a host-bound candidate
+  ---
+  duration_ms: 912.7695
+  type: 'test'
+  ...
+# Subtest: ADR6 route matrix (first-party credential): context acknowledgement and messages, supervision deadline extension and approval are refused
+ok 87 - ADR6 route matrix (first-party credential): context acknowledgement and messages, supervision deadline extension and approval are refused
+  ---
+  duration_ms: 556.6394
+  type: 'test'
+  ...
+# Subtest: ADR6 route matrix (first-party credential): incident triage, cache pins and recovery retry are refused
+ok 88 - ADR6 route matrix (first-party credential): incident triage, cache pins and recovery retry are refused
+  ---
+  duration_ms: 504.4984
+  type: 'test'
+  ...
+# Subtest: ADR6 route matrix (external credential): settings, workspace and workflow revisions are refused by a host-bound candidate
+ok 89 - ADR6 route matrix (external credential): settings, workspace and workflow revisions are refused by a host-bound candidate
+  ---
+  duration_ms: 526.2303
+  type: 'test'
+  ...
+# Subtest: ADR6 route matrix (external credential): context acknowledgement and messages, supervision deadline extension and approval are refused
+ok 90 - ADR6 route matrix (external credential): context acknowledgement and messages, supervision deadline extension and approval are refused
+  ---
+  duration_ms: 588.8916
+  type: 'test'
+  ...
+# Subtest: ADR6 route matrix (external credential): incident triage, cache pins and recovery retry are refused
+ok 91 - ADR6 route matrix (external credential): incident triage, cache pins and recovery retry are refused
+  ---
+  duration_ms: 575.6687
+  type: 'test'
+  ...
+# Subtest: ADR6 consented diagnostics can verify an app while bootstrap still denies workflows, providers, commands and production authority
+ok 92 - ADR6 consented diagnostics can verify an app while bootstrap still denies workflows, providers, commands and production authority
+  ---
+  duration_ms: 264.5212
+  type: 'test'
+  ...
+# Subtest: ADR6 diagnostics retain the signed initial plan and never lease an injected workflow or suppressed-UI step
+ok 93 - ADR6 diagnostics retain the signed initial plan and never lease an injected workflow or suppressed-UI step
+  ---
+  duration_ms: 108.7691
+  type: 'test'
+  ...
+# Subtest: ADR6 unavailable native UI stops the diagnostic application and retires its registration
+ok 94 - ADR6 unavailable native UI stops the diagnostic application and retires its registration
+  ---
+  duration_ms: 142.87
+  type: 'test'
+  ...
+# Subtest: ADR6 diagnostic planned close needs explicit fresh scope and its exact queued step; legacy app.verify authority does not widen
+ok 95 - ADR6 diagnostic planned close needs explicit fresh scope and its exact queued step; legacy app.verify authority does not widen
+  ---
+  duration_ms: 329.5615
+  type: 'test'
+  ...
+# Subtest: ADR6 verification capability inspection does not execute installed provider CLIs
+ok 96 - ADR6 verification capability inspection does not execute installed provider CLIs
+  ---
+  duration_ms: 214.7682
+  type: 'test'
+  ...
+# Subtest: ADR6 native consent verifier refuses forged signatures, substituted client context, absent UV, wrong RP and credential replay counters
+ok 97 - ADR6 native consent verifier refuses forged signatures, substituted client context, absent UV, wrong RP and credential replay counters
+  ---
+  duration_ms: 7.1777
+  type: 'test'
+  ...
+# Subtest: ADR6 installed consent is enrolled only after proof-of-possession, binds the displayed policy, and never trusts a fixture assertion
+ok 98 - ADR6 installed consent is enrolled only after proof-of-possession, binds the displayed policy, and never trusts a fixture assertion
+  ---
+  duration_ms: 170.3548
+  type: 'test'
+  ...
+# Subtest: Antigravity Judge refuses real launch without an installed trusted launcher and cannot convert a managed role
+ok 99 - Antigravity Judge refuses real launch without an installed trusted launcher and cannot convert a managed role
+  ---
+  duration_ms: 3.8749
+  type: 'test'
+  ...
+# Subtest: Antigravity Judge preserves explicit model/effort/session, stdin and native JSON schema without bypass flags
+ok 100 - Antigravity Judge preserves explicit model/effort/session, stdin and native JSON schema without bypass flags
+  ---
+  duration_ms: 0.345
+  type: 'test'
+  ...
+# Subtest: Antigravity subscription gate rejects API keys, credits, custom quota and malformed/BOM configuration
+ok 101 - Antigravity subscription gate rejects API keys, credits, custom quota and malformed/BOM configuration
+  ---
+  duration_ms: 13.9978
+  type: 'test'
+  ...
+# Subtest: Antigravity historical configuration is not authoritative current entitlement or a zero-cost proof
+ok 102 - Antigravity historical configuration is not authoritative current entitlement or a zero-cost proof
+  ---
+  duration_ms: 2.1807
+  type: 'test'
+  ...
+# Subtest: Antigravity successful-looking denied tool result, missing evidence and wrong conversation are rejected
+ok 103 - Antigravity successful-looking denied tool result, missing evidence and wrong conversation are rejected
+  ---
+  duration_ms: 8.8584
+  type: 'test'
+  ...
+# Subtest: Antigravity schema and execution completeness are checked beyond exit/status/JSON parsing
+ok 104 - Antigravity schema and execution completeness are checked beyond exit/status/JSON parsing
+  ---
+  duration_ms: 1.611
+  type: 'test'
+  ...
+# Subtest: Antigravity gets a positive CLI deadline with time to exit before the process deadline
+ok 105 - Antigravity gets a positive CLI deadline with time to exit before the process deadline
+  ---
+  duration_ms: 6.4794
+  type: 'test'
+  ...
+# Subtest: a rejected finish is observable without being accepted or preventing a valid correction
+ok 106 - a rejected finish is observable without being accepted or preventing a valid correction
+  ---
+  duration_ms: 30.556
+  type: 'test'
+  ...
+# Subtest: Antigravity diagnostic retention is bounded and repeated events are not duplicated
+ok 107 - Antigravity diagnostic retention is bounded and repeated events are not duplicated
+  ---
+  duration_ms: 0.6201
+  type: 'test'
+  ...
+# Subtest: Antigravity finish timeout preserves the engine result boundary
+ok 108 - Antigravity finish timeout preserves the engine result boundary
+  ---
+  duration_ms: 6427.7536
+  type: 'test'
+  ...
+# Subtest: Antigravity finish recovered preserves the engine result boundary
+ok 109 - Antigravity finish recovered preserves the engine result boundary
+  ---
+  duration_ms: 800.3629
+  type: 'test'
+  ...
+# Subtest: Antigravity finish invalid-result preserves the engine result boundary
+ok 110 - Antigravity finish invalid-result preserves the engine result boundary
+  ---
+  duration_ms: 732.4808
+  type: 'test'
+  ...
+# Subtest: the bridge refuses same-runtime and foreign managed markers, and ignores an absent marker
+ok 111 - the bridge refuses same-runtime and foreign managed markers, and ignores an absent marker
+  ---
+  duration_ms: 1.6293
+  type: 'test'
+  ...
+# Subtest: managed-run isolation finds configured bridge entries and requires an exact verified neutralizer
+ok 112 - managed-run isolation finds configured bridge entries and requires an exact verified neutralizer
+  ---
+  duration_ms: 27.6557
+  type: 'test'
+  ...
+# Subtest: Antigravity managed preflight scans the workspace project configuration and requires a verified neutralizer
+ok 113 - Antigravity managed preflight scans the workspace project configuration and requires a verified neutralizer
+  ---
+  duration_ms: 10.0359
+  type: 'test'
+  ...
+# Subtest: verified Codex preparation injects exact MCP child markers after exec and rejects unproved versions or scopes
+ok 114 - verified Codex preparation injects exact MCP child markers after exec and rejects unproved versions or scopes
+  ---
+  duration_ms: 20.0564
+  type: 'test'
+  ...
+# Subtest: Antigravity managed preflight ignores a registered authoring configuration outside the working directory
+ok 115 - Antigravity managed preflight ignores a registered authoring configuration outside the working directory
+  ---
+  duration_ms: 4.391
+  type: 'test'
+  ...
+# Subtest: managed-run isolation detects a Deszo bridge from any install location, not only this runtime
+ok 116 - managed-run isolation detects a Deszo bridge from any install location, not only this runtime
+  ---
+  duration_ms: 5.8976
+  type: 'test'
+  ...
+# Subtest: the dev confirmation override is process-only and uses a separate fixture root
+ok 117 - the dev confirmation override is process-only and uses a separate fixture root
+  ---
+  duration_ms: 597.6914
+  type: 'test'
+  ...
+# Subtest: workflow revisions enforce create/update ETags and replay saved receipts
+ok 118 - workflow revisions enforce create/update ETags and replay saved receipts
+  ---
+  duration_ms: 602.6476
+  type: 'test'
+  ...
+# Subtest: removing and re-adding a Cache node retires its pin incarnation
+ok 119 - removing and re-adding a Cache node retires its pin incarnation
+  ---
+  duration_ms: 732.8238
+  type: 'test'
+  ...
+# Subtest: external confirmation-off requests have an approved status record and replay their created outcome
+ok 120 - external confirmation-off requests have an approved status record and replay their created outcome
+  ---
+  duration_ms: 716.2697
+  type: 'test'
+  ...
+# Subtest: external run requests wait for approval and support first-party approval and denial
+ok 121 - external run requests wait for approval and support first-party approval and denial
+  ---
+  duration_ms: 686.4262
+  type: 'test'
+  ...
+# Subtest: external credentials cannot change settings, workspaces, Cache pins, Context, recovery or the approval queue
+ok 122 - external credentials cannot change settings, workspaces, Cache pins, Context, recovery or the approval queue
+  ---
+  duration_ms: 329.9512
+  type: 'test'
+  ...
+# Subtest: expired external requests remain expired across a runtime restart
+ok 123 - expired external requests remain expired across a runtime restart
+  ---
+  duration_ms: 449.5914
+  type: 'test'
+  ...
+# Subtest: a Deszo bridge in project config blocks dispatch before the fixture CLI starts
+ok 124 - a Deszo bridge in project config blocks dispatch before the fixture CLI starts
+  ---
+  duration_ms: 436.2697
+  type: 'test'
+  ...
+# Subtest: Antigravity workspace and MCP config paths are checked on handshake and workspace movement
+ok 125 - Antigravity workspace and MCP config paths are checked on handshake and workspace movement
+  ---
+  duration_ms: 341.4804
+  type: 'test'
+  ...
+# Subtest: workflow stream reconnect catches up every page beyond the 200-event limit
+ok 126 - workflow stream reconnect catches up every page beyond the 200-event limit
+  ---
+  duration_ms: 3873.3589
+  type: 'test'
+  ...
+# Subtest: artifact provenance uses the reverse reference index for attempt envelopes
+ok 127 - artifact provenance uses the reverse reference index for attempt envelopes
+  ---
+  duration_ms: 652.6481
+  type: 'test'
+  ...
+# Subtest: manifest v2 delivers the complete binary/deletion/executable-mode tree, including spaced Unicode paths
+ok 128 - manifest v2 delivers the complete binary/deletion/executable-mode tree, including spaced Unicode paths
+  ---
+  duration_ms: 3776.7472
+  type: 'test'
+  ...
+# Subtest: A1: delivery yields to the event loop while a verification check is running
+ok 129 - A1: delivery yields to the event loop while a verification check is running
+  ---
+  duration_ms: 4120.8676
+  type: 'test'
+  ...
+# Subtest: A1: Stop during smoke terminates the check and prevents the ref from being published
+ok 130 - A1: Stop during smoke terminates the check and prevents the ref from being published
+  ---
+  duration_ms: 1104.9119
+  type: 'test'
+  ...
+# Subtest: A6: a target checked out during smoke is refused at publication and the caller checkout stays clean
+ok 131 - A6: a target checked out during smoke is refused at publication and the caller checkout stays clean
+  ---
+  duration_ms: 2704.8056
+  type: 'test'
+  ...
+# Subtest: A3: hooks:none covers host ref publication, so a host reference-transaction hook does not run
+ok 132 - A3: hooks:none covers host ref publication, so a host reference-transaction hook does not run
+  ---
+  duration_ms: 2746.2627
+  type: 'test'
+  ...
+# Subtest: ADR5-02: Precondition fails if new branch already exists (destination collision)
+ok 133 - ADR5-02: Precondition fails if new branch already exists (destination collision)
+  ---
+  duration_ms: 710.7049
+  type: 'test'
+  ...
+# Subtest: ADR5-02 / ADR5-06: Precondition fails if target branch moved unexpectedly (ref conflict)
+ok 134 - ADR5-02 / ADR5-06: Precondition fails if target branch moved unexpectedly (ref conflict)
+  ---
+  duration_ms: 686.6845
+  type: 'test'
+  ...
+# Subtest: ADR5-01–05: Successful branch delivery applies candidate, verifies smoke, commits and updates ref to READY_FOR_MERGE
+ok 135 - ADR5-01–05: Successful branch delivery applies candidate, verifies smoke, commits and updates ref to READY_FOR_MERGE
+  ---
+  duration_ms: 3054.9502
+  type: 'test'
+  ...
+# Subtest: ADR5-04: Environment smoke check failure blocks commit and merge readiness
+ok 136 - ADR5-04: Environment smoke check failure blocks commit and merge readiness
+  ---
+  duration_ms: 1328.2796
+  type: 'test'
+  ...
+# Subtest: R2: Refuses existing destination clone directory without deleting existing files
+ok 137 - R2: Refuses existing destination clone directory without deleting existing files
+  ---
+  duration_ms: 447.2462
+  type: 'test'
+  ...
+# Subtest: R3: Candidate path traversal is rejected before write
+ok 138 - R3: Candidate path traversal is rejected before write
+  ---
+  duration_ms: 472.4746
+  type: 'test'
+  ...
+# Subtest: R4: Working tree mutation during smoke verification is rejected
+ok 139 - R4: Working tree mutation during smoke verification is rejected
+  ---
+  duration_ms: 1518.6963
+  type: 'test'
+  ...
+# Subtest: R5: Existing branch delivery preserves ancestry and fast-forward history
+ok 140 - R5: Existing branch delivery preserves ancestry and fast-forward history
+  ---
+  duration_ms: 3350.58
+  type: 'test'
+  ...
+# Subtest: R1: Store persists BranchDelivery result into m9 branch_deliveries table
+ok 141 - R1: Store persists BranchDelivery result into m9 branch_deliveries table
+  ---
+  duration_ms: 238.1803
+  type: 'test'
+  ...
+# Subtest: stdio incident reads and updates accept the stable hash identity returned by Stop-and-report
+ok 142 - stdio incident reads and updates accept the stable hash identity returned by Stop-and-report
+  ---
+  duration_ms: 1668.1612
+  type: 'test'
+  ...
+# Subtest: real stdio bridge discovers its runtime, hides execution tools, and conditionally saves with durable retry identity
+ok 143 - real stdio bridge discovers its runtime, hides execution tools, and conditionally saves with durable retry identity
+  ---
+  duration_ms: 765.9686
+  type: 'test'
+  ...
+# Subtest: real stdio bridge refuses every management call with a same-runtime or foreign managed marker
+ok 144 - real stdio bridge refuses every management call with a same-runtime or foreign managed marker
+  ---
+  duration_ms: 927.2133
+  type: 'test'
+  ...
+# Subtest: execution-enabled stdio bridge submits a pending request and cannot dispatch before a first-party decision
+ok 145 - execution-enabled stdio bridge submits a pending request and cannot dispatch before a first-party decision
+  ---
+  duration_ms: 1238.4462
+  type: 'test'
+  ...
+# Subtest: an open stdio bridge reconnects to the same store after restart and preserves save receipts
+ok 146 - an open stdio bridge reconnects to the same store after restart and preserves save receipts
+  ---
+  duration_ms: 800.3719
+  type: 'test'
+  ...
+# Subtest: an existing bridge refuses a replaced descriptor for a different store
+ok 147 - an existing bridge refuses a replaced descriptor for a different store
+  ---
+  duration_ms: 963.5401
+  type: 'test'
+  ...
+# Subtest: supervised stdio observations recover after context loss, drain bounded pages and require explicit matching ACKs
+ok 148 - supervised stdio observations recover after context loss, drain bounded pages and require explicit matching ACKs
+  ---
+  duration_ms: 1505.9273
+  type: 'test'
+  ...
+# Subtest: ADR4-04: ContextPackage is built deterministically with canonical sorting and role inclusion
+ok 149 - ADR4-04: ContextPackage is built deterministically with canonical sorting and role inclusion
+  ---
+  duration_ms: 17.1193
+  type: 'test'
+  ...
+# Subtest: ADR4-S01 / ADR4-06: Compatibility fingerprints support v1 and v2, and adopting v2 invalidates carried v1 approvals
+ok 150 - ADR4-S01 / ADR4-06: Compatibility fingerprints support v1 and v2, and adopting v2 invalidates carried v1 approvals
+  ---
+  duration_ms: 1.9319
+  type: 'test'
+  ...
+# Subtest: ADR4-05: context_needed request materializes content and widens package within attempt limits
+ok 151 - ADR4-05: context_needed request materializes content and widens package within attempt limits
+  ---
+  duration_ms: 0.8085
+  type: 'test'
+  ...
+# Subtest: ADR4-R03 / ADR4-12: REVIEW_INCOMPLETE in loops retries widening, then pauses without consuming repair iterations
+ok 152 - ADR4-R03 / ADR4-12: REVIEW_INCOMPLETE in loops retries widening, then pauses without consuming repair iterations
+  ---
+  duration_ms: 0.3154
+  type: 'test'
+  ...
+# Subtest: A2: authoritative evaluation requires complete engine records matching kind, digest, subject, boundary, criterion and outcome
+ok 153 - A2: authoritative evaluation requires complete engine records matching kind, digest, subject, boundary, criterion and outcome
+  ---
+  duration_ms: 14.9652
+  type: 'test'
+  ...
+# Subtest: ADR4-11: AcceptanceRecord enforces that unsatisfied or unverified criteria block acceptance Gate
+ok 154 - ADR4-11: AcceptanceRecord enforces that unsatisfied or unverified criteria block acceptance Gate
+  ---
+  duration_ms: 0.9092
+  type: 'test'
+  ...
+# Subtest: R8: evaluateAcceptanceRecord refuses empty criteria or satisfied criteria without evidence
+ok 155 - R8: evaluateAcceptanceRecord refuses empty criteria or satisfied criteria without evidence
+  ---
+  duration_ms: 0.3994
+  type: 'test'
+  ...
+# Subtest: R12: Widened package semantic fingerprint is independent of attempt identity
+ok 156 - R12: Widened package semantic fingerprint is independent of attempt identity
+  ---
+  duration_ms: 0.6209
+  type: 'test'
+  ...
+# Subtest: R13: Partially missing context request produces unresolved items and prevents resumption
+ok 157 - R13: Partially missing context request produces unresolved items and prevents resumption
+  ---
+  duration_ms: 0.6139
+  type: 'test'
+  ...
+# Subtest: R1: Store persists AcceptanceRecord into m9 acceptance_records table
+ok 158 - R1: Store persists AcceptanceRecord into m9 acceptance_records table
+  ---
+  duration_ms: 232.0787
+  type: 'test'
+  ...
+# Subtest: fixture context-chain
+ok 159 - fixture context-chain
+  ---
+  duration_ms: 269.3955
+  type: 'test'
+  ...
+# Subtest: fixture claude-bracket-alias
+ok 160 - fixture claude-bracket-alias
+  ---
+  duration_ms: 50.2724
+  type: 'test'
+  ...
+# Subtest: fixture continue-uuid
+ok 161 - fixture continue-uuid
+  ---
+  duration_ms: 43.8504
+  type: 'test'
+  ...
+# Subtest: fixture application-limits
+ok 162 - fixture application-limits
+  ---
+  duration_ms: 2.5293
+  type: 'test'
+  ...
+# Subtest: fixture round-map
+ok 163 - fixture round-map
+  ---
+  duration_ms: 18.4931
+  type: 'test'
+  ...
+# Subtest: fixture section-index
+ok 164 - fixture section-index
+  ---
+  duration_ms: 8.633
+  type: 'test'
+  ...
+# Subtest: fixture api-problem
+ok 165 - fixture api-problem
+  ---
+  duration_ms: 5.4359
+  type: 'test'
+  ...
+# Subtest: fixture api-run
+ok 166 - fixture api-run
+  ---
+  duration_ms: 4.0751
+  type: 'test'
+  ...
+# Subtest: fixture api-createRun
+ok 167 - fixture api-createRun
+  ---
+  duration_ms: 2.6159
+  type: 'test'
+  ...
+# Subtest: fixture api-acceptRun
+ok 168 - fixture api-acceptRun
+  ---
+  duration_ms: 6.7569
+  type: 'test'
+  ...
+# Subtest: fixture api-validation
+ok 169 - fixture api-validation
+  ---
+  duration_ms: 2.6641
+  type: 'test'
+  ...
+# Subtest: fixture api-savedWorkflow
+ok 170 - fixture api-savedWorkflow
+  ---
+  duration_ms: 4.2208
+  type: 'test'
+  ...
+# Subtest: fixture api-stopRequest
+ok 171 - fixture api-stopRequest
+  ---
+  duration_ms: 1.7672
+  type: 'test'
+  ...
+# Subtest: fixture api-stopResponse
+ok 172 - fixture api-stopResponse
+  ---
+  duration_ms: 2.0815
+  type: 'test'
+  ...
+# Subtest: fixture api-runSnapshot
+ok 173 - fixture api-runSnapshot
+  ---
+  duration_ms: 9.8509
+  type: 'test'
+  ...
+# Subtest: fixture api-capabilities
+ok 174 - fixture api-capabilities
+  ---
+  duration_ms: 5.0217
+  type: 'test'
+  ...
+# Subtest: fixture api-workspaceRequest
+ok 175 - fixture api-workspaceRequest
+  ---
+  duration_ms: 1.7734
+  type: 'test'
+  ...
+# Subtest: fixture api-workspace
+ok 176 - fixture api-workspace
+  ---
+  duration_ms: 2.9118
+  type: 'test'
+  ...
+# Subtest: fixture api-contextBinding
+ok 177 - fixture api-contextBinding
+  ---
+  duration_ms: 3.2762
+  type: 'test'
+  ...
+# Subtest: fixture api-contextBindings
+ok 178 - fixture api-contextBindings
+  ---
+  duration_ms: 3.7312
+  type: 'test'
+  ...
+# Subtest: fixture api-acknowledgeContext
+ok 179 - fixture api-acknowledgeContext
+  ---
+  duration_ms: 2.0632
+  type: 'test'
+  ...
+# Subtest: fixture api-runContextBinding
+ok 180 - fixture api-runContextBinding
+  ---
+  duration_ms: 1.916
+  type: 'test'
+  ...
+# Subtest: fixture api-applicationSettings
+ok 181 - fixture api-applicationSettings
+  ---
+  duration_ms: 3.563
+  type: 'test'
+  ...
+# Subtest: fixture api-updateApplicationSettings
+ok 182 - fixture api-updateApplicationSettings
+  ---
+  duration_ms: 3.7694
+  type: 'test'
+  ...
+# Subtest: fixture api-listQuery
+ok 183 - fixture api-listQuery
+  ---
+  duration_ms: 1.9
+  type: 'test'
+  ...
+# Subtest: fixture api-runListQuery
+ok 184 - fixture api-runListQuery
+  ---
+  duration_ms: 1.8912
+  type: 'test'
+  ...
+# Subtest: fixture api-workflowSummary
+ok 185 - fixture api-workflowSummary
+  ---
+  duration_ms: 2.1401
+  type: 'test'
+  ...
+# Subtest: fixture api-runs
+ok 186 - fixture api-runs
+  ---
+  duration_ms: 5.6273
+  type: 'test'
+  ...
+# Subtest: fixture api-workflows
+ok 187 - fixture api-workflows
+  ---
+  duration_ms: 3.7332
+  type: 'test'
+  ...
+# Subtest: fixture api-workspaces
+ok 188 - fixture api-workspaces
+  ---
+  duration_ms: 3.8261
+  type: 'test'
+  ...
+# Subtest: fixture api-runSettings
+ok 189 - fixture api-runSettings
+  ---
+  duration_ms: 3.7371
+  type: 'test'
+  ...
+# Subtest: fixture manifest-inputs
+ok 190 - fixture manifest-inputs
+  ---
+  duration_ms: 14.3771
+  type: 'test'
+  ...
+# Subtest: fixture manifest-outputs
+ok 191 - fixture manifest-outputs
+  ---
+  duration_ms: 7.4976
+  type: 'test'
+  ...
+# Subtest: fixture manifest-invocation
+ok 192 - fixture manifest-invocation
+  ---
+  duration_ms: 8.3427
+  type: 'test'
+  ...
+# Subtest: fixture event-run.created
+ok 193 - fixture event-run.created
+  ---
+  duration_ms: 30.247
+  type: 'test'
+  ...
+# Subtest: fixture event-run.state_changed
+ok 194 - fixture event-run.state_changed
+  ---
+  duration_ms: 0.8945
+  type: 'test'
+  ...
+# Subtest: fixture event-node.planned
+ok 195 - fixture event-node.planned
+  ---
+  duration_ms: 0.7066
+  type: 'test'
+  ...
+# Subtest: fixture event-attempt.state_changed
+ok 196 - fixture event-attempt.state_changed
+  ---
+  duration_ms: 0.7293
+  type: 'test'
+  ...
+# Subtest: fixture event-attempt.inputs_committed
+ok 197 - fixture event-attempt.inputs_committed
+  ---
+  duration_ms: 0.6992
+  type: 'test'
+  ...
+# Subtest: fixture event-attempt.invocation_committed
+ok 198 - fixture event-attempt.invocation_committed
+  ---
+  duration_ms: 0.6493
+  type: 'test'
+  ...
+# Subtest: fixture event-attempt.log_chunk
+ok 199 - fixture event-attempt.log_chunk
+  ---
+  duration_ms: 2.167
+  type: 'test'
+  ...
+# Subtest: fixture event-attempt.outputs_committed
+ok 200 - fixture event-attempt.outputs_committed
+  ---
+  duration_ms: 0.7291
+  type: 'test'
+  ...
+# Subtest: fixture event-attempt.error
+ok 201 - fixture event-attempt.error
+  ---
+  duration_ms: 0.6725
+  type: 'test'
+  ...
+# Subtest: fixture event-context.state_changed
+ok 202 - fixture event-context.state_changed
+  ---
+  duration_ms: 0.6438
+  type: 'test'
+  ...
+# Subtest: fixture event-context.bound
+ok 203 - fixture event-context.bound
+  ---
+  duration_ms: 0.5977
+  type: 'test'
+  ...
+# Subtest: fixture event-run.capacity_changed
+ok 204 - fixture event-run.capacity_changed
+  ---
+  duration_ms: 0.5998
+  type: 'test'
+  ...
+# Subtest: fixture event-launched
+ok 205 - fixture event-launched
+  ---
+  duration_ms: 0.6177
+  type: 'test'
+  ...
+# Subtest: fixture event-blocked
+ok 206 - fixture event-blocked
+  ---
+  duration_ms: 0.8626
+  type: 'test'
+  ...
+# Subtest: fixture value-text
+ok 207 - fixture value-text
+  ---
+  duration_ms: 4.2196
+  type: 'test'
+  ...
+# Subtest: fixture value-json
+ok 208 - fixture value-json
+  ---
+  duration_ms: 0.3531
+  type: 'test'
+  ...
+# Subtest: fixture loop-finish
+ok 209 - fixture loop-finish
+  ---
+  duration_ms: 1.3147
+  type: 'test'
+  ...
+# Subtest: fixture loop-repeat
+ok 210 - fixture loop-repeat
+  ---
+  duration_ms: 0.2252
+  type: 'test'
+  ...
+# Subtest: fixture carry-deliveryState
+ok 211 - fixture carry-deliveryState
+  ---
+  duration_ms: 16.9977
+  type: 'test'
+  ...
+# Subtest: fixture carry-specificationState
+ok 212 - fixture carry-specificationState
+  ---
+  duration_ms: 7.3231
+  type: 'test'
+  ...
+# Subtest: fixture carry-withIssue
+ok 213 - fixture carry-withIssue
+  ---
+  duration_ms: 0.4315
+  type: 'test'
+  ...
+# Subtest: fixture extended-timeout-capability
+ok 214 - fixture extended-timeout-capability
+  ---
+  duration_ms: 2.0209
+  type: 'test'
+  ...
+# Subtest: fixture extended-timeout-workflow
+ok 215 - fixture extended-timeout-workflow
+  ---
+  duration_ms: 40.3494
+  type: 'test'
+  ...
+# Subtest: fixture context-review-state-remains-valid
+ok 216 - fixture context-review-state-remains-valid
+  ---
+  duration_ms: 1.1115
+  type: 'test'
+  ...
+# Subtest: fixture m2-review-loop
+ok 217 - fixture m2-review-loop
+  ---
+  duration_ms: 34.2587
+  type: 'test'
+  ...
+# Subtest: fixture m2-artifact-set-value
+ok 218 - fixture m2-artifact-set-value
+  ---
+  duration_ms: 1.737
+  type: 'test'
+  ...
+# Subtest: fixture m2-artifact-set-manifest
+ok 219 - fixture m2-artifact-set-manifest
+  ---
+  duration_ms: 4.0542
+  type: 'test'
+  ...
+# Subtest: fixture m2-event-0
+ok 220 - fixture m2-event-0
+  ---
+  duration_ms: 173.9171
+  type: 'test'
+  ...
+# Subtest: fixture m2-event-1
+ok 221 - fixture m2-event-1
+  ---
+  duration_ms: 1.795
+  type: 'test'
+  ...
+# Subtest: fixture m2-event-2
+ok 222 - fixture m2-event-2
+  ---
+  duration_ms: 1.3952
+  type: 'test'
+  ...
+# Subtest: fixture m2-event-3
+ok 223 - fixture m2-event-3
+  ---
+  duration_ms: 1.3172
+  type: 'test'
+  ...
+# Subtest: fixture m2-event-4
+ok 224 - fixture m2-event-4
+  ---
+  duration_ms: 1.4143
+  type: 'test'
+  ...
+# Subtest: fixture m2-event-5
+ok 225 - fixture m2-event-5
+  ---
+  duration_ms: 1.4843
+  type: 'test'
+  ...
+# Subtest: fixture m2-event-6
+ok 226 - fixture m2-event-6
+  ---
+  duration_ms: 7.9684
+  type: 'test'
+  ...
+# Subtest: fixture m2-event-7
+ok 227 - fixture m2-event-7
+  ---
+  duration_ms: 1.6935
+  type: 'test'
+  ...
+# Subtest: fixture m2-event-8
+ok 228 - fixture m2-event-8
+  ---
+  duration_ms: 1.3315
+  type: 'test'
+  ...
+# Subtest: fixture m2-event-9
+ok 229 - fixture m2-event-9
+  ---
+  duration_ms: 1.2233
+  type: 'test'
+  ...
+# Subtest: fixture m2-event-10
+ok 230 - fixture m2-event-10
+  ---
+  duration_ms: 1.6335
+  type: 'test'
+  ...
+# Subtest: fixture m2-event-11
+ok 231 - fixture m2-event-11
+  ---
+  duration_ms: 1.4074
+  type: 'test'
+  ...
+# Subtest: fixture m2-event-12
+ok 232 - fixture m2-event-12
+  ---
+  duration_ms: 1.3808
+  type: 'test'
+  ...
+# Subtest: fixture m2-api-run
+ok 233 - fixture m2-api-run
+  ---
+  duration_ms: 4.2705
+  type: 'test'
+  ...
+# Subtest: fixture m2-api-runSnapshot
+ok 234 - fixture m2-api-runSnapshot
+  ---
+  duration_ms: 10.1983
+  type: 'test'
+  ...
+# Subtest: fixture m2-api-retry
+ok 235 - fixture m2-api-retry
+  ---
+  duration_ms: 7.7443
+  type: 'test'
+  ...
+# Subtest: fixture m2-api-raiseLimit
+ok 236 - fixture m2-api-raiseLimit
+  ---
+  duration_ms: 0.8641
+  type: 'test'
+  ...
+# Subtest: fixture m2-api-restartIteration
+ok 237 - fixture m2-api-restartIteration
+  ---
+  duration_ms: 0.7832
+  type: 'test'
+  ...
+# Subtest: fixture m2-api-close
+ok 238 - fixture m2-api-close
+  ---
+  duration_ms: 0.6414
+  type: 'test'
+  ...
+# Subtest: fixture m2-api-commandResponse
+ok 239 - fixture m2-api-commandResponse
+  ---
+  duration_ms: 1.9569
+  type: 'test'
+  ...
+# Subtest: fixture m2-api-runFilter
+ok 240 - fixture m2-api-runFilter
+  ---
+  duration_ms: 2.0445
+  type: 'test'
+  ...
+# Subtest: fixture m34-specification-loop
+ok 241 - fixture m34-specification-loop
+  ---
+  duration_ms: 91.6164
+  type: 'test'
+  ...
+# Subtest: fixture m34-cache-example
+ok 242 - fixture m34-cache-example
+  ---
+  duration_ms: 3.0982
+  type: 'test'
+  ...
+# Subtest: fixture m34-reviewApproved
+ok 243 - fixture m34-reviewApproved
+  ---
+  duration_ms: 6.8342
+  type: 'test'
+  ...
+# Subtest: fixture m34-reviewRejected
+ok 244 - fixture m34-reviewRejected
+  ---
+  duration_ms: 0.8336
+  type: 'test'
+  ...
+# Subtest: fixture m34-plan
+ok 245 - fixture m34-plan
+  ---
+  duration_ms: 11.8077
+  type: 'test'
+  ...
+# Subtest: fixture m34-reportOpen
+ok 246 - fixture m34-reportOpen
+  ---
+  duration_ms: 6.2633
+  type: 'test'
+  ...
+# Subtest: fixture m34-reportRevision
+ok 247 - fixture m34-reportRevision
+  ---
+  duration_ms: 0.7835
+  type: 'test'
+  ...
+# Subtest: fixture m34-certificate
+ok 248 - fixture m34-certificate
+  ---
+  duration_ms: 6.2616
+  type: 'test'
+  ...
+# Subtest: fixture m34-reviewRecord
+ok 249 - fixture m34-reviewRecord
+  ---
+  duration_ms: 5.5273
+  type: 'test'
+  ...
+# Subtest: fixture m34-subjectView
+ok 250 - fixture m34-subjectView
+  ---
+  duration_ms: 2.307
+  type: 'test'
+  ...
+# Subtest: fixture m34-event-0
+ok 251 - fixture m34-event-0
+  ---
+  duration_ms: 0.8544
+  type: 'test'
+  ...
+# Subtest: fixture m34-event-1
+ok 252 - fixture m34-event-1
+  ---
+  duration_ms: 0.7357
+  type: 'test'
+  ...
+# Subtest: fixture m34-event-2
+ok 253 - fixture m34-event-2
+  ---
+  duration_ms: 0.7598
+  type: 'test'
+  ...
+# Subtest: fixture m34-event-3
+ok 254 - fixture m34-event-3
+  ---
+  duration_ms: 0.7479
+  type: 'test'
+  ...
+# Subtest: fixture m34-event-4
+ok 255 - fixture m34-event-4
+  ---
+  duration_ms: 0.7425
+  type: 'test'
+  ...
+# Subtest: fixture m34-event-5
+ok 256 - fixture m34-event-5
+  ---
+  duration_ms: 0.7628
+  type: 'test'
+  ...
+# Subtest: fixture m34-event-6
+ok 257 - fixture m34-event-6
+  ---
+  duration_ms: 0.7957
+  type: 'test'
+  ...
+# Subtest: fixture m34-event-7
+ok 258 - fixture m34-event-7
+  ---
+  duration_ms: 0.7929
+  type: 'test'
+  ...
+# Subtest: fixture m34-event-8
+ok 259 - fixture m34-event-8
+  ---
+  duration_ms: 0.7914
+  type: 'test'
+  ...
+# Subtest: fixture m34-api-createBranch
+ok 260 - fixture m34-api-createBranch
+  ---
+  duration_ms: 5.106
+  type: 'test'
+  ...
+# Subtest: fixture m34-api-createNode
+ok 261 - fixture m34-api-createNode
+  ---
+  duration_ms: 0.7894
+  type: 'test'
+  ...
+# Subtest: fixture m34-api-cachePins
+ok 262 - fixture m34-api-cachePins
+  ---
+  duration_ms: 7.7463
+  type: 'test'
+  ...
+# Subtest: fixture m34-api-freeze
+ok 263 - fixture m34-api-freeze
+  ---
+  duration_ms: 1.6364
+  type: 'test'
+  ...
+# Subtest: fixture m34-api-chat
+ok 264 - fixture m34-api-chat
+  ---
+  duration_ms: 2.1589
+  type: 'test'
+  ...
+# Subtest: fixture m34-api-chatRunFilter
+ok 265 - fixture m34-api-chatRunFilter
+  ---
+  duration_ms: 0.8112
+  type: 'test'
+  ...
+# Subtest: fixture m5-delivery-example
+ok 266 - fixture m5-delivery-example
+  ---
+  duration_ms: 50.8143
+  type: 'test'
+  ...
+# Subtest: fixture m5-taskReturn
+ok 267 - fixture m5-taskReturn
+  ---
+  duration_ms: 6.7137
+  type: 'test'
+  ...
+# Subtest: fixture m5-taskReturnRevision
+ok 268 - fixture m5-taskReturnRevision
+  ---
+  duration_ms: 0.884
+  type: 'test'
+  ...
+# Subtest: fixture m5-taskReview
+ok 269 - fixture m5-taskReview
+  ---
+  duration_ms: 4.7829
+  type: 'test'
+  ...
+# Subtest: fixture m5-triage
+ok 270 - fixture m5-triage
+  ---
+  duration_ms: 6.7071
+  type: 'test'
+  ...
+# Subtest: fixture m5-repair
+ok 271 - fixture m5-repair
+  ---
+  duration_ms: 4.6978
+  type: 'test'
+  ...
+# Subtest: fixture m5-taskResult
+ok 272 - fixture m5-taskResult
+  ---
+  duration_ms: 16.0903
+  type: 'test'
+  ...
+# Subtest: fixture m5-checkReport
+ok 273 - fixture m5-checkReport
+  ---
+  duration_ms: 6.5916
+  type: 'test'
+  ...
+# Subtest: fixture m5-candidate
+ok 274 - fixture m5-candidate
+  ---
+  duration_ms: 5.3886
+  type: 'test'
+  ...
+# Subtest: fixture m5-conflict
+ok 275 - fixture m5-conflict
+  ---
+  duration_ms: 4.3699
+  type: 'test'
+  ...
+# Subtest: fixture m5-mapState
+ok 276 - fixture m5-mapState
+  ---
+  duration_ms: 7.6358
+  type: 'test'
+  ...
+# Subtest: fixture m5-summary
+ok 277 - fixture m5-summary
+  ---
+  duration_ms: 7.5752
+  type: 'test'
+  ...
+# Subtest: fixture m5-event-0
+ok 278 - fixture m5-event-0
+  ---
+  duration_ms: 1.4896
+  type: 'test'
+  ...
+# Subtest: fixture m5-event-1
+ok 279 - fixture m5-event-1
+  ---
+  duration_ms: 1.0151
+  type: 'test'
+  ...
+# Subtest: fixture m5-event-2
+ok 280 - fixture m5-event-2
+  ---
+  duration_ms: 1.0241
+  type: 'test'
+  ...
+# Subtest: fixture m5-event-3
+ok 281 - fixture m5-event-3
+  ---
+  duration_ms: 1.0197
+  type: 'test'
+  ...
+# Subtest: fixture m5-event-4
+ok 282 - fixture m5-event-4
+  ---
+  duration_ms: 0.9402
+  type: 'test'
+  ...
+# Subtest: fixture m5-event-5
+ok 283 - fixture m5-event-5
+  ---
+  duration_ms: 0.911
+  type: 'test'
+  ...
+# Subtest: fixture m5-event-6
+ok 284 - fixture m5-event-6
+  ---
+  duration_ms: 0.9374
+  type: 'test'
+  ...
+# Subtest: fixture m5-event-7
+ok 285 - fixture m5-event-7
+  ---
+  duration_ms: 0.9732
+  type: 'test'
+  ...
+# Subtest: fixture m5-api-raise-map-limit
+ok 286 - fixture m5-api-raise-map-limit
+  ---
+  duration_ms: 0.8856
+  type: 'test'
+  ...
+# Subtest: fixture m5-api-map-execution
+ok 287 - fixture m5-api-map-execution
+  ---
+  duration_ms: 5.5103
+  type: 'test'
+  ...
+# Subtest: fixture m6-selective-example
+ok 288 - fixture m6-selective-example
+  ---
+  duration_ms: 58.2258
+  type: 'test'
+  ...
+# Subtest: fixture m6-needCarried
+ok 289 - fixture m6-needCarried
+  ---
+  duration_ms: 6.9383
+  type: 'test'
+  ...
+# Subtest: fixture m6-needStale
+ok 290 - fixture m6-needStale
+  ---
+  duration_ms: 0.5819
+  type: 'test'
+  ...
+# Subtest: fixture m6-carryRequest
+ok 291 - fixture m6-carryRequest
+  ---
+  duration_ms: 2.5831
+  type: 'test'
+  ...
+# Subtest: fixture m6-reviewCarry
+ok 292 - fixture m6-reviewCarry
+  ---
+  duration_ms: 3.8835
+  type: 'test'
+  ...
+# Subtest: fixture m6-taskCarry
+ok 293 - fixture m6-taskCarry
+  ---
+  duration_ms: 2.7273
+  type: 'test'
+  ...
+# Subtest: fixture m6-history
+ok 294 - fixture m6-history
+  ---
+  duration_ms: 5.0188
+  type: 'test'
+  ...
+# Subtest: fixture m6-event-0
+ok 295 - fixture m6-event-0
+  ---
+  duration_ms: 0.9844
+  type: 'test'
+  ...
+# Subtest: fixture m6-event-1
+ok 296 - fixture m6-event-1
+  ---
+  duration_ms: 0.7971
+  type: 'test'
+  ...
+# Subtest: fixture rf-reference-delivery
+ok 297 - fixture rf-reference-delivery
+  ---
+  duration_ms: 158.3387
+  type: 'test'
+  ...
+# Subtest: fixture rf-delivery-certificate
+ok 298 - fixture rf-delivery-certificate
+  ---
+  duration_ms: 2.3246
+  type: 'test'
+  ...
+# Subtest: fixture rf-capture-failed
+ok 299 - fixture rf-capture-failed
+  ---
+  duration_ms: 0.624
+  type: 'test'
+  ...
+# Subtest: fixture future-capability
+ok 300 - fixture future-capability
+  ---
+  duration_ms: 1.633
+  type: 'test'
+  ...
+# Subtest: fixture unknown-node-config
+ok 301 - fixture unknown-node-config
+  ---
+  duration_ms: 1.5255
+  type: 'test'
+  ...
+# Subtest: fixture flag-model
+ok 302 - fixture flag-model
+  ---
+  duration_ms: 1.3946
+  type: 'test'
+  ...
+# Subtest: fixture binding-not-uuid
+ok 303 - fixture binding-not-uuid
+  ---
+  duration_ms: 1.2054
+  type: 'test'
+  ...
+# Subtest: fixture too-short-timeout
+ok 304 - fixture too-short-timeout
+  ---
+  duration_ms: 1.1379
+  type: 'test'
+  ...
+# Subtest: fixture workflow-capacity-forbidden
+ok 305 - fixture workflow-capacity-forbidden
+  ---
+  duration_ms: 1.1657
+  type: 'test'
+  ...
+# Subtest: fixture no-provider-records
+ok 306 - fixture no-provider-records
+  ---
+  duration_ms: 1.3548
+  type: 'test'
+  ...
+# Subtest: fixture zero-advertised-timeout
+ok 307 - fixture zero-advertised-timeout
+  ---
+  duration_ms: 1.1765
+  type: 'test'
+  ...
+# Subtest: fixture loop-string-boolean
+ok 308 - fixture loop-string-boolean
+  ---
+  duration_ms: 0.3012
+  type: 'test'
+  ...
+# Subtest: fixture loop-array-feedback
+ok 309 - fixture loop-array-feedback
+  ---
+  duration_ms: 0.2089
+  type: 'test'
+  ...
+# Subtest: fixture invalid-run-state
+ok 310 - fixture invalid-run-state
+  ---
+  duration_ms: 0.6175
+  type: 'test'
+  ...
+# Subtest: fixture future-event
+ok 311 - fixture future-event
+  ---
+  duration_ms: 0.5834
+  type: 'test'
+  ...
+# Subtest: fixture missing-attempt-scope
+ok 312 - fixture missing-attempt-scope
+  ---
+  duration_ms: 0.5702
+  type: 'test'
+  ...
+# Subtest: fixture zero-pid
+ok 313 - fixture zero-pid
+  ---
+  duration_ms: 0.6
+  type: 'test'
+  ...
+# Subtest: fixture unsupported-text-encoding
+ok 314 - fixture unsupported-text-encoding
+  ---
+  duration_ms: 0.2449
+  type: 'test'
+  ...
+# Subtest: fixture unknown-task-output
+ok 315 - fixture unknown-task-output
+  ---
+  duration_ms: 0.8129
+  type: 'test'
+  ...
+# Subtest: fixture early-dependency
+ok 316 - fixture early-dependency
+  ---
+  duration_ms: 0.7725
+  type: 'test'
+  ...
+# Subtest: fixture invalid-section-kind
+ok 317 - fixture invalid-section-kind
+  ---
+  duration_ms: 0.5094
+  type: 'test'
+  ...
+# Subtest: fixture lost-issue-id
+ok 318 - fixture lost-issue-id
+  ---
+  duration_ms: 0.4445
+  type: 'test'
+  ...
+# Subtest: fixture wrong-workflow-hash-name
+ok 319 - fixture wrong-workflow-hash-name
+  ---
+  duration_ms: 0.8507
+  type: 'test'
+  ...
+# Subtest: fixture missing-run-workspace
+ok 320 - fixture missing-run-workspace
+  ---
+  duration_ms: 0.8251
+  type: 'test'
+  ...
+# Subtest: fixture oversized-list
+ok 321 - fixture oversized-list
+  ---
+  duration_ms: 0.9109
+  type: 'test'
+  ...
+# Subtest: fixture missing-binding-digest-in-list
+ok 322 - fixture missing-binding-digest-in-list
+  ---
+  duration_ms: 1.1383
+  type: 'test'
+  ...
+# Subtest: fixture nullable-planned-attempt
+ok 323 - fixture nullable-planned-attempt
+  ---
+  duration_ms: 0.8437
+  type: 'test'
+  ...
+# Subtest: fixture duplicate-slot-id
+ok 324 - fixture duplicate-slot-id
+  ---
+  duration_ms: 35.9808
+  type: 'test'
+  ...
+# Subtest: fixture over-M1-timeout
+ok 325 - fixture over-M1-timeout
+  ---
+  duration_ms: 37.064
+  type: 'test'
+  ...
+# Subtest: fixture dependency-cycle
+ok 326 - fixture dependency-cycle
+  ---
+  duration_ms: 37.6323
+  type: 'test'
+  ...
+# Subtest: fixture implicit-json-to-text
+ok 327 - fixture implicit-json-to-text
+  ---
+  duration_ms: 34.2881
+  type: 'test'
+  ...
+# Subtest: fixture wrong-provider-context
+ok 328 - fixture wrong-provider-context
+  ---
+  duration_ms: 34.4384
+  type: 'test'
+  ...
+# Subtest: fixture missing-prompt-input
+ok 329 - fixture missing-prompt-input
+  ---
+  duration_ms: 36.0222
+  type: 'test'
+  ...
+# Subtest: fixture unordered-context
+ok 330 - fixture unordered-context
+  ---
+  duration_ms: 46.2851
+  type: 'test'
+  ...
+# Subtest: fixture duplicate-provider-id
+ok 331 - fixture duplicate-provider-id
+  ---
+  duration_ms: 1.5037
+  type: 'test'
+  ...
+# Subtest: fixture missing-test-cases-check-auth
+ok 332 - fixture missing-test-cases-check-auth
+  ---
+  duration_ms: 1.8437
+  type: 'test'
+  ...
+# Subtest: fixture missing-test-cases-check-resume
+ok 333 - fixture missing-test-cases-check-resume
+  ---
+  duration_ms: 1.2487
+  type: 'test'
+  ...
+# Subtest: fixture candidate-with-agent
+ok 334 - fixture candidate-with-agent
+  ---
+  duration_ms: 1.0554
+  type: 'test'
+  ...
+# Subtest: fixture cyclic-task-deps
+ok 335 - fixture cyclic-task-deps
+  ---
+  duration_ms: 1.0425
+  type: 'test'
+  ...
+# Subtest: fixture missing-section-reference
+ok 336 - fixture missing-section-reference
+  ---
+  duration_ms: 0.5613
+  type: 'test'
+  ...
+# Subtest: fixture section-cycle
+ok 337 - fixture section-cycle
+  ---
+  duration_ms: 0.4568
+  type: 'test'
+  ...
+# Subtest: fixture malformed-created-time
+ok 338 - fixture malformed-created-time
+  ---
+  duration_ms: 0.7811
+  type: 'test'
+  ...
+# Subtest: fixture reserved-wait-in-run
+ok 339 - fixture reserved-wait-in-run
+  ---
+  duration_ms: 1.4722
+  type: 'test'
+  ...
+# Subtest: fixture reserved-wait-in-stop-response
+ok 340 - fixture reserved-wait-in-stop-response
+  ---
+  duration_ms: 0.7891
+  type: 'test'
+  ...
+# Subtest: fixture reserved-wait-in-history-filter
+ok 341 - fixture reserved-wait-in-history-filter
+  ---
+  duration_ms: 0.7372
+  type: 'test'
+  ...
+# Subtest: fixture reserved-wait-as-next-event-state
+ok 342 - fixture reserved-wait-as-next-event-state
+  ---
+  duration_ms: 0.6014
+  type: 'test'
+  ...
+# Subtest: fixture reserved-wait-as-previous-event-state
+ok 343 - fixture reserved-wait-as-previous-event-state
+  ---
+  duration_ms: 0.5744
+  type: 'test'
+  ...
+# Subtest: fixture m2-loop-needs-capability
+ok 344 - fixture m2-loop-needs-capability
+  ---
+  duration_ms: 1.7163
+  type: 'test'
+  ...
+# Subtest: fixture m2-nested-loop
+ok 345 - fixture m2-nested-loop
+  ---
+  duration_ms: 1.5982
+  type: 'test'
+  ...
+# Subtest: fixture m2-json-state-without-schema
+ok 346 - fixture m2-json-state-without-schema
+  ---
+  duration_ms: 2.1219
+  type: 'test'
+  ...
+# Subtest: fixture m2-text-select-without-render
+ok 347 - fixture m2-text-select-without-render
+  ---
+  duration_ms: 2.7383
+  type: 'test'
+  ...
+# Subtest: fixture m2-too-many-iterations
+ok 348 - fixture m2-too-many-iterations
+  ---
+  duration_ms: 2.562
+  type: 'test'
+  ...
+# Subtest: fixture m2-loop-event-in-v1-journal
+ok 349 - fixture m2-loop-event-in-v1-journal
+  ---
+  duration_ms: 1.2604
+  type: 'test'
+  ...
+# Subtest: fixture m2-v2-event-unknown-pause-reason
+ok 350 - fixture m2-v2-event-unknown-pause-reason
+  ---
+  duration_ms: 1.0618
+  type: 'test'
+  ...
+# Subtest: fixture m2-retry-without-target
+ok 351 - fixture m2-retry-without-target
+  ---
+  duration_ms: 0.673
+  type: 'test'
+  ...
+# Subtest: fixture m2-close-with-target
+ok 352 - fixture m2-close-with-target
+  ---
+  duration_ms: 0.6525
+  type: 'test'
+  ...
+# Subtest: fixture m2-manifest-extra-field
+ok 353 - fixture m2-manifest-extra-field
+  ---
+  duration_ms: 0.6627
+  type: 'test'
+  ...
+# Subtest: fixture m2-missing-return-decision
+ok 354 - fixture m2-missing-return-decision
+  ---
+  duration_ms: 24.8456
+  type: 'test'
+  ...
+# Subtest: fixture m2-unknown-boundary-port
+ok 355 - fixture m2-unknown-boundary-port
+  ---
+  duration_ms: 23.6672
+  type: 'test'
+  ...
+# Subtest: fixture m2-body-sink
+ok 356 - fixture m2-body-sink
+  ---
+  duration_ms: 30.9607
+  type: 'test'
+  ...
+# Subtest: fixture m2-body-cycle
+ok 357 - fixture m2-body-cycle
+  ---
+  duration_ms: 27.5431
+  type: 'test'
+  ...
+# Subtest: fixture m2-iteration-context-outside-body
+ok 358 - fixture m2-iteration-context-outside-body
+  ---
+  duration_ms: 25.3793
+  type: 'test'
+  ...
+# Subtest: fixture m2-record-undeclared-input
+ok 359 - fixture m2-record-undeclared-input
+  ---
+  duration_ms: 25.1223
+  type: 'test'
+  ...
+# Subtest: fixture m2-record-pointer-on-text
+ok 360 - fixture m2-record-pointer-on-text
+  ---
+  duration_ms: 25.8333
+  type: 'test'
+  ...
+# Subtest: fixture m2-duplicate-body-id
+ok 361 - fixture m2-duplicate-body-id
+  ---
+  duration_ms: 25.41
+  type: 'test'
+  ...
+# Subtest: fixture m2-loops-field-in-core
+ok 362 - fixture m2-loops-field-in-core
+  ---
+  duration_ms: 35.552
+  type: 'test'
+  ...
+# Subtest: fixture m2-file-path-escape
+ok 363 - fixture m2-file-path-escape
+  ---
+  duration_ms: 25.2081
+  type: 'test'
+  ...
+# Subtest: fixture m2-unordered-outer-context
+ok 364 - fixture m2-unordered-outer-context
+  ---
+  duration_ms: 26.0967
+  type: 'test'
+  ...
+# Subtest: fixture m2-boundary-in-outer-graph
+ok 365 - fixture m2-boundary-in-outer-graph
+  ---
+  duration_ms: 25.6709
+  type: 'test'
+  ...
+# Subtest: fixture m34-cache-needs-capability
+ok 366 - fixture m34-cache-needs-capability
+  ---
+  duration_ms: 1.2595
+  type: 'test'
+  ...
+# Subtest: fixture m34-gate-needs-pipeline
+ok 367 - fixture m34-gate-needs-pipeline
+  ---
+  duration_ms: 7.2437
+  type: 'test'
+  ...
+# Subtest: fixture m34-pipeline-needs-loops
+ok 368 - fixture m34-pipeline-needs-loops
+  ---
+  duration_ms: 0.9001
+  type: 'test'
+  ...
+# Subtest: fixture m34-duplicate-capability
+ok 369 - fixture m34-duplicate-capability
+  ---
+  duration_ms: 0.7418
+  type: 'test'
+  ...
+# Subtest: fixture m34-route-without-cases
+ok 370 - fixture m34-route-without-cases
+  ---
+  duration_ms: 4.8104
+  type: 'test'
+  ...
+# Subtest: fixture m34-unknown-gate-mode
+ok 371 - fixture m34-unknown-gate-mode
+  ---
+  duration_ms: 5.2138
+  type: 'test'
+  ...
+# Subtest: fixture m34-selected-merge-one-input
+ok 372 - fixture m34-selected-merge-one-input
+  ---
+  duration_ms: 4.8235
+  type: 'test'
+  ...
+# Subtest: fixture m34-approved-with-blocker
+ok 373 - fixture m34-approved-with-blocker
+  ---
+  duration_ms: 0.7871
+  type: 'test'
+  ...
+# Subtest: fixture m34-rejected-without-blocker
+ok 374 - fixture m34-rejected-without-blocker
+  ---
+  duration_ms: 0.711
+  type: 'test'
+  ...
+# Subtest: fixture m34-review-extra-field
+ok 375 - fixture m34-review-extra-field
+  ---
+  duration_ms: 1.1118
+  type: 'test'
+  ...
+# Subtest: fixture m34-open-report-without-certificate
+ok 376 - fixture m34-open-report-without-certificate
+  ---
+  duration_ms: 0.6905
+  type: 'test'
+  ...
+# Subtest: fixture m34-revision-report-with-certificate
+ok 377 - fixture m34-revision-report-with-certificate
+  ---
+  duration_ms: 0.6963
+  type: 'test'
+  ...
+# Subtest: fixture m34-node-mode-two-targets
+ok 378 - fixture m34-node-mode-two-targets
+  ---
+  duration_ms: 0.6793
+  type: 'test'
+  ...
+# Subtest: fixture m34-workflow-mode-with-targets
+ok 379 - fixture m34-workflow-mode-with-targets
+  ---
+  duration_ms: 0.7001
+  type: 'test'
+  ...
+# Subtest: fixture m34-unknown-attempt-state
+ok 380 - fixture m34-unknown-attempt-state
+  ---
+  duration_ms: 1.1204
+  type: 'test'
+  ...
+# Subtest: fixture m34-nested-cache-without-capability
+ok 381 - fixture m34-nested-cache-without-capability
+  ---
+  duration_ms: 25.9926
+  type: 'test'
+  ...
+# Subtest: fixture m34-review-from-template
+ok 382 - fixture m34-review-from-template
+  ---
+  duration_ms: 100.5404
+  type: 'test'
+  ...
+# Subtest: fixture m34-reserved-slot
+ok 383 - fixture m34-reserved-slot
+  ---
+  duration_ms: 82.4833
+  type: 'test'
+  ...
+# Subtest: fixture m34-duplicate-route-case
+ok 384 - fixture m34-duplicate-route-case
+  ---
+  duration_ms: 70.0259
+  type: 'test'
+  ...
+# Subtest: fixture m34-frozen-cache-decides
+ok 385 - fixture m34-frozen-cache-decides
+  ---
+  duration_ms: 19.6844
+  type: 'test'
+  ...
+# Subtest: fixture m34-loop-too-deep
+ok 386 - fixture m34-loop-too-deep
+  ---
+  duration_ms: 62.8939
+  type: 'test'
+  ...
+# Subtest: fixture m5-map-needs-delivery
+ok 387 - fixture m5-map-needs-delivery
+  ---
+  duration_ms: 2.5949
+  type: 'test'
+  ...
+# Subtest: fixture m5-delivery-needs-pipeline
+ok 388 - fixture m5-delivery-needs-pipeline
+  ---
+  duration_ms: 2.2232
+  type: 'test'
+  ...
+# Subtest: fixture m5-unknown-optional-input
+ok 389 - fixture m5-unknown-optional-input
+  ---
+  duration_ms: 2.6756
+  type: 'test'
+  ...
+# Subtest: fixture m5-utility-with-model
+ok 390 - fixture m5-utility-with-model
+  ---
+  duration_ms: 2.7941
+  type: 'test'
+  ...
+# Subtest: fixture m5-limit-zero
+ok 391 - fixture m5-limit-zero
+  ---
+  duration_ms: 2.361
+  type: 'test'
+  ...
+# Subtest: fixture m5-triage-not-agent
+ok 392 - fixture m5-triage-not-agent
+  ---
+  duration_ms: 36.8439
+  type: 'test'
+  ...
+# Subtest: fixture m5-duplicate-role
+ok 393 - fixture m5-duplicate-role
+  ---
+  duration_ms: 42.6755
+  type: 'test'
+  ...
+# Subtest: fixture m5-role-context-missing
+ok 394 - fixture m5-role-context-missing
+  ---
+  duration_ms: 46.4032
+  type: 'test'
+  ...
+# Subtest: fixture m5-role-context-provider
+ok 395 - fixture m5-role-context-provider
+  ---
+  duration_ms: 61.6758
+  type: 'test'
+  ...
+# Subtest: fixture m5-review-blocker-approved
+ok 396 - fixture m5-review-blocker-approved
+  ---
+  duration_ms: 2.1559
+  type: 'test'
+  ...
+# Subtest: fixture m5-triage-without-target
+ok 397 - fixture m5-triage-without-target
+  ---
+  duration_ms: 1.4604
+  type: 'test'
+  ...
+# Subtest: fixture m5-spec-triage-without-refs
+ok 398 - fixture m5-spec-triage-without-refs
+  ---
+  duration_ms: 1.0123
+  type: 'test'
+  ...
+# Subtest: fixture m5-check-modified-source
+ok 399 - fixture m5-check-modified-source
+  ---
+  duration_ms: 0.9659
+  type: 'test'
+  ...
+# Subtest: fixture m5-delete-operation
+ok 400 - fixture m5-delete-operation
+  ---
+  duration_ms: 1.1587
+  type: 'test'
+  ...
+# Subtest: fixture m5-complete-with-issues
+ok 401 - fixture m5-complete-with-issues
+  ---
+  duration_ms: 1.5932
+  type: 'test'
+  ...
+# Subtest: fixture m5-revision-without-issues
+ok 402 - fixture m5-revision-without-issues
+  ---
+  duration_ms: 1.5577
+  type: 'test'
+  ...
+# Subtest: fixture m5-raise-map-limit-without-limits
+ok 403 - fixture m5-raise-map-limit-without-limits
+  ---
+  duration_ms: 2.434
+  type: 'test'
+  ...
+# Subtest: fixture m5-unknown-map-pause
+ok 404 - fixture m5-unknown-map-pause
+  ---
+  duration_ms: 1.9601
+  type: 'test'
+  ...
+# Subtest: fixture m6-revisions-needs-delivery
+ok 405 - fixture m6-revisions-needs-delivery
+  ---
+  duration_ms: 6.2509
+  type: 'test'
+  ...
+# Subtest: fixture m6-carry-on-evaluate
+ok 406 - fixture m6-carry-on-evaluate
+  ---
+  duration_ms: 5.8525
+  type: 'test'
+  ...
+# Subtest: fixture m6-empty-scope-refs
+ok 407 - fixture m6-empty-scope-refs
+  ---
+  duration_ms: 7.478
+  type: 'test'
+  ...
+# Subtest: fixture m6-carry-needs-capability
+ok 408 - fixture m6-carry-needs-capability
+  ---
+  duration_ms: 89.158
+  type: 'test'
+  ...
+# Subtest: fixture m6-joined-review-two-agents
+ok 409 - fixture m6-joined-review-two-agents
+  ---
+  duration_ms: 96.4306
+  type: 'test'
+  ...
+# Subtest: fixture m6-need-live-with-carry
+ok 410 - fixture m6-need-live-with-carry
+  ---
+  duration_ms: 1.6143
+  type: 'test'
+  ...
+# Subtest: fixture m6-need-carried-without-request
+ok 411 - fixture m6-need-carried-without-request
+  ---
+  duration_ms: 0.8305
+  type: 'test'
+  ...
+# Subtest: fixture m6-carry-rejected-verdict
+ok 412 - fixture m6-carry-rejected-verdict
+  ---
+  duration_ms: 0.8856
+  type: 'test'
+  ...
+# Subtest: fixture m6-task-carry-without-fingerprint
+ok 413 - fixture m6-task-carry-without-fingerprint
+  ---
+  duration_ms: 0.7853
+  type: 'test'
+  ...
+# Subtest: fixture m6-unknown-record-kind
+ok 414 - fixture m6-unknown-record-kind
+  ---
+  duration_ms: 1.7201
+  type: 'test'
+  ...
+# Subtest: fixture rf-delivery-without-spec-policy
+ok 415 - fixture rf-delivery-without-spec-policy
+  ---
+  duration_ms: 15.7971
+  type: 'test'
+  ...
+# Subtest: fixture rf-delivery-with-carry
+ok 416 - fixture rf-delivery-with-carry
+  ---
+  duration_ms: 17.4339
+  type: 'test'
+  ...
+# Subtest: fixture rf-delivery-on-evaluate
+ok 417 - fixture rf-delivery-on-evaluate
+  ---
+  duration_ms: 20.734
+  type: 'test'
+  ...
+# Subtest: fixture rf-spec-policy-without-delivery
+ok 418 - fixture rf-spec-policy-without-delivery
+  ---
+  duration_ms: 21.2093
+  type: 'test'
+  ...
+# Subtest: fixture rf-reserved-delivery-slot
+ok 419 - fixture rf-reserved-delivery-slot
+  ---
+  duration_ms: 184.2554
+  type: 'test'
+  ...
+# Subtest: fixture rf-delivery-certificate-without-prerequisites
+ok 420 - fixture rf-delivery-certificate-without-prerequisites
+  ---
+  duration_ms: 0.6561
+  type: 'test'
+  ...
+# Subtest: fixture pilot-free-form-output
+ok 421 - fixture pilot-free-form-output
+  ---
+  duration_ms: 31.4202
+  type: 'test'
+  ...
+# Subtest: fixture pilot-open-map-output
+ok 422 - fixture pilot-open-map-output
+  ---
+  duration_ms: 30.8513
+  type: 'test'
+  ...
+# Subtest: fixture pilot-array-root-output
+ok 423 - fixture pilot-array-root-output
+  ---
+  duration_ms: 35.6461
+  type: 'test'
+  ...
+# Subtest: strict JSON rejects duplicate keys and lone surrogates; JCS sorts keys
+ok 424 - strict JSON rejects duplicate keys and lone surrogates; JCS sorts keys
+  ---
+  duration_ms: 1.6553
+  type: 'test'
+  ...
+# Subtest: ADR6-04/10/13: bounded exploration of decide/admit/settle/revoke/crash/expire keeps the host invariants
+ok 425 - ADR6-04/10/13: bounded exploration of decide/admit/settle/revoke/crash/expire keeps the host invariants
+  ---
+  duration_ms: 126820.5974
+  type: 'test'
+  ...
+# Subtest: ADR6-01: policy creation needs a decision-bound, user-verified assertion from an enrolled credential
+ok 426 - ADR6-01: policy creation needs a decision-bound, user-verified assertion from an enrolled credential
+  ---
+  duration_ms: 226.1824
+  type: 'test'
+  ...
+# Subtest: ADR6-01: an expired challenge and an untrusted enrollment cannot authorize a policy
+ok 427 - ADR6-01: an expired challenge and an untrusted enrollment cannot authorize a policy
+  ---
+  duration_ms: 129.6233
+  type: 'test'
+  ...
+# Subtest: ADR6-01: an eligible run approval needs no repeated consent, while out-of-scope requests are refused or wait
+ok 428 - ADR6-01: an eligible run approval needs no repeated consent, while out-of-scope requests are refused or wait
+  ---
+  duration_ms: 206.6498
+  type: 'test'
+  ...
+# Subtest: ADR6-13: shared limits bound every linked operation; a declared cost below the minimum is raised
+ok 429 - ADR6-13: shared limits bound every linked operation; a declared cost below the minimum is raised
+  ---
+  duration_ms: 144.7659
+  type: 'test'
+  ...
+# Subtest: ADR6-02/03: same-boot host restart keeps expiry and counters, invalidates live connections, and needs fresh authentication
+ok 430 - ADR6-02/03: same-boot host restart keeps expiry and counters, invalidates live connections, and needs fresh authentication
+  ---
+  duration_ms: 164.521
+  type: 'test'
+  ...
+# Subtest: ADR6-04: sleep consumes lifetime, a clock rollback cannot extend it, and a reboot blocks the old policy
+ok 431 - ADR6-04: sleep consumes lifetime, a clock rollback cannot extend it, and a reboot blocks the old policy
+  ---
+  duration_ms: 256.4732
+  type: 'test'
+  ...
+# Subtest: ADR6-04: post-reboot authorization is a new linked decision that carries consumed budgets forward
+ok 432 - ADR6-04: post-reboot authorization is a new linked decision that carries consumed budgets forward
+  ---
+  duration_ms: 126.487
+  type: 'test'
+  ...
+# Subtest: ADR6-04: revocation fences admission, returns unadmitted reservations and reports admitted work for Stop
+ok 433 - ADR6-04: revocation fences admission, returns unadmitted reservations and reports admitted work for Stop
+  ---
+  duration_ms: 138.0686
+  type: 'test'
+  ...
+# Subtest: ADR6-10: a host restart during an operation leaves it reconciling and blocks new dispatch until resolved with evidence
+ok 434 - ADR6-10: a host restart during an operation leaves it reconciling and blocks new dispatch until resolved with evidence
+  ---
+  duration_ms: 225.4007
+  type: 'test'
+  ...
+# Subtest: ADR6-14: the host audit chain detects altered history
+ok 435 - ADR6-14: the host audit chain detects altered history
+  ---
+  duration_ms: 187.8567
+  type: 'test'
+  ...
+# Subtest: ADR6-08: an authorized restart launches the exact build and binds a new runtime generation to the observed process
+ok 436 - ADR6-08: an authorized restart launches the exact build and binds a new runtime generation to the observed process
+  ---
+  duration_ms: 231.9285
+  type: 'test'
+  ...
+# Subtest: ADR6-08/11: unconfirmed termination, a changed build and a mismatched process image all block the switch
+ok 437 - ADR6-08/11: unconfirmed termination, a changed build and a mismatched process image all block the switch
+  ---
+  duration_ms: 5750.6085
+  type: 'test'
+  ...
+# Subtest: ADR6-03: a runtime that is not the process the host launched cannot register
+ok 438 - ADR6-03: a runtime that is not the process the host launched cannot register
+  ---
+  duration_ms: 465.5213
+  type: 'test'
+  ...
+# Subtest: preflight reproduces schema 12 versus runtime 11 without changing store data
+ok 439 - preflight reproduces schema 12 versus runtime 11 without changing store data
+  ---
+  duration_ms: 227.4629
+  type: 'test'
+  ...
+# Subtest: preflight distinguishes line endings from a changed historical migration
+ok 440 - preflight distinguishes line endings from a changed historical migration
+  ---
+  duration_ms: 241.6467
+  type: 'test'
+  ...
+# Subtest: build inspection detects replaced executables and unexpected runtime files
+ok 441 - build inspection detects replaced executables and unexpected runtime files
+  ---
+  duration_ms: 236.1797
+  type: 'test'
+  ...
+# Subtest: doctor refuses an unmanifested build instead of presenting it as ready
+ok 442 - doctor refuses an unmanifested build instead of presenting it as ready
+  ---
+  duration_ms: 250.8672
+  type: 'test'
+  ...
+# Subtest: prepare reuses a matching package without building or overwriting it
+ok 443 - prepare reuses a matching package without building or overwriting it
+  ---
+  duration_ms: 877.173
+  type: 'test'
+  ...
+# Subtest: transport cache invalidates changed policy or missing negative measurement
+ok 444 - transport cache invalidates changed policy or missing negative measurement
+  ---
+  duration_ms: 3.6739
+  type: 'test'
+  ...
+# Subtest: repeated measurement command reuses real saved evidence without a delay or model call
+ok 445 - repeated measurement command reuses real saved evidence without a delay or model call
+  ---
+  duration_ms: 162.1384
+  type: 'test'
+  ...
+# Subtest: stdio handles split UTF-8 and a timeout cancellation without killing its bridge
+ok 446 - stdio handles split UTF-8 and a timeout cancellation without killing its bridge
+  ---
+  duration_ms: 688.7669
+  type: 'test'
+  ...
+# Subtest: stdio refuses an oversized response and settles its pending request
+ok 447 - stdio refuses an oversized response and settles its pending request
+  ---
+  duration_ms: 122.6616
+  type: 'test'
+  ...
+# Subtest: Codex reconnect progress is diagnostic; terminal failure remains a failure
+ok 448 - Codex reconnect progress is diagnostic; terminal failure remains a failure
+  ---
+  duration_ms: 2.4889
+  type: 'test'
+  ...
+# Subtest: the reusable client pins store and bridge and exposes complete supervised control
+ok 449 - the reusable client pins store and bridge and exposes complete supervised control
+  ---
+  duration_ms: 1038.8205
+  type: 'test'
+  ...
+# Subtest: build reuse ignores operator-only metadata but refuses changed compiled inputs
+ok 450 - build reuse ignores operator-only metadata but refuses changed compiled inputs
+  ---
+  duration_ms: 407.9104
+  type: 'test'
+  ...
+# Subtest: workspace planning preserves developer edits and discovers source changes without copying them
+ok 451 - workspace planning preserves developer edits and discovers source changes without copying them
+  ---
+  duration_ms: 1397.9106
+  type: 'test'
+  ...
+# Subtest: every CLI receives the exact effort on fresh and resumed sessions in either configuration profile
+ok 452 - every CLI receives the exact effort on fresh and resumed sessions in either configuration profile
+  ---
+  duration_ms: 51.9651
+  type: 'test'
+  ...
+# Subtest: legacy workflows still pass medium explicitly; invalid efforts are rejected before CLI construction
+ok 453 - legacy workflows still pass medium explicitly; invalid efforts are rejected before CLI construction
+  ---
+  duration_ms: 4.2108
+  type: 'test'
+  ...
+# Subtest: workflow schemas accept effort for ordinary Agents and Map roles and reject unknown levels
+ok 454 - workflow schemas accept effort for ordinary Agents and Map roles and reject unknown levels
+  ---
+  duration_ms: 315.7856
+  type: 'test'
+  ...
+# Subtest: the engine forwards each effort and journals it for fresh and resumed Agents
+ok 455 - the engine forwards each effort and journals it for fresh and resumed Agents
+  ---
+  duration_ms: 2370.0488
+  type: 'test'
+  ...
+# Subtest: Run Node rejects inputs from another effort or from a pre-effort run
+ok 456 - Run Node rejects inputs from another effort or from a pre-effort run
+  ---
+  duration_ms: 908.5828
+  type: 'test'
+  ...
+# Subtest: saved Context chain runs Codex → Claude → Codex, resuming the first Codex conversation
+ok 457 - saved Context chain runs Codex → Claude → Codex, resuming the first Codex conversation
+  ---
+  duration_ms: 3463.5182
+  type: 'test'
+  ...
+# Subtest: createRun is idempotent per requestId and rejects a reused ID with another payload
+ok 458 - createRun is idempotent per requestId and rejects a reused ID with another payload
+  ---
+  duration_ms: 1040.599
+  type: 'test'
+  ...
+# Subtest: a failed run receipt write rolls back run records and skips post-commit dispatch
+ok 459 - a failed run receipt write rolls back run records and skips post-commit dispatch
+  ---
+  duration_ms: 407.7034
+  type: 'test'
+  ...
+# Subtest: an output-contract failure drains the run, blocks consumers, and marks the Context for review
+ok 460 - an output-contract failure drains the run, blocks consumers, and marks the Context for review
+  ---
+  duration_ms: 1066.3876
+  type: 'test'
+  ...
+# Subtest: typed provider failures stay distinct
+ok 461 - typed provider failures stay distinct
+  ---
+  duration_ms: 1571.3235
+  type: 'test'
+  ...
+# Subtest: root Stop terminates the CLI tree, cancels unstarted work, and finishes canceled
+ok 462 - root Stop terminates the CLI tree, cancels unstarted work, and finishes canceled
+  ---
+  duration_ms: 1263.4388
+  type: 'test'
+  ...
+# Subtest: active process timeout is a typed failure
+ok 463 - active process timeout is a typed failure
+  ---
+  duration_ms: 5984.9156
+  type: 'test'
+  ...
+# Subtest: Continue reuses a ready binding; a binding needing review blocks creation until acknowledged
+ok 464 - Continue reuses a ready binding; a binding needing review blocks creation until acknowledged
+  ---
+  duration_ms: 2453.6834
+  type: 'test'
+  ...
+# Subtest: capacity is application-wide across workspaces and settings changes are journaled
+ok 465 - capacity is application-wide across workspaces and settings changes are journaled
+  ---
+  duration_ms: 3848.5866
+  type: 'test'
+  ...
+# Subtest: logs are captured as contiguous byte batches that reassemble the stream
+ok 466 - logs are captured as contiguous byte batches that reassemble the stream
+  ---
+  duration_ms: 864.6042
+  type: 'test'
+  ...
+# Subtest: lists paginate with fenced cursors; foreign cursors are rejected
+ok 467 - lists paginate with fenced cursors; foreign cursors are rejected
+  ---
+  duration_ms: 1945.6505
+  type: 'test'
+  ...
+# Subtest: artifacts are digest-verified on read; tampering is reported as corruption
+ok 468 - artifacts are digest-verified on read; tampering is reported as corruption
+  ---
+  duration_ms: 787.8722
+  type: 'test'
+  ...
+# Subtest: validation rejects executable defects and save keeps disconnected drafts
+ok 469 - validation rejects executable defects and save keeps disconnected drafts
+  ---
+  duration_ms: 463.666
+  type: 'test'
+  ...
+# Subtest: restart recovery marks running work interrupted, never retries, and frees the workspace
+ok 470 - restart recovery marks running work interrupted, never retries, and frees the workspace
+  ---
+  duration_ms: 889.2686
+  type: 'test'
+  ...
+# Subtest: F3: an ambiguous structured answer is journaled as output_contract, not a process failure
+ok 471 - F3: an ambiguous structured answer is journaled as output_contract, not a process failure
+  ---
+  duration_ms: 2409.3199
+  type: 'test'
+  ...
+# Subtest: F1: a review whose Context another Agent writes first is never carried; an independent review still is
+ok 472 - F1: a review whose Context another Agent writes first is never carried; an independent review still is
+  ---
+  duration_ms: 6286.572
+  type: 'test'
+  ...
+# Subtest: F2: delivery preparation rejects a summary that mixes another Map's candidate and checks; the coherent summary passes
+ok 473 - F2: delivery preparation rejects a summary that mixes another Map's candidate and checks; the coherent summary passes
+  ---
+  duration_ms: 19987.4574
+  type: 'test'
+  ...
+# Subtest: ADR6-01/07: a host permit admits an external run without the confirmation pause, and only that exact run
+ok 474 - ADR6-01/07: a host permit admits an external run without the confirmation pause, and only that exact run
+  ---
+  duration_ms: 2065.5582
+  type: 'test'
+  ...
+# Subtest: R6: a multibyte character split across stdout chunks is decoded intact
+ok 475 - R6: a multibyte character split across stdout chunks is decoded intact
+  ---
+  duration_ms: 3100.7154
+  type: 'test'
+  ...
+# Subtest: R5: final-answer selection follows the current output contract
+ok 476 - R5: final-answer selection follows the current output contract
+  ---
+  duration_ms: 3.313
+  type: 'test'
+  ...
+# Subtest: R5: an Antigravity text resume commits the current response, never the stale structured output
+ok 477 - R5: an Antigravity text resume commits the current response, never the stale structured output
+  ---
+  duration_ms: 1311.995
+  type: 'test'
+  ...
+# The runtime could not write its store (ENOSPC: disk full). Free space or fix the data folder, then restart; affected runs are recovered as interrupted.
+# Subtest: R3: a log-storage failure is contained as capture_failed; a store that cannot be written blocks new work without crashing
+ok 478 - R3: a log-storage failure is contained as capture_failed; a store that cannot be written blocks new work without crashing
+  ---
+  duration_ms: 1632.5151
+  type: 'test'
+  ...
+# Subtest: R7: a failing migration rolls back its DDL together with its version row
+ok 479 - R7: a failing migration rolls back its DDL together with its version row
+  ---
+  duration_ms: 322.8909
+  type: 'test'
+  ...
+# Subtest: Judge real Engine commits a bounded review idempotently without accepting code or rewriting the run
+ok 480 - Judge real Engine commits a bounded review idempotently without accepting code or rewriting the run
+  ---
+  duration_ms: 2000.7655
+  type: 'test'
+  ...
+# Subtest: Judge authenticated Engine refuses identity, revision, candidate, evidence and budget forgeries
+ok 481 - Judge authenticated Engine refuses identity, revision, candidate, evidence and budget forgeries
+  ---
+  duration_ms: 1299.957
+  type: 'test'
+  ...
+# Subtest: Judge scope cannot be registered by external token or used without its separate credentials
+ok 482 - Judge scope cannot be registered by external token or used without its separate credentials
+  ---
+  duration_ms: 956.4406
+  type: 'test'
+  ...
+# Subtest: Judge real Bridge exposes scoped evidence tools and worker-only authenticated decision submission
+not ok 483 - Judge real Bridge exposes scoped evidence tools and worker-only authenticated decision submission
+  ---
+  duration_ms: 2036.7615
+  type: 'test'
+  location: 'C:\\my\\2026\\deszo_agent_orche\\runtime\\tests\\judge-control.test.mjs:45:1'
+  failureType: 'testCodeFailure'
+  error: 'Synthetic injection must be retrieved as untrusted evidence.'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (file:///C:/my/2026/deszo_agent_orche/runtime/tests/judge-control.test.mjs:60:12)
+    process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: Judge queue persists the second request and never charges or launches it behind an active turn
+ok 484 - Judge queue persists the second request and never charges or launches it behind an active turn
+  ---
+  duration_ms: 1305.3777
+  type: 'test'
+  ...
+# Subtest: Judge Stop, host revocation and authorization expiry reject otherwise valid decisions
+ok 485 - Judge Stop, host revocation and authorization expiry reject otherwise valid decisions
+  ---
+  duration_ms: 3748.5263
+  type: 'test'
+  ...
+# Subtest: Judge terminal handoff review and timeout never change the terminal run state
+ok 486 - Judge terminal handoff review and timeout never change the terminal run state
+  ---
+  duration_ms: 1214.2709
+  type: 'test'
+  ...
+# Subtest: Judge unknown turn retains its charge and prevents blind replay or owner transfer
+ok 487 - Judge unknown turn retains its charge and prevents blind replay or owner transfer
+  ---
+  duration_ms: 964.8301
+  type: 'test'
+  ...
+# Subtest: Judge durable pending requests survive runtime crash/restart; uncertain turns are never re-dispatched
+ok 488 - Judge durable pending requests survive runtime crash/restart; uncertain turns are never re-dispatched
+  ---
+  duration_ms: 5993.2638
+  type: 'test'
+  ...
+# Subtest: Judge concurrent admission race consumes only one Engine slot and retains correct shared charges
+ok 489 - Judge concurrent admission race consumes only one Engine slot and retains correct shared charges
+  ---
+  duration_ms: 962.3051
+  type: 'test'
+  ...
+# Subtest: Judge scoped Bridge retains the managed-invocation refusal for evidence and decisions
+ok 490 - Judge scoped Bridge retains the managed-invocation refusal for evidence and decisions
+  ---
+  duration_ms: 1293.5321
+  type: 'test'
+  ...
+# Subtest: Judge queue and response expiry preserve barriers and refuse delayed starts without changing terminal history
+ok 491 - Judge queue and response expiry preserve barriers and refuse delayed starts without changing terminal history
+  ---
+  duration_ms: 2328.606
+  type: 'test'
+  ...
+# Subtest: Existing Host queue + actual Engine/Bridge commit review under real shared ledger; provider/native are explicit fixtures
+ok 492 - Existing Host queue + actual Engine/Bridge commit review under real shared ledger; provider/native are explicit fixtures
+  ---
+  duration_ms: 5683.1025
+  type: 'test'
+  ...
+# Subtest: Existing Host queue fences a crashed worker and preserves unknown invocation charges without replay
+ok 493 - Existing Host queue fences a crashed worker and preserves unknown invocation charges without replay
+  ---
+  duration_ms: 1660.3908
+  type: 'test'
+  ...
+# Subtest: Existing worker refuses missing Judge runtime before charging or calling any provider
+ok 494 - Existing worker refuses missing Judge runtime before charging or calling any provider
+  ---
+  duration_ms: 1585.8689
+  type: 'test'
+  ...
+# Subtest: Non-fixture Host refuses Judge delivery without independent native custody before any charge
+ok 495 - Non-fixture Host refuses Judge delivery without independent native custody before any charge
+  ---
+  duration_ms: 1507.2214
+  type: 'test'
+  ...
+# Subtest: decision fixtures: the engine lifecycle table and loop step agree with the documentation
+ok 496 - decision fixtures: the engine lifecycle table and loop step agree with the documentation
+  ---
+  duration_ms: 3.8141
+  type: 'test'
+  ...
+# Subtest: an Agent checker drives a structured-state loop to completion with a shared writer Context
+ok 497 - an Agent checker drives a structured-state loop to completion with a shared writer Context
+  ---
+  duration_ms: 6077.6992
+  type: 'test'
+  ...
+# Subtest: the iteration limit pauses for the user; raise-limit continues to a normal finish
+ok 498 - the iteration limit pauses for the user; raise-limit continues to a normal finish
+  ---
+  duration_ms: 5802.668
+  type: 'test'
+  ...
+# Subtest: an invalid checker decision pauses the loop as a body failure without inventing a decision
+ok 499 - an invalid checker decision pauses the loop as a body failure without inventing a decision
+  ---
+  duration_ms: 3082.7329
+  type: 'test'
+  ...
+# Subtest: retry of a failed body Agent needs an explicit Context choice and resumes the loop
+ok 500 - retry of a failed body Agent needs an explicit Context choice and resumes the loop
+  ---
+  duration_ms: 3399.9672
+  type: 'test'
+  ...
+# Subtest: fresh binding on retry remaps the Context node and keeps the old binding as history
+ok 501 - fresh binding on retry remaps the Context node and keeps the old binding as history
+  ---
+  duration_ms: 3163.1504
+  type: 'test'
+  ...
+# Subtest: the active-time limit stops body work, pauses, and raise-limit re-plans the canceled attempt
+ok 502 - the active-time limit stops body work, pauses, and raise-limit re-plans the canceled attempt
+  ---
+  duration_ms: 6035.2259
+  type: 'test'
+  ...
+# Subtest: scoped Stop on a loop pauses it; restart-iteration runs the iteration again
+ok 503 - scoped Stop on a loop pauses it; restart-iteration runs the iteration again
+  ---
+  duration_ms: 1699.685
+  type: 'test'
+  ...
+# Subtest: a deterministic Condition loop, files, merges, JSON Select, attachments and captures
+ok 504 - a deterministic Condition loop, files, merges, JSON Select, attachments and captures
+  ---
+  duration_ms: 1836.1265
+  type: 'test'
+  ...
+# Subtest: a missing input file fails with input_unavailable and a path escape is rejected before running
+ok 505 - a missing input file fails with input_unavailable and a path escape is rejected before running
+  ---
+  duration_ms: 786.1948
+  type: 'test'
+  ...
+# Subtest: runs created by the M2 runtime write journal v2; recovery is refused outside waiting_for_user
+ok 506 - runs created by the M2 runtime write journal v2; recovery is refused outside waiting_for_user
+  ---
+  duration_ms: 3849.2503
+  type: 'test'
+  ...
+# Subtest: restart recovery interrupts a running loop and its body attempt without retrying
+ok 507 - restart recovery interrupts a running loop and its body attempt without retrying
+  ---
+  duration_ms: 1724.0625
+  type: 'test'
+  ...
+# Subtest: an M1 store migrates through migration 13, keeps its v1 journal and backfills M6 identities
+ok 508 - an M1 store migrates through migration 13, keeps its v1 journal and backfills M6 identities
+  ---
+  duration_ms: 394.342
+  type: 'test'
+  ...
+# Subtest: Replay projects each step from the journal alone; later outputs stay invisible
+ok 509 - Replay projects each step from the journal alone; later outputs stay invisible
+  ---
+  duration_ms: 3342.2782
+  type: 'test'
+  ...
+# Subtest: managed task runs assessment, deterministic planning, isolated test/code roles, checks and authoritative acceptance through Engine
+ok 510 - managed task runs assessment, deterministic planning, isolated test/code roles, checks and authoritative acceptance through Engine
+  ---
+  duration_ms: 8057.3798
+  type: 'test'
+  ...
+# Subtest: managed task delivers a byte-verified feature branch without changing the caller checkout
+ok 511 - managed task delivers a byte-verified feature branch without changing the caller checkout
+  ---
+  duration_ms: 18227.8079
+  type: 'test'
+  ...
+# Subtest: check and reviewer repair loops consume the shared bound and require fresh evidence before acceptance
+ok 512 - check and reviewer repair loops consume the shared bound and require fresh evidence before acceptance
+  ---
+  duration_ms: 9170.9937
+  type: 'test'
+  ...
+# Subtest: incomplete review, absent dependencies, scope violations and reviewer mutations block acceptance without fake repair
+    # Subtest: REVIEW_INCOMPLETE
+    ok 1 - REVIEW_INCOMPLETE
+      ---
+      duration_ms: 3838.3173
+      type: 'test'
+      ...
+    # Subtest: MISSING_CONTEXT
+    ok 2 - MISSING_CONTEXT
+      ---
+      duration_ms: 4016.0775
+      type: 'test'
+      ...
+    # Subtest: SCOPE_VIOLATION
+    ok 3 - SCOPE_VIOLATION
+      ---
+      duration_ms: 3077.7606
+      type: 'test'
+      ...
+    # Subtest: REVIEW_MUTATION
+    ok 4 - REVIEW_MUTATION
+      ---
+      duration_ms: 3948.329
+      type: 'test'
+      ...
+    1..4
+ok 513 - incomplete review, absent dependencies, scope violations and reviewer mutations block acceptance without fake repair
+  ---
+  duration_ms: 14883.1102
+  type: 'test'
+  ...
+# Subtest: aggregate attempts include preparation and cannot be reset through retry
+ok 514 - aggregate attempts include preparation and cannot be reset through retry
+  ---
+  duration_ms: 2251.2325
+  type: 'test'
+  ...
+# Subtest: the aggregate elapsed deadline interrupts a running Agent sooner than its local timeout and cannot be reset
+ok 515 - the aggregate elapsed deadline interrupts a running Agent sooner than its local timeout and cannot be reset
+  ---
+  duration_ms: 1907.9894
+  type: 'test'
+  ...
+# Subtest: root, task and command Stop during actual delivery smoke terminate child trees and never publish a branch
+    # Subtest: root
+    ok 1 - root
+      ---
+      duration_ms: 11769.2561
+      type: 'test'
+      ...
+    # Subtest: task
+    ok 2 - task
+      ---
+      duration_ms: 10687.0364
+      type: 'test'
+      ...
+    # Subtest: command
+    ok 3 - command
+      ---
+      duration_ms: 10907.259
+      type: 'test'
+      ...
+    1..3
+ok 516 - root, task and command Stop during actual delivery smoke terminate child trees and never publish a branch
+  ---
+  duration_ms: 33364.8463
+  type: 'test'
+  ...
+# Subtest: final manual acceptance evidence comes from a fresh policy-selected accepter, never a readiness review
+    # Subtest: same Analyst fresh Context
+    ok 1 - same Analyst fresh Context
+      ---
+      duration_ms: 3831.0792
+      type: 'test'
+      ...
+    # Subtest: independent
+    ok 2 - independent
+      ---
+      duration_ms: 3711.3263
+      type: 'test'
+      ...
+    1..2
+ok 517 - final manual acceptance evidence comes from a fresh policy-selected accepter, never a readiness review
+  ---
+  duration_ms: 7543.4336
+  type: 'test'
+  ...
+# Subtest: an indeterminate ref-update receipt pauses delivery, preserves commit intent and refuses blind retry
+ok 518 - an indeterminate ref-update receipt pauses delivery, preserves commit intent and refuses blind retry
+  ---
+  duration_ms: 16810.3273
+  type: 'test'
+  ...
+# Subtest: restart preserves delivery intent for reconciliation and never resumes publishing
+ok 519 - restart preserves delivery intent for reconciliation and never resumes publishing
+  ---
+  duration_ms: 4647.655
+  type: 'test'
+  ...
+# Subtest: candidate risk escalation, bounded discovery and context expansion execute actual extra Engine attempts
+ok 520 - candidate risk escalation, bounded discovery and context expansion execute actual extra Engine attempts
+  ---
+  duration_ms: 9951.0636
+  type: 'test'
+  ...
+# Subtest: decision fixtures: the verification-cycle bound
+ok 521 - decision fixtures: the verification-cycle bound
+  ---
+  duration_ms: 4.0226
+  type: 'test'
+  ...
+# Subtest: round recovery: a failed real check is triaged, only the auth code is repaired, and the Map completes on fixtures
+ok 522 - round recovery: a failed real check is triaged, only the auth code is repaired, and the Map completes on fixtures
+  ---
+  duration_ms: 9037.4989
+  type: 'test'
+  ...
+# Subtest: the documented delivery example runs: three documentation reviewers approve, the Map completes and the Route shows the candidate
+ok 523 - the documented delivery example runs: three documentation reviewers approve, the Map completes and the Route shows the candidate
+  ---
+  duration_ms: 10200.443
+  type: 'test'
+  ...
+# Subtest: the verification bound pauses the Map before another cycle; raising it resumes triage and repair
+ok 524 - the verification bound pauses the Map before another cycle; raising it resumes triage and repair
+  ---
+  duration_ms: 6716.5533
+  type: 'test'
+  ...
+# Subtest: specification triage returns a revision outcome; unknown triage pauses for the user
+ok 525 - specification triage returns a revision outcome; unknown triage pauses for the user
+  ---
+  duration_ms: 9676.8573
+  type: 'test'
+  ...
+# Subtest: an executor may return specification_revision_required instead of a candidate
+ok 526 - an executor may return specification_revision_required instead of a candidate
+  ---
+  duration_ms: 2135.4068
+  type: 'test'
+  ...
+# Subtest: same-specification prior state carries independent selections; a repair re-runs only its target and consumers; new templates start a new generation
+ok 527 - same-specification prior state carries independent selections; a repair re-runs only its target and consumers; new templates start a new generation
+  ---
+  duration_ms: 11510.8901
+  type: 'test'
+  ...
+# Subtest: Assemble reports a conflict instead of last-writer-wins, and the bound counts it once
+ok 528 - Assemble reports a conflict instead of last-writer-wins, and the bound counts it once
+  ---
+  duration_ms: 2708.0214
+  type: 'test'
+  ...
+# Subtest: the Map refuses documentation without a valid approval or with an invalid map
+ok 529 - the Map refuses documentation without a valid approval or with an invalid map
+  ---
+  duration_ms: 1082.758
+  type: 'test'
+  ...
+# Subtest: pilot recovery: triage pins the specification identity in the native provider contract
+ok 530 - pilot recovery: triage pins the specification identity in the native provider contract
+  ---
+  duration_ms: 6718.1628
+  type: 'test'
+  ...
+# Subtest: pilot recovery: a Map triage retry acknowledges its visible shared Context and completes repair
+ok 531 - pilot recovery: a Map triage retry acknowledges its visible shared Context and completes repair
+  ---
+  duration_ms: 7768.6124
+  type: 'test'
+  ...
+# Subtest: pilot recovery: a task reviewer retries with its own acknowledge Context
+ok 532 - pilot recovery: a task reviewer retries with its own acknowledge Context
+  ---
+  duration_ms: 5700.744
+  type: 'test'
+  ...
+# Subtest: pilot recovery: a task reviewer retries with its own fresh Context
+ok 533 - pilot recovery: a task reviewer retries with its own fresh Context
+  ---
+  duration_ms: 5885.9641
+  type: 'test'
+  ...
+# Subtest: pilot author validation rejects unindexed and duplicate headings while ignoring fenced examples
+ok 534 - pilot author validation rejects unindexed and duplicate headings while ignoring fenced examples
+  ---
+  duration_ms: 87.1909
+  type: 'test'
+  ...
+# Subtest: PILOT-01: every engine answer contract has a provider-compatible transport, while the raw contracts do not
+ok 535 - PILOT-01: every engine answer contract has a provider-compatible transport, while the raw contracts do not
+  ---
+  duration_ms: 6.9723
+  type: 'test'
+  ...
+# Subtest: PILOT-01: transport answers decode to values the complete contract still judges
+ok 536 - PILOT-01: transport answers decode to values the complete contract still judges
+  ---
+  duration_ms: 130.5139
+  type: 'test'
+  ...
+# Subtest: PILOT-01: Gemini numeric and nullable enum restrictions remain engine-owned
+ok 537 - PILOT-01: Gemini numeric and nullable enum restrictions remain engine-owned
+  ---
+  duration_ms: 32.0834
+  type: 'test'
+  ...
+# Subtest: PILOT-01: Antigravity finish echoes must agree with every complete JSON message and the requested schema
+ok 538 - PILOT-01: Antigravity finish echoes must agree with every complete JSON message and the requested schema
+  ---
+  duration_ms: 8.4438
+  type: 'test'
+  ...
+# Subtest: PILOT-01: TaskReturn null alternatives and finish echoes decode without hiding extra task issues
+ok 539 - PILOT-01: TaskReturn null alternatives and finish echoes decode without hiding extra task issues
+  ---
+  duration_ms: 2.404
+  type: 'test'
+  ...
+# Subtest: PILOT-01: unsupported contracts are refused before any request (workflow validation)
+ok 540 - PILOT-01: unsupported contracts are refused before any request (workflow validation)
+  ---
+  duration_ms: 31.321
+  type: 'test'
+  ...
+# Subtest: PILOT-01: new and resumed invocations of every provider carry only the transport schema
+ok 541 - PILOT-01: new and resumed invocations of every provider carry only the transport schema
+  ---
+  duration_ms: 5.5581
+  type: 'test'
+  ...
+# Subtest: PILOT-01: the fixture CLI rejects a raw contract like the real CLIs, and a run with optional properties succeeds through the transport
+ok 542 - PILOT-01: the fixture CLI rejects a raw contract like the real CLIs, and a run with optional properties succeeds through the transport
+  ---
+  duration_ms: 1751.2635
+  type: 'test'
+  ...
+# Subtest: PILOT-03: after a paused loop is closed, Replay shows the loop canceled and the undecided iteration as closed without a decision
+ok 543 - PILOT-03: after a paused loop is closed, Replay shows the loop canceled and the undecided iteration as closed without a decision
+  ---
+  duration_ms: 1948.9964
+  type: 'test'
+  ...
+# Subtest: RERUN-04: issue resolution authority — own namespace, imported scope coverage, and full view for uncited issues
+ok 544 - RERUN-04: issue resolution authority — own namespace, imported scope coverage, and full view for uncited issues
+  ---
+  duration_ms: 2.6008
+  type: 'test'
+  ...
+# Subtest: decision fixtures: Route case selection and selected-Merge joins
+ok 545 - decision fixtures: Route case selection and selected-Merge joins
+  ---
+  duration_ms: 8.0811
+  type: 'test'
+  ...
+# Subtest: a Live Cache is pinned, a Frozen Cache cuts its producer, and refresh replaces the pin
+ok 546 - a Live Cache is pinned, a Frozen Cache cuts its producer, and refresh replaces the pin
+  ---
+  duration_ms: 4790.6239
+  type: 'test'
+  ...
+# Subtest: a Cache inside a loop: refresh pins after a successful pass, Frozen supplies the same value each iteration
+ok 547 - a Cache inside a loop: refresh pins after a successful pass, Frozen supplies the same value each iteration
+  ---
+  duration_ms: 2496.558
+  type: 'test'
+  ...
+# Subtest: a Frozen Cache keeps its After prerequisites
+ok 548 - a Frozen Cache keeps its After prerequisites
+  ---
+  duration_ms: 2561.9129
+  type: 'test'
+  ...
+# Subtest: a Frozen Cache without a pin rejects run creation
+ok 549 - a Frozen Cache without a pin rejects run creation
+  ---
+  duration_ms: 467.749
+  type: 'test'
+  ...
+# Subtest: Run Branch plans only the target and its producers; Run Node reuses current inputs and rejects stale ones
+ok 550 - Run Branch plans only the target and its producers; Run Node reuses current inputs and rejects stale ones
+  ---
+  duration_ms: 2403.6883
+  type: 'test'
+  ...
+# Subtest: Run Node rejects a fresh Context that would stand in for an unplanned writer
+ok 551 - Run Node rejects a fresh Context that would stand in for an unplanned writer
+  ---
+  duration_ms: 2741.5718
+  type: 'test'
+  ...
+# Subtest: manual chat continues a ready binding as a chat run hidden from workflow lists
+ok 552 - manual chat continues a ready binding as a chat run hidden from workflow lists
+  ---
+  duration_ms: 1685.2533
+  type: 'test'
+  ...
+# Subtest: a Route activates one case, skips the other branch, and a selected Merge joins it
+ok 553 - a Route activates one case, skips the other branch, and a selected Merge joins it
+  ---
+  duration_ms: 1026.5876
+  type: 'test'
+  ...
+# Subtest: the specification loop: reviewers request changes, the analyst revises, the gate opens and the next pass is verified
+ok 554 - the specification loop: reviewers request changes, the analyst revises, the gate opens and the next pass is verified
+  ---
+  duration_ms: 7258.2387
+  type: 'test'
+  ...
+# Subtest: the gate rejects a review for the wrong role and a bundle whose index does not match its headings
+ok 555 - the gate rejects a review for the wrong role and a bundle whose index does not match its headings
+  ---
+  duration_ms: 5822.776
+  type: 'test'
+  ...
+# Subtest: a scoped Stop pauses a nested loop, active time counts for both loops, and root Stop cascades
+ok 556 - a scoped Stop pauses a nested loop, active time counts for both loops, and root Stop cascades
+  ---
+  duration_ms: 3291.6821
+  type: 'test'
+  ...
+# Subtest: verify never accepts a certificate the engine did not issue or one for another subject
+ok 557 - verify never accepts a certificate the engine did not issue or one for another subject
+  ---
+  duration_ms: 680.4676
+  type: 'test'
+  ...
+# Subtest: reference delivery: the final Customer rejects once, triage repairs one task, and the next pass is accepted with pinned prerequisites
+ok 558 - reference delivery: the final Customer rejects once, triage repairs one task, and the next pass is accepted with pinned prerequisites
+  ---
+  duration_ms: 26427.9098
+  type: 'test'
+  ...
+# Subtest: reference delivery: specification triage reopens documentation, every reviewer re-reviews, unchanged tasks carry, and acceptance follows
+ok 559 - reference delivery: specification triage reopens documentation, every reviewer re-reviews, unchanged tasks carry, and acceptance follows
+  ---
+  duration_ms: 29971.8837
+  type: 'test'
+  ...
+# Subtest: RERUN-04: a Map-raised specification issue is resolved by an authorized reviewer, the revised Gate opens, and the delivery is accepted
+ok 560 - RERUN-04: a Map-raised specification issue is resolved by an authorized reviewer, the revised Gate opens, and the delivery is accepted
+  ---
+  duration_ms: 23590.576
+  type: 'test'
+  ...
+# Subtest: release defaults, v2 retirement, approval identity, and saved opt-outs survive the full HTTP lifecycle
+ok 561 - release defaults, v2 retirement, approval identity, and saved opt-outs survive the full HTTP lifecycle
+  ---
+  duration_ms: 6385.3388
+  type: 'test'
+  ...
+# Subtest: restart ends control of an interrupted active run
+ok 562 - restart ends control of an interrupted active run
+  ---
+  duration_ms: 2750.8563
+  type: 'test'
+  ...
+# Subtest: restart ends control of a legacy interrupted run
+ok 563 - restart ends control of a legacy interrupted run
+  ---
+  duration_ms: 861.486
+  type: 'test'
+  ...
+# Subtest: carry decisions fail closed: an unknown closure never carries across revisions, and dependencies must carry first
+ok 564 - carry decisions fail closed: an unknown closure never carries across revisions, and dependencies must carry first
+  ---
+  duration_ms: 4.6418
+  type: 'test'
+  ...
+# Subtest: evaluate refuses a carry request that prepare did not plan
+ok 565 - evaluate refuses a carry request that prepare did not plan
+  ---
+  duration_ms: 568.3917
+  type: 'test'
+  ...
+# Subtest: a changed internal contract: the Customer approval is carried with provenance, readiness re-reviews, and only independent tasks are carried
+ok 566 - a changed internal contract: the Customer approval is carried with provenance, readiness re-reviews, and only independent tasks are carried
+  ---
+  duration_ms: 14373.521
+  type: 'test'
+  ...
+# Subtest: the documented selective-delivery example runs its first revision with every reviewer live
+ok 567 - the documented selective-delivery example runs its first revision with every reviewer live
+  ---
+  duration_ms: 8313.3032
+  type: 'test'
+  ...
+# Subtest: a changed auth contract invalidates every dependent scope; an edited reviewer prompt makes its approval stale
+ok 568 - a changed auth contract invalidates every dependent scope; an edited reviewer prompt makes its approval stale
+  ---
+  duration_ms: 11735.5222
+  type: 'test'
+  ...
+# Subtest: R1: instructions changed through a template slot, or a changed native profile, invalidate carried approvals and tasks
+ok 569 - R1: instructions changed through a template slot, or a changed native profile, invalidate carried approvals and tasks
+  ---
+  duration_ms: 17956.4401
+  type: 'test'
+  ...
+# Subtest: changing reviewer and Map role effort invalidates carried approvals and task selections
+ok 570 - changing reviewer and Map role effort invalidates carried approvals and task selections
+  ---
+  duration_ms: 10532.3011
+  type: 'test'
+  ...
+# Subtest: an open blocker raised by a slot forces that reviewer to run live
+ok 571 - an open blocker raised by a slot forces that reviewer to run live
+  ---
+  duration_ms: 9140.0713
+  type: 'test'
+  ...
+# Subtest: a reviewer inspects immutable snapshot A while another task is still being produced
+ok 572 - a reviewer inspects immutable snapshot A while another task is still being produced
+  ---
+  duration_ms: 8335.7803
+  type: 'test'
+  ...
+# Subtest: observation batches are bounded, contiguous and cannot ACK a later live snapshot
+ok 573 - observation batches are bounded, contiguous and cannot ACK a later live snapshot
+  ---
+  duration_ms: 11.9451
+  type: 'test'
+  ...
+# Subtest: an oversized Unicode payload remains inspectable and blocks ACK until every byte has been returned
+ok 574 - an oversized Unicode payload remains inspectable and blocks ACK until every byte has been returned
+  ---
+  duration_ms: 4.4417
+  type: 'test'
+  ...
+# Subtest: context recovery exposes pending receipt/cursors; a new bridge cannot reuse that receipt
+ok 575 - context recovery exposes pending receipt/cursors; a new bridge cannot reuse that receipt
+  ---
+  duration_ms: 1.4741
+  type: 'test'
+  ...
+# Subtest: a lost ACK response retries one durable command and never renews a receipt with another requestId
+ok 576 - a lost ACK response retries one durable command and never renews a receipt with another requestId
+  ---
+  duration_ms: 2.2384
+  type: 'test'
+  ...
+# Subtest: a no-event period requires a new health observation for each explicit acknowledgement
+ok 577 - a no-event period requires a new health observation for each explicit acknowledgement
+  ---
+  duration_ms: 2.8593
+  type: 'test'
+  ...
+# Subtest: journal gaps cannot be acknowledged
+ok 578 - journal gaps cannot be acknowledged
+  ---
+  duration_ms: 1.0894
+  type: 'test'
+  ...
+# Subtest: a smaller retry bound cannot silently cut a pending observation
+ok 579 - a smaller retry bound cannot silently cut a pending observation
+  ---
+  duration_ms: 2.7665
+  type: 'test'
+  ...
+# Subtest: parallel observations cannot replace a pending receipt, and a bounded timeout sends no ACK
+ok 580 - parallel observations cannot replace a pending receipt, and a bounded timeout sends no ACK
+  ---
+  duration_ms: 15.3348
+  type: 'test'
+  ...
+# Subtest: approval wait reconciles the same request, prepares emergency Stop and returns an observation without ACK
+ok 581 - approval wait reconciles the same request, prepares emergency Stop and returns an observation without ACK
+  ---
+  duration_ms: 25.4453
+  type: 'test'
+  ...
+# Subtest: a stream keeps every byte in order across batches, with contiguous offsets and a verifiable manifest
+ok 582 - a stream keeps every byte in order across batches, with contiguous offsets and a verifiable manifest
+  ---
+  duration_ms: 49.0498
+  type: 'test'
+  ...
+# Subtest: a stream stops at its hard bound with an explicit capture-limit fault and keeps what it captured
+ok 583 - a stream stops at its hard bound with an explicit capture-limit fault and keeps what it captured
+  ---
+  duration_ms: 3.1465
+  type: 'test'
+  ...
+# Subtest: supervision is refused without a supervisor, and grant decisions need the first-party credential
+ok 584 - supervision is refused without a supervisor, and grant decisions need the first-party credential
+  ---
+  duration_ms: 524.5086
+  type: 'test'
+  ...
+# Subtest: an unverified client matrix refuses a grant even when a supervisor exists
+ok 585 - an unverified client matrix refuses a grant even when a supervisor exists
+  ---
+  duration_ms: 412.7441
+  type: 'test'
+  ...
+# Subtest: incidents are filed by any authorised writer, triaged only by the first-party credential, and record their authority
+ok 586 - incidents are filed by any authorised writer, triaged only by the first-party credential, and record their authority
+  ---
+  duration_ms: 577.4269
+  type: 'test'
+  ...
+# Subtest: stop-and-report stops the run, files one incident per request, and records a headless termination as unconfirmed
+ok 587 - stop-and-report stops the run, files one incident per request, and records a headless termination as unconfirmed
+  ---
+  duration_ms: 2762.3678
+  type: 'test'
+  ...
+# Subtest: a finished run exports a verifiable audit bundle; the shareable profile omits raw streams and says so
+ok 588 - a finished run exports a verifiable audit bundle; the shareable profile omits raw streams and says so
+  ---
+  duration_ms: 1389.9963
+  type: 'test'
+  ...
+# Subtest: watch returns the journal after a cursor, acknowledgement records its lag, and command status reconciles
+ok 589 - watch returns the journal after a cursor, acknowledgement records its lag, and command status reconciles
+  ---
+  duration_ms: 1378.4164
+  type: 'test'
+  ...
+# Subtest: an artifact range is byte-exact, carries its own digest, and never splits more than the request asked for
+ok 590 - an artifact range is byte-exact, carries its own digest, and never splits more than the request asked for
+  ---
+  duration_ms: 395.7344
+  type: 'test'
+  ...
+# Subtest: a Stop on a live run produces a termination proof that the run records before it returns to the runtime
+ok 591 - a Stop on a live run produces a termination proof that the run records before it returns to the runtime
+  ---
+  duration_ms: 1590.2787
+  type: 'test'
+  ...
+# Subtest: a supervised run is armed before its first launch, a missed acknowledgement pauses dispatch, and escalation stops the run
+ok 592 - a supervised run is armed before its first launch, a missed acknowledgement pauses dispatch, and escalation stops the run
+  ---
+  duration_ms: 2163.7773
+  type: 'test'
+  ...
+# Subtest: controller-paused Root Stop finalizes an idle supervised run without dispatching more work
+ok 593 - controller-paused Root Stop finalizes an idle supervised run without dispatching more work
+  ---
+  duration_ms: 847.6934
+  type: 'test'
+  ...
+# Subtest: an incident spooled while the store was unavailable is reconciled into the registry on the next start
+ok 594 - an incident spooled while the store was unavailable is reconciled into the registry on the next start
+  ---
+  duration_ms: 380.3344
+  type: 'test'
+  ...
+# Supervision could not arm run 3dd19b48-e0ff-4a44-93f2-4170a63a3c9a: The supervisor refused the arm.
+# Subtest: a refused arm revokes the grant and stops the run after exactly one arm request, with no unhandled rejection
+ok 595 - a refused arm revokes the grant and stops the run after exactly one arm request, with no unhandled rejection
+  ---
+  duration_ms: 1769.6528
+  type: 'test'
+  ...
+# Subtest: a truncated spool file is quarantined and recorded as a capture gap, and startup continues
+ok 596 - a truncated spool file is quarantined and recorded as a capture gap, and startup continues
+  ---
+  duration_ms: 462.0381
+  type: 'test'
+  ...
+# Subtest: a retried spool write for the same incident overwrites the entry instead of failing
+ok 597 - a retried spool write for the same incident overwrites the entry instead of failing
+  ---
+  duration_ms: 481.9592
+  type: 'test'
+  ...
+# Subtest: an unknown supervisor record never proves a stop
+ok 598 - an unknown supervisor record never proves a stop
+  ---
+  duration_ms: 1986.7563
+  type: 'test'
+  ...
+# Subtest: a supervised run is acknowledged only with its grant's controller credential
+ok 599 - a supervised run is acknowledged only with its grant's controller credential
+  ---
+  duration_ms: 1970.7587
+  type: 'test'
+  ...
+# Subtest: a grant pins its workflow revision, and requesting or binding it needs the controller credential
+ok 600 - a grant pins its workflow revision, and requesting or binding it needs the controller credential
+  ---
+  duration_ms: 662.6547
+  type: 'test'
+  ...
+# Subtest: first-party approval binds a pending supervised run after restart without persisting its controller secret
+ok 601 - first-party approval binds a pending supervised run after restart without persisting its controller secret
+  ---
+  duration_ms: 968.7572
+  type: 'test'
+  ...
+# Subtest: revoking a pending run grant prevents capture and cannot fall back to an ordinary run
+ok 602 - revoking a pending run grant prevents capture and cannot fall back to an ordinary run
+  ---
+  duration_ms: 646.7463
+  type: 'test'
+  ...
+# Subtest: the emergency credential goes only to the granted controller, and the run ending ends it
+ok 603 - the emergency credential goes only to the granted controller, and the run ending ends it
+  ---
+  duration_ms: 1622.1747
+  type: 'test'
+  ...
+# Subtest: building an audit bundle with a 64 MiB object keeps the event loop responsive, and the worst stall is measured
+ok 604 - building an audit bundle with a 64 MiB object keeps the event loop responsive, and the worst stall is measured
+  ---
+  duration_ms: 4091.2459
+  type: 'test'
+  ...
+# worst event-loop stall while building a 64 MiB bundle: 51.9 ms
+# Subtest: no supervisor variables means a headless runtime
+ok 605 - no supervisor variables means a headless runtime
+  ---
+  duration_ms: 3.2728
+  type: 'test'
+  ...
+# Subtest: a missing launch shim refuses to start supervision, and the token is still removed from the environment
+ok 606 - a missing launch shim refuses to start supervision, and the token is still removed from the environment
+  ---
+  duration_ms: 1.8037
+  type: 'test'
+  ...
+# Subtest: a present launch shim yields a client that keeps its token in memory
+ok 607 - a present launch shim yields a client that keeps its token in memory
+  ---
+  duration_ms: 1.9397
+  type: 'test'
+  ...
+# Subtest: only the launch shim's own failure codes are spawn failures; every other exit code is the CLI's result
+ok 608 - only the launch shim's own failure codes are spawn failures; every other exit code is the CLI's result
+  ---
+  duration_ms: 0.6308
+  type: 'test'
+  ...
+# Subtest: an emergency request reaches the supervisor on its own line and returns its reply
+ok 609 - an emergency request reaches the supervisor on its own line and returns its reply
+  ---
+  duration_ms: 24.8546
+  type: 'test'
+  ...
+# Subtest: an absent supervisor is reported as unavailable, never as a completed Stop
+ok 610 - an absent supervisor is reported as unavailable, never as a completed Stop
+  ---
+  duration_ms: 3.5936
+  type: 'test'
+  ...
+# Subtest: ADR3-01: TaskAssessment schema validates complete structure and rejects invalid axes
+ok 611 - ADR3-01: TaskAssessment schema validates complete structure and rejects invalid axes
+  ---
+  duration_ms: 56.8658
+  type: 'test'
+  ...
+# Subtest: ADR3-02: Deterministic plan selection produces identical fingerprints for identical inputs
+ok 612 - ADR3-02: Deterministic plan selection produces identical fingerprints for identical inputs
+  ---
+  duration_ms: 62.1255
+  type: 'test'
+  ...
+# Subtest: ADR3-03: Source-derived floors override underestimated Analyst assessment when critical paths are touched
+ok 613 - ADR3-03: Source-derived floors override underestimated Analyst assessment when critical paths are touched
+  ---
+  duration_ms: 5.2109
+  type: 'test'
+  ...
+# Subtest: ADR3-03: Undeclared critical areas in project policy fails closed to full reference stages
+ok 614 - ADR3-03: Undeclared critical areas in project policy fails closed to full reference stages
+  ---
+  duration_ms: 6.2499
+  type: 'test'
+  ...
+# Subtest: ADR3-S01 / ADR3-03: Assembly-time candidate floor check catches undeclared critical edits and escalates workflow
+ok 615 - ADR3-S01 / ADR3-03: Assembly-time candidate floor check catches undeclared critical edits and escalates workflow
+  ---
+  duration_ms: 3.4106
+  type: 'test'
+  ...
+# Subtest: ADR3-04: Distinct code and test reviewers are enforced
+ok 616 - ADR3-04: Distinct code and test reviewers are enforced
+  ---
+  duration_ms: 3.0929
+  type: 'test'
+  ...
+# Subtest: ADR3-06: Aggregate bounds accounting tracks attempts and duration, halting on exhaustion
+ok 617 - ADR3-06: Aggregate bounds accounting tracks attempts and duration, halting on exhaustion
+  ---
+  duration_ms: 3.088
+  type: 'test'
+  ...
+# Subtest: ADR3-09: EvaluationRecord schema validates comparative evaluation metrics and corpus cases
+ok 618 - ADR3-09: EvaluationRecord schema validates comparative evaluation metrics and corpus cases
+  ---
+  duration_ms: 15.9104
+  type: 'test'
+  ...
+# Subtest: R9: Missing role bindings are rejected and never substituted with invented defaults
+ok 619 - R9: Missing role bindings are rejected and never substituted with invented defaults
+  ---
+  duration_ms: 1.3306
+  type: 'test'
+  ...
+# Subtest: R11: Plan fingerprint changes when requirements or aggregate bounds change
+ok 620 - R11: Plan fingerprint changes when requirements or aggregate bounds change
+  ---
+  duration_ms: 2.0366
+  type: 'test'
+  ...
+# Subtest: R14: High uncertainty or unverified verifiability elevates floor to at least modular
+ok 621 - R14: High uncertainty or unverified verifiability elevates floor to at least modular
+  ---
+  duration_ms: 1.2067
+  type: 'test'
+  ...
+# Subtest: A4: an identical retry of an execution plan revision returns its receipt and keeps the active revision
+ok 622 - A4: an identical retry of an execution plan revision returns its receipt and keeps the active revision
+  ---
+  duration_ms: 429.5075
+  type: 'test'
+  ...
+# Subtest: A4: a different document under an existing revision is refused and the active revision is preserved
+ok 623 - A4: a different document under an existing revision is refused and the active revision is preserved
+  ---
+  duration_ms: 541.5938
+  type: 'test'
+  ...
+# Subtest: A4: a failed revision insert rolls back its supersession so the previous revision stays active
+ok 624 - A4: a failed revision insert rolls back its supersession so the previous revision stays active
+  ---
+  duration_ms: 578.0281
+  type: 'test'
+  ...
+# Subtest: A5: opening a store migrated with the earlier m9 upgrades execution plans and keeps its rows
+ok 625 - A5: opening a store migrated with the earlier m9 upgrades execution plans and keeps its rows
+  ---
+  duration_ms: 448.8259
+  type: 'test'
+  ...
+# Subtest: R1: Store persists TaskAssessment and ExecutionPlan records into m9 tables
+ok 626 - R1: Store persists TaskAssessment and ExecutionPlan records into m9 tables
+  ---
+  duration_ms: 430.7543
+  type: 'test'
+  ...
+1..626
+# tests 635
+# suites 0
+# pass 634
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 854145.6521

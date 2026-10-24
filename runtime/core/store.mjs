@@ -10,31 +10,9 @@ export class CorruptionError extends Error {
   constructor(message) { super(message); this.code = 'corruption'; }
 }
 
-// The bundled release ships m1.sql next to the runtime; development reads the documented DDL.
-const BUNDLED_DDL = new URL('./m1.sql', import.meta.url);
-const DDL_PATH = process.env.DESZO_DDL_PATH || (existsSync(BUNDLED_DDL) ? BUNDLED_DDL : new URL('../../docs/storage/m1.sql', import.meta.url));
-const BUNDLED_M2 = new URL('./m2.sql', import.meta.url);
-const M2_PATH = existsSync(BUNDLED_M2) ? BUNDLED_M2 : new URL('../../docs/storage/m2.sql', import.meta.url);
-const BUNDLED_M3 = new URL('./m3.sql', import.meta.url);
-const M3_PATH = existsSync(BUNDLED_M3) ? BUNDLED_M3 : new URL('../../docs/storage/m3.sql', import.meta.url);
-const BUNDLED_M4 = new URL('./m4.sql', import.meta.url);
-const M4_PATH = existsSync(BUNDLED_M4) ? BUNDLED_M4 : new URL('../../docs/storage/m4.sql', import.meta.url);
-const BUNDLED_M5 = new URL('./m5.sql', import.meta.url);
-const M5_PATH = existsSync(BUNDLED_M5) ? BUNDLED_M5 : new URL('../../docs/storage/m5.sql', import.meta.url);
-const BUNDLED_M6 = new URL('./m6.sql', import.meta.url);
-const M6_PATH = existsSync(BUNDLED_M6) ? BUNDLED_M6 : new URL('../../docs/storage/m6.sql', import.meta.url);
-const BUNDLED_M7 = new URL('./m7.sql', import.meta.url);
-const M7_PATH = existsSync(BUNDLED_M7) ? BUNDLED_M7 : new URL('../../docs/storage/m7.sql', import.meta.url);
-const BUNDLED_M8 = new URL('./m8.sql', import.meta.url);
-const M8_PATH = existsSync(BUNDLED_M8) ? BUNDLED_M8 : new URL('../../docs/storage/m8.sql', import.meta.url);
-const BUNDLED_M9 = new URL('./m9.sql', import.meta.url);
-const M9_PATH = existsSync(BUNDLED_M9) ? BUNDLED_M9 : new URL('../../docs/storage/m9.sql', import.meta.url);
-const BUNDLED_M10 = new URL('./m10.sql', import.meta.url);
-const M10_PATH = existsSync(BUNDLED_M10) ? BUNDLED_M10 : new URL('../../docs/storage/m10.sql', import.meta.url);
-const BUNDLED_M11 = new URL('./m11.sql', import.meta.url);
-const M11_PATH = existsSync(BUNDLED_M11) ? BUNDLED_M11 : new URL('../../docs/storage/m11.sql', import.meta.url);
+import { MIGRATION_PATHS } from './migrations.mjs';
+export { MIGRATION_PATHS } from './migrations.mjs';
 export const nowIso = () => new Date().toISOString();
-export const MIGRATION_PATHS = [DDL_PATH, M2_PATH, M3_PATH, M4_PATH, M5_PATH, M6_PATH, M7_PATH, M8_PATH, M9_PATH, M10_PATH, M11_PATH];
 
 // A reference script's transaction and pragma lines are applied by the runtime around it, so the
 // schema change and its schema_migrations row commit together.

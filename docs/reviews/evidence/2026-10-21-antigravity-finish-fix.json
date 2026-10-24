@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "checkedAt": "2026-10-21T07:24:53.4440480Z",
+  "implementation": "source-verified",
+  "adapterVersion": 3,
+  "provider": "antigravity",
+  "cliVersion": "1.4.2",
+  "model": "gemini-3.8-flash-high",
+  "effort": "high",
+  "originalFailure": {
+    "runId": "bed47786-bb0b-4550-add6-ec83a64af8ba",
+    "incidentId": "719d32a4-28fd-4128-ba39-922589f72d23",
+    "records": 65,
+    "before": {
+      "terminal": false,
+      "finalText": null,
+      "diagnostics": []
+    },
+    "after": {
+      "terminal": false,
+      "finalText": null,
+      "diagnostics": [
+        "Antigravity finish step 2: invalid arguments:\n- at '/attemptedApproaches': got null, want array\n- at '/issueSummary': got null, want string"
+      ]
+    },
+    "replayProviderCalls": 0
+  },
+  "realCliCases": [
+    {
+      "id": "9b02dda4-8d8e-463b-93a1-6a9bcb94fe87",
+      "elapsedMs": 69324,
+      "exitCode": 0,
+      "terminal": true,
+      "observedModel": "gemini-3.8-flash-high",
+      "effort": "high",
+      "schemaErrors": [],
+      "verdict": "READY_FOR_REVIEW",
+      "issueSummaryType": "String",
+      "approachesType": "Object[]",
+      "diagnostics": [
+        "Antigravity read_file step 2: file does not exist"
+      ],
+      "toolSteps": [
+        {
+          "name": "read_file",
+          "state": "ACTIVE"
+        },
+        {
+          "name": "read_file",
+          "state": "ERROR"
+        },
+        {
+          "name": "run_command",
+          "state": "ACTIVE"
+        },
+        {
+          "name": "run_command",
+          "state": "DONE"
+        }
+      ],
+      "sourceHashes": {
+        "runtime/core/adapters.mjs": "2cf11ff92d376c0603865d672f33e51c7f7bd5032b498f99d8383b50b585779f",
+        "runtime/core/engine.mjs": "83f9817f5f4a86cc0dfbb5cc3e09685587091774c33a6546c52bc13597b5c358"
+      }
+    },
+    {
+      "id": "016e8110-f500-43b7-b3ca-efccc402061a",
+      "elapsedMs": 15487,
+      "exitCode": 0,
+      "terminal": true,
+      "observedModel": "gemini-3.8-flash-high",
+      "effort": "high",
+      "schemaErrors": [],
+      "verdict": "READY_FOR_REVIEW",
+      "issueSummaryType": "String",
+      "approachesType": "Object[]",
+      "diagnostics": [],
+      "toolSteps": [],
+      "sourceHashes": {
+        "runtime/core/adapters.mjs": "2cf11ff92d376c0603865d672f33e51c7f7bd5032b498f99d8383b50b585779f",
+        "runtime/core/engine.mjs": "83f9817f5f4a86cc0dfbb5cc3e09685587091774c33a6546c52bc13597b5c358"
+      }
+    }
+  ],
+  "emptyFieldsCase": {
+    "issueSummary": "",
+    "attemptedApproaches": [],
+    "extraTools": 0,
+    "success": true
+  },
+  "regression": {
+    "command": "npm test",
+    "tests": 584,
+    "passed": 584,
+    "failed": 0,
+    "exitCode": 0,
+    "durationMs": 642898.1243,
+    "newRegressionTests": 6
+  },
+  "bundle": {
+    "command": "npm run runtime:bundle",
+    "exitCode": 0,
+    "runnerSha256": "528ebdb42b02b5e63b250b3a0f95f9089dcdba7a9cab2738e51201c9ff7988ce",
+    "bridgeSha256": "10c07fa067149d7bfc93eec212829a3062364ebe8a0ed8a6dbb1f5044d7a60d2"
+  },
+  "delivery": {
+    "liveDeszoReplaced": false,
+    "workflowStarted": false,
+    "globalCliSettingsChanged": false,
+    "adrAcceptanceClaimed": false,
+    "limitation": "Standalone CLI verification; the open stable Deszo and captured Fixer worktree still need reconciliation before continuation."
+  }
+}

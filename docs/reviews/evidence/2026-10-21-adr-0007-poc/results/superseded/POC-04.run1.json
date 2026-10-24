@@ -1,0 +1,108 @@
+{
+  "experiment": "POC-04",
+  "title": "Concurrent escalations and serialization",
+  "status": "PASS",
+  "checks": [
+    {
+      "name": "[default-capabilities] turn A is admitted and emits turn/started",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "[default-capabilities] at most one autonomous turn runs per session",
+      "pass": true,
+      "detail": "max=1"
+    },
+    {
+      "name": "[default-capabilities] turn B is not started while A is active",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "[default-capabilities] turn B is refused explicitly, or it is started or finished later (not accepted and then lost)",
+      "pass": true,
+      "detail": "accepted; later record=failed; later start=false"
+    },
+    {
+      "name": "[experimental-native-queue] the native queue accepts a request while turn A is active",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "[experimental-native-queue] a queued request is started by the App Server after turn A completes (serialized, not concurrent)",
+      "pass": true,
+      "detail": "started after A"
+    },
+    {
+      "name": "[interrupt-bound] an active turn can be bounded by turn/interrupt and reaches a terminal status",
+      "pass": true,
+      "detail": null
+    }
+  ],
+  "measurements": {
+    "default-capabilities": {
+      "turnA": {
+        "admissionAckMs": 19.286,
+        "turnStartedAfterSendMs": 92.748,
+        "turnId": "01a15e4f-4d70-75a2-a825-c089a13102e6",
+        "completedStatus": "failed",
+        "completedAtMs": 33873,
+        "endedOnItsOwn": true
+      },
+      "turnB": {
+        "acceptedWhileAActive": true,
+        "error": null,
+        "initialStatus": "inProgress",
+        "turnId": "01a15e4f-4d70-75a2-a825-c089a13102e6",
+        "notificationsWhileAActive": [],
+        "recordAfterA": {
+          "id": "01a15e4f-4d70-75a2-a825-c089a13102e6",
+          "status": "failed"
+        }
+      },
+      "steerIntoActiveTurnAccepted": true,
+      "afterTurnA": {
+        "startedTurnId": null,
+        "startedWithinSeconds": "none within 90 s"
+      },
+      "turnListingAfterA": [
+        {
+          "id": "01a15e4f-4d70-75a2-a825-c089a13102e6",
+          "status": "failed"
+        }
+      ],
+      "maxConcurrentTurnsObserved": 1
+    },
+    "experimental-native-queue": {
+      "initialize": "ok",
+      "nativeQueue": {
+        "addOk": true,
+        "addError": null,
+        "listOk": true,
+        "listSummary": "{\"data\":[{\"id\":\"01a15e51-2ffb-73c3-af54-e40ab8d00f34\",\"input\":[{\"type\":\"text\",\"text\":\"ADR7 POC queued C bf0b9ce2-1b41-4732-888f-bc6664a58a33\",\"text_elements\":[]}],\"clientUserMessageId\":\"21b65643-7e6a-45f0-98fd-6e596b77fe46\"}],\"nextCursor\":null}"
+      },
+      "turnA": {
+        "endedOnItsOwn": true,
+        "completedStatus": "failed"
+      },
+      "queuedRequestStarted": {
+        "startedAtMs": 30652,
+        "wallClockFromQueueMs": 30648
+      },
+      "queueChangedNotifications": 3
+    },
+    "interrupt-bound": {
+      "interrupt": {
+        "startedTurn": true,
+        "acknowledged": true,
+        "error": null,
+        "completedStatus": "interrupted",
+        "interruptToCompletionMs": -154710
+      }
+    }
+  },
+  "notes": [
+    "Each arm starts its own App Server in an isolated home. The active turns end through Codex retries of unauthenticated model requests, not through a model answer, so timings are control-path measurements only.",
+    "The default arm does not declare experimentalApi, so thread/queue/* is not available there; the queue arm declares it. Experimental methods are a capability to be justified, not assumed safe."
+  ]
+}

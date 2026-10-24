@@ -1,0 +1,75 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DeszoJudgeDecision",
+  "description": "Structured decision returned by external Judge controller for ADR-0007 attention requests",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["deszo.judge.decision.v1"]
+    },
+    "request_id": {
+      "type": "string"
+    },
+    "controller_id": {
+      "type": "string"
+    },
+    "session_id": {
+      "type": "string"
+    },
+    "workflow_revision": {
+      "type": "integer"
+    },
+    "evidence_digest": {
+      "type": "string"
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["APPROVE", "REVISE", "REJECT", "ABORT", "NEED_MORE_EVIDENCE"]
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "observation": { "type": "string" },
+          "source": { "type": "string" }
+        },
+        "required": ["observation", "source"],
+        "additionalProperties": false
+      }
+    },
+    "policy_evaluation": {
+      "type": "object",
+      "properties": {
+        "tests_passed": { "type": "boolean" },
+        "budget_ok": { "type": "boolean" },
+        "diff_within_bounds": { "type": "boolean" }
+      },
+      "required": ["tests_passed", "budget_ok", "diff_within_bounds"],
+      "additionalProperties": false
+    },
+    "resource_adjustments": {
+      "type": "null"
+    }
+  },
+  "required": [
+    "schema_version",
+    "request_id",
+    "controller_id",
+    "session_id",
+    "workflow_revision",
+    "evidence_digest",
+    "verdict",
+    "confidence",
+    "findings",
+    "policy_evaluation",
+    "resource_adjustments"
+  ],
+  "additionalProperties": false
+}

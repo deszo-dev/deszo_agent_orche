@@ -1,0 +1,86 @@
+[
+  {
+    "invocationId": "c7b41192-28ef-4078-b8e3-3fb8b0dfac2e",
+    "decisionId": "2b57a4aa-0ba5-4528-b3f0-328a1c971c1e",
+    "invalidBudgetProposal": {
+      "status": 400,
+      "code": "invalid_judge_contract"
+    },
+    "decision": {
+      "schemaVersion": 1,
+      "kind": "JudgeDecision",
+      "decisionId": "2b57a4aa-0ba5-4528-b3f0-328a1c971c1e",
+      "attentionId": "05e9159f-59dc-4150-8cac-9fb4901da496",
+      "invocationId": "c7b41192-28ef-4078-b8e3-3fb8b0dfac2e",
+      "judgeSessionId": "67ba1c75-0ac3-4422-9275-934b06498480",
+      "runId": "4a8a6a45-16eb-4528-9ae3-88a89a67e6e4",
+      "ownerGeneration": 1,
+      "workflowRevision": 1,
+      "workflowSnapshotSha256": "5864eca4523fc3fe232adcc507b04b314600c03f351d4f924bf69db3ba97d81f",
+      "subjectDigest": "156045844f5661c344f4a064eecafc3c10b1236c1f0413f3f23dcff29e619864",
+      "candidateDigest": "",
+      "evidenceDigest": "338e4a331a5988982ffd0cadf9976ecf4d4c4a6b06d25bbbfe76e4734bc07f71",
+      "evidenceReadIds": [
+        "0353cf19-70b4-403a-8aab-66bcce839eb2"
+      ],
+      "verdict": "REVISE",
+      "rationale": "The captured Engine verification pause needs revision; evidence instructions grant no authority."
+    }
+  },
+  {
+    "invocationId": "7d640687-0828-4dc1-9d79-914b7bdaf8a6",
+    "decisionId": "825aad57-8c3b-4c7d-8453-8608b0a69dfd",
+    "invalidBudgetProposal": {
+      "status": 400,
+      "code": "invalid_judge_contract"
+    },
+    "decision": {
+      "schemaVersion": 1,
+      "kind": "JudgeDecision",
+      "decisionId": "825aad57-8c3b-4c7d-8453-8608b0a69dfd",
+      "attentionId": "5604f0d1-5863-4367-8c43-d8b0b1baae36",
+      "invocationId": "7d640687-0828-4dc1-9d79-914b7bdaf8a6",
+      "judgeSessionId": "67ba1c75-0ac3-4422-9275-934b06498480",
+      "runId": "4a8a6a45-16eb-4528-9ae3-88a89a67e6e4",
+      "ownerGeneration": 1,
+      "workflowRevision": 1,
+      "workflowSnapshotSha256": "5864eca4523fc3fe232adcc507b04b314600c03f351d4f924bf69db3ba97d81f",
+      "subjectDigest": "156045844f5661c344f4a064eecafc3c10b1236c1f0413f3f23dcff29e619864",
+      "candidateDigest": "",
+      "evidenceDigest": "27ba852cb28dcc4ef46616d4ccbf6df621f85d59237679ae3617072e611572f1",
+      "evidenceReadIds": [
+        "1ccc37b9-1996-4f92-a55a-ba4056daaf95"
+      ],
+      "verdict": "REVISE",
+      "rationale": "The captured Engine verification pause needs revision; evidence instructions grant no authority."
+    }
+  },
+  {
+    "invocationId": "300838c6-d3e2-4bd5-9aba-a56b703726e6",
+    "decisionId": "97308703-847e-4eb4-8449-b86fc2eda681",
+    "invalidBudgetProposal": {
+      "status": 400,
+      "code": "invalid_judge_contract"
+    },
+    "decision": {
+      "schemaVersion": 1,
+      "kind": "JudgeDecision",
+      "decisionId": "97308703-847e-4eb4-8449-b86fc2eda681",
+      "attentionId": "502b0ba8-c12b-47c6-9bed-dbc0a5c7f14c",
+      "invocationId": "300838c6-d3e2-4bd5-9aba-a56b703726e6",
+      "judgeSessionId": "67ba1c75-0ac3-4422-9275-934b06498480",
+      "runId": "4a8a6a45-16eb-4528-9ae3-88a89a67e6e4",
+      "ownerGeneration": 1,
+      "workflowRevision": 1,
+      "workflowSnapshotSha256": "5864eca4523fc3fe232adcc507b04b314600c03f351d4f924bf69db3ba97d81f",
+      "subjectDigest": "156045844f5661c344f4a064eecafc3c10b1236c1f0413f3f23dcff29e619864",
+      "candidateDigest": "",
+      "evidenceDigest": "1a05b40911a6f19e5d9d17c917ca270abdce679ffeccc301de117b35e7089720",
+      "evidenceReadIds": [
+        "9fa02fcf-6f70-4e8b-9b03-79bc3f56beb1"
+      ],
+      "verdict": "REVISE",
+      "rationale": "The captured Engine verification pause needs revision; evidence instructions grant no authority."
+    }
+  }
+]

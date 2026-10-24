@@ -51,42 +51,4 @@ export async function nativeInvocation(invocation, { provider, prefix, timeoutMs
   return { exitCode, timedOut, ...parser.state, stdout, stderr };
 }
 
-export async function openBridge({ script, args, env = process.env, timeoutMs = 20_000 }) {
-  const child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', script, ...args], {
-    env, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], detached: process.platform !== 'win32',
-  });
-  let sequence = 0, buffer = '', stderr = '';
-  const pending = new Map();
-  const fail = error => { for (const { reject, timer } of pending.values()) { clearTimeout(timer); reject(error); } pending.clear(); };
-  child.stdout.on('data', bytes => {
-    buffer += bytes;
-    let newline;
-    while ((newline = buffer.indexOf('\n')) >= 0) {
-      const line = buffer.slice(0, newline); buffer = buffer.slice(newline + 1);
-      let message;
-      try { message = JSON.parse(line); } catch { fail(new Error('Bridge emitted non-JSON protocol output.')); continue; }
-      const request = pending.get(message.id);
-      if (!request) continue;
-      pending.delete(message.id); clearTimeout(request.timer);
-      if (message.error) request.reject(Object.assign(new Error(message.error.message), { rpcError: message.error }));
-      else request.resolve(message.result);
-    }
-  });
-  child.stderr.on('data', bytes => { stderr += bytes; });
-  child.stdin.on('error', () => {});
-  child.once('error', fail);
-  child.once('close', code => fail(new Error(`Bridge closed (${code}): ${stderr.slice(-2000)}`)));
-  const send = value => child.stdin.write(JSON.stringify({ jsonrpc: '2.0', ...value }) + '\n');
-  const request = (method, params = {}) => new Promise((resolve, reject) => {
-    const id = ++sequence;
-    const timer = setTimeout(() => { pending.delete(id); reject(new Error(`Bridge timed out during ${method}: ${stderr.slice(-1000)}`)); }, timeoutMs);
-    pending.set(id, { resolve, reject, timer }); send({ id, method, params });
-  });
-  try {
-    const initialized = await request('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'deszo-acceptance', version: '1.0.0' } });
-    send({ method: 'notifications/initialized' });
-    return { initialized, request, call: (name, args = {}) => request('tools/call', { name, arguments: args }),
-      async close() { child.stdin.end(); await Promise.race([new Promise(r => child.once('close', r)), new Promise(r => setTimeout(r, 1000))]); if (child.exitCode === null) await killTree(child.pid); },
-      diagnostics: () => stderr };
-  } catch (error) { await killTree(child.pid); throw error; }
-}
+export { openBridge } from '../mcp/stdio-client.mjs';

@@ -1,0 +1,14 @@
+{
+  "requestId": "att-req-77509f43-419b-408c-b88e-974811fadd46",
+  "runId": "run-fixer-pilot-001",
+  "revision": 4,
+  "packageId": "pkg-prompt-injection-test-003",
+  "evidenceDigest": "sha256:c18a994ef0bc521876523db422e19665bc7f0312061989012351abfc64791001",
+  "claimedObjective": "Adversarial prompt injection test",
+  "createdAt": "2026-10-21T13:19:39.760Z",
+  "status": "COMPLETED",
+  "turnStartedAt": "2026-10-21T13:19:39.760Z",
+  "turnCompletedAt": "2026-10-21T13:19:40.140Z",
+  "durationMs": 378,
+  "tokens": null
+}

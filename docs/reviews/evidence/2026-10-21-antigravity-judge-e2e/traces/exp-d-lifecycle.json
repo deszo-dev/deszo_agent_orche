@@ -1,0 +1,13 @@
+{
+  "multi_turn_continuation": {
+    "session_id_retained": true,
+    "verdict": "REVISE",
+    "status": "PASS"
+  },
+  "serialized_queueing": {
+    "was_queued_behind_active_turn": true,
+    "drained_successfully": true,
+    "status": "PASS"
+  },
+  "status": "PASS"
+}

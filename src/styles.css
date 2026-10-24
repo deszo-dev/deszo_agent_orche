@@ -142,3 +142,14 @@ input.invalid { border-color: #c45; }
 .state-chip.implementation_complete { color: var(--ok); border-color: #385448; background: #1f3129; }
 .map-history { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }
 .map-history .chip-button.active { border-color: #7c6cf0; }
+.autonomy-modal { width: min(760px, 92vw); max-height: 90vh; overflow-y: auto; }
+.autonomy-modal header { display: flex; align-items: center; justify-content: space-between; }
+.autonomy-toggle { display: flex; gap: 10px; align-items: center; margin: 18px 0 8px; }
+.autonomy-toggle input { width: auto; }
+.autonomy-form, .autonomy-policy { display: grid; gap: 12px; margin: 16px 0; }
+.autonomy-policy { padding: 14px; border: 1px solid #385448; border-radius: 8px; }
+.autonomy-limits { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
+.autonomy-limits label { display: grid; gap: 5px; }
+.autonomy-modal textarea { width: 100%; font-family: monospace; }
+.autonomy-modal details { margin: 14px 0; }
+.autonomy-modal pre { overflow: auto; white-space: pre-wrap; }

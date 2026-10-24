@@ -32,6 +32,10 @@ export function installHostAutonomy(Engine, { ApiError }) {
     if (this.hostAuthority) throw new ApiError(403, 'host_permit_required', `${route} needs a Local Control Host permit in this host-bound runtime, so the request is refused.`);
   };
 
+  P.refuseHostMutation = function refuseHostMutation(route) {
+    if (this.hostAuthority) throw new ApiError(403, 'trusted_authority_required', `${route} cannot be changed by a candidate runtime. Use the independent trusted session/installation procedure.`);
+  };
+
   // Asks the host to admit a permit for exactly this request. The host's own decision is compared field by field;
   // the engine never widens it (another workflow revision, workspace or operation is refused).
   P.admitHostPermit = async function admitHostPermit(permitId, expected) {
@@ -136,9 +140,9 @@ export function installHostAutonomy(Engine, { ApiError }) {
 
   // The host binding of a run: its workflow revision and workspace, as the host's decisions name them.
   P.hostRunBinding = function hostRunBinding(runId) {
-    const row = this.store.get('SELECT workflow_id, workspace_id, workflow_snapshot_artifact_id FROM runs WHERE id = ?', runId);
+    const row = this.store.get('SELECT r.workflow_id, r.workspace_id, r.workflow_snapshot_artifact_id, w.cwd_identity FROM runs r JOIN workspaces w ON w.id = r.workspace_id WHERE r.id = ?', runId);
     if (!row) throw new ApiError(404, 'not_found', `Run ${runId} does not exist.`);
-    return { workflowId: row.workflow_id, workspaceId: row.workspace_id, workflowSnapshotSha256: this.store.artifactRow(row.workflow_snapshot_artifact_id).sha256 };
+    return { workflowId: row.workflow_id, workspaceId: row.workspace_id, workspaceCwdIdentity: row.cwd_identity, workflowSnapshotSha256: this.store.artifactRow(row.workflow_snapshot_artifact_id).sha256 };
   };
 
   // Charges one provider invocation before its CLI is launched. Refusal is returned, never thrown past the attempt.
@@ -146,6 +150,26 @@ export function installHostAutonomy(Engine, { ApiError }) {
     if (!this.hostAuthority) return null;
     try {
       const host = this.requireHostAuthority();
+      // The managed task records an actual repair cycle before it schedules its next role. Several role calls,
+      // context expansions and transport retries in that cycle share one durable host decision. A context-only
+      // retry with repairs=0 never consumes a repair. Provider calls still have their separate invocation charge.
+      const work = this.store.get('SELECT t.id,t.state_artifact_id FROM task_work w JOIN managed_tasks t ON t.id=w.task_execution_id WHERE w.attempt_id=?', attemptId);
+      const repairs = work ? this.store.readJson(work.state_artifact_id).repairs : 0;
+      if (repairs > 0) {
+        const repair = await viaHost(() => host.decide({ requestId: derivedUuid(runId, `managed-repair:${work.id}:${repairs}`), policyId: this.hostPolicyId,
+          operation: 'repair.run', ...this.hostRunBinding(runId), runtimeGeneration: this.hostRuntimeGeneration, cost: {}, justification: `managed task ${work.id}, repair cycle ${repairs}` }));
+        if (repair.outcome !== 'approved') return { refused: true, reason: repair.reason };
+        const previous = await viaHost(() => host.permitRequest(repair.permitId));
+        if (previous.state !== 'settled' || previous.effect !== 'consumed') {
+          const admission = await viaHost(() => host.admit(repair.permitId));
+          if (!admission.admitted) {
+            await viaHost(() => host.settle(repair.permitId, { effect: 'not_executed', evidence: `repair admission refused: ${admission.reason}` }));
+            return { refused: true, reason: `repair admission: ${admission.reason}` };
+          }
+          // Scheduling the repair cycle is the effect, rather than each subsequent CLI's success.
+          await viaHost(() => host.settle(repair.permitId, { effect: 'consumed', evidence: `admitted managed repair cycle ${repairs} of ${work.id}` }));
+        }
+      }
       const receipt = await viaHost(() => host.decide({ requestId: randomUUID(), policyId: this.hostPolicyId, operation: 'provider.invoke', ...this.hostRunBinding(runId),
         runtimeGeneration: this.hostRuntimeGeneration, cost: {}, justification: `provider invocation ${attemptId}` }));
       if (receipt.outcome !== 'approved') return { refused: true, reason: receipt.reason };
@@ -179,7 +203,7 @@ export function installHostAutonomy(Engine, { ApiError }) {
       operation: 'supervision.approve', workflowId: grant.workflow_id, workflowSnapshotSha256: grant.workflow_snapshot_sha256, workspaceId: grant.workspace_id,
     });
     let result;
-    try { result = this.decideControlGrant(grantId, { requestId: body.requestId ?? randomUUID(), decision: 'approve' }); }
+    try { result = this.decideControlGrant(grantId, { requestId: body.requestId ?? randomUUID(), decision: 'approve' }, { hostAdmission: admission }); }
     catch (error) {
       await this.settleHostPermit(admission.permitId, 'not_executed', `engine refused the approval: ${error.message}`);
       throw error;

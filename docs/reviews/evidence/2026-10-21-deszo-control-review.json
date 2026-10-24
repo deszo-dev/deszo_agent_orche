@@ -1,0 +1,200 @@
+{
+  "kind": "DeszoControlReview",
+  "version": 1,
+  "at": "2026-10-21T09:03:10.009Z",
+  "sourceHead": "8efb0caedcf2f2d1a5670aef8e4eacb49852ba15",
+  "initialFailure": {
+    "supportedSchema": 11,
+    "selectedProfileSchema": 12,
+    "businessRunStarted": false,
+    "rootCause": "Required supervision changes remained on a divergent branch; operator omitted actual profile/build compatibility."
+  },
+  "selected": {
+    "build": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\operator\\builds\\2026-10-21-control-review",
+    "storeId": "93322f30-eefc-4a74-8023-b805f69e2018",
+    "runtimeInstanceId": "5a463739-3d9b-4a66-a259-94233dd9bd77",
+    "schemaVersion": 12,
+    "supportedSchemaVersion": 12,
+    "toolCount": 43,
+    "processContainment": "tauri-job"
+  },
+  "workflow": {
+    "revision": 1,
+    "snapshotSha256": "e9a59fb978c566e2f182e9905004acc014966ff37f849187312161ecde51ec76",
+    "roles": [
+      {
+        "id": "fixer-developer",
+        "provider": "claude",
+        "model": "claude-haiku-5-5",
+        "effort": "xhigh",
+        "timeoutSeconds": 600
+      },
+      {
+        "id": "fixer-watcher",
+        "provider": "antigravity",
+        "model": "gemini-3.8-flash-high",
+        "effort": "high",
+        "timeoutSeconds": 300
+      }
+    ]
+  },
+  "workspace": {
+    "workspaceId": "deszo-fixer",
+    "cwd": "C:\\Users\\jusse\\.codex\\worktrees\\deszo-fixer\\deszo_agent_orche",
+    "cwdIdentity": "ccc4fbc3d78e372d1fe250d9b2cbc0d3af1243bf2256b1294205d296cea4b528",
+    "createdAt": "2026-10-21T06:28:13.706Z",
+    "updatedAt": "2026-10-21T06:28:13.706Z"
+  },
+  "control": {
+    "newSessions": 0,
+    "newGrants": 0,
+    "newRunRequests": 0,
+    "newRuns": 0,
+    "modelCalls": 0,
+    "previousRun": {
+      "runId": "bed47786-bb0b-4550-add6-ec83a64af8ba",
+      "control": {
+        "runId": "bed47786-bb0b-4550-add6-ec83a64af8ba",
+        "controlMode": "supervised",
+        "dispatchPaused": false,
+        "controller": {
+          "grantId": "4efd4901-e0fc-41d2-bf82-a0b6f8acdee4",
+          "controllerSessionId": "931a884b-3f4a-4e98-9453-1039aff884bc",
+          "state": "ended",
+          "boundAt": "2026-10-21T06:34:14.345Z",
+          "ackCursor": 574,
+          "lastAckAt": "2026-10-21T06:43:28.455Z",
+          "pausedAt": null,
+          "observationDeadlineMs": 180000,
+          "escalationDeadlineMs": 900000,
+          "millisecondsSinceAcknowledgement": 7751186
+        },
+        "terminationOutcome": "stopped",
+        "supervisor": true
+      },
+      "processes": {
+        "items": []
+      }
+    }
+  },
+  "verification": {
+    "runtimeSuite": {
+      "tests": 611,
+      "passed": 611,
+      "failed": 0,
+      "durationMs": 651428.7076,
+      "log": ".deszo/revisions/control-review-2026-10-21/npm-test.log",
+      "exitCode": 0,
+      "note": "Runtime source remained unchanged; later operator refinements were tested in the final controller suite."
+    },
+    "controllerSuite": {
+      "tests": 13,
+      "passed": 13,
+      "failed": 0,
+      "durationMs": 4679.4037,
+      "log": ".deszo/revisions/control-review-2026-10-21/controller-tools-final.log",
+      "exitCode": 0
+    },
+    "nativeSuite": {
+      "tests": 13,
+      "passed": 13,
+      "failed": 0,
+      "exitCode": 0,
+      "log": ".deszo/revisions/control-review-2026-10-21/native-tests.log"
+    },
+    "desktopBuild": {
+      "exitCode": 0,
+      "exeSha256": "ef15d47ceaad613900182bc8e3b55f44a6ca4b4d40f195ea97516ab71fdf1c17"
+    },
+    "runtimeInputsMatch": true,
+    "doctorLive": "ready_to_connect",
+    "transport": {
+      "kind": "DeszoControllerTransport",
+      "version": 1,
+      "measuredAt": "2026-10-21T08:26:30.531Z",
+      "fingerprint": "c5f27a74be22ec8cb41cdbbb0f21725eefd8d086af126529b94772b2a3284f5d",
+      "identity": {
+        "clientVersion": "deszo-stdio-controller/1",
+        "protocolVersion": "2025-03-26",
+        "maxWatchWaitMs": 20000,
+        "bridgeHttpTimeoutMs": 30000,
+        "toolTimeoutMs": 45000,
+        "enclosingToolTimeoutMs": 55000,
+        "platform": "win32",
+        "nodeMajor": 22,
+        "driverSha256": "f117fe15b5e5973c6342125c13f645e678ec19253293bbf45f8dd3a90c84dfaf"
+      },
+      "passed": true,
+      "providerCalls": 0,
+      "samples": [
+        {
+          "delayMs": 25000,
+          "elapsedMs": 25016.614400000002,
+          "error": null,
+          "passed": true
+        },
+        {
+          "delayMs": 60000,
+          "elapsedMs": 45013.3242,
+          "error": "controller_transport_timeout",
+          "passed": true
+        }
+      ],
+      "limitation": "This explicit stdio driver only. Not the desktop default MCP transport, model latency, consent, or autonomous-worker authority."
+    },
+    "cachedPreparation": {
+      "prepared": true,
+      "cached": true,
+      "build": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\operator\\builds\\2026-10-21-control-review",
+      "exe": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\operator\\builds\\2026-10-21-control-review\\deszo.exe",
+      "authorityGranted": false,
+      "modelCalls": 0,
+      "elapsedMs": 346.3093
+    },
+    "skill": {
+      "installed": "C:/Users/jusse/.codex/skills/deszo-control",
+      "source": "C:\\my\\2026\\deszo_agent_orche\\skills\\deszo-control",
+      "validated": true
+    }
+  },
+  "incident": {
+    "incidentId": "6b0d9868-c57f-449c-9962-08fcf454d4f5",
+    "state": "open",
+    "causeStatus": "confirmed",
+    "initial": {
+      "artifactId": "70069c58-3a37-4e13-951e-0ff142c225b4",
+      "sha256": "739f73ab2c822c02b603f802075b90bad9f5489d694e493cd72dd4396d3e1a29"
+    }
+  },
+  "docsCheck": {
+    "state": "passed",
+    "exitCode": 0,
+    "schemas": 29,
+    "positiveSchemaCases": 141,
+    "negativeSchemaCases": 82,
+    "negativeSemanticCases": 42,
+    "markdownFiles": 98,
+    "localLinks": 954,
+    "mermaidDiagrams": 9,
+    "jsonFences": 3,
+    "sections": 14,
+    "tasks": 5,
+    "decisionCases": 50,
+    "sqlTables": 13,
+    "sqlCases": 67,
+    "sqlTablesAfterMigration2": 15,
+    "sqlTablesAfterMigration3": 17,
+    "sqlTablesAfterMigration4": 19,
+    "sqlTablesAfterMigration5": 19,
+    "strictJsonRejections": 2,
+    "errors": []
+  },
+  "limits": [
+    "Local build metadata is not ADR-0006 protected build attestation.",
+    "Live startup and MCP were checked; no new Developer/Watcher task or native UI acceptance was run.",
+    "The semantic log projection follow-up remains open; no automatic ACK or lease-renewal daemon exists.",
+    "Captured workspace synchronization and the next exact task revision are checked separately before another run."
+  ],
+  "workspaceSynchronizationReceipt": ".deszo/revisions/control-review-2026-10-21/workspace-sync.json",
+  "verifiedAt": "2026-10-21T09:12:23.754Z"
+}

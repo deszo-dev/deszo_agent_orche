@@ -326,7 +326,7 @@ test('restart recovery interrupts a running loop and its body attempt without re
   await api.close();
 });
 
-test('an M1 store migrates through migration 11, keeps its v1 journal and backfills M6 identities', async () => {
+test('an M1 store migrates to the latest migration, keeps its v1 journal and backfills M6 identities', async () => {
   const { DatabaseSync } = await import('node:sqlite');
   const { mkdtempSync, readdirSync, writeFileSync } = await import('node:fs');
   const { MIGRATION_PATHS, Store } = await import('../core/store.mjs');
@@ -354,7 +354,8 @@ test('an M1 store migrates through migration 11, keeps its v1 journal and backfi
   v5.close();
 
   const store = new Store(root);
-  assert.equal(store.get('SELECT MAX(version) AS v FROM schema_migrations').v, 11);
+  // The store reaches the end of the migration catalogue (m14 added the continuation tables after this test was written).
+  assert.equal(store.get('SELECT MAX(version) AS v FROM schema_migrations').v, MIGRATION_PATHS.length);
   assert.equal(store.get('SELECT kind FROM runs WHERE id = ?', 'r').kind, 'workflow');
   assert.equal(store.get('SELECT revision FROM workflows WHERE id = ?', 'wf').revision, 1);
   assert.deepEqual({ ...store.get('SELECT state, journal_version FROM runs WHERE id = ?', 'r') }, { state: 'failed', journal_version: 1 });

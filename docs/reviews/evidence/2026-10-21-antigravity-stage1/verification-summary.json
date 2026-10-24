@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "kind": "Stage1VerificationSummary",
+  "recordedAt": "2026-10-22T02:49:37.330Z",
+  "fullRuntimeSuite": {
+    "tests": 638,
+    "pass": 638,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0
+  },
+  "targetedFinalSource": {
+    "tests": 25,
+    "pass": 25,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0
+  },
+  "docsErrors": 0,
+  "runtimeBundle": "PASS",
+  "baselineHashes": [
+    {
+      "path": "../2026-10-21-adr-0007-baseline.json",
+      "sha256": "d18fa3e2657345ce1cae97a9ba381609d72547f2b9a4d21bf975ecd102634d68"
+    },
+    {
+      "path": "../2026-10-21-adr-0007-baseline.mjs",
+      "sha256": "e6f3f274f962b0cc2b0aa7dc2133bd003ea532d1a4ccdefe34a98409af5e7de3"
+    },
+    {
+      "path": "../2026-10-21-adr-0007-legacy-grant.json",
+      "sha256": "d4b7ece36c9118075bfccd025aa174c92223e5aa34f549dc496c4187231bc507"
+    },
+    {
+      "path": "../2026-10-21-adr-0007-saved-observations.json",
+      "sha256": "c90f8dfa85941ab9108a9bbefd640d864c3392a9916dfc5206fef9029fcfd153"
+    },
+    {
+      "path": "../2026-10-21-adr-0007-source-journal.json",
+      "sha256": "934e30de7e3de863ea903342ebf08f80459c0634f242625cf13e151363817296"
+    }
+  ],
+  "fullSuiteStartFingerprint": "9c47cf7a2871627508efcd3c3cf6615ee996f7cae47fbbf32465116ac2d075e9",
+  "finalSourceFingerprint": "756f1fbff6fda7c73b8f4cc1f30faf514f8250faefeeec96920891cb02202739",
+  "lateSourceDelta": {
+    "paths": [
+      "runtime/core/antigravityJudgeAdapter.mjs"
+    ],
+    "exactReconstructionVerified": true,
+    "scope": "Successful --help stderr metadata parsing only; no admission, decision, parser, billing, execution or recovery logic changed.",
+    "supplementalChecks": [
+      "25 targeted tests on final source",
+      "installed CLI read-only capability inspection",
+      "runtime bundle on final source"
+    ]
+  },
+  "realProviderCalls": 0,
+  "componentDecisionCount": 3,
+  "processHygiene": {
+    "scope": "Node test runners, fixture CLIs and Bridge children referencing runtime/tests or .deszo/tests",
+    "remaining": 0
+  },
+  "productionPathE2E": "BLOCKED",
+  "readiness": {
+    "adapter": "PARTIAL_PASS",
+    "bridge": "PARTIAL_PASS",
+    "engineBoundedHandoffReview": "PASS",
+    "hostWorker": "PARTIAL_PASS",
+    "subscription": "INCONCLUSIVE",
+    "operational": "BLOCKED"
+  }
+}

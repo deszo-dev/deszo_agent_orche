@@ -248,6 +248,7 @@
           "type": "string",
           "pattern": "^[a-z][a-z0-9-]{0,63}$"
         },
+        "controlMode": { "enum": ["supervised", "unsupervised"] },
         "kind": {
           "enum": [
             "workflow",
@@ -570,6 +571,34 @@
         "contexts",
         "loops"
       ],
+      "additionalProperties": false
+    },
+    "linkRepairRequest": {
+      "type": "object",
+      "description": "ADR-0008 Suspend: suspend a waiting parent run and create its linked repair run in a different workspace. The Engine validates both workflows and the candidate identity.",
+      "properties": {
+        "requestId": { "type": "string", "format": "uuid" },
+        "failedNodeInstanceId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+        "repairWorkflowId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+        "repairWorkflowSnapshotSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "repairWorkspaceId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+        "candidateDigest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "continuationCheckpointId": { "type": "string", "pattern": "^chk-[a-z0-9-]{1,60}$" }
+      },
+      "required": ["requestId", "failedNodeInstanceId", "repairWorkflowId", "repairWorkflowSnapshotSha256", "repairWorkspaceId", "candidateDigest", "continuationCheckpointId"],
+      "additionalProperties": false
+    },
+    "lifecycleReceiptRequest": {
+      "type": "object",
+      "description": "ADR-0008 Lifecycle receipt: the Host's verified outcome of application.activate_candidate for one lifecycle operation. Accepted only for the operation's own candidate digest.",
+      "properties": {
+        "requestId": { "type": "string", "format": "uuid" },
+        "operationId": { "type": "string", "format": "uuid" },
+        "candidateDigest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "outcome": { "enum": ["verified"] },
+        "receiptId": { "type": "string", "format": "uuid" }
+      },
+      "required": ["requestId", "operationId", "candidateDigest", "outcome", "receiptId"],
       "additionalProperties": false
     },
     "recoveryRequest": {

@@ -1,0 +1,86 @@
+{
+  "experiment": "POC-05",
+  "title": "Single-writer enforcement",
+  "status": "FAIL",
+  "checks": [
+    {
+      "name": "S1 a second writable admission in the same home is refused while the owner is alive",
+      "pass": true,
+      "detail": "resume=false write=not attempted"
+    },
+    {
+      "name": "S2 a write from a superseded owner generation is refused by the client",
+      "pass": false,
+      "detail": "accepted: Codex has no owner generation"
+    },
+    {
+      "name": "S3a a profile without experimental capability cannot load the session by path",
+      "pass": true,
+      "detail": "thread/resume.path requires experimentalApi capability"
+    },
+    {
+      "name": "S3b a second profile cannot write the session by path while the owner is alive",
+      "pass": true,
+      "detail": "no rollout found for thread id 01a15e35-108a-7772-a1b0-e281f95d3e53"
+    },
+    {
+      "name": "S3c a copied rollout cannot be resumed as the same session in another profile while the owner is alive",
+      "pass": false,
+      "detail": "resumed as clone; write=true"
+    },
+    {
+      "name": "S4 the dedicated session rollout is absent from the default profile session store (names only)",
+      "pass": true,
+      "detail": null
+    }
+  ],
+  "measurements": {
+    "ownerSeedWriteOk": true,
+    "S1": {
+      "resumeAccepted": false,
+      "resumeError": "thread 01a15e35-108a-7772-a1b0-e281f95d3e53 already has an active writer",
+      "writeAccepted": null,
+      "writeError": null
+    },
+    "S2": {
+      "ledger": {
+        "generation1": "superseded by takeover (Deszo ledger, not Codex state)",
+        "generation2": "takeover recorded"
+      },
+      "staleWriteAccepted": true,
+      "error": null
+    },
+    "S3a": {
+      "pathResumeAccepted": false,
+      "error": "thread/resume.path requires experimentalApi capability"
+    },
+    "S3b": {
+      "pathResumeAccepted": false,
+      "error": "no rollout found for thread id 01a15e35-108a-7772-a1b0-e281f95d3e53",
+      "writeAccepted": null,
+      "writePersistedToOwnersRollout": null
+    },
+    "S3c": {
+      "copiedRolloutResumeAccepted": true,
+      "resumeError": null,
+      "cloneWriteAccepted": true
+    },
+    "takeoverAfterOwnerExit": {
+      "resumeAccepted": true,
+      "error": null
+    },
+    "S4": {
+      "defaultProfileRolloutFilesCounted": 129,
+      "dedicatedRolloutFound": false
+    }
+  },
+  "ids": {
+    "threadId": "01a15e35-108a-7772-a1b0-e281f95d3e53"
+  },
+  "notes": [
+    "S1 shows Codex refuses a second writable admission to a session that a live process holds in the same home. The mechanism is a per-thread writer lock in thread-writer-locks/, with OS file locking. Lock files persist as zero-length files after exit, so their presence is not evidence that a lock is held.",
+    "S2 shows the stale owner keeps writing: Codex has no owner generation, so a superseded holder is stopped only by Deszo terminating or fencing it.",
+    "S3a and S3b are the isolation question. A profile without the experimental capability is refused by a capability gate (not by ownership). A profile that declares it is tested while the owner is alive, because the writer lock belongs to the holder's home, not to the rollout.",
+    "The default profile was not started or written. Only file names were listed."
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://deszo.local/documentation/judge-control.schema.json",
+  "title":"Bounded Antigravity Judge controller contracts (ADR-0007 Stage 1)",
+  "$defs": {
+    "registration": {
+      "type":"object",
+      "properties":{
+        "requestId":{"type":"string","format":"uuid"},
+        "controllerSessionId":{"type":"string","format":"uuid"},
+        "runIds":{"type":"array","minItems":1,"maxItems":8,"uniqueItems":true,"items":{"type":"string","format":"uuid"}},
+        "provider":{"const":"antigravity"},"model":{"const":"gemini-3.8-flash-high"},"effort":{"const":"high"},
+        "nativeSessionId":{"type":"string","format":"uuid"},"ownership":{"const":"dedicated"},
+        "billing":{"const":"subscription_only"},"maxInvocations":{"type":"integer","minimum":1,"maximum":3},
+        "expiresAt":{"type":"string","format":"date-time"},
+        "queueWaitMs":{"type":"integer","minimum":1000,"maximum":900000}
+      },
+      "required":["requestId","controllerSessionId","runIds","provider","model","effort","nativeSessionId","ownership","billing","maxInvocations","expiresAt","queueWaitMs"],
+      "additionalProperties":false
+    },
+    "decision": {
+      "type":"object",
+      "properties":{
+        "schemaVersion":{"const":1},"kind":{"const":"JudgeDecision"},
+        "decisionId":{"type":"string","format":"uuid"},"attentionId":{"type":"string","format":"uuid"},
+        "invocationId":{"type":"string","format":"uuid"},"judgeSessionId":{"type":"string","format":"uuid"},
+        "runId":{"type":"string","format":"uuid"},"ownerGeneration":{"type":"integer","minimum":1},
+        "workflowRevision":{"type":"integer","minimum":1},
+        "workflowSnapshotSha256":{"type":"string","pattern":"^[a-f0-9]{64}$"},
+        "subjectDigest":{"type":"string","pattern":"^[a-f0-9]{64}$"},
+        "candidateDigest":{"type":"string","pattern":"^([a-f0-9]{64})?$"},
+        "evidenceDigest":{"type":"string","pattern":"^[a-f0-9]{64}$"},
+        "evidenceReadIds":{"type":"array","minItems":1,"maxItems":32,"uniqueItems":true,"items":{"type":"string","format":"uuid"}},
+        "verdict":{"enum":["APPROVE","REVISE","NEED_MORE_EVIDENCE"]},
+        "rationale":{"type":"string","minLength":1,"maxLength":2000}
+      },
+      "required":["schemaVersion","kind","decisionId","attentionId","invocationId","judgeSessionId","runId","ownerGeneration","workflowRevision","workflowSnapshotSha256","subjectDigest","candidateDigest","evidenceDigest","evidenceReadIds","verdict","rationale"],
+      "additionalProperties":false
+    }
+  }
+}

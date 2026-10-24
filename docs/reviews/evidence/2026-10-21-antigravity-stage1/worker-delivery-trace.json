@@ -1,0 +1,182 @@
+[
+  {
+    "sequence": 6,
+    "eventType": "worker.plan_enqueued",
+    "payload": {
+      "digest": "2ef581119abee84ea5fa14e0679453ef653a236c29a20b2bf7a9c835327da666",
+      "itemId": "e7c42b99-11d3-480a-bda6-c5eabb26639f",
+      "mode": "deterministic",
+      "steps": 1
+    },
+    "sha256": "30a2e5d4305b629d1be366aca8d6fada04ac252a0934dfd04aaa755885175d33",
+    "recordedAt": "2026-10-22T02:35:11.517Z"
+  },
+  {
+    "sequence": 7,
+    "eventType": "worker.step_claimed",
+    "payload": {
+      "index": 0,
+      "itemId": "e7c42b99-11d3-480a-bda6-c5eabb26639f",
+      "requestId": "dbc1763f-d21b-04f9-4011-a47509968e40",
+      "type": "judge.review",
+      "workerId": "fixture-native-worker"
+    },
+    "sha256": "5e64d3c75b67bd5fee2227605952f51d877403f5768692c34003daa2902ac13b",
+    "recordedAt": "2026-10-22T02:35:11.522Z"
+  },
+  {
+    "sequence": 8,
+    "eventType": "judge.adapter_received",
+    "payload": {
+      "attentionId": "05e9159f-59dc-4150-8cac-9fb4901da496",
+      "fixtureAssurance": true,
+      "packageDigest": "338e4a331a5988982ffd0cadf9976ecf4d4c4a6b06d25bbbfe76e4734bc07f71"
+    },
+    "sha256": "595ce61f68f671117bc6364a85f6abf5065ad35b2727d177bad89ec995d8b149",
+    "recordedAt": "2026-10-22T02:35:11.531Z"
+  },
+  {
+    "sequence": 12,
+    "eventType": "judge.decision_recorded",
+    "payload": {
+      "attentionId": "05e9159f-59dc-4150-8cac-9fb4901da496",
+      "fixtureAssurance": true,
+      "invocationId": "c7b41192-28ef-4078-b8e3-3fb8b0dfac2e",
+      "receiptDigest": "c0735a31434097a896f79b90b3ec201ce4c17122b9e570f0c097f07b2ffb9f14"
+    },
+    "sha256": "87db2b90d0d96a21fe158da5d4f689fd37c7d583aaba4138dc19425d20504357",
+    "recordedAt": "2026-10-22T02:35:12.490Z"
+  },
+  {
+    "sequence": 13,
+    "eventType": "worker.step_finished",
+    "payload": {
+      "index": 0,
+      "itemId": "e7c42b99-11d3-480a-bda6-c5eabb26639f",
+      "receiptDigest": "d97fea693511a389d2db18b25750ffc4c6d71404df824f9694b86a6904fe6305",
+      "state": "succeeded"
+    },
+    "sha256": "4e9d4d6187e8bfe91e701c29530179c6e7c2977a91cfd8316206723dc18087b2",
+    "recordedAt": "2026-10-22T02:35:12.550Z"
+  },
+  {
+    "sequence": 14,
+    "eventType": "worker.plan_enqueued",
+    "payload": {
+      "digest": "531c06011994050d75bd2c070d487421fe850347b7ebe952a830e263a1baad64",
+      "itemId": "ba3033a0-06f2-4fd6-8944-4a673289dc2d",
+      "mode": "deterministic",
+      "steps": 1
+    },
+    "sha256": "71ff7eacf61821ae7ba531166fce832ccbb2e5d5327718bfa0900297d7fa490f",
+    "recordedAt": "2026-10-22T02:35:12.595Z"
+  },
+  {
+    "sequence": 15,
+    "eventType": "worker.step_claimed",
+    "payload": {
+      "index": 0,
+      "itemId": "ba3033a0-06f2-4fd6-8944-4a673289dc2d",
+      "requestId": "7360be98-94a7-3613-d8c2-a3f06cb628aa",
+      "type": "judge.review",
+      "workerId": "fixture-native-worker"
+    },
+    "sha256": "c7a28d81a30c33aaafb61269dff8f61463a11ad91ee30e97904374260271352b",
+    "recordedAt": "2026-10-22T02:35:12.602Z"
+  },
+  {
+    "sequence": 16,
+    "eventType": "judge.adapter_received",
+    "payload": {
+      "attentionId": "5604f0d1-5863-4367-8c43-d8b0b1baae36",
+      "fixtureAssurance": true,
+      "packageDigest": "27ba852cb28dcc4ef46616d4ccbf6df621f85d59237679ae3617072e611572f1"
+    },
+    "sha256": "fff062204db50d82f072d8dd171397bc91deb1826049f66b9d0de6ba15c226a5",
+    "recordedAt": "2026-10-22T02:35:12.614Z"
+  },
+  {
+    "sequence": 20,
+    "eventType": "judge.decision_recorded",
+    "payload": {
+      "attentionId": "5604f0d1-5863-4367-8c43-d8b0b1baae36",
+      "fixtureAssurance": true,
+      "invocationId": "7d640687-0828-4dc1-9d79-914b7bdaf8a6",
+      "receiptDigest": "9c4bf87ff078b77ccf4b1ccfe7e2ce623c25ee63c31c49fd872d7888513c6beb"
+    },
+    "sha256": "5f107f1932f6a9659ed1f8ce02bc5bd674aeb7276bf6085abf9e9f5f75ae5e48",
+    "recordedAt": "2026-10-22T02:35:13.566Z"
+  },
+  {
+    "sequence": 21,
+    "eventType": "worker.step_finished",
+    "payload": {
+      "index": 0,
+      "itemId": "ba3033a0-06f2-4fd6-8944-4a673289dc2d",
+      "receiptDigest": "f5b1364f87e07cffc065174f52c54a0e3eac4de97d87dd4766ed4649ba91aaa0",
+      "state": "succeeded"
+    },
+    "sha256": "480da5cca2ce8a4bc495de46f068b0822b3b03e1f84d68d36d24ba709e7dc3a5",
+    "recordedAt": "2026-10-22T02:35:13.633Z"
+  },
+  {
+    "sequence": 22,
+    "eventType": "worker.plan_enqueued",
+    "payload": {
+      "digest": "e2a0866724d8dc712055f0bbb21901648cc84f0d274bc5a02d70553c1b6a8f30",
+      "itemId": "40dadf7c-3d0b-4708-ab48-bb344b62f72a",
+      "mode": "deterministic",
+      "steps": 1
+    },
+    "sha256": "281d25ecf542a355de7c3dabde58f885d00d3f6af374a96a0d0c4d13be0322ba",
+    "recordedAt": "2026-10-22T02:35:13.679Z"
+  },
+  {
+    "sequence": 23,
+    "eventType": "worker.step_claimed",
+    "payload": {
+      "index": 0,
+      "itemId": "40dadf7c-3d0b-4708-ab48-bb344b62f72a",
+      "requestId": "bd2d3184-6bbe-b5e9-3952-e409786f7839",
+      "type": "judge.review",
+      "workerId": "fixture-native-worker"
+    },
+    "sha256": "7eda3d036b7e8ec4f7ba03c685b6ac09df7ffa097ec1f28bc4954b28f0e0cce7",
+    "recordedAt": "2026-10-22T02:35:13.684Z"
+  },
+  {
+    "sequence": 24,
+    "eventType": "judge.adapter_received",
+    "payload": {
+      "attentionId": "502b0ba8-c12b-47c6-9bed-dbc0a5c7f14c",
+      "fixtureAssurance": true,
+      "packageDigest": "1a05b40911a6f19e5d9d17c917ca270abdce679ffeccc301de117b35e7089720"
+    },
+    "sha256": "44df09c40145cc4798de0040b02e93e8113aee044ed77df2358fddde94ca57ab",
+    "recordedAt": "2026-10-22T02:35:13.692Z"
+  },
+  {
+    "sequence": 28,
+    "eventType": "judge.decision_recorded",
+    "payload": {
+      "attentionId": "502b0ba8-c12b-47c6-9bed-dbc0a5c7f14c",
+      "fixtureAssurance": true,
+      "invocationId": "300838c6-d3e2-4bd5-9aba-a56b703726e6",
+      "receiptDigest": "9a71b71fce78cdbb546bddf5bae5b891b04f2557d7b59fa9d6298f25559329a5"
+    },
+    "sha256": "68f882761e188e5e5da4021c8a22e97483b9ea6ad65538fb1c382f56b28fee06",
+    "recordedAt": "2026-10-22T02:35:14.674Z"
+  },
+  {
+    "sequence": 29,
+    "eventType": "worker.step_finished",
+    "payload": {
+      "index": 0,
+      "itemId": "40dadf7c-3d0b-4708-ab48-bb344b62f72a",
+      "receiptDigest": "777be804553c5c683497195a6653bc80775573717b05e33b00c3d6a33157475f",
+      "state": "succeeded"
+    },
+    "sha256": "25b41d18e502d3591d91c80ebeaa2f0b60520d47b5985187d69ef379d03ae705",
+    "recordedAt": "2026-10-22T02:35:14.725Z"
+  }
+]

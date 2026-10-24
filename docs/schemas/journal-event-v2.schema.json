@@ -614,7 +614,14 @@
                 "context_prerequisite",
                 "capture_failed",
                 "managed_tool_isolation_unavailable",
-                "capture_limit"
+                "capture_limit",
+                "lifecycle_unauthorized",
+                "lifecycle_contract",
+                "lifecycle_candidate_mismatch",
+                "lifecycle_checkpoint_mismatch",
+                "workspace_overlap",
+                "workspace_unavailable",
+                "workspace_binding_mismatch"
               ]
             },
             "message": {
@@ -2151,6 +2158,93 @@
             "record"
           ],
           "additionalProperties": false
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "enum": [
+            "judge.session_registered",
+            "judge.request_persisted",
+            "judge.turn_admitted",
+            "judge.turn_started",
+            "judge.evidence_read",
+            "judge.evidence_detail_read",
+            "judge.decision_received",
+            "judge.decision_rejected",
+            "judge.decision_applied",
+            "judge.turn_settled",
+            "judge.attention_expired",
+            "judge.invocation_unknown",
+            "judge.queued_behind_active_turn"
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "record": {
+              "$ref": "#/$defs/ref"
+            }
+          },
+          "required": [
+            "record"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "null"
+        },
+        "attemptId": {
+          "type": "null"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "enum": [
+            "continuation.linked_repair_opened",
+            "continuation.linked_repair_started",
+            "continuation.repair_completed",
+            "continuation.repair_failed",
+            "continuation.parent_resumed",
+            "continuation.parent_resume_refused",
+            "continuation.lifecycle_intent",
+            "continuation.lifecycle_host_delivery_failed",
+            "continuation.lifecycle_verified",
+            "continuation.lifecycle_released",
+            "continuation.workspace_isolation_refused",
+            "continuation.reconciled"
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "origin": {
+              "enum": [
+                "ENGINE",
+                "HOST_RECEIPT"
+              ]
+            }
+          },
+          "required": [
+            "origin"
+          ]
+        },
+        "nodeInstanceId": {
+          "type": "null"
+        },
+        "attemptId": {
+          "type": "null"
         }
       },
       "required": [

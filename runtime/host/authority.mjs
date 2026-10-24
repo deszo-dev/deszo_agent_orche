@@ -18,8 +18,9 @@ import { canonicalBytes, canonicalHash, canonicalize, sha256 } from '../core/can
 import { check } from '../core/schemas.mjs';
 import { ASSURANCE_LEVELS, missingProductionCapabilities } from './capabilities.mjs';
 import { remainingAuthority, systemTimeSource } from './timeSource.mjs';
+import { validateControllerPlan } from './controllerQueue.mjs';
 
-const MIGRATION_FILES = ['host-h1.sql', 'host-h2.sql'];
+const MIGRATION_FILES = ['host-h1.sql', 'host-h2.sql', 'host-h3.sql', 'host-h4.sql', 'host-h5.sql'];
 const migrationUrl = name => (existsSync(new URL(`./${name}`, import.meta.url)) ? new URL(`./${name}`, import.meta.url) : new URL(`../../docs/storage/${name}`, import.meta.url));
 export const HOST_MIGRATIONS = MIGRATION_FILES.map(migrationUrl);
 const SCHEMA = 'autonomy-policy.schema.json';
@@ -44,15 +45,18 @@ const MINIMUM_COST = {
   'app.start': { restarts: 1 },
   'app.restart': { restarts: 1 },
   'app.rollback': { restarts: 1 },
+  'app.verify': { restarts: 1 },
+  'runtime.reregister': { restarts: 1 },
   'worker.model_call': { workerModelCalls: 1 },
   [PROVIDER_OPERATION]: { providerInvocations: 1 },
 };
 const NEEDS_WORKFLOW = new Set(['run.approve', 'supervision.approve', 'run.retry', 'repair.run', PROVIDER_OPERATION]);
-const NEEDS_RUNTIME = new Set(['run.approve', 'supervision.approve', 'run.retry', 'repair.run', PROVIDER_OPERATION]);
+const NEEDS_RUNTIME = new Set(['run.approve', 'supervision.approve', 'run.retry', 'repair.run', 'runtime.reregister', PROVIDER_OPERATION]);
 const NEEDS_COMMAND = new Set(['check.run', 'build.run']);
-const TARGET_OPERATIONS = new Set(['app.start', 'app.restart', 'app.rollback', 'app.stop']);
+const TARGET_OPERATIONS = new Set(['app.start', 'app.restart', 'app.rollback', 'app.stop', 'app.verify', 'runtime.reregister']);
+const VERIFICATION_OPERATIONS=new Set(['app.verify','app.stop','runtime.reregister','run.stop_and_report']);
 // Requests a registered runtime may make for itself. Everything else needs the authenticated controller.
-const RUNTIME_REQUESTABLE = new Set([PROVIDER_OPERATION]);
+const RUNTIME_REQUESTABLE = new Set([PROVIDER_OPERATION, 'repair.run', 'runtime.reregister']);
 // Stop, evidence and reconciliation stay available when dispatch is blocked; they start no new work.
 const FAIL_CLOSED_EXEMPT = new Set(['run.stop_and_report']);
 
@@ -146,8 +150,9 @@ export class ControlHost {
     this.migrate();
     // A store records the assurance it was created with; fixture state can never be opened as production state.
     const marked = this.get(`SELECT value FROM host_meta WHERE key = 'assurance'`);
-    if (!marked) this.run(`INSERT INTO host_meta(key, value) VALUES ('assurance', ?)`, assurance);
-    else if (marked.value !== assurance) throw new HostError(409, 'assurance_mismatch', `This store was created for ${marked.value} assurance and cannot be opened as ${assurance}.`);
+    const storeAssurance = assurance === 'bootstrap' ? 'production' : assurance;
+    if (!marked) this.run(`INSERT INTO host_meta(key, value) VALUES ('assurance', ?)`, storeAssurance);
+    else if (marked.value !== storeAssurance) throw new HostError(409, 'assurance_mismatch', `This store was created for ${marked.value} assurance and cannot be opened as ${assurance}.`);
     if (recover) this.recover();
     else this.refreshBlock();
   }
@@ -255,7 +260,7 @@ export class ControlHost {
   }
 
   // ---------- Consent: an immutable proposed decision and a fresh single-use challenge ----------
-  proposePolicy({ decisionType = 'create', supersedesPolicyId = null, controller, scope, limits, durationMs }) {
+  proposePolicy({ decisionType = 'create', supersedesPolicyId = null, controller, scope, limits, durationMs,initialPlan }) {
     this.requireWritable();
     let sessionId = randomUUID();
     let carriedUsage = zeroCost();
@@ -274,6 +279,8 @@ export class ControlHost {
       audience: this.audience, controller, scope, limits, carriedUsage, durationMs,
       issuedAt: new Date(issuedAtMs).toISOString(), expiresAt: new Date(issuedAtMs + durationMs).toISOString(),
     };
+    if(scope?.verificationOnly&&(scope.operations.some(operation=>!VERIFICATION_OPERATIONS.has(operation))||scope.commands.length||['attempts','providerInvocations','workerModelCalls','repairs','builds'].some(key=>limits[key]!==0)))throw new HostError(400,'invalid_verification_scope','Native verification cannot authorize workflow/provider/command execution or model/repair/build budgets.');
+    if(initialPlan!==undefined){decision.initialPlan=initialPlan;validateControllerPlan(initialPlan,decision);}
     contract('proposedDecision', decision, 'The proposed policy decision');
     const challenge = { challengeId: randomUUID(), nonce: randomBytes(32).toString('hex'), decisionDigest: canonicalHash(decision), audience: this.audience,
       expiresAt: new Date(issuedAtMs + CHALLENGE_LIFETIME_MS).toISOString() };
@@ -288,6 +295,7 @@ export class ControlHost {
   // Verifies a decision-bound assertion from an enrolled credential and atomically consumes the challenge.
   authorizePolicy({ challengeId, assertion }) {
     this.requireWritable();
+    if (this.assurance !== 'fixture') throw new HostError(403, 'trusted_consent_required', 'Installed authority requires the protected WebAuthn broker; software fixture assertions cannot authorize it.');
     contract('consentAssertion', assertion, 'The consent assertion');
     const challenge = this.get('SELECT * FROM consent_challenges WHERE challenge_id = ?', challengeId);
     if (!challenge) throw new HostError(404, 'not_found', 'Consent challenge not found.');
@@ -319,6 +327,7 @@ export class ControlHost {
         if (previous.state === 'revoked') throw new HostError(409, 'revoked', 'The policy was revoked before consent completed.');
         revision = previous.revision + 1;
         this.run(`UPDATE policies SET state = 'superseded' WHERE policy_id = ? AND state = 'active'`, previous.policy_id);
+        this.releaseIssuedPermits(previous.policy_id, nowIsoFrom(this.time));
       }
       // The anchor is taken when the decision commits; the displayed expiry is also an upper bound.
       const anchor = this.time.uptimeMs() - Math.max(0, this.time.wallNow() - Date.parse(decision.issuedAt));
@@ -336,6 +345,30 @@ export class ControlHost {
     const row = this.get('SELECT * FROM policies WHERE policy_id = ?', policyId);
     if (!row) throw new HostError(404, 'not_found', 'Policy not found.');
     return row;
+  }
+
+  // Called inside the protected WebAuthn verifier's transaction, never exposed as a public protocol method.
+  commitVerifiedConsent(challengeId, evidence) {
+    this.requireWritable();
+    const challenge = this.get('SELECT * FROM consent_challenges WHERE challenge_id = ?', challengeId);
+    if (!challenge || challenge.consumed_at || Date.parse(challenge.expires_at) <= this.time.wallNow()) throw new HostError(403, 'challenge_expired', 'The policy proposal is absent, consumed or expired.');
+    const decision = JSON.parse(challenge.decision_json), bootId = this.time.bootId();
+    if (!bootId || canonicalHash(decision) !== challenge.decision_digest || evidence.displayedDecisionDigest !== challenge.decision_digest) throw new HostError(403, 'decision_altered', 'The policy/boot binding is invalid.');
+    let revision = 1;
+    if (decision.supersedesPolicyId) {
+      const previous = this.policyRow(decision.supersedesPolicyId);
+      if (previous.state === 'revoked' || previous.state === 'superseded') throw new HostError(409, 'conflict', 'The previous authority changed before consent completed.');
+      revision = previous.revision + 1;
+      this.run("UPDATE policies SET state = 'superseded' WHERE policy_id = ?", previous.policy_id);
+      this.releaseIssuedPermits(previous.policy_id, nowIsoFrom(this.time));
+    }
+    const claimed = this.run('UPDATE consent_challenges SET consumed_at = ?, policy_id = ? WHERE challenge_id = ? AND consumed_at IS NULL', nowIsoFrom(this.time), decision.policyId, challengeId);
+    if (claimed.changes !== 1) throw new HostError(409, 'challenge_consumed', 'The policy challenge was consumed concurrently.');
+    const anchor = this.time.uptimeMs() - Math.max(0, this.time.wallNow() - Date.parse(decision.issuedAt));
+    this.run(`INSERT INTO policies(policy_id,session_id,supersedes_policy_id,revision,decision_json,decision_digest,consent_json,challenge_id,issued_at,expires_at,duration_ms,boot_id,uptime_anchor_ms,state)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,'active')`, decision.policyId, decision.sessionId, decision.supersedesPolicyId, revision, challenge.decision_json, challenge.decision_digest, canonicalize(evidence), challengeId, decision.issuedAt, decision.expiresAt, decision.durationMs, bootId, anchor);
+    this.audit('policy.authorized', { challengeId, decisionDigest: challenge.decision_digest, revision, mechanism: evidence.mechanism, credentialId: evidence.credentialId }, { policyId: decision.policyId, sessionId: decision.sessionId });
+    return { ...this.policyReceipt(this.policyRow(decision.policyId)), replayed: false };
   }
 
   policyReceipt(row) {
@@ -401,8 +434,9 @@ export class ControlHost {
       this.audit('runtime.registered', { operationId, runtimeGeneration, processEvidence: expected, peerVerified: Boolean(peerEvidence) }, { sessionId: policy.session_id, policyId });
     });
     for (const [generation, registration] of this.runtimeRegistrations) if (registration.policyId === policyId) this.runtimeRegistrations.delete(generation);
-    this.runtimeRegistrations.set(runtimeGeneration, { policyId, operationId, processEvidence: expected, hostInstance: this.hostInstance, attachSecretSha256: sha256(attachSecret) });
-    return { runtimeGeneration, attachSecret, assurance: this.assurance };
+    const verificationOnly=operation.kind==='app.verify';
+    this.runtimeRegistrations.set(runtimeGeneration, { policyId, operationId, verificationOnly, processEvidence: expected, hostInstance: this.hostInstance, attachSecretSha256: sha256(attachSecret) });
+    return { runtimeGeneration, attachSecret, assurance: this.assurance,verificationOnly };
   }
 
   // The controlling runtime at session start. The authenticated controller attests its process; the host records it and
@@ -455,6 +489,12 @@ export class ControlHost {
   }
 
   // Whether a process was started or registered by this host for the policy. Stop and restart target only such processes.
+  // Whether this host launched the process for the policy (lifecycle launches only; registrations of a controller do not count).
+  launchedByHost(policyId, process) {
+    return this.all('SELECT evidence_json FROM operations WHERE policy_id = ?', policyId)
+      .some(row => sameProcess(JSON.parse(row.evidence_json).launch, process));
+  }
+
   ownsProcess(policyId, process) {
     for (const registration of this.runtimeRegistrations.values()) {
       if (registration.policyId === policyId && sameProcess(registration.processEvidence, process)) return true;
@@ -527,15 +567,27 @@ export class ControlHost {
 
   // Returns { outcome, reason } for a request against a policy; the caller records it.
   evaluate(policy, decision, request, cost) {
+    const scope=decision.scope;
+    const registered=this.runtimeRegistrations.get(request.runtimeGeneration);
+    const verificationAllowed=scope.verificationOnly===true&&(request.operation==='app.verify'||(['runtime.reregister','app.stop'].includes(request.operation)&&registered?.verificationOnly&&registered.policyId===policy.policy_id));
+    if(scope.verificationOnly&&!VERIFICATION_OPERATIONS.has(request.operation))return{outcome:'denied',reason:'verification_only_policy'};
+    if(request.operation==='app.verify'&&!scope.verificationOnly)return{outcome:'denied',reason:'verification_scope_required'};
+    if (this.assurance === 'bootstrap' && !FAIL_CLOSED_EXEMPT.has(request.operation)&&!verificationAllowed) return { outcome: 'denied', reason: 'autonomy_disabled: native enablement evidence is incomplete' };
     if (policy.state === 'revoked') return { outcome: 'denied', reason: 'revoked' };
     if (policy.state === 'superseded') return { outcome: 'denied', reason: 'superseded' };
     const time = remainingAuthority(policy, this.time);
     if (!time.valid) return { outcome: 'denied', reason: time.reason };
     if (this.closedBarriers.has(policy.policy_id)) return { outcome: 'denied', reason: 'admission_barrier_closed' };
     if (this.dispatchBlocked && !FAIL_CLOSED_EXEMPT.has(request.operation)) return { outcome: 'pending', reason: `host_reconciling: ${this.dispatchBlocked}` };
-    const scope = decision.scope;
+    if (!FAIL_CLOSED_EXEMPT.has(request.operation) && this.applicationStopping(policy.policy_id)) return { outcome: 'pending', reason: 'application_stopping' };
     if (!scope.operations.includes(request.operation)) return { outcome: 'denied', reason: 'operation_not_authorized' };
     if (request.workspaceId !== undefined && !scope.workspaces.some(w => w.workspaceId === request.workspaceId)) return { outcome: 'denied', reason: 'workspace_not_authorized' };
+    // Provider charges name the workspace directory they run in: a workspace re-pointed to another directory is refused.
+    if (request.operation === PROVIDER_OPERATION && !request.workspaceCwdIdentity) return { outcome: 'denied', reason: 'workspace_binding_required' };
+    if (request.workspaceCwdIdentity !== undefined) {
+      const bound = scope.workspaces.find(w => w.workspaceId === request.workspaceId);
+      if (bound && bound.cwdIdentity !== request.workspaceCwdIdentity) return { outcome: 'denied', reason: 'workspace_cwd_not_authorized' };
+    }
     if (NEEDS_WORKFLOW.has(request.operation)) {
       if (!request.workspaceId || !request.workflowId || !request.workflowSnapshotSha256) return { outcome: 'denied', reason: 'workflow_binding_required' };
       const rule = scope.workflows.find(w => w.workflowId === request.workflowId);
@@ -550,6 +602,7 @@ export class ControlHost {
     if (NEEDS_RUNTIME.has(request.operation)) {
       const registration = request.runtimeGeneration ? this.runtimeRegistrations.get(request.runtimeGeneration) : null;
       if (!registration || registration.policyId !== policy.policy_id || registration.hostInstance !== this.hostInstance) return { outcome: 'denied', reason: 'runtime_not_registered' };
+      if(registration.verificationOnly&&request.operation!=='runtime.reregister')return{outcome:'denied',reason:'runtime_verification_only'};
     }
     // Lifecycle requests must name exactly the authorized profile, build root, application mode and desktop, and may
     // stop only a process this host started or registered. Checked before any external effect.
@@ -561,6 +614,11 @@ export class ControlHost {
       if (!sameDesktop(target.desktop, scope.desktop)) return { outcome: 'denied', reason: 'desktop_not_authorized' };
       if (!target.buildDir || !insideRoot(scope.buildRoot, target.buildDir)) return { outcome: 'denied', reason: 'build_root_not_authorized' };
       if (target.currentProcess && !this.ownsProcess(policy.policy_id, target.currentProcess)) return { outcome: 'denied', reason: 'stop_target_not_owned' };
+      // A separate preview stops only what this host launched for it. The stable controlling runtime that a policy registered
+      // at session start is outside the preview's scope and must survive a preview restart.
+      if (target.currentProcess && scope.applicationMode === 'separate_preview' && !this.launchedByHost(policy.policy_id, target.currentProcess)) {
+        return { outcome: 'denied', reason: 'controller_protected_in_preview' };
+      }
     }
     const used = this.usage(policy.session_id);
     const exhausted = BUDGET_KEYS.find(key => used[key] + cost[key] > decision.limits[key]);
@@ -577,10 +635,20 @@ export class ControlHost {
   // The request a permit was decided for. The engine compares it with what it is about to admit.
   permitRequest(permitId) {
     const permit = this.permitView(permitId);
-    return { permitId, state: permit.state, policyId: permit.policy_id, decisionId: permit.decision_id, operation: permit.operation, request: JSON.parse(permit.request_json) };
+    return { permitId, state: permit.state, effect: permit.effect, policyId: permit.policy_id, decisionId: permit.decision_id, operation: permit.operation, request: JSON.parse(permit.request_json) };
+  }
+
+  // Read-only current authority check for a captured effect; never re-admit or refund a model invocation.
+  validatePermit(permitId) {
+    const permit=this.permitView(permitId),policy=this.policyRow(permit.policy_id),time=remainingAuthority(policy,this.time);
+    return {permitId,valid:time.valid&&policy.state==='active'&&permit.generation===policy.revocation_generation&&permit.host_instance===this.hostInstance&&!this.closedBarriers.has(policy.policy_id)&&!this.dispatchBlocked&&!this.applicationStopping(policy.policy_id)&&(['admitted'].includes(permit.state)||(permit.state==='settled'&&permit.effect==='consumed')),remainingMs:time.remainingMs};
   }
 
   // ---------- Admission barrier ----------
+  applicationStopping(policyId) {
+    return Boolean(this.get("SELECT operation_id FROM operations WHERE policy_id=? AND kind='app.stop' AND outcome IN ('in_progress','reconciling')", policyId));
+  }
+
   // A permit passes only while its revocation generation is current, its host instance is this one, the policy is
   // valid and no barrier is closed. The state change is the ordering point against revocation and expiry.
   admit(permitId) {
@@ -599,6 +667,7 @@ export class ControlHost {
       const time = remainingAuthority(policy, this.time);
       if (!time.valid) return refuse(time.reason);
       if (this.dispatchBlocked && !FAIL_CLOSED_EXEMPT.has(permit.operation)) return refuse('host_reconciling');
+      if (!FAIL_CLOSED_EXEMPT.has(permit.operation) && this.applicationStopping(policy.policy_id)) return refuse('application_stopping');
       const claimed = this.run(`UPDATE permits SET state = 'admitted', admitted_at = ? WHERE permit_id = ? AND state = 'issued'`, nowIsoFrom(this.time), permitId);
       if (claimed.changes !== 1) return refuse('permit_raced');
       this.audit('admission.granted', { permitId, decisionId: permit.decision_id, remainingMs: time.remainingMs }, { sessionId: policy.session_id, policyId: policy.policy_id });
@@ -672,6 +741,15 @@ export class ControlHost {
     return { workRef, released: true };
   }
 
+  // A superseded policy keeps its owned work under the session, but none of its unadmitted permits may be admitted now.
+  // They are invalidated so their reservations stop counting against the session's shared budget.
+  releaseIssuedPermits(policyId, at) {
+    for (const permit of this.all(`SELECT permit_id FROM permits WHERE policy_id = ? AND state = 'issued'`, policyId)) {
+      this.run(`UPDATE permits SET state = 'invalidated', settled_at = ? WHERE permit_id = ? AND state = 'issued'`, at, permit.permit_id);
+      this.run(`UPDATE budget_ledger SET state = 'released', settled_at = ? WHERE permit_id = ? AND state = 'reserved'`, at, permit.permit_id);
+    }
+  }
+
   // ---------- Revocation and expiry ----------
   // Invalidates unadmitted permits of the policies, returns their reservations and returns the native Stop scope: admitted
   // permits and every active work item still owned by them, whatever their accounting state.
@@ -700,12 +778,14 @@ export class ControlHost {
     if (!actor) throw new HostError(400, 'invalid_request', 'Revocation records who requested it.');
     if (connectionId) this.requireController(connectionId, policyId);
     this.closedBarriers.add(policyId);
-    let result;
+    let result, closedPolicyIds;
     try {
       result = this.transaction(() => {
         const policy = this.policyRow(policyId);
         const at = nowIsoFrom(this.time);
-        const ids = [...new Set([policyId, ...this.all('SELECT policy_id FROM policies WHERE session_id = ? AND state = ?', policy.session_id, 'active').map(r => r.policy_id)])];
+        // Superseded policies keep their owned work under the session, so revocation covers the whole chain, not only active rows.
+        const ids = [...new Set([policyId, ...this.all("SELECT policy_id FROM policies WHERE session_id = ? AND state IN ('active','superseded')", policy.session_id).map(r => r.policy_id)])];
+        closedPolicyIds = ids;
         for (const id of ids) {
           this.run(`UPDATE policies SET state = 'revoked', revocation_generation = revocation_generation + 1, revoked_at = ?, revoked_by = ? WHERE policy_id = ? AND state != 'revoked'`, at, actor, id);
         }
@@ -719,7 +799,7 @@ export class ControlHost {
       throw error;
     }
     for (const [id, connection] of this.controllerConnections) if (connection.policyId === policyId) this.controllerConnections.delete(id);
-    if (this.onStop && (result.stopScope.length || result.stopWorks.length)) this.onStop(result.stopScope, result.stopWorks);
+    if (this.onStop) this.onStop(result.stopScope, result.stopWorks, { policyIds: closedPolicyIds });
     this.refreshBlock();
     return result;
   }
@@ -738,7 +818,9 @@ export class ControlHost {
         if (this.closedBarriers.has(policy.policy_id)) continue;
         const time = remainingAuthority(policy, this.time);
         if (time.valid) continue;
-        const scope = this.closePolicies([policy.policy_id], at);
+        // Expiry of the policy that covers the session also closes the policies it superseded: their owned work is in its scope.
+        const chain = this.all("SELECT policy_id FROM policies WHERE session_id = ? AND state IN ('active','superseded')", policy.session_id).map(r => r.policy_id);
+        const scope = this.closePolicies(chain, at);
         scope.permits.forEach(id => permits.add(id));
         works.push(...scope.works);
         closed.push({ policyId: policy.policy_id, reason: time.reason });
@@ -746,7 +828,7 @@ export class ControlHost {
       }
       return { permits: [...permits], works };
     });
-    if (this.onStop && (result.permits.length || result.works.length)) this.onStop(result.permits, result.works);
+    if (this.onStop && (closed.length || result.permits.length || result.works.length)) this.onStop(result.permits, result.works, { policyIds: closed.map(p => p.policyId) });
     this.refreshBlock();
     return { closed, stopScope: result.permits, stopWorks: result.works };
   }
@@ -772,6 +854,7 @@ export class ControlHost {
       const permit = this.permitView(permitId);
       if (permit.state !== 'admitted') throw new HostError(409, 'not_admitted', 'An operation starts only under an admitted permit.');
       if (permit.operation !== kind) throw new HostError(409, 'conflict', `The permit was decided for ${permit.operation}, not ${kind}.`);
+      if (kind.startsWith('app.') && this.get("SELECT operation_id FROM operations WHERE policy_id=? AND kind LIKE 'app.%' AND outcome IN ('in_progress','reconciling')", permit.policy_id)) throw new HostError(409, 'lifecycle_busy', 'A lifecycle operation already owns this policy; reconcile its receipt before another replacement.');
       const operationId = randomUUID();
       const at = nowIsoFrom(this.time);
       this.run(`INSERT INTO operations(operation_id, policy_id, kind, phase, outcome, intent_json, evidence_json, permit_id, created_at, updated_at) VALUES (?, ?, ?, 'intent_recorded', 'in_progress', ?, '{}', ?, ?, ?)`,
@@ -801,7 +884,7 @@ export class ControlHost {
       if (!['build_verified', 'old_terminated'].includes(operation.phase)) throw new HostError(409, 'conflict', `A launch needs a verified build; the operation is at ${operation.phase}.`);
       const policy = this.policyRow(operation.policy_id);
       const time = remainingAuthority(policy, this.time);
-      if (policy.state !== 'active' || !time.valid || this.closedBarriers.has(policy.policy_id)) throw new HostError(403, 'policy_not_active', `The policy is not valid for a launch (${policy.state}, ${time.reason}).`);
+      if (policy.state !== 'active' || !time.valid || this.closedBarriers.has(policy.policy_id) || this.dispatchBlocked) throw new HostError(403, 'policy_not_active', `The policy is not valid/reconciled for a launch (${policy.state}, ${time.reason}).`);
       const nonce = randomBytes(32).toString('hex');
       this.run(`INSERT INTO registration_proofs(proof_sha256, policy_id, operation_id, kind, expected_json, host_instance, issued_at) VALUES (?, ?, ?, 'launch', '{}', ?, ?)`,
         sha256(Buffer.from(nonce)), policy.policy_id, operationId, this.hostInstance, nowIsoFrom(this.time));
@@ -888,6 +971,10 @@ export class ControlHost {
     if (reconciling) reasons.push(`${reconciling} operation(s) need reconciliation`);
     const orphaned = this.get(`SELECT COUNT(*) AS n FROM active_work WHERE state = 'active' AND host_instance != ?`, this.hostInstance).n;
     if (orphaned) reasons.push(`${orphaned} owned work item(s) from a previous host instance need native reconciliation`);
+    if (this.get("SELECT name FROM sqlite_master WHERE type='table' AND name='controller_queue'")) {
+      const queued = this.get("SELECT COUNT(*) AS n FROM controller_queue WHERE state='reconciling'").n;
+      if (queued) reasons.push(`${queued} controller step(s) need native reconciliation`);
+    }
     this.dispatchBlocked = reasons.length ? reasons.join('; ') : null;
     return this.dispatchBlocked;
   }

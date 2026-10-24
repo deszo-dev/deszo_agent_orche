@@ -79,7 +79,7 @@ export interface Workspace { workspaceId: string; cwd: string; cwdIdentity: stri
 export type RunState = 'queued' | 'running' | 'draining' | 'waiting_for_user' | 'stopping' | 'succeeded' | 'failed' | 'canceled' | 'interrupted';
 export type AttemptState = 'scheduled' | 'waiting' | 'running' | 'succeeded' | 'failed' | 'canceled' | 'blocked' | 'interrupted' | 'reused' | 'skipped';
 export const TERMINAL_RUN: RunState[] = ['succeeded', 'failed', 'canceled', 'interrupted'];
-export interface Run { runId: string; workflowId: string; workflowSnapshot: ArtifactRef; executionHash: string; state: RunState; lastSequence: number; createdAt: string; workspaceId: string; kind: 'workflow' | 'chat' }
+export interface Run { runId: string; workflowId: string; workflowSnapshot: ArtifactRef; executionHash: string; state: RunState; lastSequence: number; createdAt: string; workspaceId: string; kind: 'workflow' | 'chat'; controlMode?: 'supervised' | 'unsupervised' }
 export interface CachePin { nodeId: string; value: { type: ValueType; artifact: ArtifactRef }; sourceRunId: string; sourceAttemptId: string; fingerprint: string; sourceChanged: boolean; orphaned?: boolean; pinnedAt: string }
 export interface LoopExecution { loopNodeId: string; state: 'running' | 'paused' | 'finished' | 'failed' | 'canceled' | 'interrupted'; iteration: number; maxIterations: number; maxActiveMinutes: number; activeMs: number; pauseReason: string | null }
 export interface RunSnapshot {
@@ -125,4 +125,5 @@ export interface RunRequest {
   requestId: string; workflowId: string; workspaceId: string; workflowSnapshotSha256: string; clientLabel: string | null;
   state: 'pending' | 'approved' | 'denied' | 'expired'; createdAt: string; expiresAt: string; runId: string | null;
   problem: { code: string; message: string; details: { path: string; message: string }[] } | null;
+  controlGrantId?: string | null; controlModeRequested?: 'supervised' | 'unsupervised';
 }

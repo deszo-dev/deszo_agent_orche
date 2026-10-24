@@ -1,0 +1,12 @@
+{
+  "cliVersion": "1.4.4",
+  "authMethod": "consumer",
+  "quotaProject": null,
+  "gcpMeteredBilling": false,
+  "useG1Credits": false,
+  "hasApiKeyOverride": false,
+  "mcpPermissions": [
+    "mcp(deszo-evidence/*)"
+  ],
+  "status": "PASS"
+}

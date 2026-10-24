@@ -325,6 +325,40 @@ test('a supervised run is armed before its first launch, a missed acknowledgemen
   }
 });
 
+test('controller-paused Root Stop finalizes an idle supervised run without dispatching more work', async () => {
+  const api = await startTestRunner();
+  const engine = api.runner.engine;
+  try {
+    const seeded = await pendingSupervisedRun(api);
+    const approval = await api.call('POST', `/api/v2/run-requests/${seeded.command.requestId}/decision`, { requestId: randomUUID(), decision: 'approve' });
+    assert.equal(approval.status, 202, JSON.stringify(approval.body));
+    const runId = approval.body.run.runId;
+    await api.waitFor(runId, run => run.state === 'waiting_for_user');
+    assert.equal(engine.liveIn(engine.runs.get(runId)).length, 0, 'the shim refusal has left no launched child');
+    engine.store.run('UPDATE control_grants SET last_ack_at = ? WHERE id = ?', new Date(Date.now() - 60_000).toISOString(), seeded.grantId);
+    engine.watchdogTick(seeded.grantId, runId);
+    assert.equal(engine.dispatchPaused.has(runId), true);
+    const attemptsBeforeStop = engine.store.get('SELECT COUNT(*) AS n FROM attempts WHERE run_id = ?', runId).n;
+    engine.supervisor.escalated = true;
+    await engine.checkEscalation(runId);
+    const ended = await api.waitFor(runId, run => ENDED.includes(run.state), 2_000);
+    assert.equal(ended.run.state, 'canceled');
+    const proof = await waitUntil(() => engine.store.get('SELECT outcome, containment, proof_artifact_id FROM termination_proofs WHERE run_id = ?', runId), 2_000);
+    assert.equal(proof.outcome, 'stopped');
+    assert.equal(proof.containment, 'none', 'an empty launch set is proven without claiming native process containment');
+    const record = engine.store.readJson(proof.proof_artifact_id);
+    assert.equal(record.controlMode, 'supervised', 'the proof retains execution mode after the grant ends');
+    assert.equal(record.ownedAttempts, 0);
+    assert.deepEqual(record.members, []);
+    assert.ok(engine.supervisor.calls.some(([operation]) => operation === 'prove'));
+    assert.equal(engine.store.get('SELECT COUNT(*) AS n FROM attempts WHERE run_id = ?', runId).n, attemptsBeforeStop, 'Stop does not plan another attempt');
+    assert.ok(engine.store.all('SELECT process_id FROM attempts WHERE run_id = ?', runId).every(attempt => attempt.process_id === null), 'no child was launched after controller pause');
+    assert.equal(engine.activeGrant(runId), null, 'ending the run ends its control grant');
+    assert.equal(engine.watchdogs.has(runId), false);
+    assert.equal(engine.dispatchPaused.has(runId), false);
+  } finally { await api.close(); }
+});
+
 test('an incident spooled while the store was unavailable is reconciled into the registry on the next start', async () => {
   mkdirSync(testsRoot, { recursive: true });
   const root = mkdtempSync(join(testsRoot, 'spool-'));
@@ -459,7 +493,7 @@ test('a grant pins its workflow revision, and requesting or binding it needs the
     const saved = await api.save(singleAgent({ id: 'pinned' }));
     const session = engine.createControllerSession({ requestId: randomUUID(), clientLabel: 'test controller', clientProvider: 'codex' }).body;
     const request = sha => ({ requestId: randomUUID(), controllerSessionId: session.controllerSessionId, workflowId: 'pinned', workflowSnapshotSha256: sha,
-      workspaceId: 'main', clientProvider: 'codex', requestedActions: ['observe'], observationDeadlineMs: 10000, escalationDeadlineMs: 30000 });
+      workspaceId: 'main', clientProvider: 'codex', clientVersion: codex.testedVersion, requestedActions: ['observe'], observationDeadlineMs: 10000, escalationDeadlineMs: 30000 });
     const refusal = (fn, status, code) => { try { fn(); } catch (error) { assert.equal(error.status, status, error.message); assert.equal(error.code, code); return; } assert.fail(`expected ${status} ${code}`); };
     refusal(() => engine.requestControlGrant(request('f'.repeat(64)), { controllerToken: session.controllerToken }), 409, 'conflict');
     refusal(() => engine.requestControlGrant(request(saved.snapshotSha256), { controllerToken: null }), 403, 'controller_credential_required');
@@ -475,6 +509,79 @@ test('a grant pins its workflow revision, and requesting or binding it needs the
     codex.status = savedStatus;
     await api.close();
   }
+});
+
+async function pendingSupervisedRun(api) {
+  const engine = api.runner.engine;
+  engine.supervisor = fakeSupervisor();
+  await api.workspace();
+  const current = engine.currentSettings();
+  await api.call('PUT', '/api/v2/settings', {requestId: randomUUID(), expectedRevision: current.revision,
+    settings: {...current.settings, externalRunConfirmation: true}});
+  const saved = await api.save(singleAgent({id: 'supervised-approval', context: null}));
+  const session = engine.createControllerSession({requestId: randomUUID(), clientLabel: 'approval controller', clientProvider: 'codex'}).body;
+  const grantBody = {requestId: randomUUID(), controllerSessionId: session.controllerSessionId, workflowId: 'supervised-approval',
+    workflowSnapshotSha256: saved.snapshotSha256, workspaceId: 'main', clientProvider: 'codex',
+    clientVersion: clientTimeouts.entries.find(x => x.provider === 'codex').testedVersion,
+    requestedActions: ['observe', 'acknowledge', 'stop'], observationDeadlineMs: 10000, escalationDeadlineMs: 30000};
+  const options = {headers: {'X-Deszo-Controller-Token': session.controllerToken}};
+  const wrongVersion = await api.callExternal('POST', '/api/v2/control-grants', {...grantBody, requestId: randomUUID(), clientVersion: 'unmeasured-version'}, options);
+  assert.equal(wrongVersion.status, 409);
+  assert.equal(wrongVersion.body.code, 'supervision_unavailable');
+  const grant = await api.callExternal('POST', '/api/v2/control-grants', grantBody, options);
+  assert.equal(grant.status, 202, JSON.stringify(grant.body));
+  assert.equal((await api.callExternal('GET', '/api/v2/control-grants')).status, 403, 'only the first-party app can list the approval queue');
+  const queue = await api.call('GET', '/api/v2/control-grants');
+  assert.equal(queue.body.items[0].workflowSnapshotSha256, saved.snapshotSha256);
+  assert.equal(queue.body.items[0].clientLabel, 'approval controller');
+  assert.equal(queue.body.items[0].clientVersion, grantBody.clientVersion);
+  await api.call('POST', `/api/v2/control-grants/${grant.body.grantId}/decision`, {requestId: randomUUID(), decision: 'approve'});
+  const command = {requestId: randomUUID(), workflowId: 'supervised-approval', workflowSnapshotSha256: saved.snapshotSha256,
+    workspaceId: 'main', controlGrantId: grant.body.grantId};
+  const withoutCredential = await api.callExternal('POST', '/api/v2/runs', {...command, requestId: randomUUID()});
+  assert.equal(withoutCredential.status, 403);
+  const pending = await api.callExternal('POST', '/api/v2/runs', command, options);
+  assert.equal(pending.body.outcome, 'confirmation_pending', JSON.stringify(pending.body));
+  assert.equal(engine.store.get('SELECT COUNT(*) AS n FROM runs').n, 0);
+  assert.equal(JSON.stringify(engine.store.get('SELECT * FROM external_run_requests WHERE request_id = ?', command.requestId)).includes(session.controllerToken), false);
+  const status = await api.callExternal('GET', `/api/v2/run-requests/${command.requestId}`);
+  assert.equal(status.body.controlModeRequested, 'supervised');
+  assert.equal(status.body.controlGrantId, grant.body.grantId);
+  return {command, session, grantId: grant.body.grantId};
+}
+
+test('first-party approval binds a pending supervised run after restart without persisting its controller secret', async () => {
+  const first = await startTestRunner();
+  let seeded;
+  try {seeded = await pendingSupervisedRun(first);} finally {await first.close();}
+  const api = await startTestRunner({root: first.root});
+  api.runner.engine.supervisor = fakeSupervisor();
+  try {
+    const approval = await api.call('POST', `/api/v2/run-requests/${seeded.command.requestId}/decision`, {requestId: randomUUID(), decision: 'approve'});
+    assert.equal(approval.status, 202, JSON.stringify(approval.body));
+    assert.equal(approval.body.run.controlMode, 'supervised');
+    assert.equal(approval.body.request.controlModeRequested, 'supervised');
+    const runId = approval.body.run.runId;
+    await api.waitFor(runId, run => run.state === 'waiting_for_user');
+    assert.deepEqual(api.runner.engine.supervisor.arms.map(x => x.runId), [runId], 'the native arm happens exactly once');
+    const attempts = api.runner.engine.store.all('SELECT process_id FROM attempts WHERE run_id = ?', runId);
+    assert.ok(attempts.every(x => x.process_id === null), 'the fake supervisor has no shim and must not fall back to direct process creation');
+    await api.call('POST', `/api/v2/runs/${runId}/stop`, {requestId: randomUUID()});
+    await api.waitFor(runId, run => ENDED.includes(run.state));
+  } finally {await api.close();}
+});
+
+test('revoking a pending run grant prevents capture and cannot fall back to an ordinary run', async () => {
+  const api = await startTestRunner();
+  try {
+    const seeded = await pendingSupervisedRun(api);
+    await api.call('POST', `/api/v2/control-grants/${seeded.grantId}/revoke`, {requestId: randomUUID(), reason: 'Operator revoked before dispatch.'});
+    const approval = await api.call('POST', `/api/v2/run-requests/${seeded.command.requestId}/decision`, {requestId: randomUUID(), decision: 'approve'});
+    assert.equal(approval.status, 409, JSON.stringify(approval.body));
+    assert.equal(api.runner.engine.store.get('SELECT COUNT(*) AS n FROM runs').n, 0);
+    assert.equal(api.runner.engine.supervisor.arms.length, 0);
+    assert.equal((await api.callExternal('GET', `/api/v2/run-requests/${seeded.command.requestId}`)).body.state, 'denied');
+  } finally {await api.close();}
 });
 
 test('the emergency credential goes only to the granted controller, and the run ending ends it', async () => {

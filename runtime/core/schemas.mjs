@@ -29,6 +29,7 @@ import deliveryPlan from '../../docs/schemas/delivery-plan.schema.json' with { t
 import deliveryResult from '../../docs/schemas/delivery-result.schema.json' with { type: 'json' };
 import managedTask from '../../docs/schemas/managed-task.schema.json' with { type: 'json' };
 import autonomyPolicy from '../../docs/schemas/autonomy-policy.schema.json' with { type: 'json' };
+import judgeControl from '../../docs/schemas/judge-control.schema.json' with { type: 'json' };
 
 export const SCHEMAS = {
   'workflow.schema.json': workflow,
@@ -60,6 +61,7 @@ export const SCHEMAS = {
   'delivery-result.schema.json': deliveryResult,
   'managed-task.schema.json': managedTask,
   'autonomy-policy.schema.json': autonomyPolicy,
+  'judge-control.schema.json': judgeControl,
 };
 
 const AjvClass = Ajv2020.default || Ajv2020;

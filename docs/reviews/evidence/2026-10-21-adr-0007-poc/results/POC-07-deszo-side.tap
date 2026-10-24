@@ -1,0 +1,497 @@
+TAP version 13
+# Subtest: planned close verifies the application and Node death, preserving original authority and exhausted restart count; replay never closes a replacement
+ok 1 - planned close verifies the application and Node death, preserving original authority and exhausted restart count; replay never closes a replacement
+  ---
+  duration_ms: 352.2629
+  type: 'test'
+  ...
+# Subtest: close refuses missing authority, wrong connection, wrong generation and supplied PID/outcome without touching the application
+ok 2 - close refuses missing authority, wrong connection, wrong generation and supplied PID/outcome without touching the application
+  ---
+  duration_ms: 199.1997
+  type: 'test'
+  ...
+# Subtest: Stop fences outstanding permits and new queue claims; concurrent identical requests return the pending receipt
+ok 3 - Stop fences outstanding permits and new queue claims; concurrent identical requests return the pending receipt
+  ---
+  duration_ms: 224.106
+  type: 'test'
+  ...
+1..0
+# Subtest: runtime\\tests\\adr6-attestation.test.mjs
+ok 2 - runtime\\tests\\adr6-attestation.test.mjs
+  ---
+  duration_ms: 1971.7068
+  type: 'test'
+  ...
+1..0
+# Subtest: runtime\\tests\\adr6-bridge-credentials.test.mjs
+ok 3 - runtime\\tests\\adr6-bridge-credentials.test.mjs
+  ---
+  duration_ms: 854.8086
+  type: 'test'
+  ...
+# Subtest: ADR6 authority closure follows real shared imports outside its path prefixes while allowing unrelated UI changes
+ok 6 - ADR6 authority closure follows real shared imports outside its path prefixes while allowing unrelated UI changes
+  ---
+  duration_ms: 1738.9281
+  type: 'test'
+  ...
+# Subtest: ADR6 the engine charges one host repair cycle across role/context turns and refuses the next cycle before another provider permit
+ok 7 - ADR6 the engine charges one host repair cycle across role/context turns and refuses the next cycle before another provider permit
+  ---
+  duration_ms: 410.421
+  type: 'test'
+  ...
+# Subtest: ADR6 durable queue fences concurrent workers, preserves receipts and never replays an unknown effect
+ok 8 - ADR6 durable queue fences concurrent workers, preserves receipts and never replays an unknown effect
+  ---
+  duration_ms: 217.795
+  type: 'test'
+  ...
+# Subtest: ADR6 rollback refuses a schema downgrade, while fork restore preserves new committed writes and original profile
+ok 9 - ADR6 rollback refuses a schema downgrade, while fork restore preserves new committed writes and original profile
+  ---
+  duration_ms: 745.0144
+  type: 'test'
+  ...
+# Subtest: ADR6 a real committed WAL write during profile copying still blocks restore and preserves the new source data
+ok 10 - ADR6 a real committed WAL write during profile copying still blocks restore and preserves the new source data
+  ---
+  duration_ms: 718.2458
+  type: 'test'
+  ...
+# Subtest: ADR6 Node recovery authenticates a fresh native peer, retains expiry/budgets and fences the previous generation
+ok 11 - ADR6 Node recovery authenticates a fresh native peer, retains expiry/budgets and fences the previous generation
+  ---
+  duration_ms: 400.901
+  type: 'test'
+  ...
+# Subtest: ADR6 Node recovery requires explicit scope and remaining restart budget, with no new consent term
+ok 12 - ADR6 Node recovery requires explicit scope and remaining restart budget, with no new consent term
+  ---
+  duration_ms: 655.1454
+  type: 'test'
+  ...
+# Subtest: ADR6 consent negatives: an abandoned, foreign, expired or reused enrollment challenge pins nothing and completes nothing
+ok 13 - ADR6 consent negatives: an abandoned, foreign, expired or reused enrollment challenge pins nothing and completes nothing
+  ---
+  duration_ms: 130.8949
+  type: 'test'
+  ...
+1..0
+# Subtest: runtime\\tests\\adr6-incident-spool.test.mjs
+ok 7 - runtime\\tests\\adr6-incident-spool.test.mjs
+  ---
+  duration_ms: 672.0135
+  type: 'test'
+  ...
+1..0
+# Subtest: runtime\\tests\\adr6-migration-matrix.test.mjs
+ok 8 - runtime\\tests\\adr6-migration-matrix.test.mjs
+  ---
+  duration_ms: 684.7494
+  type: 'test'
+  ...
+1..0
+# Subtest: runtime\\tests\\adr6-native-job.test.mjs
+ok 9 - runtime\\tests\\adr6-native-job.test.mjs
+  ---
+  duration_ms: 161.0001
+  type: 'test'
+  ...
+1..0
+# Subtest: runtime\\tests\\adr6-native-ui.test.mjs
+ok 10 - runtime\\tests\\adr6-native-ui.test.mjs
+  ---
+  duration_ms: 515.4158
+  type: 'test'
+  ...
+1..0
+# Subtest: runtime\\tests\\adr6-profile-crash.test.mjs
+ok 11 - runtime\\tests\\adr6-profile-crash.test.mjs
+  ---
+  duration_ms: 689.7935
+  type: 'test'
+  ...
+# Subtest: ADR6-I01 (N02): revoking a policy stops a running run whose permit was already settled for accounting
+ok 19 - ADR6-I01 (N02): revoking a policy stops a running run whose permit was already settled for accounting
+  ---
+  duration_ms: 3363.3756
+  type: 'test'
+  ...
+# Subtest: ADR6-I03: a second authority owner for the same state is refused; a read-only view cannot write
+ok 20 - ADR6-I03: a second authority owner for the same state is refused; a read-only view cannot write
+  ---
+  duration_ms: 296.9969
+  type: 'test'
+  ...
+# Subtest: ADR6-I05 (N06): a run under a one-invocation budget cannot complete three provider invocations
+ok 21 - ADR6-I05 (N06): a run under a one-invocation budget cannot complete three provider invocations
+  ---
+  duration_ms: 2564.4276
+  type: 'test'
+  ...
+# Subtest: ADR6 route guard: in a host-bound runtime a direct run and an approved request need a host permit; pending requests stay pending
+ok 22 - ADR6 route guard: in a host-bound runtime a direct run and an approved request need a host permit; pending requests stay pending
+  ---
+  duration_ms: 1666.0989
+  type: 'test'
+  ...
+# Subtest: ADR6-GAP3: superseding a policy invalidates its unadmitted permits and returns their reservations to the session budget
+ok 23 - ADR6-GAP3: superseding a policy invalidates its unadmitted permits and returns their reservations to the session budget
+  ---
+  duration_ms: 164.1299
+  type: 'test'
+  ...
+# Subtest: ADR6-GAP3: a consent commit that supersedes a policy keeps its owned work under the session and releases its permits
+ok 24 - ADR6-GAP3: a consent commit that supersedes a policy keeps its owned work under the session and releases its permits
+  ---
+  duration_ms: 236.4371
+  type: 'test'
+  ...
+1..0
+# Subtest: runtime\\tests\\adr6-route-matrix.test.mjs
+ok 13 - runtime\\tests\\adr6-route-matrix.test.mjs
+  ---
+  duration_ms: 685.1495
+  type: 'test'
+  ...
+# Subtest: ADR6 consented diagnostics can verify an app while bootstrap still denies workflows, providers, commands and production authority
+ok 26 - ADR6 consented diagnostics can verify an app while bootstrap still denies workflows, providers, commands and production authority
+  ---
+  duration_ms: 397.8753
+  type: 'test'
+  ...
+# Subtest: ADR6 diagnostic planned close needs explicit fresh scope and its exact queued step; legacy app.verify authority does not widen
+ok 27 - ADR6 diagnostic planned close needs explicit fresh scope and its exact queued step; legacy app.verify authority does not widen
+  ---
+  duration_ms: 500.3976
+  type: 'test'
+  ...
+1..0
+# Subtest: runtime\\tests\\adr6-webauthn.test.mjs
+ok 15 - runtime\\tests\\adr6-webauthn.test.mjs
+  ---
+  duration_ms: 808.1992
+  type: 'test'
+  ...
+# Subtest: Antigravity finish timeout preserves the engine result boundary
+ok 29 - Antigravity finish timeout preserves the engine result boundary
+  ---
+  duration_ms: 7435.003
+  type: 'test'
+  ...
+# Subtest: Antigravity finish recovered preserves the engine result boundary
+ok 30 - Antigravity finish recovered preserves the engine result boundary
+  ---
+  duration_ms: 1481.3574
+  type: 'test'
+  ...
+# Subtest: Antigravity finish invalid-result preserves the engine result boundary
+ok 31 - Antigravity finish invalid-result preserves the engine result boundary
+  ---
+  duration_ms: 1355.6589
+  type: 'test'
+  ...
+# Subtest: the bridge refuses same-runtime and foreign managed markers, and ignores an absent marker
+ok 32 - the bridge refuses same-runtime and foreign managed markers, and ignores an absent marker
+  ---
+  duration_ms: 2.6806
+  type: 'test'
+  ...
+# Subtest: managed-run isolation finds configured bridge entries and requires an exact verified neutralizer
+ok 33 - managed-run isolation finds configured bridge entries and requires an exact verified neutralizer
+  ---
+  duration_ms: 42.87
+  type: 'test'
+  ...
+# Subtest: Antigravity managed preflight scans the workspace project configuration and requires a verified neutralizer
+ok 34 - Antigravity managed preflight scans the workspace project configuration and requires a verified neutralizer
+  ---
+  duration_ms: 23.8516
+  type: 'test'
+  ...
+# Subtest: Antigravity managed preflight ignores a registered authoring configuration outside the working directory
+ok 35 - Antigravity managed preflight ignores a registered authoring configuration outside the working directory
+  ---
+  duration_ms: 8.9579
+  type: 'test'
+  ...
+# Subtest: managed-run isolation detects a Deszo bridge from any install location, not only this runtime
+ok 36 - managed-run isolation detects a Deszo bridge from any install location, not only this runtime
+  ---
+  duration_ms: 10.2769
+  type: 'test'
+  ...
+# Subtest: expired external requests remain expired across a runtime restart
+ok 37 - expired external requests remain expired across a runtime restart
+  ---
+  duration_ms: 1250.3156
+  type: 'test'
+  ...
+# Subtest: R5: Existing branch delivery preserves ancestry and fast-forward history
+ok 38 - R5: Existing branch delivery preserves ancestry and fast-forward history
+  ---
+  duration_ms: 6252.6906
+  type: 'test'
+  ...
+# Subtest: real stdio bridge refuses every management call with a same-runtime or foreign managed marker
+ok 39 - real stdio bridge refuses every management call with a same-runtime or foreign managed marker
+  ---
+  duration_ms: 2018.8461
+  type: 'test'
+  ...
+# Subtest: an open stdio bridge reconnects to the same store after restart and preserves save receipts
+ok 40 - an open stdio bridge reconnects to the same store after restart and preserves save receipts
+  ---
+  duration_ms: 2423.4193
+  type: 'test'
+  ...
+1..0
+# Subtest: runtime\\tests\\context-contracts.test.mjs
+ok 20 - runtime\\tests\\context-contracts.test.mjs
+  ---
+  duration_ms: 781.5895
+  type: 'test'
+  ...
+# Subtest: fixture manifest-invocation
+ok 42 - fixture manifest-invocation
+  ---
+  duration_ms: 32.6094
+  type: 'test'
+  ...
+# Subtest: fixture event-attempt.invocation_committed
+ok 43 - fixture event-attempt.invocation_committed
+  ---
+  duration_ms: 92.8096
+  type: 'test'
+  ...
+# Subtest: fixture reserved-wait-in-run
+ok 44 - fixture reserved-wait-in-run
+  ---
+  duration_ms: 13.7323
+  type: 'test'
+  ...
+# Subtest: fixture reserved-wait-in-stop-response
+ok 45 - fixture reserved-wait-in-stop-response
+  ---
+  duration_ms: 5.0451
+  type: 'test'
+  ...
+# Subtest: fixture reserved-wait-in-history-filter
+ok 46 - fixture reserved-wait-in-history-filter
+  ---
+  duration_ms: 5.8963
+  type: 'test'
+  ...
+# Subtest: fixture reserved-wait-as-next-event-state
+ok 47 - fixture reserved-wait-as-next-event-state
+  ---
+  duration_ms: 2.4967
+  type: 'test'
+  ...
+# Subtest: fixture reserved-wait-as-previous-event-state
+ok 48 - fixture reserved-wait-as-previous-event-state
+  ---
+  duration_ms: 2.1873
+  type: 'test'
+  ...
+# Subtest: fixture m34-reserved-slot
+ok 49 - fixture m34-reserved-slot
+  ---
+  duration_ms: 614.0374
+  type: 'test'
+  ...
+# Subtest: fixture rf-reserved-delivery-slot
+ok 50 - fixture rf-reserved-delivery-slot
+  ---
+  duration_ms: 590.6181
+  type: 'test'
+  ...
+1..0
+# Subtest: runtime\\tests\\control-host-exploration.test.mjs
+ok 22 - runtime\\tests\\control-host-exploration.test.mjs
+  ---
+  duration_ms: 647.2481
+  type: 'test'
+  ...
+# Subtest: ADR6-01: an expired challenge and an untrusted enrollment cannot authorize a policy
+ok 52 - ADR6-01: an expired challenge and an untrusted enrollment cannot authorize a policy
+  ---
+  duration_ms: 302.0452
+  type: 'test'
+  ...
+# Subtest: ADR6-04: post-reboot authorization is a new linked decision that carries consumed budgets forward
+ok 53 - ADR6-04: post-reboot authorization is a new linked decision that carries consumed budgets forward
+  ---
+  duration_ms: 350.3517
+  type: 'test'
+  ...
+# Subtest: workspace planning preserves developer edits and discovers source changes without copying them
+ok 54 - workspace planning preserves developer edits and discovers source changes without copying them
+  ---
+  duration_ms: 1724.9542
+  type: 'test'
+  ...
+1..0
+# Subtest: runtime\\tests\\effort.test.mjs
+ok 25 - runtime\\tests\\effort.test.mjs
+  ---
+  duration_ms: 760.9282
+  type: 'test'
+  ...
+1..0
+# Subtest: runtime\\tests\\engine.test.mjs
+ok 26 - runtime\\tests\\engine.test.mjs
+  ---
+  duration_ms: 732.0115
+  type: 'test'
+  ...
+1..0
+# Subtest: runtime\\tests\\followup.test.mjs
+ok 27 - runtime\\tests\\followup.test.mjs
+  ---
+  duration_ms: 813.5778
+  type: 'test'
+  ...
+# Subtest: ADR6-01/07: a host permit admits an external run without the confirmation pause, and only that exact run
+ok 58 - ADR6-01/07: a host permit admits an external run without the confirmation pause, and only that exact run
+  ---
+  duration_ms: 3147.2466
+  type: 'test'
+  ...
+1..0
+# Subtest: runtime\\tests\\integrity.test.mjs
+ok 29 - runtime\\tests\\integrity.test.mjs
+  ---
+  duration_ms: 1042.7079
+  type: 'test'
+  ...
+1..0
+# Subtest: runtime\\tests\\loops.test.mjs
+ok 30 - runtime\\tests\\loops.test.mjs
+  ---
+  duration_ms: 790.8257
+  type: 'test'
+  ...
+# Subtest: managed task runs assessment, deterministic planning, isolated test/code roles, checks and authoritative acceptance through Engine
+ok 61 - managed task runs assessment, deterministic planning, isolated test/code roles, checks and authoritative acceptance through Engine
+  ---
+  duration_ms: 10285.2262
+  type: 'test'
+  ...
+# Subtest: managed task delivers a byte-verified feature branch without changing the caller checkout
+ok 62 - managed task delivers a byte-verified feature branch without changing the caller checkout
+  ---
+  duration_ms: 27093.4902
+  type: 'test'
+  ...
+# Subtest: an indeterminate ref-update receipt pauses delivery, preserves commit intent and refuses blind retry
+ok 63 - an indeterminate ref-update receipt pauses delivery, preserves commit intent and refuses blind retry
+  ---
+  duration_ms: 21126.6635
+  type: 'test'
+  ...
+# Subtest: restart preserves delivery intent for reconciliation and never resumes publishing
+ok 64 - restart preserves delivery intent for reconciliation and never resumes publishing
+  ---
+  duration_ms: 6442.1134
+  type: 'test'
+  ...
+1..0
+# Subtest: runtime\\tests\\map.test.mjs
+ok 32 - runtime\\tests\\map.test.mjs
+  ---
+  duration_ms: 850.0686
+  type: 'test'
+  ...
+# Subtest: PILOT-01: new and resumed invocations of every provider carry only the transport schema
+ok 66 - PILOT-01: new and resumed invocations of every provider carry only the transport schema
+  ---
+  duration_ms: 15.0936
+  type: 'test'
+  ...
+# Subtest: RERUN-04: issue resolution authority — own namespace, imported scope coverage, and full view for uncited issues
+ok 67 - RERUN-04: issue resolution authority — own namespace, imported scope coverage, and full view for uncited issues
+  ---
+  duration_ms: 3.3296
+  type: 'test'
+  ...
+1..0
+# Subtest: runtime\\tests\\pipeline.test.mjs
+ok 34 - runtime\\tests\\pipeline.test.mjs
+  ---
+  duration_ms: 695.9092
+  type: 'test'
+  ...
+1..0
+# Subtest: runtime\\tests\\reference.test.mjs
+ok 35 - runtime\\tests\\reference.test.mjs
+  ---
+  duration_ms: 696.5991
+  type: 'test'
+  ...
+1..0
+# Subtest: runtime\\tests\\release.test.mjs
+ok 36 - runtime\\tests\\release.test.mjs
+  ---
+  duration_ms: 194.7275
+  type: 'test'
+  ...
+1..0
+# Subtest: runtime\\tests\\restart-control.test.mjs
+ok 37 - runtime\\tests\\restart-control.test.mjs
+  ---
+  duration_ms: 785.8619
+  type: 'test'
+  ...
+1..0
+# Subtest: runtime\\tests\\revisions.test.mjs
+ok 38 - runtime\\tests\\revisions.test.mjs
+  ---
+  duration_ms: 536.8183
+  type: 'test'
+  ...
+1..0
+# Subtest: runtime\\tests\\run-observer.test.mjs
+ok 39 - runtime\\tests\\run-observer.test.mjs
+  ---
+  duration_ms: 211.3405
+  type: 'test'
+  ...
+# Subtest: incidents are filed by any authorised writer, triaged only by the first-party credential, and record their authority
+ok 74 - incidents are filed by any authorised writer, triaged only by the first-party credential, and record their authority
+  ---
+  duration_ms: 747.3853
+  type: 'test'
+  ...
+1..0
+# Subtest: runtime\\tests\\supervisor-client.test.mjs
+ok 41 - runtime\\tests\\supervisor-client.test.mjs
+  ---
+  duration_ms: 161.8504
+  type: 'test'
+  ...
+1..0
+# Subtest: runtime\\tests\\supervisor-pipe.test.mjs
+ok 42 - runtime\\tests\\supervisor-pipe.test.mjs
+  ---
+  duration_ms: 168.4293
+  type: 'test'
+  ...
+# Subtest: A4: a different document under an existing revision is refused and the active revision is preserved
+ok 77 - A4: a different document under an existing revision is refused and the active revision is preserved
+  ---
+  duration_ms: 558.5131
+  type: 'test'
+  ...
+1..77
+# tests 77
+# suites 0
+# pass 77
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 142186.9799

@@ -1,2 +1,3 @@
 # Audit evidence must retain its exact bytes so recorded SHA-256 digests survive checkout.
 docs/reviews/evidence/* -text
+docs/reviews/evidence/2026-10-21-antigravity-stage1/** -text

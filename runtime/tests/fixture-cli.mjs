@@ -204,11 +204,25 @@ if (triage) {
 if (scenario === 'write-out') { appendFileSync(join(process.cwd(), 'out.txt'), `written by ${provider}
 `); }
 if (scenario === 'noisy') { for (let i = 0; i < 400; i++) event({ type: 'fixture_noise', index: i, padding: 'x'.repeat(400) }); }
+if (scenario === 'lifecycle-proposal') {
+  // Deterministic Judge proposal for the self-repair fixture. It repeats the candidate identity that the harness saved in the
+  // workspace (candidate.json) and never computes or invents one. Without that file it proposes nothing.
+  const candidateFile = join(process.cwd(), 'candidate.json');
+  const candidate = existsSync(candidateFile) ? JSON.parse(readFileSync(candidateFile, 'utf8')) : null;
+  answer(candidate
+    ? `Candidate reviewed; contract tests passed.\nREQUEST_LIFECYCLE_ACTION ${JSON.stringify({ action: 'application.activate_candidate', target_version: candidate.candidateId ?? '0.2.1-repair.1', candidate_digest: candidate.candidateDigest, continuation_checkpoint_id: candidate.continuationCheckpointId })}`
+    : 'No candidate identity was found; no lifecycle action is requested.');
+  done(); process.exit(0);
+}
 const slow = /^slow-(\d+)$/.exec(scenario);
 if (slow) {
   // A descendant proves that Stop terminates the whole tree; a normal finish cleans it up.
   const descendant = spawn(process.execPath, ['-e', 'setInterval(()=>{},1000)'], { windowsHide: true, stdio: 'ignore' });
   descendant.unref();
+  if (stateDir) {
+    writeFileSync(join(stateDir, 'slow-provider.pid'), String(process.pid));
+    writeFileSync(join(stateDir, 'slow-descendant.pid'), String(descendant.pid));
+  }
   await sleep(Number(slow[1]) * 1000);
   try { process.kill(descendant.pid); } catch { /* Already gone. */ }
 }

@@ -6,6 +6,10 @@ Updated: 2026-10-15
 
 Deszo exposes workflow authoring through API v3 and a shared local stdio MCP bridge. The bridge attaches to an already running Deszo runtime. It does not launch a runtime or read the database. Other local tools can call the same authenticated loopback HTTP API directly.
 
+For current controller operations use the [Deszo Control skill](../../skills/deszo-control/SKILL.md) and the maintained `scripts/deszo-control.mjs` preflight/preparation commands. The [2026-10-21 control review](../reviews/2026-10-21-deszo-control-review.md) explains profile compatibility, complete supervised MCP tooling, reusable transport evidence and build receipts. A successful build alone is insufficient to select a runtime for an existing profile.
+
+The separate [Antigravity Judge Stage 1 scope](JUDGE_STAGE1.md) adds opt-in, invocation-scoped evidence and Worker-only decision submission. Its production-component tests do not certify installed native Judge delivery or extend the older client acceptance below; see the [qualified report](../reviews/2026-10-21-antigravity-stage1-report.md).
+
 The [acceptance test plan](ACCEPTANCE_TEST_PLAN.md) defines the ordered release gates. The [2026-10-15 acceptance report](../pilots/2026-10-15-authoring-acceptance.md) records the native probes, successful real-provider rerun, confirmation-default change, v2 save cutover, and installed-client results.
 
 ## Generate a client configuration

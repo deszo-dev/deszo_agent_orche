@@ -1,0 +1,25 @@
+
+> deszo@0.2.0 docs:check
+> node docs/tools/validate-docs.mjs
+
+{
+  "schemas": 30,
+  "positiveSchemaCases": 141,
+  "negativeSchemaCases": 82,
+  "negativeSemanticCases": 42,
+  "markdownFiles": 115,
+  "localLinks": 1100,
+  "mermaidDiagrams": 11,
+  "jsonFences": 6,
+  "sections": 14,
+  "tasks": 5,
+  "decisionCases": 50,
+  "sqlTables": 13,
+  "sqlCases": 67,
+  "sqlTablesAfterMigration2": 15,
+  "sqlTablesAfterMigration3": 17,
+  "sqlTablesAfterMigration4": 19,
+  "sqlTablesAfterMigration5": 19,
+  "strictJsonRejections": 2,
+  "errors": []
+}

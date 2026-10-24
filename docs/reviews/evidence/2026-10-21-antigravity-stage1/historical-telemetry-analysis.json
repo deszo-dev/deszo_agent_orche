@@ -1,0 +1,153 @@
+{
+  "schemaVersion": 1,
+  "kind": "Stage1HistoricalTelemetryAnalysis",
+  "recordedAt": "2026-10-21T14:49:32.073Z",
+  "newProviderCalls": 0,
+  "sources": {
+    "reportedSummary": {
+      "path": "../2026-10-21-antigravity-judge-e2e/traces/exp-f-telemetry.json",
+      "sha256": "a6831f0b224063103218b281859a2f0d1323a9f52d267561cd7078c9c0bb06ea"
+    },
+    "scopeDocumentation": "https://antigravity.google/docs/cli/headless/"
+  },
+  "historicalSummary": {
+    "claimedInvocations": 6,
+    "claimedTotalTokens": 524195,
+    "claimedDurationSeconds": "199.66"
+  },
+  "availableRawInvocationSnapshots": 4,
+  "snapshots": [
+    {
+      "source": "../2026-10-21-antigravity-judge-e2e/traces/turn-1-result.json",
+      "sourceSha256": "6d092dfbe552321b3dced1cbf28dc9232aac4cdc305fa4dfa3434a8b017491d7",
+      "nativeSessionIdentitySha256": "46d5cead783dba2ff74fdca70ae1b60bddf3c566b5cfb63cbddc52d111f03a7e",
+      "providerNumTurns": 1,
+      "providerStatus": "SUCCESS",
+      "localCliDurationMs": 39972,
+      "providerCumulativeDurationSeconds": 28.1061527,
+      "nativeUsage": {
+        "input_tokens": 27512,
+        "output_tokens": 3311,
+        "thinking_tokens": 2842,
+        "cache_read_tokens": 0,
+        "total_tokens": 30823
+      },
+      "deniedActionCount": 0,
+      "promptBytes": null,
+      "evidenceBytes": null,
+      "providerRetries": null
+    },
+    {
+      "source": "../2026-10-21-antigravity-judge-e2e/traces/turn-denial-result.json",
+      "sourceSha256": "e3f02832617ea259241e323b003f332063558ca7ac8e61961034e62c347a4575",
+      "nativeSessionIdentitySha256": "46d5cead783dba2ff74fdca70ae1b60bddf3c566b5cfb63cbddc52d111f03a7e",
+      "providerNumTurns": 2,
+      "providerStatus": "SUCCESS",
+      "localCliDurationMs": 31044,
+      "providerCumulativeDurationSeconds": 60.843423,
+      "nativeUsage": {
+        "input_tokens": 53166,
+        "output_tokens": 5292,
+        "thinking_tokens": 4609,
+        "cache_read_tokens": 0,
+        "total_tokens": 58458
+      },
+      "deniedActionCount": 0,
+      "promptBytes": null,
+      "evidenceBytes": null,
+      "providerRetries": null,
+      "derivedSincePreviousSnapshot": {
+        "turnsCovered": 1,
+        "usage": {
+          "input_tokens": 25654,
+          "output_tokens": 1981,
+          "thinking_tokens": 1767,
+          "cache_read_tokens": 0,
+          "total_tokens": 27635
+        },
+        "qualification": "Difference of observed cumulative counters; a gap covers multiple turns and is not an independently billed per-turn measurement."
+      }
+    },
+    {
+      "source": "../2026-10-21-antigravity-judge-e2e/traces/turn-3-followup-result.json",
+      "sourceSha256": "6cec2dae85426eaae9195888d78196af6e89ea08ca637172d3955aecd385d56d",
+      "nativeSessionIdentitySha256": "46d5cead783dba2ff74fdca70ae1b60bddf3c566b5cfb63cbddc52d111f03a7e",
+      "providerNumTurns": 3,
+      "providerStatus": "SUCCESS",
+      "localCliDurationMs": 31267,
+      "providerCumulativeDurationSeconds": 91.5149992,
+      "nativeUsage": {
+        "input_tokens": 85324,
+        "output_tokens": 7163,
+        "thinking_tokens": 5981,
+        "cache_read_tokens": 0,
+        "total_tokens": 92487
+      },
+      "deniedActionCount": 0,
+      "promptBytes": null,
+      "evidenceBytes": null,
+      "providerRetries": null,
+      "derivedSincePreviousSnapshot": {
+        "turnsCovered": 1,
+        "usage": {
+          "input_tokens": 32158,
+          "output_tokens": 1871,
+          "thinking_tokens": 1372,
+          "cache_read_tokens": 0,
+          "total_tokens": 34029
+        },
+        "qualification": "Difference of observed cumulative counters; a gap covers multiple turns and is not an independently billed per-turn measurement."
+      }
+    },
+    {
+      "source": "../2026-10-21-antigravity-judge-e2e/traces/turn-adversarial-result.json",
+      "sourceSha256": "1cefb37d712f8ee4994f23502d255a0738b356ef525dd8be2077a2c782a279ad",
+      "nativeSessionIdentitySha256": "46d5cead783dba2ff74fdca70ae1b60bddf3c566b5cfb63cbddc52d111f03a7e",
+      "providerNumTurns": 6,
+      "providerStatus": "SUCCESS",
+      "localCliDurationMs": 50891,
+      "providerCumulativeDurationSeconds": 191.3327222,
+      "nativeUsage": {
+        "input_tokens": 117151,
+        "output_tokens": 14621,
+        "thinking_tokens": 12052,
+        "cache_read_tokens": 100349,
+        "total_tokens": 131772
+      },
+      "deniedActionCount": 0,
+      "promptBytes": null,
+      "evidenceBytes": null,
+      "providerRetries": null,
+      "derivedSincePreviousSnapshot": {
+        "turnsCovered": 3,
+        "usage": {
+          "input_tokens": 31827,
+          "output_tokens": 7458,
+          "thinking_tokens": 6071,
+          "cache_read_tokens": 100349,
+          "total_tokens": 39285
+        },
+        "qualification": "Difference of observed cumulative counters; a gap covers multiple turns and is not an independently billed per-turn measurement."
+      }
+    }
+  ],
+  "latestObservedCumulativeSessionUsage": {
+    "input_tokens": 117151,
+    "output_tokens": 14621,
+    "thinking_tokens": 12052,
+    "cache_read_tokens": 100349,
+    "total_tokens": 131772
+  },
+  "analysis": {
+    "usageScope": "cumulative_session",
+    "numTurnsScope": "cumulative_session",
+    "nativeDurationScope": "cumulative_session",
+    "localCliDurationScope": "one_process_wall_time",
+    "historicalAggregation": "Summing resumed cumulative usage snapshots double counts earlier session work. The raw counters increase with num_turns in the same native session; the official headless documentation identifies these metadata counters as cumulative.",
+    "thinkingTokens": "Do not add thinking_tokens again to total_tokens; the native total equals input_tokens + output_tokens in the observed records.",
+    "efficiencyCause": "Repeated session history/cumulative accounting is demonstrated. Relative effects of prompt bytes, MCP output, reasoning effort, model steps and cache behavior cannot be isolated from four saved snapshots; the two queued-turn raw results and matched before/after quota observations are absent.",
+    "comparison": "Minimal / one-detail / multiple-detail Bridge measurements are in component-performance.json. They are deterministic component measurements, not live model consumption.",
+    "billing": "No trustworthy billing attribution or before/after subscription-quota measurements. The historical hard-coded $0.00 field is not adopted."
+  },
+  "productionPathE2E": "BLOCKED"
+}

@@ -1,0 +1,24 @@
+{
+  "grantId": "4efd4901-e0fc-41d2-bf82-a0b6f8acdee4",
+  "state": "approved",
+  "runId": null,
+  "workflowId": "deszo-fixer",
+  "workspaceId": "deszo-fixer",
+  "controllerSessionId": "931a884b-3f4a-4e98-9453-1039aff884bc",
+  "workflowSnapshotSha256": "e9a59fb978c566e2f182e9905004acc014966ff37f849187312161ecde51ec76",
+  "clientLabel": "Deszo Fixer judge — Codex 2026-10-21",
+  "clientProvider": "codex",
+  "clientVersion": "codex-cli 0.163.0-alpha.10.2",
+  "requestedActions": [
+    "observe",
+    "acknowledge",
+    "stop",
+    "stop-and-report",
+    "scoped-stop"
+  ],
+  "observationDeadlineMs": 180000,
+  "escalationDeadlineMs": 900000,
+  "requestedAt": "2026-10-21T06:31:39.203Z",
+  "decidedAt": "2026-10-21T06:32:09.692Z",
+  "boundAt": null
+}

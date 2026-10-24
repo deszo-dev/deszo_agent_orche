@@ -56,7 +56,7 @@ function setup({ scope: scopeOverrides = {}, limits: limitOverrides = {}, durati
   const { runtimeGeneration, attachSecret } = host.registerInitialRuntime({ policyId, connectionId, processEvidence: { pid: process.pid, creationTime: 'fixture-start', imageSha256: 'c'.repeat(64), sessionId: 1 } });
   const decide = (overrides = {}) => host.decide({ requestId: randomUUID(), policyId, operation: 'run.approve', workspaceId: 'main', workflowId: scope.workflows[0].workflowId,
     workflowSnapshotSha256: scope.workflows[0].baselineSha256, runtimeGeneration, cost: {}, ...overrides }, { connectionId });
-  return { root, time, host, scope, limits, policyId, connectionId, runtimeGeneration, attachSecret, decide };
+  return { root, time, host, scope, limits, policyId, connectionId, runtimeGeneration, attachSecret, decide, authenticatorKey: authenticator.privateKey, controllerPublicKey: controller.publicKey };
 }
 
 // A host-bound runtime in this process, reached over the real IPC protocol, as the runner binds it.
@@ -349,7 +349,8 @@ test('ADR6-I06 (N09): a launch whose reply is lost is reconciling, and a second 
 });
 
 test('ADR6-I06: a stop call that never answers is bounded and leaves the operation reconciling', async () => {
-  const ctx = setup();
+  // The stopped process is the registered controlling runtime, which only a controlling switch may stop (see ADR6-GAP1).
+  const ctx = setup({ scope: { applicationMode: 'controlling_switch' } });
   try {
     const build = buildFixture(ctx);
     // A stop call that never answers is bounded by the phase timeout and is ambiguous, not a clean refusal.
@@ -448,6 +449,110 @@ test('ADR6 route guard: in a host-bound runtime a direct run and an approved req
     assert.equal(created.body.outcome, 'created', JSON.stringify(created));
     assert.equal((await ctx.api.waitFor(created.body.run.runId)).run.state, 'succeeded');
   });
+});
+
+// ---------- Supersession: a superseded policy's owned work and permits stay under the session's fences ----------
+
+// Issues a real extension of the policy (a new decision, consent assertion and single-use challenge) and returns the new policy ID.
+function extendPolicy(ctx, supersedesPolicyId, durationMs = HOUR) {
+  const proposal = ctx.host.proposePolicy({ decisionType: 'extend', supersedesPolicyId, controller: { controllerId: 'fixture-controller', publicKey: ctx.controllerPublicKey },
+    scope: ctx.scope, limits: ctx.limits, durationMs });
+  const clientData = { type: 'deszo.autonomy.consent', challengeId: proposal.challengeId, nonce: proposal.nonce, decisionDigest: proposal.decisionDigest, audience: proposal.audience };
+  const flags = { userPresent: true, userVerified: true };
+  return ctx.host.authorizePolicy({ challengeId: proposal.challengeId, assertion: { credentialId: 'fixture-credential', clientData, flags, signature: signed(ctx.authenticatorKey, { clientData, flags }) } }).policyId;
+}
+
+test('ADR6-GAP3: revoking the current policy stops owned work admitted under the policy it superseded', () => {
+  const ctx = setup();
+  const permit = ctx.decide();
+  assert.equal(ctx.host.admit(permit.permitId).admitted, true);
+  ctx.host.settle(permit.permitId, { effect: 'consumed', evidence: 'run under the first policy', workRef: 'run-under-first-policy' });
+  const second = extendPolicy(ctx, ctx.policyId);
+  assert.equal(ctx.host.policyRow(ctx.policyId).state, 'superseded');
+  const revoked = ctx.host.revoke(second, { actor: 'regression test' });
+  assert.ok(revoked.stopWorks.some(work => work.workRef === 'run-under-first-policy'), 'The superseded policy\'s owned run is in the kill-switch Stop scope.');
+  ctx.host.close();
+});
+
+test('ADR6-GAP3: superseding a policy invalidates its unadmitted permits and returns their reservations to the session budget', () => {
+  const ctx = setup();
+  const issued = ctx.decide();
+  const sessionId = ctx.host.status(ctx.policyId).sessionId;
+  assert.equal(ctx.host.usage(sessionId).attempts, 1);
+  extendPolicy(ctx, ctx.policyId);
+  assert.equal(ctx.host.permitView(issued.permitId).state, 'invalidated');
+  assert.equal(ctx.host.usage(sessionId).attempts, 0, 'The reservation of the invalidated permit no longer counts.');
+  ctx.host.close();
+});
+
+test('ADR6-GAP3: expiry of the covering policy stops owned work admitted under the superseded policy', () => {
+  const ctx = setup({ durationMs: HOUR });
+  const permit = ctx.decide();
+  assert.equal(ctx.host.admit(permit.permitId).admitted, true);
+  ctx.host.settle(permit.permitId, { effect: 'consumed', evidence: 'run under the first policy', workRef: 'run-expiring-chain' });
+  extendPolicy(ctx, ctx.policyId, 2 * HOUR);
+  ctx.time.advance(2 * HOUR + 1);
+  const closed = ctx.host.enforceExpiry();
+  assert.ok(closed.stopWorks.some(work => work.workRef === 'run-expiring-chain'), 'Owned work of the superseded policy is in the expiry Stop scope.');
+  ctx.host.close();
+});
+
+// ---------- Workspace binding: a provider charge names the directory it runs in ----------
+
+test('ADR6-GAP4: a provider charge is refused when its workspace no longer sits in the authorized directory', () => {
+  const ctx = setup();
+  const runtime = { policyId: ctx.policyId, runtimeGeneration: ctx.runtimeGeneration };
+  const base = { policyId: ctx.policyId, operation: 'provider.invoke', workspaceId: 'main', workflowId: ctx.scope.workflows[0].workflowId,
+    workflowSnapshotSha256: SNAPSHOT, runtimeGeneration: ctx.runtimeGeneration, cost: {} };
+  try {
+    const moved = ctx.host.decide({ ...base, requestId: randomUUID(), workspaceCwdIdentity: 'c'.repeat(64) }, { runtime });
+    assert.equal(moved.outcome, 'denied');
+    assert.equal(moved.reason, 'workspace_cwd_not_authorized', 'A re-pointed workspace is refused.');
+    const unbound = ctx.host.decide({ ...base, requestId: randomUUID() }, { runtime });
+    assert.equal(unbound.reason, 'workspace_binding_required', 'A charge must name its directory.');
+    const bound = ctx.host.decide({ ...base, requestId: randomUUID(), workspaceCwdIdentity: 'b'.repeat(64) }, { runtime });
+    assert.equal(bound.outcome, 'approved', bound.reason);
+  } finally { ctx.host.close(); }
+});
+
+test('ADR6-GAP3: a consent commit that supersedes a policy keeps its owned work under the session and releases its permits', () => {
+  const ctx = setup();
+  const admitted = ctx.decide();
+  assert.equal(ctx.host.admit(admitted.permitId).admitted, true);
+  ctx.host.settle(admitted.permitId, { effect: 'consumed', evidence: 'run before the consent commit', workRef: 'run-before-consent-commit' });
+  const issued = ctx.decide();
+  const proposal = ctx.host.proposePolicy({ decisionType: 'extend', supersedesPolicyId: ctx.policyId, controller: { controllerId: 'fixture-controller', publicKey: ctx.controllerPublicKey },
+    scope: ctx.scope, limits: ctx.limits, durationMs: HOUR });
+  const receipt = ctx.host.commitVerifiedConsent(proposal.challengeId, { mechanism: 'fixture-verified', credentialId: 'fixture-credential', displayedDecisionDigest: proposal.decisionDigest });
+  try {
+    assert.equal(ctx.host.policyRow(ctx.policyId).state, 'superseded');
+    assert.equal(ctx.host.permitView(issued.permitId).state, 'invalidated', 'The unadmitted permit of the superseded policy is invalidated.');
+    const revoked = ctx.host.revoke(receipt.policyId, { actor: 'regression test' });
+    assert.ok(revoked.stopWorks.some(work => work.workRef === 'run-before-consent-commit'), 'The consent-superseded run is in the kill-switch scope.');
+  } finally { ctx.host.close(); }
+});
+
+// ---------- Topology: a separate preview never stops the stable controlling runtime ----------
+
+test('ADR6-GAP1: a preview restart cannot stop the stable controlling runtime; a controlling switch may', () => {
+  for (const [mode, expected] of [['separate_preview', 'controller_protected_in_preview'], ['controlling_switch', 'within_policy']]) {
+    const ctx = setup({ scope: { applicationMode: mode } });
+    try {
+      const build = buildFixture(ctx);
+      const target = { profile: ctx.scope.dataProfile, applicationMode: mode, desktop: ctx.scope.desktop, buildRoot: ctx.scope.buildRoot,
+        buildDir: build.buildDir, buildId: build.manifest.buildId, currentProcess: { pid: process.pid, creationTime: 'fixture-start' } };
+      const receipt = ctx.host.decide({ requestId: randomUUID(), policyId: ctx.policyId, operation: 'app.restart', cost: {}, target }, { connectionId: ctx.connectionId });
+      assert.equal(receipt.outcome, mode === 'controlling_switch' ? 'approved' : 'denied', mode);
+      assert.equal(receipt.reason, expected, mode);
+    } finally { ctx.host.close(); }
+  }
+});
+
+// ---------- Bootstrap: a restarted runtime cannot reuse consumed one-time values ----------
+
+test('ADR6 bootstrap: a runtime restarted with the pipe and policy but without its one-time values fails closed', async () => {
+  await assert.rejects(hostFromEnvironment({ DESZO_CONTROL_HOST_PIPE: pipeFor(tmpdir()), DESZO_HOST_POLICY_ID: randomUUID() }, { packaged: false }),
+    /needs a launch proof or a registered runtime generation/);
 });
 
 // ---------- Enablement gates (ADR6 section 7) ----------

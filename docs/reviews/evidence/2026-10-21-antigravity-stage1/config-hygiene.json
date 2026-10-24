@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "kind": "Stage1ConfigurationHygiene",
+  "mode": "apply",
+  "recordedAt": "2026-10-21T14:41:17.662Z",
+  "provenPocRegistration": true,
+  "authenticationStoresRead": false,
+  "providerCalls": 0,
+  "files": [
+    {
+      "relative": ".gemini/config/mcp_config.json",
+      "changed": true,
+      "wouldChange": true,
+      "beforeSha256": "0ffdfacb3ec60e5bf9d6f38c198df032153fa9bf053459215449464c6db2c01f",
+      "afterSha256": "d8e397af03b5b032f21d0aa967086f0c78b33c87b76f2e9898ae0a144df7de02",
+      "backupBesideOriginal": ".gemini/config/mcp_config.json.stage1-poc-backup-0ffdfacb3ec6.json",
+      "utf8BomAfter": false,
+      "unrelatedSemanticsPreserved": true
+    },
+    {
+      "relative": ".gemini/antigravity-cli/settings.json",
+      "changed": true,
+      "wouldChange": true,
+      "beforeSha256": "24ac3588ac8bfa10d29decc1765c8b39ca9106444ac96b4c3aec5048520c1642",
+      "afterSha256": "ee6d1034985be06dde6005c06f88905313a86b286452e8756a977a6cdf55fcbb",
+      "backupBesideOriginal": ".gemini/antigravity-cli/settings.json.stage1-poc-backup-24ac3588ac8b.json",
+      "utf8BomAfter": false,
+      "unrelatedSemanticsPreserved": true
+    }
+  ]
+}

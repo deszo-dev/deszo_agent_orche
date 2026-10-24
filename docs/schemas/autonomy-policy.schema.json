@@ -11,12 +11,25 @@
       "enum": [
         "run.approve", "supervision.approve", "run.stop_and_report", "run.retry",
         "check.run", "build.run", "repair.run", "delivery.local",
-        "app.stop", "app.start", "app.restart", "app.rollback",
-        "worker.model_call", "provider.invoke"
+        "app.stop", "app.start", "app.restart", "app.rollback", "app.verify",
+        "worker.model_call", "provider.invoke", "runtime.reregister"
       ]
     },
     "budgetKey": {
       "enum": ["attempts", "providerInvocations", "workerModelCalls", "operations", "restarts", "repairs", "builds"]
+    },
+    "controllerPlan": {
+      "type": "object", "properties": {
+        "schemaVersion": {"const": 1}, "kind": {"const": "ControllerPlan"}, "mode": {"const": "deterministic"},
+        "steps": {"type":"array","minItems":1,"maxItems":64,"items":{"oneOf":[
+          {"type":"object","properties":{"type":{"const":"lifecycle.stop"},"args":{"type":"object","properties":{"buildId":{"$ref":"#/$defs/id"}},"required":["buildId"],"additionalProperties":false}},"required":["type","args"],"additionalProperties":false},
+          {"type":"object","properties":{"type":{"enum":["lifecycle.restart","lifecycle.rollback","lifecycle.verify"]},"args":{"type":"object","properties":{"buildId":{"$ref":"#/$defs/id"},"requireUi":{"type":"boolean"}},"required":["buildId"],"additionalProperties":false}},"required":["type","args"],"additionalProperties":false},
+          {"type":"object","properties":{"type":{"enum":["command.check","command.build"]},"args":{"type":"object","properties":{"commandId":{"$ref":"#/$defs/id"},"workspaceId":{"$ref":"#/$defs/id"}},"required":["commandId","workspaceId"],"additionalProperties":false}},"required":["type","args"],"additionalProperties":false},
+          {"type":"object","properties":{"type":{"const":"workflow.run"},"args":{"type":"object","properties":{"workflowId":{"$ref":"#/$defs/id"},"workflowSnapshotSha256":{"$ref":"#/$defs/sha256"},"workspaceId":{"$ref":"#/$defs/id"}},"required":["workflowId","workflowSnapshotSha256","workspaceId"],"additionalProperties":false}},"required":["type","args"],"additionalProperties":false},
+          {"type":"object","properties":{"type":{"const":"judge.review"},"args":{"type":"object","properties":{"judgeSessionId":{"type":"string","format":"uuid"},"attentionId":{"type":"string","format":"uuid"},"runId":{"type":"string","format":"uuid"},"workflowId":{"$ref":"#/$defs/id"},"workflowSnapshotSha256":{"$ref":"#/$defs/sha256"},"workspaceId":{"$ref":"#/$defs/id"}},"required":["judgeSessionId","attentionId","runId","workflowId","workflowSnapshotSha256","workspaceId"],"additionalProperties":false}},"required":["type","args"],"additionalProperties":false},
+          {"type":"object","properties":{"type":{"const":"evidence.audit"},"args":{"type":"object","properties":{"runId":{"type":"string","format":"uuid"}},"required":["runId"],"additionalProperties":false}},"required":["type","args"],"additionalProperties":false}
+        ]}}
+      },"required":["schemaVersion","kind","mode","steps"],"additionalProperties":false
     },
     "limits": {
       "type": "object",
@@ -63,9 +76,10 @@
     "scope": {
       "type": "object",
       "properties": {
+        "judgeProfile": {"type":"object","properties":{"judgeSessionId":{"type":"string","format":"uuid"},"nativeSessionId":{"type":"string","format":"uuid"},"ownerGeneration":{"type":"integer","minimum":1},"provider":{"const":"antigravity"},"model":{"const":"gemini-3.8-flash-high"},"effort":{"const":"high"},"ownership":{"const":"dedicated"},"billing":{"const":"subscription_only"}},"required":["judgeSessionId","nativeSessionId","ownerGeneration","provider","model","effort","ownership","billing"],"additionalProperties":false},
         "dataProfile": { "$ref": "#/$defs/id" },
         "workspaces": {
-          "type": "array", "minItems": 1,
+          "type": "array",
           "items": {
             "type": "object",
             "properties": { "workspaceId": { "$ref": "#/$defs/id" }, "cwdIdentity": { "$ref": "#/$defs/sha256" } },
@@ -73,7 +87,7 @@
             "additionalProperties": false
           }
         },
-        "workflows": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/workflowRule" } },
+        "workflows": { "type": "array", "items": { "$ref": "#/$defs/workflowRule" } },
         "operations": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/operationKind" } },
         "commands": { "type": "array", "items": { "$ref": "#/$defs/allowedCommand" } },
         "desktop": {
@@ -84,8 +98,10 @@
         },
         "buildRoot": { "type": "string", "minLength": 1 },
         "applicationMode": { "enum": ["separate_preview", "controlling_switch"] },
-        "deliveryBoundary": { "enum": ["candidate", "verified_branch"] }
+        "deliveryBoundary": { "enum": ["candidate", "verified_branch"] },
+        "verificationOnly": {"const":true,"description":"Freshly consented native lifecycle diagnostics only; no workflow/provider/build execution and no production authority."}
       },
+      "allOf":[{"if":{"required":["verificationOnly"]},"else":{"properties":{"workspaces":{"minItems":1},"workflows":{"minItems":1}}}}],
       "required": ["dataProfile", "workspaces", "workflows", "operations", "commands", "desktop", "buildRoot", "applicationMode", "deliveryBoundary"],
       "additionalProperties": false
     },
@@ -110,6 +126,7 @@
           "additionalProperties": false
         },
         "scope": { "$ref": "#/$defs/scope" },
+        "initialPlan": {"$ref":"#/$defs/controllerPlan"},
         "limits": { "$ref": "#/$defs/limits" },
         "carriedUsage": { "$ref": "#/$defs/cost" },
         "durationMs": { "type": "integer", "minimum": 60000, "maximum": 86400000 },
@@ -161,6 +178,7 @@
         "commandId": { "$ref": "#/$defs/id" },
         "operationId": { "$ref": "#/$defs/id" },
         "cost": { "$ref": "#/$defs/cost" },
+        "workspaceCwdIdentity": { "$ref": "#/$defs/sha256" },
         "justification": { "type": "string", "maxLength": 2000 },
         "target": {
           "description": "Lifecycle targets are checked against the decided scope before any stop or launch. currentProcess must be a process this host started or registered for the policy.",
@@ -194,6 +212,17 @@
         }
       },
       "required": ["requestId", "policyId", "operation", "cost"],
+      "additionalProperties": false
+    },
+    "applicationStopRequest": {
+      "type": "object",
+      "description": "Planned close of the exact idle, host-launched generation. No caller-supplied PIDs, commands, process proofs or outcome claims. Emergency Stop/revocation remains a separate safety path.",
+      "properties": {
+        "policyId": { "type": "string", "format": "uuid" },
+        "requestId": { "$ref": "#/$defs/id" },
+        "runtimeGeneration": { "type": "string", "format": "uuid" }
+      },
+      "required": ["policyId", "requestId", "runtimeGeneration"],
       "additionalProperties": false
     },
     "decisionReceipt": {

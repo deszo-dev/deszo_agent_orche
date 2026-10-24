@@ -13,17 +13,19 @@
 // could replace a file. The inspector re-hashes the image of the process actually created, which detects a replaced
 // executable but not a replaced resource loaded later. Locking the build against writes is a gate.
 import { createHash } from 'node:crypto';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync, lstatSync, realpathSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import { canonicalHash } from '../core/canonical.mjs';
 import { check } from '../core/schemas.mjs';
 import { HostError } from './authority.mjs';
 
 function filesUnder(root) {
+  if (lstatSync(root).isSymbolicLink() || resolve(realpathSync(root)).toLowerCase() !== resolve(root).toLowerCase()) throw new HostError(403, 'unsafe_build_path', 'Build roots cannot traverse symbolic links or junctions.');
   const out = [];
   const walk = dir => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const full = join(dir, entry.name);
+      if (entry.isSymbolicLink()) throw new HostError(403, 'unsafe_build_path', 'Build artifacts cannot contain symbolic links or junctions.');
       if (entry.isDirectory()) walk(full);
       else if (entry.isFile()) out.push(full);
     }
@@ -78,17 +80,25 @@ export class ApplicationLifecycle {
 
   // Stop, then native proof that the process ended. Returns true only with that proof.
   async stopAndConfirm(process) {
-    await this.bounded('stop', () => this.launcher.stop(process));
-    return (await this.bounded('termination check', () => this.inspector.isRunning(process))) === false;
+    // The native stop reports whether its whole owned domain is empty; a fixture launcher reports nothing.
+    const stop = await this.bounded('stop', () => this.launcher.stop(process));
+    if (stop?.domainEmpty === false) return false;
+    return this.bounded('termination check', async () => {
+      const end=Date.now()+Math.min(5000,this.phaseTimeoutMs);
+      do { if((await this.inspector.isRunning(process))===false)return true; await sleep(this.pollMs); } while(Date.now()<end);
+      return false;
+    });
   }
 
   // Performs one authorized restart. Returns { outcome, reason, operationId, runtimeGeneration } where outcome is one of
   // blocked (refused, nothing started), reconciling (an effect may have happened), failed (established failure) or verified.
-  async restart({ connectionId, policyId, requestId, buildRoot, buildDir, manifest, profile, applicationMode, desktop, currentProcess = null, rationale,
+  async restart({ connectionId, policyId, requestId, buildRoot, buildDir, manifest, profile, applicationMode, desktop, currentProcess = null, rationale, operation = 'app.restart',
     startupDeadlineMs = 30_000, requireUi = false, justification }) {
     const target = { profile, applicationMode, desktop, buildRoot, buildDir: resolve(buildDir), buildId: manifest.buildId,
       currentProcess: currentProcess ? { pid: currentProcess.pid, creationTime: currentProcess.creationTime } : null };
-    const receipt = this.host.decide({ requestId, policyId, operation: 'app.restart', cost: {}, justification: justification ?? rationale, target }, { connectionId });
+    if (!['app.restart', 'app.rollback','app.verify'].includes(operation)) throw new HostError(400, 'invalid_request', 'Only restart, compatible rollback or consented native verification is supported.');
+    if(operation==='app.verify'&&!requireUi)throw new HostError(400,'native_ui_required','Native verification cannot omit the application UI evidence.');
+    const receipt = this.host.decide({ requestId, policyId, operation, cost: {}, justification: justification ?? rationale, target }, { connectionId });
     if (receipt.outcome !== 'approved') return { outcome: 'blocked', reason: `authority: ${receipt.reason}`, operationId: null, runtimeGeneration: null };
     const admission = this.host.admit(receipt.permitId);
     if (!admission.admitted) {
@@ -101,9 +111,15 @@ export class ApplicationLifecycle {
       this.host.settle(receipt.permitId, { effect: 'not_executed', evidence: `build unreadable: ${error.message}` });
       return { outcome: 'blocked', reason: 'build_unreadable', operationId: null, runtimeGeneration: null };
     }
-    const { operationId } = this.host.beginOperation({ permitId: receipt.permitId, kind: 'app.restart',
-      intent: { buildId: manifest.buildId, manifestDigest: identity.manifestDigest, profile, applicationMode, rationale, expectedCurrent: currentProcess,
-        recovery: 'last verified build; data restore only with a profile-specific compatible plan' } });
+    let operationId;
+    try {
+      ({ operationId } = this.host.beginOperation({ permitId: receipt.permitId, kind: operation,
+        intent: { buildId: manifest.buildId, buildDir: resolve(buildDir), manifestDigest: identity.manifestDigest, profile, applicationMode, rationale, expectedCurrent: currentProcess,
+          recovery: 'last verified build; data restore only with a profile-specific compatible plan' } }));
+    } catch (error) {
+      this.host.settle(receipt.permitId, { effect: 'not_executed', evidence: `lifecycle intent refused: ${error.message}` });
+      return { outcome: 'blocked', reason: error.code || 'intent_refused', operationId: null, runtimeGeneration: null };
+    }
     const blocked = (reason, effect, evidence = {}) => {
       this.host.finishOperation(operationId, { outcome: 'blocked', reason, evidence });
       this.host.settle(receipt.permitId, { effect, evidence: reason });
@@ -169,8 +185,8 @@ export class ApplicationLifecycle {
       let ui = null;
       if (requireUi) {
         ui = this.uiCheck ? await this.bounded('UI check', () => this.uiCheck({ runtimeGeneration, process: observed })) : null;
-        if (!ui?.available) { this.host.retireRuntime(runtimeGeneration, 'ui_evidence_unavailable'); return blocked('ui_evidence_unavailable', 'consumed', { ui }); }
-        if (ui.pid !== observed.pid || ui.runtimeGeneration !== runtimeGeneration) { this.host.retireRuntime(runtimeGeneration, 'ui_evidence_not_bound'); return blocked('ui_evidence_not_bound', 'consumed', { ui }); }
+        if (!ui?.available) { this.host.retireRuntime(runtimeGeneration, 'ui_evidence_unavailable'); if(!(await this.stopAndConfirm(observed)))return ambiguous('ui_unavailable_and_termination_unconfirmed',{ui}); return blocked('ui_evidence_unavailable', 'consumed', { ui,stopped:true }); }
+        if (ui.pid !== observed.pid || ui.runtimeGeneration !== runtimeGeneration) { this.host.retireRuntime(runtimeGeneration, 'ui_evidence_not_bound'); if(!(await this.stopAndConfirm(observed)))return ambiguous('ui_identity_mismatch_and_termination_unconfirmed',{ui}); return blocked('ui_evidence_not_bound', 'consumed', { ui,stopped:true }); }
       }
 
       // 6. Verified only with the whole evidence chain.

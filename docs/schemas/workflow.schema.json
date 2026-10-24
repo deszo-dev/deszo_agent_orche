@@ -569,6 +569,10 @@
             "attachFiles": {
               "type": "boolean"
             },
+            "role": {
+              "enum": ["judge"],
+              "description": "Designated Judge (ADR-0009). Only this agent may propose a lifecycle action; at most one agent per workflow may declare it."
+            },
             "captures": {
               "type": "array",
               "items": {

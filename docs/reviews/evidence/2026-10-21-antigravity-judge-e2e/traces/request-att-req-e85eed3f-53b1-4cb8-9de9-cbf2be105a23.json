@@ -1,0 +1,14 @@
+{
+  "requestId": "att-req-e85eed3f-53b1-4cb8-9de9-cbf2be105a23",
+  "runId": "run-fixer-pilot-001",
+  "revision": 3,
+  "packageId": "unpermitted-probe",
+  "evidenceDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "claimedObjective": "Denial boundary probe",
+  "createdAt": "2026-10-21T13:19:38.183Z",
+  "status": "COMPLETED",
+  "turnStartedAt": "2026-10-21T13:19:38.184Z",
+  "turnCompletedAt": "2026-10-21T13:19:38.576Z",
+  "durationMs": 392,
+  "tokens": null
+}

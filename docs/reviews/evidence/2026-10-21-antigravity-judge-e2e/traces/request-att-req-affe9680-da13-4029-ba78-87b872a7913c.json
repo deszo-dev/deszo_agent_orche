@@ -1,0 +1,11 @@
+{
+  "requestId": "att-req-affe9680-da13-4029-ba78-87b872a7913c",
+  "runId": "run-fixer-pilot-001",
+  "revision": 4,
+  "packageId": "pkg-fixer-rev3-001",
+  "evidenceDigest": "sha256:7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069",
+  "claimedObjective": "Crash simulation test",
+  "createdAt": "2026-10-21T13:29:49.789Z",
+  "status": "IN_FLIGHT",
+  "turnStartedAt": "2026-10-21T13:29:49.790Z"
+}

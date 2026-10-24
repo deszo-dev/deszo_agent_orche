@@ -1,0 +1,14 @@
+{
+  "requestId": "att-req-286e08db-d7e0-4980-a068-5578ad2e68d6",
+  "runId": "run-fixer-pilot-001",
+  "revision": 4,
+  "packageId": "pkg-fixer-failing-tests-002",
+  "evidenceDigest": "sha256:8b42e71829cdba12891d4e7826190abf31726a31019283741829019238471209",
+  "claimedObjective": "Attempted fix but 2 edge cases still failing",
+  "createdAt": "2026-10-21T13:19:38.583Z",
+  "status": "COMPLETED",
+  "turnStartedAt": "2026-10-21T13:19:38.584Z",
+  "turnCompletedAt": "2026-10-21T13:19:39.011Z",
+  "durationMs": 426,
+  "tokens": null
+}

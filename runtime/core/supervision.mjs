@@ -63,15 +63,21 @@ export function installSupervision(Engine, { ApiError }) {
     return this.store.get("SELECT * FROM control_grants WHERE run_id = ? AND state = 'active'", runId) ?? null;
   };
 
+  P.boundGrant = function boundGrant(runId) {
+    return this.activeGrant(runId) ?? this.store.get('SELECT * FROM control_grants WHERE run_id = ? ORDER BY bound_at DESC LIMIT 1', runId) ?? null;
+  };
+
   P.controlModeOf = function controlModeOf(runId) {
-    return this.supervisor && this.activeGrant(runId) ? 'supervised' : 'unsupervised';
+    // Execution mode is historical: ending/revoking a bound grant cannot rewrite a captured run or its proof.
+    return this.store.get('SELECT 1 FROM control_grants WHERE run_id = ? LIMIT 1', runId) ? 'supervised' : 'unsupervised';
   };
 
   P.controllerHealth = function controllerHealth(runId) {
-    const grant = this.activeGrant(runId);
+    const grant = this.boundGrant(runId);
     if (!grant) return null;
     const since = grant.last_ack_at ?? grant.bound_at;
-    return { grantId: grant.id, state: grant.state, ackCursor: grant.ack_cursor, lastAckAt: grant.last_ack_at, pausedAt: grant.paused_at,
+    return { grantId: grant.id, controllerSessionId: grant.controller_session_id, state: grant.state, boundAt: grant.bound_at,
+      ackCursor: grant.ack_cursor, lastAckAt: grant.last_ack_at, pausedAt: grant.paused_at,
       observationDeadlineMs: grant.observation_deadline_ms, escalationDeadlineMs: grant.escalation_deadline_ms,
       millisecondsSinceAcknowledgement: since ? Date.now() - Date.parse(since) : null };
   };
@@ -114,6 +120,7 @@ export function installSupervision(Engine, { ApiError }) {
       if (!this.supervisor) throw new ApiError(409, 'supervision_unavailable', 'This runtime has no Tauri supervisor, so it cannot grant supervision. Ordinary runs stay unsupervised and report controlMode "unsupervised".');
       const client = clientStatus(body.clientProvider);
       if (client.status !== 'verified') throw new ApiError(409, 'supervision_unavailable', `The ${body.clientProvider} tool-timeout matrix is unverified, so supervised observation cannot be guaranteed for this client.`);
+      if (client.testedVersion && body.clientVersion !== client.testedVersion) throw new ApiError(409, 'supervision_unavailable', 'The controller version does not match the measured tool-timeout matrix.');
       if (!this.store.get('SELECT id FROM controller_sessions WHERE id = ?', body.controllerSessionId)) throw new ApiError(404, 'not_found', 'Controller session not found.');
       this.requireControllerCredential(controllerToken, body.controllerSessionId);
       const workflow = this.store.get('SELECT w.id, a.sha256 AS sha FROM workflows w JOIN artifacts a ON a.id = w.snapshot_artifact_id WHERE w.id = ?', body.workflowId);
@@ -133,7 +140,8 @@ export function installSupervision(Engine, { ApiError }) {
   };
 
   // First-party only (enforced by the route table). Approval makes the grant available to one new run.
-  P.decideControlGrant = function decideControlGrant(grantId, body) {
+  P.decideControlGrant = function decideControlGrant(grantId, body, { hostAdmission = null } = {}) {
+    if (this.hostAuthority && body?.decision === 'approve' && !this.isHostAdmission(hostAdmission, hostAdmission?.permitId, 'supervision.approve')) this.refuseHostMutation('Supervision approval');
     contract('controlGrantDecision', body);
     return this.idempotent(`POST /control-grants/${grantId}/decision`, body.requestId, { grantId, ...body }, () => {
       const grant = this.grantRow(grantId);
@@ -152,18 +160,39 @@ export function installSupervision(Engine, { ApiError }) {
 
   P.getControlGrant = function getControlGrant(grantId) {
     const grant = this.grantRow(grantId);
+    const record = this.store.readJson(grant.grant_artifact_id);
+    const session = this.store.get('SELECT client_label FROM controller_sessions WHERE id = ?', grant.controller_session_id);
     return { grantId, state: grant.state, runId: grant.run_id, workflowId: grant.workflow_id, workspaceId: grant.workspace_id, controllerSessionId: grant.controller_session_id,
+      workflowSnapshotSha256: grant.workflow_snapshot_sha256, clientLabel: session?.client_label ?? null,
+      clientProvider: record.clientProvider, clientVersion: record.clientVersion, requestedActions: record.requestedActions,
       observationDeadlineMs: grant.observation_deadline_ms, escalationDeadlineMs: grant.escalation_deadline_ms, requestedAt: grant.requested_at, decidedAt: grant.decided_at, boundAt: grant.bound_at };
   };
 
-  // Called inside createRun, before the run's first dispatch: the observer is armed before any launch.
-  P.bindControlGrant = function bindControlGrant(grantId, { runId, workflowId, workspaceId, snapshotSha256, controllerToken = null }) {
+  P.listControlGrants = function listControlGrants({state = 'pending', limit = 50} = {}) {
+    if (!['pending', 'approved', 'active', 'denied', 'revoked', 'ended', 'all'].includes(state) || !Number.isInteger(limit) || limit < 1 || limit > 100)
+      throw new ApiError(400, 'invalid_request', 'Invalid control-grant list state or limit.');
+    const rows = state === 'all' ? this.store.all('SELECT id FROM control_grants ORDER BY requested_at DESC LIMIT ?', limit)
+      : this.store.all('SELECT id FROM control_grants WHERE state = ? ORDER BY requested_at DESC LIMIT ?', state, limit);
+    return {items: rows.map(row => this.getControlGrant(row.id)), nextCursor: null};
+  };
+
+  P.assertControlGrantForRun = function assertControlGrantForRun(grantId, {workflowId, workspaceId, snapshotSha256, controllerToken = null, approvedRequestId = null}) {
     const grant = this.grantRow(grantId);
     if (grant.state !== 'approved') throw new ApiError(409, 'conflict', `The control grant is ${grant.state}; only an approved, unused grant can start a supervised run.`);
-    if (grant.workflow_id !== workflowId || grant.workspace_id !== workspaceId) throw new ApiError(409, 'conflict', 'The control grant does not match this workflow and workspace.');
-    if (grant.workflow_snapshot_sha256 !== snapshotSha256) throw new ApiError(409, 'conflict', 'The control grant was approved for a different workflow revision.');
-    this.requireControllerCredential(controllerToken, grant.controller_session_id);
+    if (grant.workflow_id !== workflowId || grant.workspace_id !== workspaceId || grant.workflow_snapshot_sha256 !== snapshotSha256)
+      throw new ApiError(409, 'conflict', 'The control grant does not match this workflow snapshot and workspace.');
+    if (approvedRequestId) {
+      const proof = this.store.get('SELECT c.*, r.state FROM run_request_controls c JOIN external_run_requests r ON r.request_id = c.request_id WHERE c.request_id = ?', approvedRequestId);
+      if (!proof || proof.state !== 'pending' || proof.grant_id !== grantId || proof.controller_session_id !== grant.controller_session_id)
+        throw new ApiError(403, 'controller_credential_required', 'The pending run has no matching authenticated controller binding.');
+    } else this.requireControllerCredential(controllerToken, grant.controller_session_id);
     if (!this.supervisor) throw new ApiError(409, 'supervision_unavailable', 'This runtime has no Tauri supervisor, so it cannot start a supervised run.');
+    return grant;
+  };
+
+  // Called inside createRun, before the run's first dispatch: the observer is armed before any launch.
+  P.bindControlGrant = function bindControlGrant(grantId, { runId, workflowId, workspaceId, snapshotSha256, controllerToken = null, approvedRequestId = null }) {
+    const grant = this.assertControlGrantForRun(grantId, {workflowId, workspaceId, snapshotSha256, controllerToken, approvedRequestId});
     // The only arm is the awaited one below; a refusal reaches failArm instead of an unhandled rejection.
     const at = nowIso();
     // The run may not launch anything until the supervisor confirms the arm (pumpRun honours awaitingArm).
@@ -232,6 +261,7 @@ export function installSupervision(Engine, { ApiError }) {
   // First-party only (route table). The supervisor confirms the new deadline before the runtime reports success, and the
   // extension is journaled with its request so a retry replays the same answer.
   P.extendEscalation = async function extendEscalation(runId, body) {
+    this.refuseHostMutation('Supervision deadline extension');
     contract('controlExtensionRequest', body);
     const replay = this.store.get('SELECT response_artifact_id FROM command_receipts WHERE request_id = ?', body.requestId);
     if (replay) return { status: 200, body: this.store.readJson(replay.response_artifact_id) };
@@ -326,17 +356,20 @@ export function installSupervision(Engine, { ApiError }) {
       const event = body.cursor ? this.store.get('SELECT timestamp FROM journal_events WHERE run_id = ? AND sequence = ?', runId, body.cursor) : null;
       const at = nowIso();
       const lagMs = event ? Date.parse(at) - Date.parse(event.timestamp) : null;
-      const grant = this.activeGrant(runId);
+      const grant = this.boundGrant(runId);
       if (grant) this.requireControllerCredential(controllerToken, grant.controller_session_id);
       this.store.run('INSERT INTO observation_acks(id, run_id, controller_session_id, cursor, event_timestamp, acknowledged_at, lag_ms) VALUES (?, ?, ?, ?, ?, ?, ?)',
         randomUUID(), runId, grant?.controller_session_id ?? null, body.cursor, event?.timestamp ?? null, at, lagMs);
-      const resumed = Boolean(grant?.paused_at);
-      if (grant) this.store.run('UPDATE control_grants SET last_ack_at = ?, ack_cursor = ?, paused_at = NULL WHERE id = ?', at, Math.max(grant.ack_cursor, body.cursor), grant.id);
+      const active = grant?.state === 'active';
+      const resumed = Boolean(active && grant.paused_at);
+      if (grant) this.store.run('UPDATE control_grants SET last_ack_at = ?, ack_cursor = ?, paused_at = ? WHERE id = ?', at, Math.max(grant.ack_cursor, body.cursor), active ? null : grant.paused_at, grant.id);
       return { status: 200, body: { runId, cursor: body.cursor, acknowledgedAt: at, lagMs, controlMode: grant ? 'supervised' : 'unsupervised', resumedDispatch: resumed } };
     }, () => {
-      if (this.activeGrant(runId)) void Promise.resolve().then(() => this.supervisor?.heartbeat?.(runId)).catch(() => { /* A missed heartbeat is logged by the supervisor. */ });
-      this.dispatchPaused.delete(runId);
-      queueMicrotask(() => this.pump());
+      if (this.activeGrant(runId)) {
+        void Promise.resolve().then(() => this.supervisor?.heartbeat?.(runId)).catch(() => { /* A missed heartbeat is logged by the supervisor. */ });
+        this.dispatchPaused.delete(runId);
+        queueMicrotask(() => this.pump());
+      }
     });
   };
 
@@ -430,7 +463,7 @@ export function installSupervision(Engine, { ApiError }) {
     const ownedAttempts = request.pids.length;
     let outcome, reason, proofContainment = containment.containment;
     if (!request.observed) { outcome = 'termination_unconfirmed'; reason = 'This runtime instance did not observe the Stop request, so termination cannot be proven.'; proofContainment = 'none'; }
-    else if (!ownedAttempts) { outcome = 'stopped'; reason = 'No process was launched for this run, so no owned member can remain.'; proofContainment = 'none'; }
+    else if (!ownedAttempts) { outcome = 'stopped'; reason = 'The runtime owned no active process when Root Stop was requested; no owned member remains.'; proofContainment = 'none'; }
     else if (containment.confirmed) { outcome = 'stopped'; reason = containment.reason; }
     else { outcome = 'termination_unconfirmed'; reason = containment.reason; }
     const proof = { schemaVersion: 1, kind: 'TerminationProof', runId, outcome, containment: proofContainment, controlMode: this.controlModeOf(runId),
@@ -500,6 +533,7 @@ export function installSupervision(Engine, { ApiError }) {
   };
 
   P.triageIncident = function triageIncident(incidentId, body) {
+    this.refuseHostMutation('Incident resolution');
     contract('incidentTriageRequest', body);
     return this.idempotent(`POST /incidents/${incidentId}/triage`, body.requestId, { incidentId, ...body }, () => {
       const incident = this.store.get('SELECT * FROM incidents WHERE id = ?', incidentId);

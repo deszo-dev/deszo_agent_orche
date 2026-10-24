@@ -1,0 +1,90 @@
+{
+  "experiment": "POC-08",
+  "title": "Failure and fallback",
+  "status": "INCONCLUSIVE",
+  "checks": [
+    {
+      "name": "a missing client binary is detected before any session operation",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "a client that exits at startup yields a bounded failure within 25 s",
+      "pass": true,
+      "detail": "initialize failed: app-server exited before responding"
+    },
+    {
+      "name": "an unknown session identifier is refused explicitly",
+      "pass": true,
+      "detail": "no rollout found for thread id e7c4231e-9c67-425b-853b-aeeee8ab4dae"
+    },
+    {
+      "name": "the controlling process remains usable after a refused session lookup",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "an unavailable scoped MCP server is reported and its tools are not listed",
+      "pass": true,
+      "detail": "{\"data\":[{\"name\":\"poc-broken\",\"runtimeStatus\":null,\"pluginId\":null,\"httpOrigin\":null,\"serverInfo\":null,\"serverCapabilities\":null,\"tools\":{},\"toolsError\":\"MCP st"
+    },
+    {
+      "name": "an unavailable scoped MCP server does not block session creation",
+      "pass": true,
+      "detail": null
+    }
+  ],
+  "measurements": {
+    "clientBinaryMissing": {
+      "detected": true
+    },
+    "clientCrashAtStartup": {
+      "result": "initialize failed: app-server exited before responding",
+      "elapsedMs": 102,
+      "exit": {
+        "atMs": 101.367,
+        "code": 1,
+        "signal": null
+      }
+    },
+    "unknownSessionRefusalMs": 16.95500000000004
+  },
+  "trace": [
+    {
+      "step": "broken MCP registration",
+      "statusSnippet": "{\"data\":[{\"name\":\"poc-broken\",\"runtimeStatus\":null,\"pluginId\":null,\"httpOrigin\":null,\"serverInfo\":null,\"serverCapabilities\":null,\"tools\":{},\"toolsError\":\"MCP startup failed: handshaking with MCP server failed: connection closed: initialize response: connection closed: initialize response\",\"resources"
+    }
+  ],
+  "conditionsNotProducedLive": [
+    {
+      "condition": "queue-wait expiry under a real queue",
+      "status": "INCONCLUSIVE",
+      "why": "Live queue expiry needs an arbitrary-length predecessor turn; covered as controlled-clock logic in lib/judge-attention-timing.test.mjs."
+    },
+    {
+      "condition": "response deadline expiry",
+      "status": "INCONCLUSIVE",
+      "why": "Requires a real 900 s wait with a decision outstanding; covered as controlled-clock logic (lib/judge-attention-timing.test.mjs)."
+    },
+    {
+      "condition": "stale ownership",
+      "status": "SEE POC-05, POC-06",
+      "why": "Stale-generation admission is observed in POC-05 S2 and POC-06 (Codex accepts it)."
+    },
+    {
+      "condition": "insufficient budget",
+      "status": "INCONCLUSIVE",
+      "why": "Codex exposes no budget signal here. Deszo refusal logic is covered by the existing runtime suite, not by a live Codex turn."
+    },
+    {
+      "condition": "worker restart",
+      "status": "SEE POC-02",
+      "why": "Resume after process exit is observed in POC-02."
+    },
+    {
+      "condition": "ambiguous turn-start acknowledgement",
+      "status": "SEE POC-06",
+      "why": "Lost acknowledgement is observed in POC-06."
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "runRoot": "<POC_ROOT>",
+  "generatedBy": "run-poc.mjs",
+  "experiments": [
+    {
+      "id": "POC-04",
+      "status": "FAIL",
+      "failedChecks": [
+        "[default-capabilities] a second request during an active turn is refused explicitly or runs later as its own turn (not merged into A)",
+        "[default-capabilities] the second request content is recorded in the session, not dropped"
+      ],
+      "elapsedMs": 159847,
+      "exitCode": 0
+    },
+    {
+      "id": "POC-06",
+      "status": "FAIL",
+      "failedChecks": [
+        "a takeover cannot move the session file out from under a live owner",
+        "a live owner cannot write the session after its file was moved away",
+        "a session created with no items survives a kill immediately after creation"
+      ],
+      "elapsedMs": 19618,
+      "exitCode": 0
+    }
+  ]
+}

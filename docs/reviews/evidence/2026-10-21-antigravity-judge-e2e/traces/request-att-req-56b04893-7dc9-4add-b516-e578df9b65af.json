@@ -1,0 +1,21 @@
+{
+  "requestId": "att-req-56b04893-7dc9-4add-b516-e578df9b65af",
+  "runId": "run-fixer-pilot-001",
+  "revision": 4,
+  "packageId": "pkg-fixer-rev3-001",
+  "evidenceDigest": "sha256:7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069",
+  "claimedObjective": "Concurrent Queue Turn 2",
+  "createdAt": "2026-10-21T13:28:12.399Z",
+  "status": "COMPLETED",
+  "queueReason": "queued_behind_active_turn",
+  "turnStartedAt": "2026-10-21T13:28:36.903Z",
+  "turnCompletedAt": "2026-10-21T13:28:58.891Z",
+  "durationMs": 21987,
+  "tokens": {
+    "input_tokens": 99469,
+    "output_tokens": 9793,
+    "thinking_tokens": 7691,
+    "cache_read_tokens": 68794,
+    "total_tokens": 109262
+  }
+}

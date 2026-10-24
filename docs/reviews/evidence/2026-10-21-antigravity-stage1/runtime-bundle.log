@@ -1,0 +1,7 @@
+
+> deszo@0.2.0 runtime:bundle
+> node scripts/bundle-runtime.mjs
+
+(node:23404) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+Runtime bundled into C:\my\2026\deszo_agent_orche\dist-runtime

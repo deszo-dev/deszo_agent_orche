@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "kind": "Stage1ScopedProcessInventory",
+  "recordedAt": "2026-10-22T02:48:23.4073591Z",
+  "scope": "Node test runners, fixture CLIs and Bridge children referencing runtime/tests or .deszo/tests",
+  "remaining": 0,
+  "processes": [],
+  "existingApplicationAndServiceProcessesModified": false,
+  "backgroundMonitorInstalled": false
+}
