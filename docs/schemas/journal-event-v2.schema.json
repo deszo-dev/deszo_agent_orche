@@ -632,7 +632,8 @@
                 "lifecycle_checkpoint_mismatch",
                 "workspace_overlap",
                 "workspace_unavailable",
-                "workspace_binding_mismatch"
+                "workspace_binding_mismatch",
+                "custody_unresolved"
               ]
             },
             "message": {

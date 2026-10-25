@@ -1,7 +1,7 @@
 use std::{
     env,
     fs::{self, OpenOptions},
-    io::{self, Read},
+    io::{self, Read, Write},
     path::PathBuf,
     process::{Command, Stdio},
     thread,
@@ -75,7 +75,46 @@ fn main() {
             .expect("spawn contained provider descendant");
         fs::write(fixture.join("slow-provider.pid"), std::process::id().to_string()).expect("write provider PID");
         fs::write(fixture.join("slow-descendant.pid"), child.id().to_string()).expect("write descendant PID");
-        thread::sleep(Duration::from_secs(240));
+        // Output while it runs, so that a Host-owned CLI's spool holds bytes across an application replacement.
+        event(r#"{"type":"thread.started","thread_id":"proofb-slow-child"}"#);
+        for tick in 0..240 {
+            event(&format!(r#"{{"type":"progress","tick":{tick}}}"#));
+            thread::sleep(Duration::from_secs(1));
+        }
+        return;
+    }
+
+    // Supervised write proof: a leader and a descendant run in the workspace, and the leader writes Git objects and refs into its repository
+    // every quarter second until it is ended. Each tick is logged, so the proof can show that the writes stopped with the process tree.
+    if model == "fixture-git-writer" {
+        use std::os::windows::process::CommandExt;
+        let fixture = fixture_dir();
+        let cwd = env::current_dir().expect("workspace directory");
+        let descendant = Command::new("cmd.exe")
+            .args(["/d", "/s", "/c", "ping -n 300 127.0.0.1 >nul"])
+            .creation_flags(0x08000000)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("spawn writer descendant");
+        fs::write(fixture.join("writer.pid"), std::process::id().to_string()).expect("write writer PID");
+        fs::write(fixture.join("writer-descendant.pid"), descendant.id().to_string()).expect("write writer descendant PID");
+        event(r#"{"type":"thread.started","thread_id":"proofb-git-writer"}"#);
+        for tick in 0..100_000u32 {
+            let file = format!("tick-{tick}.txt");
+            fs::write(cwd.join(&file), format!("tick {tick}
+")).expect("write tick file");
+            let hash = Command::new("git").args(["hash-object", "-w", &file]).current_dir(&cwd).output().expect("git hash-object");
+            let sha = String::from_utf8_lossy(&hash.stdout).trim().to_string();
+            let reference = format!("refs/deszo-proof/tick-{tick}");
+            let updated = Command::new("git").args(["update-ref", reference.as_str(), sha.as_str()]).current_dir(&cwd).status().expect("git update-ref");
+            let millis = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0);
+            let mut log = OpenOptions::new().create(true).append(true).open(fixture.join("writes.log")).expect("open writes log");
+            writeln!(log, "{tick} {millis} {}", updated.success()).expect("log tick");
+            event(&format!(r#"{{"type":"progress","tick":{tick}}}"#));
+            thread::sleep(Duration::from_millis(250));
+        }
         return;
     }
 

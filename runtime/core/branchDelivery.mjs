@@ -79,6 +79,12 @@ function runProcess(command, args, { cwd, env, timeoutMs = 30000, signal, encodi
 const git = (args, cwd, options = {}) => runProcess('git', args, { cwd, ...options });
 const hooksOverride = dir => ['-c', `core.hooksPath=${slash(dir)}`];
 
+// The source repository is written by `fetch` (objects) and `update-ref` (the target ref). A `fetch` can end with `git maintenance run --auto`,
+// and that may detach a `git gc` which keeps repacking the repository after the fetch has returned. The delivery does not wait for a detached
+// process, so the source-repository fetch disables automatic maintenance. Its arguments are exported so that the proof runs these exact values.
+export const SOURCE_FETCH_CONFIG = ['-c', 'gc.auto=0', '-c', 'maintenance.auto=false'];
+export const SOURCE_FETCH_OPTIONS = ['--no-auto-gc', '--no-auto-maintenance'];
+
 // Preconditions that hold before preparation and again immediately before publication (ADR-0005, audit A6).
 // Returns null when satisfied, otherwise the status and diagnostics of the refusal.
 async function publicationPreconditions(plan, repoPath, runGit = git) {
@@ -455,7 +461,7 @@ export async function executeBranchDelivery({
   // or ref move during smoke is refused here. Host Git runs with the empty hooks path (A3). The update is a
   // compare-and-swap; a checkout that starts after this re-check is an external race that Git cannot prevent.
   const published = { verifiedCommitId: commitSha, treeId: actualTree, parentCommitId: parentSha };
-  const fetched = await git([...hostHooks, 'fetch', cloneDir, commitSha], repoPath, { signal });
+  const fetched = await git([...hostHooks, ...SOURCE_FETCH_CONFIG, 'fetch', ...SOURCE_FETCH_OPTIONS, cloneDir, commitSha], repoPath, { signal });
   if (signal?.aborted) return stopped();
   if (fetched.status !== 0) {
     return fail('delivery_failed', `Failed to fetch the verified commit into the host repository: ${fetched.stderr}`, { ...published });

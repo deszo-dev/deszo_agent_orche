@@ -75,15 +75,21 @@ export function installLinkedRepair(Engine, { ApiError }) {
     return link ? this.linkedRepairWorkspaceIssueForLink(link) : null;
   };
 
-  // Last synchronous check before any Engine-owned process launch. This also covers managed-task and Map check processes.
-  const launchContained = P.launchContained;
-  P.launchContained = function (runId, options) {
+  // The synchronous PDE-R10 check every Engine-owned process launch passes through. Process Custody calls it too, so a
+  // Host-owned CLI has no path around the isolation contract. It throws when the Repair's roots overlap its Parent's.
+  P.assertLinkedRepairLaunch = function (runId) {
     const isolationIssue = this.linkedRepairWorkspaceIssueForRun(runId);
     if (isolationIssue) {
       const state = this.runs.get(runId);
       if (state) this.refuseLinkedRepairExecution(state, isolationIssue);
       throw Object.assign(new Error(isolationIssue.message), { code: isolationIssue.code });
     }
+  };
+
+  // Last synchronous check before any Engine-owned process launch. This also covers managed-task and Map check processes.
+  const launchContained = P.launchContained;
+  P.launchContained = function (runId, options) {
+    this.assertLinkedRepairLaunch(runId);
     return launchContained.call(this, runId, options);
   };
 

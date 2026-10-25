@@ -16,6 +16,9 @@ use std::{
 };
 use uuid::Uuid;
 
+mod custody;
+pub use custody::{run_service as run_custody_service, AllowedExecutable, CustodyConfig, CustodyRegistry, Refusal, ServiceConfig};
+
 const IPC_MAX_LINE: usize = 128 * 1024;
 const ENGINE_READY_TIMEOUT: Duration = Duration::from_secs(45);
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(15);
@@ -46,6 +49,9 @@ pub struct HostConfig {
     pub test_engine_ready_timeout_ms: Option<u64>,
     #[serde(default = "default_true")]
     pub forward_runtime_stderr: bool,
+    /// Process Custody (PoC). Absent means custody commands are refused and no CLI is ever launched through the Host.
+    #[serde(default)]
+    pub custody: Option<CustodyConfig>,
 }
 
 fn default_true() -> bool {
@@ -187,6 +193,9 @@ struct Response {
     result: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     error: Option<String>,
+    /// A stable machine code for refusals that the Engine must act on (for example `stale_engine`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    code: Option<String>,
 }
 
 struct RuntimeState {
@@ -211,6 +220,7 @@ struct Shared {
     state: Mutex<RuntimeState>,
     ready: Condvar,
     journal: Mutex<File>,
+    custody: Option<CustodyRegistry>,
 }
 
 struct ManagedProcess {
@@ -226,6 +236,9 @@ struct ManagedProcess {
 struct Containment(windows_sys::Win32::Foundation::HANDLE);
 #[cfg(windows)]
 unsafe impl Send for Containment {}
+// A Job object is internally synchronized; its handle may be queried and terminated from any thread.
+#[cfg(windows)]
+unsafe impl Sync for Containment {}
 
 #[cfg(unix)]
 struct Containment(i32);
@@ -283,22 +296,21 @@ impl Containment {
         #[cfg(windows)]
         {
             use std::os::windows::io::AsRawHandle;
-            let ok = unsafe {
-                windows_sys::Win32::System::JobObjects::AssignProcessToJobObject(
-                    self.0,
-                    child.as_raw_handle() as _,
-                )
-            };
-            if ok == 0 {
-                return Err(format!(
-                    "AssignProcessToJobObject failed: {}",
-                    std::io::Error::last_os_error()
-                ));
-            }
+            return self.assign_handle(child.as_raw_handle() as _);
         }
         #[cfg(unix)]
         {
             self.0 = child.id() as i32;
+            Ok(())
+        }
+    }
+
+    // Assigns a process by its raw handle, for launches that create the process suspended (Process Custody).
+    #[cfg(windows)]
+    fn assign_handle(&self, process: windows_sys::Win32::Foundation::HANDLE) -> Result<(), String> {
+        let ok = unsafe { windows_sys::Win32::System::JobObjects::AssignProcessToJobObject(self.0, process) };
+        if ok == 0 {
+            return Err(format!("AssignProcessToJobObject failed: {}", std::io::Error::last_os_error()));
         }
         Ok(())
     }
@@ -455,7 +467,12 @@ impl Host {
             .read(true)
             .open(&journal_file)
             .map_err(err)?;
+        let custody = match &config.custody {
+            Some(custody_config) => Some(CustodyRegistry::open(&host_dir, &durable.generation, custody_config)?),
+            None => None,
+        };
         let shared = Arc::new(Shared {
+            custody,
             config: config.clone(),
             installation_root,
             installation_id,
@@ -566,6 +583,17 @@ impl Host {
                     serde_json::json!({ "pid": pid, "buildId": build_id, "generation": generation, "bootstrap": bootstrap,
                         "status": status, "message": message }),
                 )?;
+                // With Process Custody enabled, an Engine that exits does not end the Host: the CLIs it admitted are still
+                // owned here. The managed tree is released; the Host keeps serving custody until a new Engine attaches.
+                if self.shared.custody.is_some() {
+                    let mut guard = self.shared.state.lock().map_err(poison)?;
+                    if let Some(mut process) = guard.managed.take() {
+                        let _ = process.containment.terminate();
+                        let _ = process.child.wait();
+                    }
+                    guard.ready_generation = None;
+                    continue;
+                }
                 if let Err(error) = shutdown_managed(&self.shared) {
                     let cleanup_message =
                         format!("{message}; managed process cleanup failed: {error}");
@@ -582,6 +610,10 @@ impl Host {
             if guard.stop_requested {
                 break;
             }
+        }
+        // A graceful Host stop ends every custody Job it still owns, with a recorded reason, before the managed tree.
+        if let Some(custody) = &self.shared.custody {
+            custody.shutdown();
         }
         shutdown_managed(&self.shared)?;
         self.listener.set_nonblocking(true).ok();
@@ -1254,6 +1286,13 @@ fn dispatch(shared: &Arc<Shared>, command: &str, payload: serde_json::Value) -> 
                 "receipt acknowledgement is missing its identity".into(),
             )),
         },
+        command if command.starts_with("custody.") => match &shared.custody {
+            Some(custody) => match custody.dispatch(command, &payload) {
+                Ok(value) => Dispatch::Reply(ok(value)),
+                Err(refusal) => Dispatch::Reply(Response { ok: false, result: None, error: Some(refusal.message), code: Some(refusal.code.to_string()) }),
+            },
+            None => Dispatch::Reply(Response { ok: false, result: None, error: Some("Process Custody is not enabled in this Host.".into()), code: Some("custody_disabled".into()) }),
+        },
         "engine.status" => {
             let state = match shared.state.lock() {
                 Ok(value) => value,
@@ -1615,6 +1654,10 @@ fn activate_candidate_inner(
         state.durable.active_build_id = request.candidate_id.clone();
         state.durable.active_digest = installed_digest.clone();
         state.durable.generation = new_generation.clone();
+        // Custody follows the lifecycle generation: the new Engine attaches under it, the previous one is refused.
+        if let Some(custody) = &shared.custody {
+            custody.set_generation(&new_generation);
+        }
         let operation = state
             .durable
             .operation
@@ -1932,6 +1975,7 @@ fn ok(result: serde_json::Value) -> Response {
         ok: true,
         result: Some(result),
         error: None,
+        code: None,
     }
 }
 fn error_response(message: String) -> Response {
@@ -1939,6 +1983,7 @@ fn error_response(message: String) -> Response {
         ok: false,
         result: None,
         error: Some(message),
+        code: None,
     }
 }
 fn random_capability() -> String {

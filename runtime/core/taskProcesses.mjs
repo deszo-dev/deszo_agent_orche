@@ -6,6 +6,7 @@ import { nowIso } from './store.mjs';
 import { assertValid } from './schemas.mjs';
 import { ref } from './utilities.mjs';
 import { enclosingLoops, parseInstance } from './planning.mjs';
+import { crashBeforeIdentityPoint } from './custody.mjs';
 
 const BUFFER_LIMIT = 16 * 1024 * 1024;
 
@@ -87,8 +88,11 @@ export function installTaskProcesses(Engine) {
             this.markTaskWorkLaunched(record.workId);
             if (record.loops.length) { record.counted = true; for (const loop of record.loops) this.bodyStarted(state, loop); }
             const startIdentity = `${child.pid}@${startedAt}`;
-            this.store.run('UPDATE attempts SET process_id=?,process_start_identity=?,supervisor_generation=?,started_at=? WHERE id=?', child.pid, startIdentity, this.supervisorGeneration, startedAt, attempt.id);
-            this.store.appendEvents(state.id, this.attemptTransition(attempt, 'running', 'Run-owned utility process launched.', { pid: child.pid, startIdentity, supervisorGeneration: this.supervisorGeneration }));
+            // Test-only identity hold (inert unless a marker names it): the attempt keeps no process identity while the utility runs.
+            if (!crashBeforeIdentityPoint()) {
+              this.store.run('UPDATE attempts SET process_id=?,process_start_identity=?,supervisor_generation=?,started_at=? WHERE id=?', child.pid, startIdentity, this.supervisorGeneration, startedAt, attempt.id);
+              this.store.appendEvents(state.id, this.attemptTransition(attempt, 'running', 'Run-owned utility process launched.', { pid: child.pid, startIdentity, supervisorGeneration: this.supervisorGeneration }));
+            }
             timer = setTimeout(() => { record.timedOut = true; void killTree(child.pid); }, effectiveTimeout);
             if (signal?.aborted || record.stopRequested || this.runState(state.id) !== 'running') onAbort();
           } catch (error) { onFault(error); }

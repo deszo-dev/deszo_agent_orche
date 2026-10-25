@@ -10,7 +10,7 @@ import { ContractError } from './core/schemas.mjs';
 import { CorruptionError } from './core/store.mjs';
 import { supervisorFromEnvironment } from './core/supervisor-client.mjs';
 import { hostFromEnvironment } from './host/runtimeBinding.mjs';
-import { lifecycleBridgeFromEnvironment } from './host/lifecycleBridge.mjs';
+import { custodyBridgeFromEnvironment, lifecycleBridgeFromEnvironment } from './host/lifecycleBridge.mjs';
 import { autonomyGateway } from './host/uiGateway.mjs';
 import { acquireRuntimeLock } from './lock.mjs';
 
@@ -39,6 +39,20 @@ function atomicWrite(path, value) {
   const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`;
   writeFileSync(temporary, value, { mode: 0o600, flag: 'wx' });
   renameSync(temporary, path);
+}
+
+// The runtime lock is released only after the Engine has shut down. An Engine whose shutdown failed may still run CLIs or timers, so its lock
+// is kept, and ends with this process.
+async function shutDownThenRelease(engine, releaseLock) {
+  if (engine) {
+    try { await engine.shutdown(); }
+    catch (error) {
+      process.stderr.write(`The Engine did not shut down cleanly; the runtime lock is kept until this process ends: ${error.message}\n`);
+      try { engine.store.close(); } catch { /* Already closed. */ }
+      return;
+    }
+  }
+  await releaseLock();
 }
 
 function readOrCreateOwnerToken(path) {
@@ -109,6 +123,8 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
     engine = new Engine({ root, adapters, runtimeInstanceId, nodeExecutable, bridgeScript: bridgeFile, supervisor: supervisorFromEnvironment(), hostAuthority: hostBinding?.adapter ?? null, hostRuntimeGeneration: hostBinding?.runtimeGeneration ?? null, hostPolicyId: hostBinding?.policyId ?? null,hostVerificationOnly:hostBinding?.verificationOnly===true,judgeAttentionEnabled,
       externalRunConfirmationOverride: devTestConfirmationOff ? false : null,
       lifecycleHost: lifecycleHost?.context ?? null,
+      // Process Custody is an explicit experimental opt-in; without it every CLI keeps the existing launch path.
+      custodyHost: process.env.DESZO_PROCESS_CUSTODY === '1' ? (lifecycleHost ?? custodyBridgeFromEnvironment(process.env)) : null,
       processContainment: supervised ? 'tauri-job' : 'standalone-best-effort', ...(maximumAgentTimeoutSeconds ? { maximumAgentTimeoutSeconds } : {}), ...(loopMinuteMs ? { loopMinuteMs } : {}) });
     await engine.initialize();
     engine.closePendingRunRequestsAtOwnerCutover();
@@ -131,8 +147,7 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
       engine.putWorkspace('main', { cwd: join(engine.store.workdirs, 'scratch', 'main') });
   } catch (error) {
     hostBinding?.client.close();
-    if (engine) { try { await engine.shutdown(); } catch { engine.store.close(); } }
-    await releaseLock();
+    await shutDownThenRelease(engine, releaseLock);
     throw error;
   }
   // The host delivers the native Stop scope of a committed revocation or expiry.
@@ -143,6 +158,7 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
   });
   const streams = new Set();
   let shuttingDown = false;
+  let closing = null;
 
   const identifyCaller = req => {
     const match = /^Bearer ([a-f0-9]{64})$/i.exec(req.headers.authorization || '');
@@ -496,15 +512,16 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
     }
   });
 
+  // The initialized Engine may already run work (resumed Custody attempts, timers); it is shut down before the lock lets a successor in.
   try { await new Promise((resolvePromise, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolvePromise); }); }
-  catch (error) { engine.store.close(); await releaseLock(); throw error; }
+  catch (error) { await shutDownThenRelease(engine, releaseLock); throw error; }
   const identity = engine.runtimeIdentity();
   if (hostBinding?.assurance === 'production'||hostBinding?.verificationOnly) {
     try {
       await hostBinding.client.call('runtime.ready', { runtimeGeneration: hostBinding.runtimeGeneration, port: server.address().port, token, hostToken,
         buildId: hostBinding.buildId, protocolVersion: hostBinding.protocolVersion,
         storeSchemaVersion: engine.store.get('SELECT MAX(version) AS version FROM schema_migrations').version, ...identity });
-    } catch (error) { server.close(); engine.store.close(); await releaseLock(); hostBinding.client.close(); throw error; }
+    } catch (error) { server.close(); await shutDownThenRelease(engine, releaseLock); hostBinding.client.close(); throw error; }
   }
   descriptor = { descriptorVersion: 1, apiVersions: ['v2', 'v3', 'v4'], storeId: identity.storeId, runtimeInstanceId, applicationRoot: identity.applicationRoot,
     nodeExecutable: identity.nodeExecutable, bridgeScript: bridgeFile, connectionFile, port: server.address().port, token, root: identity.applicationRoot,
@@ -524,15 +541,19 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
       const text = await response.text();
       return { status: response.status, body: text ? JSON.parse(text) : null, headers: response.headers };
     } } : {}),
-    async close() {
-      if (shuttingDown) return; shuttingDown = true;
-      hostBinding?.client.close();
-      for (const entry of streams) entry.close();
-      const serverClosed = new Promise(resolvePromise => server.close(resolvePromise));
-      server.closeAllConnections?.();
-      await engine.shutdown();
-      await serverClosed;
-      await releaseLock();
+    // Every caller waits for the one shutdown, so that none of them can end the process while the Engine is still stopping its CLIs.
+    close() {
+      closing ??= (async () => {
+        shuttingDown = true;
+        hostBinding?.client.close();
+        for (const entry of streams) entry.close();
+        const serverClosed = new Promise(resolvePromise => server.close(resolvePromise));
+        server.closeAllConnections?.();
+        await engine.shutdown();
+        await serverClosed;
+        await releaseLock();
+      })();
+      return closing;
     },
   };
 }

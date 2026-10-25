@@ -43,7 +43,8 @@ test('P34 migrates exact legacy definitions once without rewriting system workfl
   await assert.rejects(startTestRunner({ root }), /injected legacy import failure/);
   const interrupted = new DatabaseSync(join(root, 'store', 'state.sqlite'));
   try {
-    assert.equal(interrupted.prepare('SELECT MAX(version) AS version FROM schema_migrations').get().version, 15);
+    // The failure happens after every catalogued migration has applied, so the version is the catalogue's latest.
+    assert.equal(interrupted.prepare('SELECT MAX(version) AS version FROM schema_migrations').get().version, MIGRATION_PATHS.length);
     assert.equal(interrupted.prepare('SELECT legacy_import_complete FROM workflow_publication_state WHERE singleton = 1').get().legacy_import_complete, 0);
     assert.equal(interrupted.prepare('SELECT COUNT(*) AS n FROM workflow_publications').get().n, 0, 'the failed import left no partial Published Versions');
     assert.equal(interrupted.prepare('SELECT COUNT(*) AS n FROM workflow_changes').get().n, 0, 'the failed import left no partial change events');

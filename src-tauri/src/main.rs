@@ -506,15 +506,35 @@ fn get_runner_connection(app: tauri::AppHandle, state: tauri::State<RuntimeState
     #[cfg(windows)]
     {
         if let Err(error) = job.assign(&child) {
+            // The runtime tree is terminated and waited for; kill-on-close ends any member that remains before a retry.
+            let _ = job.terminate_and_wait(Duration::from_secs(10));
             let _ = child.kill();
             let _ = child.wait();
             return Err(error);
         }
-        let stdin = child.stdin.as_mut().ok_or("Runtime stdin unavailable")?;
-        stdin.write_all(b"{\"command\":\"contained\"}\n").map_err(|e| e.to_string())?;
-        stdin.flush().map_err(|e| e.to_string())?;
+        let announced = (|| -> Result<(), String> {
+            let stdin = child.stdin.as_mut().ok_or("Runtime stdin unavailable")?;
+            stdin.write_all(b"{\"command\":\"contained\"}\n").map_err(|e| e.to_string())?;
+            stdin.flush().map_err(|e| e.to_string())
+        })();
+        if let Err(error) = announced {
+            // The runtime tree is terminated and waited for; kill-on-close ends any member that remains, as for every start failure.
+            let _ = job.terminate_and_wait(Duration::from_secs(10));
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(error);
+        }
     }
-    let stdout = child.stdout.take().ok_or("Runtime stdout unavailable")?;
+    let stdout = match child.stdout.take() {
+        Some(stdout) => stdout,
+        None => {
+            #[cfg(windows)]
+            let _ = job.terminate_and_wait(Duration::from_secs(10));
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err("Runtime stdout unavailable".into());
+        }
+    };
     let (sender, receiver) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
         let mut reader = BufReader::new(stdout);
@@ -525,6 +545,8 @@ fn get_runner_connection(app: tauri::AppHandle, state: tauri::State<RuntimeState
     let line = match receiver.recv_timeout(Duration::from_secs(30)) {
         Ok(Ok(line)) => line,
         _ => {
+            #[cfg(windows)]
+            let _ = job.terminate_and_wait(Duration::from_secs(10));
             let _ = child.kill();
             let _ = child.wait();
             return Err("The runtime did not start within 30 seconds. See runtime/runner.log in the data folder.".into());
@@ -533,6 +555,8 @@ fn get_runner_connection(app: tauri::AppHandle, state: tauri::State<RuntimeState
     let mut connection: Connection = match serde_json::from_str(&line) {
         Ok(connection) => connection,
         Err(e) => {
+            #[cfg(windows)]
+            let _ = job.terminate_and_wait(Duration::from_secs(10));
             let _ = child.kill();
             let _ = child.wait();
             return Err(format!("The runtime returned an invalid connection: {e}"));

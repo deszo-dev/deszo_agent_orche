@@ -7,7 +7,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { spawn, spawnSync } from 'node:child_process';
 import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { delimiter, join, resolve } from 'node:path';
 
 const repo = resolve(import.meta.dirname, '../..');
@@ -124,7 +124,7 @@ async function createPackage(source, destination, buildId) {
     bootstrap: 'tauri', desktopExecutable: 'deszo.exe', desktopBuildId: buildId }));
 }
 
-async function prepareInstallation(tag, artifacts, { damageCandidate = null, swapCandidateExeToA = false, readyTimeoutMs } = {}) {
+async function prepareInstallation(tag, artifacts, { damageCandidate = null, swapCandidateExeToA = false, readyTimeoutMs, custody = false } = {}) {
   const root = await mkdtemp(join(testsRoot, `desktop-host-proof-b-${tag}-`));
   const installation = join(root, 'installation');
   const profile = join(root, 'profile-a');
@@ -152,22 +152,27 @@ async function prepareInstallation(tag, artifacts, { damageCandidate = null, swa
     await writeFile(resourceManifestPath, JSON.stringify(resourceManifest, null, 2));
   }
   const candidateDigest = await digestCandidate(candidateB);
+  // Custody allowlist: the only executable the Host may launch for a provider is the proof's provider fixture, by digest.
+  const custodyConfig = custody ? { allowedExecutables: [{ path: artifacts.fixtureCli, sha256: await fileSha256(artifacts.fixtureCli) }] } : null;
   const hostConfig = profileRoot => ({ installationRoot: installation, profileRoot, stagingRoot: staging, nodeExecutable: process.execPath,
     initialBuildId: 'build-a', testDuplicateReceiptDelivery: true,
-    ...(readyTimeoutMs ? { testEngineReadyTimeoutMs: readyTimeoutMs } : {}) });
+    ...(readyTimeoutMs ? { testEngineReadyTimeoutMs: readyTimeoutMs } : {}),
+    ...(custodyConfig ? { custody: custodyConfig } : {}) });
   const configPath = join(root, 'host-config-profile-a.json');
   await writeFile(configPath, JSON.stringify(hostConfig(profile)));
   return { root, installation, profile, profileB, staging, fixtureState, webviewRoot, codexHome, buildA, candidateB,
     candidateDigest, configPath, hostConfig };
 }
 
-function hostProcess(configPath, fixtureCli, fixtureState, webviewRoot) {
+function hostProcess(configPath, fixtureCli, fixtureState, webviewRoot, { custody = false } = {}) {
   const pathKey = Object.keys(process.env).find(key => key.toUpperCase() === 'PATH') || 'PATH';
   const env = { ...process.env,
     [pathKey]: `${join(fixtureCli, '..')}${delimiter}${process.env[pathKey] || ''}`,
     DESZO_PROOFB_FIXTURE_STATE: fixtureState,
     CODEX_HOME: join(webviewRoot, '..', 'codex-home'),
     WEBVIEW2_USER_DATA_FOLDER: webviewRoot,
+    // Process Custody (PoC): the Engines of this installation launch provider CLIs through the Host's custody service.
+    ...(custody ? { DESZO_PROCESS_CUSTODY: '1' } : {}),
   };
   const child = spawn(hostExe, ['run', '--config', configPath], { cwd: repo, env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
   child.stdout.setEncoding('utf8'); child.stderr.setEncoding('utf8');
@@ -397,17 +402,37 @@ async function readHostState(installation) {
   return JSON.parse(await readFile(join(profileStates, keys[0], 'lifecycle.json'), 'utf8'));
 }
 
+// The OS creation time of a process, in milliseconds. PID equality alone does not identify a process instance.
+function processCreationMs(pid) {
+  if (!pid) return null;
+  const script = `$p = Get-Process -Id ${Number(pid)} -ErrorAction SilentlyContinue; if ($p) { $p.StartTime.ToUniversalTime().ToString('o') }`;
+  const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8', windowsHide: true, timeout: 30_000 });
+  const text = result.stdout.trim();
+  return text ? Date.parse(text) : null;
+}
+
+// The Host records a process creation time as a Windows FILETIME (100 ns ticks since 1601); convert it to milliseconds.
+function filetimeMs(ticks) {
+  return Number(BigInt(ticks) / 10000n) - 11644473600000;
+}
+
+// The lifecycle generation each application build was spawned under, from the Host's own journal.
+function appSpawnGenerations(events) {
+  return Object.fromEntries(events.filter(item => item.type === 'application_spawned').map(item => [item.payload.buildId, item.payload.generation]));
+}
+
 function isAlive(pid) {
   try { process.kill(pid, 0); return true; } catch (error) { return error.code === 'EPERM'; }
 }
 
 const removeTestRoot = path => rm(path, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
 
-async function runFreshProof(iteration, artifacts) {
-  const prepared = await prepareInstallation(`run-${iteration}`, artifacts);
-  const host = hostProcess(prepared.configPath, artifacts.fixtureCli, prepared.fixtureState, prepared.webviewRoot);
+async function runFreshProof(iteration, artifacts, { custody = false } = {}) {
+  const prepared = await prepareInstallation(`run-${iteration}`, artifacts, { custody });
+  const host = hostProcess(prepared.configPath, artifacts.fixtureCli, prepared.fixtureState, prepared.webviewRoot, { custody });
   const unrelated = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { windowsHide: true, stdio: 'ignore' });
   let proofPassed = false;
+  let custodyTree = null;
   try {
     const connectionFileA = await desktopConnection(prepared.profile, buildAId, host);
     const uiA = await cdpConnection(prepared.webviewRoot, host);
@@ -431,6 +456,9 @@ async function runFreshProof(iteration, artifacts) {
     assert.equal(existsSync(join(prepared.profileB, 'runtime')), false, 'the rejected Host did not start an Engine in Profile B');
 
     const flows = await setUpLinkedFlows(uiA, prepared.profile, prepared.candidateDigest);
+    // The OS creation times are taken before activation, so that a later match is the same process instance, not a reused PID.
+    custodyTree = custody ? { providerPid: flows.providerPid, descendantPid: flows.descendantPid, providerAtLaunchMs: processCreationMs(flows.providerPid),
+      descendantAtLaunchMs: processCreationMs(flows.descendantPid) } : null;
     await waitForHostEvent(host, prepared.installation, item => item.type === 'activation_accepted' && item.payload.operationId === flows.operation.id);
 
     // The authenticated operation has been accepted. From here the harness only reads the Host journal, descriptors,
@@ -452,8 +480,14 @@ async function runFreshProof(iteration, artifacts) {
     assert.notEqual(connectionFileB.runtimeInstanceId, connectionFileA.runtimeInstanceId);
     assert.equal(isAlive(hostPid), true, 'the real Rust Host process survived Tauri A and Tauri B');
     assert.equal(isAlive(unrelated.pid), true, 'the Host job did not affect an unrelated sibling process');
-    assert.equal(isAlive(flows.providerPid), false, 'the active provider CLI stopped with Tauri A');
-    assert.equal(isAlive(flows.descendantPid), false, 'the provider descendant stopped with Tauri A');
+    if (custody) {
+      // Process Custody: the provider CLI and its descendant belong to the Host's own Job, not to Tauri A's tree.
+      assert.equal(isAlive(flows.providerPid), true, 'the Custody-owned provider CLI survived the Tauri A to Tauri B replacement');
+      assert.equal(isAlive(flows.descendantPid), true, 'the Custody-owned provider descendant survived with its CLI');
+    } else {
+      assert.equal(isAlive(flows.providerPid), false, 'the active provider CLI stopped with Tauri A');
+      assert.equal(isAlive(flows.descendantPid), false, 'the provider descendant stopped with Tauri A');
+    }
     assert.equal(repairDone.run.state, 'succeeded');
     assert.equal(parentDone.run.state, 'succeeded');
 
@@ -475,7 +509,17 @@ async function runFreshProof(iteration, artifacts) {
     assert.equal(view.journal.filter(item => item.type === 'continuation.lifecycle_verified').length, 1);
     assert.equal(view.attempts.filter(item => item.node_id === 'developer' && [flows.parentRunId, flows.repairRunId].includes(item.run_id)).length, 2,
       'committed Parent and Repair work did not repeat');
-    assert.equal(view.runs.find(item => item.id === flows.sideRunId).state, 'interrupted', 'the concurrently active workspace was recovered as interrupted');
+    if (custody) {
+      // The concurrently active workspace is not interrupted: its attempt continues under Tauri B, bound to the same process.
+      assert.notEqual(view.runs.find(item => item.id === flows.sideRunId).state, 'interrupted', 'the Custody-owned workspace continued under Tauri B');
+      const bound = new DatabaseSync(join(prepared.profile, 'store/state.sqlite'), { readOnly: true });
+      try {
+        const rows = bound.prepare(`SELECT a.process_id FROM attempts a JOIN attempt_custody c ON c.attempt_id = a.id WHERE a.run_id = ?`).all(flows.sideRunId);
+        assert.ok(rows.some(row => row.process_id === flows.providerPid), 'the provider attempt is bound to the same Host-owned process');
+      } finally { bound.close(); }
+    } else {
+      assert.equal(view.runs.find(item => item.id === flows.sideRunId).state, 'interrupted', 'the concurrently active workspace was recovered as interrupted');
+    }
     assert.equal(view.runs.filter(item => ['queued', 'running', 'draining', 'waiting_for_user', 'stopping'].includes(item.state)
       && ['main', 'main-repair'].includes(item.workspace_id)).length, 0, 'no conflicting active Parent or Repair run remains');
 
@@ -489,6 +533,62 @@ async function runFreshProof(iteration, artifacts) {
     assert.equal(ready[1].payload.receiptId, ready[2].payload.receiptId);
     assert.equal(events.filter(item => item.type === 'candidate_activated').length, 1);
     assert.ok(events.some(item => item.type === 'managed_process_tree_stopped' && item.payload.buildId === 'build-a'));
+    if (custody) {
+      // Process instances: the same creation times before and after activation, cross-checked against the Host's own record.
+      assert.equal(processCreationMs(flows.providerPid), custodyTree.providerAtLaunchMs, 'the CLI is the same process instance after activation');
+      assert.equal(processCreationMs(flows.descendantPid), custodyTree.descendantAtLaunchMs, 'the descendant is the same process instance after activation');
+      const sideBinding = new DatabaseSync(join(prepared.profile, 'store/state.sqlite'), { readOnly: true });
+      let binding;
+      try { binding = sideBinding.prepare('SELECT c.custody_id, a.id AS attempt_id, a.process_id FROM attempt_custody c JOIN attempts a ON a.id = c.attempt_id WHERE a.run_id = ?').all(flows.sideRunId); }
+      finally { sideBinding.close(); }
+      assert.equal(binding.length, 1, 'the provider attempt has exactly one Host-owned process binding');
+      const hostDir = join(prepared.installation, '.deszo-host/custody/attempts');
+      const readSideRecords = () => readdirSync(hostDir).filter(name => name.endsWith('.json')).map(name => JSON.parse(readFileSync(join(hostDir, name), 'utf8')))
+        .filter(item => item.runId === flows.sideRunId);
+      // The Engine acknowledges committed output as it arrives; the record shows that acknowledgement once it is persisted.
+      await eventually(() => readSideRecords().some(item => item.stdoutAcked > 0), 'the Engine to acknowledge the Host-owned CLI output after the replacement', 90_000);
+      const sideRecords = readSideRecords();
+      // The Tauri application writes each runtime's stderr to the profile's runner.log; across the whole replacement there must be no
+      // refused custody command in it.
+      const runtimeLog = existsSync(join(prepared.profile, 'runtime/runner.log')) ? readFileSync(join(prepared.profile, 'runtime/runner.log'), 'utf8') : '';
+      const refusals = runtimeLog.split(/\r?\n/).filter(line => line.includes('Process Custody:'));
+      assert.deepEqual(refusals, [], 'no custody command was refused by the Host during the replacement');
+      assert.equal(sideRecords.length, 1, 'the Host admitted and launched the provider exactly once');
+      const hostRecord = sideRecords[0];
+      assert.equal(hostRecord.custodyId, binding[0].custody_id, 'the Engine binding names the Host record');
+      assert.equal(hostRecord.processId, flows.providerPid, 'the Host recorded the same CLI process');
+      // Output across the replacement: the Host spooled it, the Engine acknowledged only durable bytes, and the journal holds what was acknowledged.
+      assert.ok(hostRecord.stdoutDurable > 0, 'the Host spooled CLI output across the replacement');
+      assert.ok(hostRecord.stdoutAcked > 0 && hostRecord.stdoutAcked <= hostRecord.stdoutDurable, 'the Engine acknowledged only durable output');
+      const journal = new DatabaseSync(join(prepared.profile, 'store/state.sqlite'), { readOnly: true });
+      let committedStdout;
+      try {
+        committedStdout = journal.prepare("SELECT envelope_json FROM journal_events WHERE attempt_id = ? AND event_type = 'attempt.log_chunk'").all(binding[0].attempt_id)
+          .map(row => JSON.parse(row.envelope_json).payload).filter(payload => payload.stream === 'stdout').reduce((sum, payload) => sum + payload.byteLength, 0);
+      } finally { journal.close(); }
+      assert.ok(committedStdout >= hostRecord.stdoutAcked && committedStdout <= hostRecord.stdoutDurable, 'the Engine journal holds what it acknowledged, and nothing beyond the durable spool');
+      // Across both Engines, the committed chunks form one contiguous byte range: no gap and no repeated byte.
+      const journalChunks = new DatabaseSync(join(prepared.profile, 'store/state.sqlite'), { readOnly: true });
+      let chunkSpan;
+      try {
+        const chunks = journalChunks.prepare("SELECT envelope_json FROM journal_events WHERE attempt_id = ? AND event_type = 'attempt.log_chunk' ORDER BY sequence")
+          .all(binding[0].attempt_id).map(row => JSON.parse(row.envelope_json).payload).filter(payload => payload.stream === 'stdout')
+          .sort((a, b) => a.chunkIndex - b.chunkIndex);
+        let expected = 0;
+        chunkSpan = { chunks: chunks.length, contiguous: true, bytes: 0 };
+        for (const chunk of chunks) {
+          if (chunk.byteOffset !== expected) chunkSpan.contiguous = false;
+          expected = chunk.byteOffset + chunk.byteLength;
+        }
+        chunkSpan.bytes = expected;
+      } finally { journalChunks.close(); }
+      assert.equal(chunkSpan.contiguous, true, 'the committed output has no gap or repeated byte across the replacement');
+      assert.equal(chunkSpan.bytes, committedStdout, 'the contiguous span is exactly the committed output');
+      assert.equal(Math.abs(filetimeMs(hostRecord.processCreationTime) - custodyTree.providerAtLaunchMs) <= 2, true, 'the Host creation identity matches the OS process');
+      custodyTree.hostRecord = { custodyId: hostRecord.custodyId, state: hostRecord.state, processId: hostRecord.processId, stdoutDurable: hostRecord.stdoutDurable, stdoutAcked: hostRecord.stdoutAcked, spoolComplete: hostRecord.spoolComplete, admissions: sideRecords.length,
+        journalChunks: chunkSpan.chunks, journalContiguous: chunkSpan.contiguous, journalStdoutBytes: chunkSpan.bytes };
+      custodyTree.generations = appSpawnGenerations(events);
+    }
     assert.equal((await readFile(join(prepared.installation, '.deszo-host/active.json'), 'utf8')).includes('build-b'), true);
     assert.equal(existsSync(join(prepared.fixtureState, 'provider-host-capability-leak.marker')), false, 'the lifecycle capability was removed before provider launch');
 
@@ -508,7 +608,7 @@ async function runFreshProof(iteration, artifacts) {
     assert.ok(!JSON.stringify(receipt).includes(uiA.firstPartyToken), 'lifecycle receipt contains no first-party Engine credential');
 
     proofPassed = true;
-    return { iteration, hostPid, installationId: durable.installationId, profileRoot: prepared.profile,
+    return { iteration, custody, custodyTree, hostPid, installationId: durable.installationId, profileRoot: prepared.profile,
       applicationPids: [appA.payload.pid, appBEvent.payload.pid], enginePids: [ready[0].payload.enginePid, ready[1].payload.enginePid],
       buildIds: appSpawns.map(item => item.payload.buildId),
       builds: artifacts.packages.map(item => ({ buildId: item.buildId, executable: item.executable, runtime: item.runtime,
@@ -529,6 +629,10 @@ async function runFreshProof(iteration, artifacts) {
     await stopHost(host);
     if (proofPassed) assert.ok(hostEvents(prepared.installation).some(item => item.type === 'managed_process_tree_stopped' && item.payload.buildId === buildBId),
       'the final Host shutdown contained Tauri B and its production Engine');
+    // A graceful Host stop ends every Custody Job it still owns; the CLI and its descendant must be gone afterwards.
+    if (proofPassed && custodyTree) {
+      await eventually(() => !isAlive(custodyTree.providerPid) && !isAlive(custodyTree.descendantPid), 'the Host stop to end its Custody-owned tree', 30_000);
+    }
     if (process.env.DESZO_PROOFB_KEEP_ARTIFACTS !== '1') await removeTestRoot(prepared.root);
     else console.error(`Proof B diagnostics preserved at ${prepared.root}`);
   }
@@ -542,6 +646,17 @@ test('Proof B: real Rust Host restarts Tauri A as Tauri B and Engine autonomousl
     assert.notEqual(evidence[0].hostPid, evidence[1].hostPid);
     assert.ok(evidence.every(item => item.buildIds.join(',') === 'build-a,build-b'));
     await writeFile(join(testsRoot, 'tauri-host-proof-b-runs.json'), JSON.stringify({ platform: process.platform, artifacts: artifacts.packages, runs: evidence }, null, 2));
+  });
+
+// Process Custody on the real desktop path: the same Tauri A to Tauri B replacement, with the provider CLI launched by the Host's
+// custody service. The live CLI and its descendant must survive the replacement with the same identity, and be bound to Build B.
+test('Proof B with Process Custody: a Custody-owned provider CLI and its descendant survive real Tauri A to Tauri B replacement',
+  { timeout: 900_000 }, async () => {
+    const artifacts = await desktopArtifacts();
+    const evidence = await runFreshProof(3, artifacts, { custody: true });
+    assert.deepEqual(evidence.buildIds, ['build-a', 'build-b']);
+    assert.equal(evidence.custody, true);
+    await writeFile(join(testsRoot, 'tauri-custody-proof-b.json'), JSON.stringify({ platform: process.platform, artifacts: artifacts.packages, run: evidence }, null, 2));
   });
 
 test('negative desktop Host case: incomplete Tauri candidate resources are refused before shutdown', { timeout: 180_000 }, async () => {
@@ -666,3 +781,143 @@ test('negative desktop Host case: unexpected Tauri exit is recorded without a su
     await removeTestRoot(prepared.root);
   }
 });
+
+// Supervised containment on the real desktop path (ADR-0002 section 4). The writer is an ordinary agent. The runtime launches it through the Tauri
+// supervisor's launch shim, so its process tree is a member of the runtime's Job Object, and it writes Git objects and refs into a repository while
+// it runs. The runtime is then ended with the writer in progress: by an external kill (`engine-kill`), or by a crash in the window between the OS
+// creation of the writer and the durable record of its process identity (`identity-window`, the attempt row still names no process). The desktop
+// shell must end the whole tree, before anything else can run, and the repository must receive no write after that. No successor runtime can
+// start in the same application process: the lifecycle capability is one-time, so a later Engine is a new application, started by the Host.
+async function readWhenReady(path, timeoutMs = 60_000) {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    try { return (await readFile(path, 'utf8')).trim(); } catch { /* Not written yet. */ }
+    await new Promise(done => setTimeout(done, 100));
+  }
+  throw new Error(`${path} was not written in time`);
+}
+
+function writeLog(fixtureState) {
+  const path = join(fixtureState, 'writes.log');
+  if (!existsSync(path)) return [];
+  return readFileSync(path, 'utf8').trim().split(/\r?\n/).filter(Boolean).map(line => {
+    const [tick, millis, ok] = line.split(' ');
+    return { tick: Number(tick), millis: Number(millis), ok: ok === 'true' };
+  });
+}
+
+// Polls until each process is gone; returns the first time each was observed gone. A process that is never observed gone is a failure.
+async function observeDeaths(pids, timeoutMs) {
+  const deadAt = new Map();
+  const started = Date.now();
+  while (deadAt.size < pids.length) {
+    for (const pid of pids) if (!deadAt.has(pid) && !isAlive(pid)) deadAt.set(pid, Date.now());
+    if (deadAt.size === pids.length) break;
+    if (Date.now() - started > timeoutMs) throw new Error(`process ${pids.filter(pid => !deadAt.has(pid)).join(', ')} is still alive after ${timeoutMs} ms`);
+    await new Promise(done => setTimeout(done, 25));
+  }
+  return deadAt;
+}
+
+async function runSupervisedWriterProof(scenario) {
+  const artifacts = await desktopArtifacts();
+  const prepared = await prepareInstallation(`supervised-${scenario}`, artifacts, { custody: false });
+  const marker = join(prepared.root, 'crash-before-identity.marker');
+  // The Host passes its environment to the application and the runtime; the marker is named only for the Host that starts Tauri A.
+  if (scenario === 'identity-window') process.env.DESZO_TEST_CRASH_BEFORE_IDENTITY_MARKER = marker;
+  let host;
+  try { host = hostProcess(prepared.configPath, artifacts.fixtureCli, prepared.fixtureState, prepared.webviewRoot); }
+  finally { delete process.env.DESZO_TEST_CRASH_BEFORE_IDENTITY_MARKER; }
+  try {
+    await desktopConnection(prepared.profile, buildAId, host);
+    // The bundled UI's own connection carries the first-party credential the API accepts (as in Proof B).
+    const connection = await cdpConnection(prepared.webviewRoot, host);
+    const ready = await waitForHostEvent(host, prepared.installation, item => item.type === 'engine_ready' && item.payload.buildId === buildAId);
+    const enginePid = Number(ready.payload.enginePid);
+    const applicationPid = Number(ready.payload.applicationPid);
+    assert.ok(enginePid && enginePid !== applicationPid, 'the runtime is a child of the Tauri application');
+
+    // The workspace is a Git repository that the writer updates; its objects and refs live only there.
+    const repo = join(prepared.root, 'writer-repo');
+    await mkdir(repo, { recursive: true });
+    for (const args of [['init', '-q', '-b', 'main'], ['config', 'user.name', 'Proof'], ['config', 'user.email', 'proof@example.com'], ['commit', '-q', '--allow-empty', '-m', 'base']]) {
+      assert.equal(run('git', args, { cwd: repo }).status, 0, `git ${args.join(' ')}`);
+    }
+    const workspace = await apiCall(connection, 'PUT', '/api/v2/workspaces/supervised-writer', { cwd: repo });
+    assert.equal(workspace.status, 200, JSON.stringify(workspace.body));
+    const saved = await saveWorkflow(connection, workflow('supervised-writer-proof', [agent('writer', 'fixture-git-writer', { timeoutSeconds: 300 })], [
+      edge('request-writer', 'request', 'text', 'writer', 'prompt'), edge('writer-result', 'writer', 'text', 'result', 'value')]));
+    // identity-window: the first launch's identity write is withheld for 8 s (the Engine keeps running meanwhile), then the runtime ends.
+    // The hold lasts shorter than the supervisor's runtime-silence limit (15 s), so the Host-side supervisor does not end the writer first.
+    if (scenario === 'identity-window') await writeFile(marker, '8000');
+    const runId = await runWorkflow(connection, saved, 'supervised-writer');
+
+    // Identities are taken as soon as each process exists: the identity-window runtime ends a few seconds after the writer starts.
+    const writerPid = Number(await readWhenReady(join(prepared.fixtureState, 'writer.pid')));
+    const writerIdentity = processCreationMs(writerPid);
+    const descendantPid = Number(await readWhenReady(join(prepared.fixtureState, 'writer-descendant.pid')));
+    const descendantIdentity = processCreationMs(descendantPid);
+    assert.ok(writerIdentity && descendantIdentity, 'the writer and its descendant are live OS processes');
+    await eventually(() => writeLog(prepared.fixtureState).length >= 4, 'the writer to write into its repository', 60_000);
+    const writesBeforeEnd = writeLog(prepared.fixtureState).length;
+
+    const db = new DatabaseSync(join(prepared.profile, 'store/state.sqlite'), { readOnly: true });
+    let writerAttemptBeforeEnd;
+    try { writerAttemptBeforeEnd = db.prepare("SELECT id, state, process_id FROM attempts WHERE run_id = ? AND node_instance_id = 'writer'").get(runId); }
+    finally { db.close(); }
+
+    if (scenario === 'engine-kill') {
+      const killed = run('taskkill', ['/PID', String(enginePid), '/F'], {});
+      assert.equal(killed.status, 0, `taskkill of the runtime: ${killed.stderr}`);
+    }
+    // The runtime ends (killed, or crashed in the identity window). Nothing else in this proof starts a runtime.
+    await eventually(() => !isAlive(enginePid), 'the runtime to end', 60_000);
+    const runtimeEndedObserved = Date.now();
+    const deaths = await observeDeaths([writerPid, descendantPid], 30_000);
+    const writesAtDeath = writeLog(prepared.fixtureState).length;
+    await new Promise(done => setTimeout(done, 3_000));
+    const writesLater = writeLog(prepared.fixtureState);
+    // Measured: no repository write after the moment the tree was observed gone. Writes before that moment are reported, not asserted away.
+    assert.equal(writesLater.length, writesAtDeath, 'the repository received no write after the tree was observed gone');
+    const writes = writesLater;
+    const lastWriteMs = Math.max(...writes.map(item => item.millis));
+    assert.ok(lastWriteMs <= Math.min(deaths.get(writerPid), deaths.get(descendantPid)), 'every repository write happened before the tree was observed ended');
+    assert.equal(readFileSync(join(prepared.fixtureState, 'writer.pid'), 'utf8').trim(), String(writerPid), 'the writer was not launched again');
+    assert.equal(processCreationMs(writerPid), null, 'the writer is gone (the identity is no longer live)');
+
+    const after = new DatabaseSync(join(prepared.profile, 'store/state.sqlite'), { readOnly: true });
+    let writerAttemptAfter;
+    try { writerAttemptAfter = after.prepare("SELECT id, state, process_id FROM attempts WHERE run_id = ? AND node_instance_id = 'writer'").get(runId); }
+    finally { after.close(); }
+    // The attempt row names the process the runtime launched through the shim (its PID), not the CLI it runs: the CLI is the shim's child.
+    if (scenario === 'identity-window') {
+      assert.equal(writerAttemptBeforeEnd.process_id, null, 'the attempt row names no process at the crash: the absent PID is not treated as evidence');
+    } else {
+      assert.notEqual(writerAttemptBeforeEnd.process_id, null, 'the attempt row named the launched process before the kill');
+    }
+    const evidence = {
+      scenario, platform: process.platform, runId, applicationPid, enginePid, writer: { pid: writerPid, descendantPid, identityMs: writerIdentity, descendantIdentityMs: descendantIdentity },
+      attemptAtEnd: { before: writerAttemptBeforeEnd, after: writerAttemptAfter },
+      writesBeforeEnd, writesTotal: writes.length, lastWriteMs, runtimeEndedObservedMs: runtimeEndedObserved,
+      observedGoneMs: { writer: deaths.get(writerPid), descendant: deaths.get(descendantPid) },
+      writesAfterGone: writes.length - writesAtDeath,
+    };
+    return evidence;
+  } finally {
+    await stopHost(host);
+    if (process.env.DESZO_PROOFB_KEEP_ARTIFACTS !== '1') await removeTestRoot(prepared.root);
+    else console.error(`Supervised proof diagnostics preserved at ${prepared.root}`);
+  }
+}
+
+test('Supervised containment (desktop): ending the runtime during a supervised Git write leaves no writer, no descendant and no further repository write',
+  { timeout: 900_000 }, async () => {
+    const evidence = await runSupervisedWriterProof('engine-kill');
+    await writeFile(join(testsRoot, 'tauri-supervised-containment-engine-kill.json'), JSON.stringify(evidence, null, 2));
+  });
+
+test('Supervised containment (desktop): a crash between the writer\'s OS creation and its durable identity leaves no writer and no further write',
+  { timeout: 900_000 }, async () => {
+    const evidence = await runSupervisedWriterProof('identity-window');
+    await writeFile(join(testsRoot, 'tauri-supervised-containment-identity-window.json'), JSON.stringify(evidence, null, 2));
+  });

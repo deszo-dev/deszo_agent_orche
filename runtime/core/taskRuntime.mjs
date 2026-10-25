@@ -10,6 +10,7 @@ import { scopeMatches } from './map.mjs';
 import { deriveSourceFacts, evaluateCandidateFloors, selectExecutionPlan } from './taskAssessment.mjs';
 import { buildContextPackage, computeCompatibilityFingerprint, evaluateAcceptanceRecord, handleContextNeededRequest, handleReviewOutcomeInLoop } from './contextPackage.mjs';
 import { deliveryManifestDigest, executeBranchDelivery } from './branchDelivery.mjs';
+import { afterBarrierWork } from './custody.mjs';
 
 const ACTIVE = new Set(['running', 'paused']);
 const pending = new Set(['scheduled', 'waiting']);
@@ -290,18 +291,28 @@ export function installTaskRuntime(Engine, { ApiError }) {
   };
 
   P.runManagedTaskUtility = function runManagedTaskUtility(state, execution, attempt) {
-    const keys = execution.data.current.phase === 'deliver' ? [`delivery:${this.workspaceOf(state).cwd_identity}:${execution.data.config.delivery.targetBranchRef}`] : [];
+    // A delivery writes into the source repository: it fetches the verified commit there and updates the target ref. While a Host-owned
+    // process may still run in an overlapping workspace (Process Custody), the delivery waits for its owner to confirm the end. The other
+    // utilities only read the repository's committed objects or work in their own directories.
+    const deliveryCwd = execution.data.current.phase === 'deliver' ? this.workspaceOf(state).cwd : null;
+    if (deliveryCwd && (this.custodyHoldOverlapping(deliveryCwd) || this.custodyLaunchOverlapping(deliveryCwd) || this.unconfirmedOverlapping(deliveryCwd))) {
+      if (attempt.state === 'scheduled') this.store.appendEvents(state.id, this.attemptTransition(attempt, 'waiting', 'Waiting for a Host-owned process to end in this workspace; its owner has not yet confirmed that it has.'));
+      return;
+    }
+    const keys = deliveryCwd ? [`delivery:${this.workspaceOf(state).cwd_identity}:${execution.data.config.delivery.targetBranchRef}`] : [];
     if (keys.some(key => this.locks.has(key))) {
       if (attempt.state === 'scheduled') this.store.appendEvents(state.id, this.attemptTransition(attempt, 'waiting', 'Waiting for the repository/ref delivery lock.'));
       return;
     }
     for (const key of keys) { this.locks.add(key); this.store.run('INSERT INTO resource_locks(resource_key,run_id,attempt_id,acquired_at) VALUES(?,?,?,?)', key, state.id, attempt.id, nowIso()); }
     const controller = new AbortController();
-    const record = { runId: state.id, taskExecutionId: execution.row.id, loops: enclosingLoops(parseInstance(execution.row.node_instance_id).prefix).map(item => item.loopInstance), keys, child: null, launched: false, stopRequested: false, abortController: controller };
+    const record = { runId: state.id, taskExecutionId: execution.row.id, loops: enclosingLoops(parseInstance(execution.row.node_instance_id).prefix).map(item => item.loopInstance), keys, child: null, launched: false, stopRequested: false, abortController: controller, deliveryCwd };
     this.processes.set(attempt.id, record);
     record.exited = new Promise(done => { record.resolveExit = done; });
     this.store.appendEvents(state.id, [...this.attemptTransition(attempt, 'running', 'Managed task utility started.'), this.commitInputs(state, attempt, {})]);
-    this.executeManagedTaskUtility(state, execution, attempt, controller.signal).then(() => {
+    // A delivery's claim is held by the admission above until its work starts (the barrier is inert outside tests).
+    afterBarrierWork(this.testBarrier, 'delivery-claimed', { runId: state.id, phase: execution.data.current.phase, workspaceCwd: this.workspaceOf(state).cwd },
+      () => this.executeManagedTaskUtility(state, execution, attempt, controller.signal)).then(() => {
       if (controller.signal.aborted || record.stopRequested || this.runState(state.id) === 'stopping') {
         const current = this.store.get('SELECT * FROM attempts WHERE id=?', attempt.id);
         if (current.state === 'running') this.store.appendEvents(state.id, this.attemptTransition(current, 'canceled', 'Managed utility stopped.'));

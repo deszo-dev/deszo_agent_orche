@@ -1,0 +1,176 @@
+// Deterministic provider fixture for Process Custody tests. It speaks the Codex JSON event stream, needs no model and no
+// subscription, and is selected by --model. It records every invocation and the NAMES of its environment (never values)
+// so a test can prove that one launch happened and that no lifecycle or custody credential reached the provider.
+use std::{
+    env,
+    fs::{self, OpenOptions},
+    io::{self, Read, Write},
+    os::windows::process::CommandExt,
+    path::PathBuf,
+    process::{Command, Stdio},
+    thread,
+    time::Duration,
+};
+
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+fn fixture_dir() -> PathBuf {
+    env::var_os("CUSTODY_FIXTURE_STATE_DIR")
+        .map(PathBuf::from)
+        .expect("CUSTODY_FIXTURE_STATE_DIR names the fixture state directory")
+}
+
+// One newline-delimited event, flushed at once so that the Host's spool sees output while the CLI is still running.
+fn event(line: &str) {
+    let mut out = io::stdout().lock();
+    writeln!(out, "{line}").expect("write event");
+    out.flush().expect("flush event");
+}
+
+fn answer(text: &str) {
+    let escaped = text.replace('\\', "\\\\").replace('"', "\\\"");
+    event(&format!(r#"{{"type":"item.completed","item":{{"type":"agent_message","text":"{escaped}"}}}}"#));
+    event(r#"{"type":"turn.completed","usage":{"input_tokens":1,"output_tokens":1}}"#);
+}
+
+// Reads `key=NUMBER` from the prompt; the prompt carries the test's directives.
+fn directive(prompt: &str, key: &str, default: u64) -> u64 {
+    prompt
+        .split(|c: char| c.is_whitespace() || c == ']' || c == '[')
+        .find_map(|token| token.strip_prefix(&format!("{key}=")).and_then(|value| value.parse().ok()))
+        .unwrap_or(default)
+}
+
+#[link(name = "kernel32")]
+extern "system" {
+    fn GetStdHandle(which: u32) -> isize;
+    fn SetHandleInformation(handle: isize, mask: u32, flags: u32) -> i32;
+}
+
+// The descendant must not hold this CLI's output pipes open: its standard handles stop being inheritable before it is spawned, so
+// the CLI's own streams end with the CLI while the descendant lives on in the Job.
+fn stop_inheriting_standard_handles() {
+    const HANDLE_FLAG_INHERIT: u32 = 1;
+    for which in [-10i32 as u32, -11i32 as u32, -12i32 as u32] {
+        unsafe {
+            let handle = GetStdHandle(which);
+            if handle != 0 && handle != -1 {
+                SetHandleInformation(handle, HANDLE_FLAG_INHERIT, 0);
+            }
+        }
+    }
+}
+
+// Appends one numbered line to `path` every 100 ms for `millis`, then exits. Run as a descendant or by the writer models.
+fn write_ticks(path: &PathBuf, millis: u64) {
+    let started = std::time::Instant::now();
+    let mut tick = 0u64;
+    while started.elapsed() < Duration::from_millis(millis) {
+        let mut file = OpenOptions::new().create(true).append(true).open(path).expect("open marker");
+        writeln!(file, "{} {tick}", std::process::id()).expect("write marker");
+        tick += 1;
+        thread::sleep(Duration::from_millis(100));
+    }
+}
+
+fn main() {
+    let args: Vec<String> = env::args().skip(1).collect();
+    // Descendant mode for `custody-orphan`: no provider protocol, just the marker.
+    if args.first().is_some_and(|arg| arg == "--orphan-writer") {
+        write_ticks(&PathBuf::from(&args[1]), args[2].parse().expect("orphan duration"));
+        return;
+    }
+    if args.iter().any(|arg| arg == "--version") {
+        println!("Deszo Custody fixture CLI 1.0");
+        return;
+    }
+    if args.first().is_some_and(|arg| arg == "login") {
+        println!("Logged in using ChatGPT");
+        return;
+    }
+    let model = args.windows(2).find(|pair| pair[0] == "--model").map(|pair| pair[1].clone()).unwrap_or_default();
+    let mut prompt = String::new();
+    io::stdin().read_to_string(&mut prompt).expect("read provider prompt");
+
+    let dir = fixture_dir();
+    let mut log = OpenOptions::new().create(true).append(true).open(dir.join("invocations.log")).expect("open invocation log");
+    writeln!(log, "{} {}", std::process::id(), model).expect("record invocation");
+    // Names only. A credential in this list is a leak, and the test fails on it.
+    let mut names: Vec<String> = env::vars().map(|(name, _)| name).collect();
+    names.sort();
+    fs::write(dir.join(format!("env-{}.txt", std::process::id())), names.join("\n")).expect("record environment names");
+
+    event(r#"{"type":"thread.started","thread_id":"custody-fixture"}"#);
+    match model.as_str() {
+        "custody-steady" => {
+            let ticks = directive(&prompt, "ticks", 20);
+            for tick in 0..ticks {
+                event(&format!(r#"{{"type":"progress","tick":{tick}}}"#));
+                thread::sleep(Duration::from_millis(500));
+            }
+            answer("Steady run complete.");
+        }
+        "custody-split" => {
+            // A two-byte character is split across two writes, and the first record is a partial line.
+            let record = "{\"type\":\"progress\",\"text\":\"Splitté-ünïcode\"}\n";
+            let bytes = record.as_bytes();
+            let split = record.find('é').expect("the fixture text contains é") + 1;
+            let mut out = io::stdout().lock();
+            out.write_all(&bytes[..split]).expect("write first half");
+            out.flush().expect("flush first half");
+            thread::sleep(Duration::from_millis(400));
+            out.write_all(&bytes[split..]).expect("write second half");
+            out.flush().expect("flush second half");
+            drop(out);
+            answer("Split output complete.");
+        }
+        "custody-descendant" => {
+            // A descendant inherits this CLI's Job and its pipes; it must end with the CLI's containment, never sooner.
+            let child = Command::new("cmd.exe")
+                .args(["/d", "/s", "/c", "ping -n 300 127.0.0.1 >nul"])
+                .creation_flags(CREATE_NO_WINDOW)
+                .stdin(Stdio::null())
+                .spawn()
+                .expect("spawn descendant");
+            fs::write(dir.join("descendant.pid"), child.id().to_string()).expect("record descendant");
+            let ticks = directive(&prompt, "ticks", 120);
+            for tick in 0..ticks {
+                event(&format!(r#"{{"type":"progress","tick":{tick}}}"#));
+                thread::sleep(Duration::from_millis(500));
+            }
+            answer("Descendant run complete.");
+        }
+        "custody-writer" => {
+            // Writes into its own workspace while it runs: the bytes another execution there would conflict with.
+            let ticks = directive(&prompt, "ticks", 120);
+            let marker = env::current_dir().expect("working directory").join("custody-writer.log");
+            for tick in 0..ticks {
+                let mut file = OpenOptions::new().create(true).append(true).open(&marker).expect("open marker");
+                writeln!(file, "{} {tick}", std::process::id()).expect("write marker");
+                event(&format!(r#"{{"type":"progress","tick":{tick}}}"#));
+                thread::sleep(Duration::from_millis(500));
+            }
+            answer("Writer run complete.");
+        }
+        "custody-orphan" => {
+            // The leader starts a descendant in its Job that outlives it, writing a marker for `orphanMs`, and then exits at once.
+            stop_inheriting_standard_handles();
+            let marker = dir.join("orphan.log");
+            let child = Command::new(env::current_exe().expect("fixture path"))
+                .args(["--orphan-writer", &marker.to_string_lossy(), &directive(&prompt, "orphanMs", 8000).to_string()])
+                .creation_flags(CREATE_NO_WINDOW)
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+                .expect("spawn orphan descendant");
+            fs::write(dir.join("descendant.pid"), child.id().to_string()).expect("record descendant");
+            answer("Leader exits; its descendant runs on.");
+        }
+        "custody-exit" => {
+            answer("Exiting with the directed code.");
+            std::process::exit(directive(&prompt, "code", 3) as i32);
+        }
+        _ => answer("Deterministic custody fixture response."),
+    }
+}

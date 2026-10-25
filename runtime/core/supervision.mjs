@@ -459,17 +459,34 @@ export function installSupervision(Engine, { ApiError }) {
   P.recordTerminationProof = async function recordTerminationProof(runId) {
     const request = this.stopRequests.get(runId) ?? { requestedAt: nowIso(), pids: [], observed: false };
     this.stopRequests.delete(runId);
-    const members = request.pids.map(({ attemptId, pid }) => ({ attemptId, pid, state: isAlive(pid) ? 'running' : 'exited' }));
-    const containment = await this.containmentFor(runId, request);
-    const ownedAttempts = request.pids.length;
-    let outcome, reason, proofContainment = containment.containment;
+    // A Host-owned CLI is in the Host's own Job, not in the run Job: the run Job proves only the members it owns, and each Host-owned tree is
+    // proven by its Host (processTreeEnded). A stop is recorded as stopped only when both proofs hold.
+    // Every Host-owned invocation of the run counts, not only the ones this Stop snapshot saw: an invocation admitted or launched after the snapshot
+    // is part of the run until its Host proves its tree ended.
+    // Only invocations whose hold is still held: a hold released on the Host's proof has already been proven ended.
+    const bound = this.store.all("SELECT b.attempt_id AS attemptId, b.custody_id AS custodyId FROM attempt_custody b JOIN custody_workspace_holds h ON h.custody_id = b.custody_id WHERE b.run_id = ? AND h.state = 'held'", runId);
+    const boundOnly = bound.filter(item => !request.pids.some(pid => pid.attemptId === item.attemptId));
+    const hostOwned = [...request.pids.filter(item => item.custodyId), ...boundOnly.map(item => ({ attemptId: item.attemptId, pid: null, custodyId: item.custodyId }))];
+    const members = [...request.pids.map(({ attemptId, pid }) => ({ attemptId, pid, state: isAlive(pid) ? 'running' : 'exited' })),
+      ...boundOnly.map(item => ({ attemptId: item.attemptId, pid: null, state: 'unknown' }))];
+    const jobOwned = request.pids.filter(item => !item.custodyId);
+    let jobProof;
+    try { jobProof = await this.runJobProof(runId, { ...request, pids: jobOwned }, jobOwned.length); }
+    catch (error) { jobProof = { containment: 'windows-job', confirmed: false, remainingMembers: null, reason: `The supervisor could not prove the run Job state: ${error.message}` }; }
+    const hostProof = await this.hostTreeProof(hostOwned);
+    const ownedAttempts = new Set([...request.pids.map(item => item.attemptId), ...hostOwned.map(item => item.attemptId)]).size;
+    const confirmed = jobProof.confirmed && hostProof.confirmed;
+    let outcome, reason, proofContainment = jobProof.containment;
+    // A stop that only Host-owned trees made is contained by the Host's Job (a Windows Job); it is not a stop with no containment.
+    if (confirmed && hostOwned.length) proofContainment = 'windows-job';
+    // A proof that did not confirm names no containment: the label says what was proven.
+    if (!confirmed) proofContainment = 'none';
     if (!request.observed) { outcome = 'termination_unconfirmed'; reason = 'This runtime instance did not observe the Stop request, so termination cannot be proven.'; proofContainment = 'none'; }
-    else if (!ownedAttempts) { outcome = 'stopped'; reason = 'The runtime owned no active process when Root Stop was requested; no owned member remains.'; proofContainment = 'none'; }
-    else if (containment.confirmed) { outcome = 'stopped'; reason = containment.reason; }
-    else { outcome = 'termination_unconfirmed'; reason = containment.reason; }
+    else if (confirmed) { outcome = 'stopped'; reason = [jobProof.reason, hostProof.reason].filter(Boolean).join(' ').slice(0, 1000); }
+    else { outcome = 'termination_unconfirmed'; reason = [jobProof.reason, hostProof.reason].filter(Boolean).join(' ').slice(0, 1000); }
     const proof = { schemaVersion: 1, kind: 'TerminationProof', runId, outcome, containment: proofContainment, controlMode: this.controlModeOf(runId),
       requestedAt: request.requestedAt, confirmedAt: outcome === 'stopped' ? nowIso() : null, ownedAttempts,
-      remainingMembers: containment.remainingMembers ?? (outcome === 'stopped' ? 0 : null), members, reason };
+      remainingMembers: hostProof.confirmed ? (jobProof.remainingMembers ?? (outcome === 'stopped' ? 0 : null)) : null, members, reason };
     assertValid('execution-evidence.schema.json', 'terminationProof', proof, 'Termination proof');
     const artifact = this.store.putJson(proof);
     this.store.transaction(() => {
@@ -481,6 +498,38 @@ export function installSupervision(Engine, { ApiError }) {
     // Only a confirmed stop drops the run Job; an unconfirmed one keeps it so kill-on-close still reaps the members.
     if (outcome === 'stopped') await Promise.resolve().then(() => this.supervisor?.releaseRun?.(runId)).catch(() => {});
     return proof;
+  };
+
+  // The run Job's proof. Without owned members it proves that the run Job has no member left (a run Job the supervisor never created has none);
+  // without any supervisor, nothing else can own a member and the proof is the runtime's own record.
+  P.runJobProof = async function runJobProof(runId, request, owned) {
+    if (owned) return this.containmentFor(runId, request);
+    if (!this.supervisor?.proveStopped) return { containment: 'none', confirmed: true, remainingMembers: 0, reason: 'The runtime owned no active process when Root Stop was requested; no owned member remains.' };
+    // With no owned member there is no launch set, so the proof never claims native containment (containment 'none'). The run Job is still asked:
+    // a member left in it (for example a grandchild of a finished command) keeps the Stop unconfirmed.
+    const probe = await this.supervisor.proveStopped(runId, []);
+    if (probe.remainingMembers === 0) return { containment: 'none', confirmed: true, remainingMembers: 0, reason: 'The runtime owned no active process when Root Stop was requested, and the run Job has no member left.' };
+    if (probe.remainingMembers !== null) return { containment: 'none', confirmed: false, remainingMembers: probe.remainingMembers, reason: probe.reason };
+    // The supervisor has no run Job for this run. That is a proof only when no process of this run was ever launched into a run Job; a run Job the
+    // supervisor has lost is not a proof, so the Stop stays unconfirmed.
+    const launched = this.store.get("SELECT 1 AS n FROM attempts a WHERE a.run_id = ? AND a.process_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM attempt_custody c WHERE c.attempt_id = a.id) LIMIT 1", runId);
+    // Nothing was launched, so nothing is claimed about native containment: the proof is the runtime's own record, as for an empty launch set.
+    if (!launched) return { containment: 'none', confirmed: true, remainingMembers: 0, reason: 'No process of this run was launched into a run Job, so no run Job member can remain.' };
+    return { containment: 'none', confirmed: false, remainingMembers: null, reason: 'The supervisor holds no run Job for this run, so nothing proves that its members stopped.' };
+  };
+
+  // Host-owned process trees are proven by their Host: the custody record reports processTreeEnded only when the Job is drained.
+  P.hostTreeProof = async function hostTreeProof(hostOwned) {
+    for (const item of hostOwned) {
+      let status = null;
+      try {
+        status = await this.custodyCall('custody.status', { custodyId: item.custodyId });
+        // An invocation admitted but never launched is withdrawn, so that the Host can no longer turn it into a process; its tree is then ended.
+        if (status?.state === 'admitted') status = await this.custodyCall('custody.cancel', { custodyId: item.custodyId });
+      } catch { status = null; }
+      if (status?.processTreeEnded !== true) return { confirmed: false, reason: `The Host has not proven that the process tree of attempt ${item.attemptId} ended.` };
+    }
+    return { confirmed: true, reason: hostOwned.length ? 'Every Host-owned process tree is proven ended by its Host.' : null };
   };
 
   P.containmentFor = async function containmentFor(runId, request) {
