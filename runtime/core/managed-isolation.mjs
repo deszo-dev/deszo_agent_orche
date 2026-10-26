@@ -232,11 +232,16 @@ function codexMarkerOverride(name, runtimeInstanceId) {
 }
 
 function verifiedNeutralizer(provider, cliVersion, args, entries, configuredScopes, bridgeEntries, runtimeInstanceId) {
-  const entry = entries.find(item => item.provider === provider);
+  const entry = entries.find(item => item.provider === provider && item.testedVersion === cliVersion);
   const neutralizer = entry?.neutralizer;
-  if (entry?.status !== 'verified' || entry.testedVersion !== cliVersion || !neutralizer || typeof neutralizer !== 'object') return null;
+  if (entry?.status !== 'verified' || !neutralizer || typeof neutralizer !== 'object') return null;
   if (neutralizer.kind === 'marker-propagation' && coveredScopes(neutralizer, configuredScopes))
     return neutralizer.id || `marker-propagation:${cliVersion}`;
+  if (provider === 'codex' && neutralizer.kind === 'codex-restricted-config-omission' && coveredScopes(neutralizer, configuredScopes)) {
+    const command = args.indexOf('exec');
+    if (command >= 0 && args.indexOf('--ignore-user-config') > command && !args.some(arg => arg.startsWith('mcp_servers.')))
+      return neutralizer.id || `codex-restricted-config-omission:${cliVersion}`;
+  }
   if (provider === 'codex' && neutralizer.kind === 'codex-explicit-mcp-marker' && coveredScopes(neutralizer, configuredScopes)) {
     const command = args.indexOf('exec');
     if (args.indexOf('--ignore-user-config') > command && command >= 0 && !args.some(arg => arg.startsWith('mcp_servers.')))

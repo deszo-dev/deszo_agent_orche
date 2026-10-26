@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-25T19:44:08Z",
+  "verdict": "REAL CODEX CUSTODY NOT VERIFIED",
+  "environment": {
+    "os": "Microsoft Windows 11 Home Single Language 10.0.26300 build 26300",
+    "codexCliVersion": "codex-cli 0.164.0-alpha.11.1",
+    "codexExecutable": "%LOCALAPPDATA%/OpenAI/Codex/bin/<build>/codex.exe",
+    "codexExecutableSha256": "1103e9e09c71fa2cd0afd6d8f3b9a2d63174fe8efd7cb5bd09f1cb14ef58a098",
+    "authentication": "Existing ChatGPT sign-in confirmed by codex login status; no credentials read or recorded",
+    "node": "v22.20.0",
+    "rustHostSha256": "65f0e26ea5840c8ebd78c0ec5dc0a58d2116e135c8861eb2a7ae81bf2171d5ff",
+    "protocol": "codex exec --json"
+  },
+  "invocation": {
+    "model": "gpt-6-luna",
+    "custody": true,
+    "windowsSandboxMode": "elevated",
+    "filesystemSandbox": "workspace-write",
+    "approvalMode": "never",
+    "launches": 1
+  },
+  "deszo": {
+    "runId": "65965d8b-dc95-47e3-a2d4-e7ca35990312",
+    "publishedVersionId": "bc7dbce1-7dfa-4b50-880b-f69fc2617168",
+    "providerAttemptId": "8c47a709-55e0-4ff6-8f92-5aca5eb1d08f",
+    "custodyInvocationId": "0a327b0d-f491-422c-9c35-a0a954ee680a",
+    "runState": "succeeded",
+    "providerAttemptState": "succeeded",
+    "providerTerminalSettlementCount": 1,
+    "hostPid": 22572,
+    "engineAPid": 5928,
+    "engineBPid": null,
+    "codexPid": 28316,
+    "codexProcessCreationIdentity": "custody:134374306309198430",
+    "codexProcessExitCode": 0,
+    "hostState": "exited",
+    "spoolComplete": true,
+    "processTreeEnded": true,
+    "stdoutBytesCommittedAndAcknowledged": 5133,
+    "stderrBytesCommittedAndAcknowledged": 158,
+    "workspaceHold": "released"
+  },
+  "disposableProject": {
+    "initialCommitOnly": true,
+    "outsideDeszoRepositoryAndUserProfile": true,
+    "initialCommit": "b2dbe94764ec67c22763ccf5b4796ef5fe7f0b87",
+    "modifiedFiles": [
+      "README.md",
+      "src/normalize.mjs",
+      "test/normalize.test.mjs"
+    ],
+    "gitDiffCheckExitCode": 0,
+    "codexNpmTestExitCode": 1,
+    "codexNpmTestFailure": "PowerShell resolved the user-level npm shim, which referenced a missing npm-cli.js at C:/Users/<user>/AppData/Roaming/npm/node_modules/npm/bin/npm-cli.js.",
+    "independentNodeTestCommand": "node --test",
+    "independentNodeTestSummary": {
+      "tests": 3,
+      "passed": 3,
+      "failed": 0
+    },
+    "independentNodeTestRanAfterCodexExit": true
+  },
+  "engineReplacement": {
+    "status": "not_proven",
+    "reason": "Codex exited before the proof test reached its hold barrier; Engine A was not replaced while the provider process was active.",
+    "sameProcessReattachedByEngineB": false,
+    "duplicateLaunchCheck": "one real Custody launch was observed; no Engine B phase occurred",
+    "desktopTauriReplacement": "fixture-based Tauri Proof B and its Custody variant passed; real Codex desktop continuity was not run"
+  },
+  "scope": "This record proves one real Codex process launched through Process Custody, edited the disposable project and settled its provider turn. It does not prove Stage 1 acceptance, real Engine A-to-B continuity, or real-Codex desktop replacement. Fixture-based Tauri replacement is separate evidence."
+}

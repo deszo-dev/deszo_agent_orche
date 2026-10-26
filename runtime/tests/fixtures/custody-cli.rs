@@ -41,6 +41,12 @@ fn directive(prompt: &str, key: &str, default: u64) -> u64 {
         .unwrap_or(default)
 }
 
+fn text_directive<'a>(prompt: &'a str, key: &str) -> Option<&'a str> {
+    prompt
+        .split(|c: char| c.is_whitespace() || c == ']' || c == '[')
+        .find_map(|token| token.strip_prefix(&format!("{key}=")))
+}
+
 #[link(name = "kernel32")]
 extern "system" {
     fn GetStdHandle(which: u32) -> isize;
@@ -84,6 +90,16 @@ fn main() {
         println!("Deszo Custody fixture CLI 1.0");
         return;
     }
+    // The fixture advertises the bounded noninteractive options that the real Custody adapter requires. This lets the real
+    // Engine's CLI capability check run unchanged in Process Custody integration tests.
+    if args.first().is_some_and(|arg| arg == "--help") {
+        println!("--ask-for-approval <never|on-request>\nexec");
+        return;
+    }
+    if args.first().is_some_and(|arg| arg == "exec") && args.get(1).is_some_and(|arg| arg == "--help") {
+        println!("--json\n--sandbox <workspace-write>\n--ephemeral\n--ignore-user-config\n--ignore-rules\n--skip-git-repo-check");
+        return;
+    }
     if args.first().is_some_and(|arg| arg == "login") {
         println!("Logged in using ChatGPT");
         return;
@@ -109,6 +125,44 @@ fn main() {
                 thread::sleep(Duration::from_millis(500));
             }
             answer("Steady run complete.");
+        }
+        "custody-stdio" => {
+            eprintln!("P1C-10 durable stderr fixture marker");
+            let ticks = directive(&prompt, "ticks", 6);
+            for tick in 0..ticks {
+                event(&format!(r#"{{"type":"progress","tick":{tick}}}"#));
+                thread::sleep(Duration::from_millis(500));
+            }
+            answer("Custody stdout and stderr replay complete.");
+        }
+        "custody-gated" => {
+            let gate = text_directive(&prompt, "gate").expect("the prompt names its READY/RELEASE gate");
+            let cwd = env::current_dir().expect("working directory");
+            let ready = cwd.join(format!("READY-{gate}.marker"));
+            let release = cwd.join(format!("RELEASE-{gate}.marker"));
+            fs::write(&ready, format!("{} ready\n", std::process::id())).expect("write READY marker");
+            eprintln!("P1C gated Custody invocation is waiting for RELEASE");
+            let started = std::time::Instant::now();
+            while !release.exists() {
+                if started.elapsed() > Duration::from_secs(180) {
+                    eprintln!("P1C gated Custody invocation exceeded its bounded wait");
+                    std::process::exit(4);
+                }
+                thread::sleep(Duration::from_millis(50));
+            }
+            answer("P1C_GATE_RELEASED");
+        }
+        "custody-verify" => {
+            let marker = env::current_dir().expect("working directory").join("custody-writer.log");
+            let rows = fs::read_to_string(marker).expect("Node A side-effect record");
+            let executions = rows.lines().count();
+            if executions != 1 || !prompt.contains("P1C_GATE_RELEASED") {
+                eprintln!("P1C verification failed: writer executions={executions}, gate result present={}", prompt.contains("P1C_GATE_RELEASED"));
+                std::process::exit(5);
+            }
+            let mut count = OpenOptions::new().create(true).append(true).open("custody-node-c.log").expect("open Node C counter");
+            writeln!(count, "{} verified", std::process::id()).expect("record Node C execution");
+            answer("P1C_VERIFY_OK");
         }
         "custody-split" => {
             // A two-byte character is split across two writes, and the first record is a partial line.
@@ -168,6 +222,8 @@ fn main() {
             answer("Leader exits; its descendant runs on.");
         }
         "custody-exit" => {
+            let delay = directive(&prompt, "delayMs", 0);
+            if delay > 0 { thread::sleep(Duration::from_millis(delay)); }
             answer("Exiting with the directed code.");
             std::process::exit(directive(&prompt, "code", 3) as i32);
         }

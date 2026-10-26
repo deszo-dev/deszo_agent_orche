@@ -10,6 +10,27 @@ import { contextChain, fixtureAdapters, singleAgent, startTestRunner } from './h
 
 const schemaClean = (definition, body) => assert.deepEqual(check('runtime-api-v2.schema.json', definition, body), [], definition);
 
+test('provider detection forwards and caches Process Custody scope independently', async () => {
+  const api = await startTestRunner();
+  try {
+    const calls = [];
+    api.runner.engine.adapters.detect = async (provider, options) => {
+      calls.push({ provider, options });
+      return { provider, available: true, processCustody: options.processCustody };
+    };
+    const standard = await api.runner.engine.detect('codex', { fresh: true });
+    const custody = await api.runner.engine.detect('codex', { processCustody: true });
+    const cached = await api.runner.engine.detect('codex', { processCustody: true });
+    assert.equal(standard.processCustody, false);
+    assert.equal(custody.processCustody, true);
+    assert.equal(cached.processCustody, true);
+    assert.deepEqual(calls, [
+      { provider: 'codex', options: { processCustody: false } },
+      { provider: 'codex', options: { processCustody: true } },
+    ]);
+  } finally { await api.close(); }
+});
+
 test('saved Context chain runs Codex → Claude → Codex, resuming the first Codex conversation', async () => {
   const api = await startTestRunner();
   try {
@@ -146,7 +167,10 @@ test('typed provider failures stay distinct', async () => {
   const api = await startTestRunner({ unavailable: ['claude'] });
   try {
     await api.workspace();
-    for (const [model, provider, code] of [['fixture-quota', 'codex', 'quota'], ['fixture-no-terminal', 'codex', 'output_contract'], ['fixture-not-json', 'codex', 'output_contract'], ['fixture-echo', 'claude', 'authentication']]) {
+    for (const [model, provider, code] of [['fixture-quota', 'codex', 'quota'], ['fixture-rate-limited', 'codex', 'rate_limited'],
+      ['fixture-auth-required', 'codex', 'authentication'], ['fixture-service-unavailable', 'codex', 'provider_unavailable'],
+      ['fixture-malformed-jsonl', 'codex', 'provider_protocol'], ['fixture-no-terminal', 'codex', 'output_contract'],
+      ['fixture-not-json', 'codex', 'output_contract'], ['fixture-echo', 'claude', 'authentication']]) {
       const workflow = singleAgent({ id: `typed-${code.replace('_', '-')}-${provider}-${model.replace('fixture-', '')}`, model, provider, context: null, output: model === 'fixture-not-json' ? { format: 'json' } : { format: 'text' } });
       const created = await api.run(workflow);
       const snapshot = await api.waitFor(created.body.run.runId);

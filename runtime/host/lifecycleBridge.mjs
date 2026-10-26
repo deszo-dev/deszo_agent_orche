@@ -9,6 +9,9 @@ const ENV = [
 ];
 // Process Custody reads its own bootstrap, for an Engine started beside a custody service rather than a managed Host.
 const CUSTODY_ENV = ['DESZO_CUSTODY_ADDRESS', 'DESZO_CUSTODY_CAPABILITY', 'DESZO_CUSTODY_GENERATION'];
+// Custody admission and launch verify the complete allowlisted executable on the Host. A large native CLI can take tens of
+// seconds to hash in an unoptimized Host build, so these two bounded commands need a longer window than ordinary IPC.
+const CUSTODY_FILE_VERIFY_TIMEOUT_MS = 120_000;
 
 function loopbackPort(address, label) {
   const match = /^127\.0\.0\.1:(\d+)$/.exec(address ?? '');
@@ -28,7 +31,8 @@ function hostCall(port, capability) {
       socket.destroy();
       error ? reject(error) : resolve(value);
     };
-    socket.setTimeout(5_000, () => finish(new Error('Lifecycle Host IPC timed out.')));
+    const timeoutMs = command === 'custody.reserve' || command === 'custody.launch' ? CUSTODY_FILE_VERIFY_TIMEOUT_MS : 5_000;
+    socket.setTimeout(timeoutMs, () => finish(new Error('Lifecycle Host IPC timed out.')));
     socket.once('error', error => finish(new Error(`Lifecycle Host IPC failed: ${error.message}`)));
     socket.once('connect', () => socket.write(`${JSON.stringify({ capability, command, payload })}\n`));
     socket.on('data', chunk => {

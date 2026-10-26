@@ -20,7 +20,7 @@ import { installTaskRuntime } from './taskRuntime.mjs';
 import { installTaskProcesses } from './taskProcesses.mjs';
 import { installJudgeAttention } from './judgeAttention.mjs';
 import { installLinkedRepair } from './linkedRepair.mjs';
-import { afterBarrierWork, crashBeforeIdentityPoint, custodyFaultPoint, installCustody } from './custody.mjs';
+import { afterBarrierWork, crashBeforeIdentityPoint, custodyFaultPoint, installCustody, STOP_FAMILY } from './custody.mjs';
 import { shimFailureOf } from './supervisor-client.mjs';
 import { StreamRecorder } from './streams.mjs';
 import { prepareManagedToolIsolation } from './managed-isolation.mjs';
@@ -35,6 +35,10 @@ export class ApiError extends Error {
   constructor(status, code, message, details = []) { super(message); this.status = status; this.code = code; this.details = details; }
 }
 
+// The attempt-error codes that both journal schema versions accept. A launch error whose own code is not among them is recorded as a provider
+// that did not start, so that the journal stays valid.
+const ATTEMPT_ERROR_CODES = new Set(['authentication', 'quota', 'billing_policy', 'provider_unavailable', 'rate_limited', 'provider_protocol',
+  'unsupported_cli', 'custody_unavailable', 'permission', 'timeout', 'process', 'output_contract', 'context_unavailable', 'corruption', 'interrupted']);
 const TERMINAL_RUN = new Set(['succeeded', 'failed', 'canceled', 'interrupted']);
 const ACTIVE_RUN = new Set(['queued', 'running', 'draining', 'waiting_for_user', 'stopping']);
 const ACTIVE_SQL = `('queued','running','draining','waiting_for_user','stopping')`;
@@ -90,10 +94,10 @@ export function routeCase(cases, selected) {
 }
 
 export class Engine {
-  constructor({ root, adapters = defaultAdapters, processContainment = 'standalone-best-effort', supervisorGeneration = randomUUID(), runtimeInstanceId = randomUUID(), nodeExecutable = process.execPath, bridgeScript = resolve(import.meta.dirname, '../../mcp/bridge.mjs'), externalRunConfirmationOverride = null, maximumAgentTimeoutSeconds = M1_MAXIMUM_TIMEOUT, detectionTtlMs = 30_000, loopMinuteMs = 60_000, supervisor = null, hostAuthority = null, hostRuntimeGeneration = null, hostPolicyId = null,hostVerificationOnly=false, judgeAttentionEnabled=false, lifecycleHost = null, custodyHost = null } = {}) {
+  constructor({ root, adapters = defaultAdapters, processContainment = 'standalone-best-effort', supervisorGeneration = randomUUID(), runtimeInstanceId = randomUUID(), nodeExecutable = process.execPath, bridgeScript = resolve(import.meta.dirname, '../../mcp/bridge.mjs'), externalRunConfirmationOverride = null, maximumAgentTimeoutSeconds = M1_MAXIMUM_TIMEOUT, detectionTtlMs = 30_000, loopMinuteMs = 60_000, supervisor = null, hostAuthority = null, hostRuntimeGeneration = null, hostPolicyId = null,hostVerificationOnly=false, judgeAttentionEnabled=false, lifecycleHost = null, custodyHost = null, processCustodyRequired = false } = {}) {
     // Process Custody (PoC) owns CLIs through the Lifecycle Host. A Local Control Host binding has its own run permits, so the
     // two are not combined in this PoC.
-    if (custodyHost && hostAuthority) throw new Error('Process Custody is not available with a Local Control Host binding in this PoC.');
+    if ((custodyHost || processCustodyRequired) && hostAuthority) throw new Error('Process Custody is not available with a Local Control Host binding in this PoC.');
     this.judgeAttentionEnabled = judgeAttentionEnabled === true;
     this.store = new Store(root);
     // ADR-0006: outer authority from a Local Control Host, when this runtime is registered with one.
@@ -103,7 +107,11 @@ export class Engine {
     this.hostPolicyId = hostPolicyId;
     this.lifecycleHost = lifecycleHost;
     // Process Custody state: the Host bridge, this Engine's epoch, why custody is unusable (if it is), and the runs to resume.
-    this.custodyHost = custodyHost; this.custodyEpoch = null; this.custodyUnavailable = null; this.custodyResumes = []; this.custodyAbandon = [];
+    this.custodyHost = custodyHost; this.processCustodyRequired = processCustodyRequired === true;
+    this.custodyEpoch = null;
+    this.custodyUnavailable = this.processCustodyRequired && !custodyHost
+      ? 'Process Custody is required, but no Custody Host bridge is configured.' : null;
+    this.custodyResumes = []; this.custodyAbandon = [];
     this.hostAdmissions = new WeakSet();
     this.hostPermitRuns = new Map();
     this.hostRuns = new Map();
@@ -233,16 +241,27 @@ export class Engine {
     const open = this.store.all(`SELECT * FROM runs WHERE state IN ${ACTIVE_SQL} ORDER BY created_at`);
     const uncertain = [], unconfirmedWorkspaces = [];
     await this.recoverSurvivors(uncertain, unconfirmedWorkspaces);
+    // Read by the continuation check: a Run whose workspace an unconfirmed process may still use is not continued.
+    this.unconfirmedWorkspaces = unconfirmedWorkspaces;
+    // A process that a restart could not confirm ended blocks every continuation, as it blocks new Runs (createRun).
+    const blocked = uncertain.length > 0;
     for (const run of open) {
       // A run suspended for a linked repair, or waiting at a lifecycle gate, is not interrupted: nothing is executing in it.
       if (this.isContinuationHeld(run)) continue;
-      // A Host-owned CLI (Process Custody) is never killed from here. When the run's only running attempts are custody attempts,
-      // the run resumes against the Host's record; otherwise its custody CLIs are stopped through the Host.
+      // P1: a Run continues only on the exact published definition it was captured from. One that does not verify is interrupted below.
+      const intact = this.publishedDefinitionIntact(run);
+      // A queued Run has dispatched nothing: startRun starts it, as it would have without the restart, when the restart gates pass.
+      if (run.state === 'queued' && intact && this.restartGatesPass(run, blocked)) continue;
+      // A Host-owned CLI is reattached only when the Run passes the same restart gates as ordinary continuation. Otherwise its
+      // custody process is stopped through the Host, and the Run keeps its existing restart outcome.
       const custodyRows = this.store.all(`SELECT a.id AS attempt_id, c.custody_id FROM attempts a JOIN attempt_custody c ON c.attempt_id = a.id WHERE a.run_id = ? AND a.state = 'running'`, run.id);
       const custodyIds = new Set(custodyRows.map(row => row.attempt_id));
-      const resumable = custodyRows.length > 0 && this.store.all(`SELECT id FROM attempts WHERE run_id = ? AND state = 'running'`, run.id).every(row => custodyIds.has(row.id));
+      const resumable = intact && this.restartGatesPass(run, blocked) && custodyRows.length > 0
+        && this.store.all(`SELECT id FROM attempts WHERE run_id = ? AND state = 'running'`, run.id).every(row => custodyIds.has(row.id));
       if (resumable) for (const row of custodyRows) this.custodyResumes.push({ run_id: run.id, attempt_id: row.attempt_id });
       else for (const row of custodyRows) this.custodyAbandon.push(row.custody_id);
+      // P1: an ordinary Run with no attempt in flight, and no launch of unknown outcome, continues from its durable state.
+      if (!resumable && this.canContinueRun(run, intact, blocked) && this.rebuildRunState(run)) continue;
       this.store.transaction(() => {
         const events = [];
         for (const attempt of this.store.all('SELECT * FROM attempts WHERE run_id = ? ORDER BY rowid', run.id)) {
@@ -258,7 +277,7 @@ export class Engine {
         this.store.run(`UPDATE loop_iterations SET outcome = 'interrupted', ended_at = ? WHERE run_id = ? AND outcome IN ('running','paused')`, nowIso(), run.id);
         for (const binding of this.store.all(`SELECT b.* FROM context_bindings b JOIN run_context_bindings m ON m.binding_id = b.id WHERE m.run_id = ? AND b.state = 'writing'`, run.id))
           events.push(this.bindingTransition(binding, 'needs_review', 'Runtime restarted during a native write; native history may have advanced.')[0]);
-        if (!resumable) events.push(this.runEvent(run, 'interrupted', 'Runtime restarted or lost process supervision.'));
+        if (!resumable) events.push(this.runEvent(run, 'interrupted', intact ? 'Runtime restarted or lost process supervision.' : 'Recovery refused: the published workflow definition of this Run is missing or inconsistent.'));
         this.store.appendEvents(run.id, events);
       });
     }
@@ -271,13 +290,70 @@ export class Engine {
     this.watchUnconfirmed();
   }
 
+  // P1: a Run continues only on the exact published definition it was captured from. Its snapshot must still verify, hash to the execution
+  // hash recorded at capture, and be the snapshot of the publication it names with the same digest.
+  publishedDefinitionIntact(run) {
+    let workflow;
+    // A snapshot that is missing or fails its digest is inconsistent. Any other read failure is not a verdict on the Run, so it stops startup.
+    try { workflow = this.store.readJson(run.workflow_snapshot_artifact_id); }
+    catch (error) { if (error instanceof CorruptionError) return false; throw error; }
+    const { view, ...definition } = workflow;
+    if (canonicalHash(definition) !== run.execution_hash) return false;
+    if (run.published_version_id === null) return true;
+    const publication = this.store.get('SELECT snapshot_artifact_id, definition_digest, execution_hash FROM workflow_publications WHERE id = ?', run.published_version_id);
+    return publication?.snapshot_artifact_id === run.workflow_snapshot_artifact_id && publication.definition_digest === run.definition_digest
+      && publication.execution_hash === run.execution_hash;
+  }
+
+  isLinkedRun(runId) { return Boolean(this.store.get('SELECT 1 FROM run_links WHERE parent_run_id = ? OR repair_run_id = ?', runId, runId)); }
+
+  // The conditions every restart continuation shares. Anything that depends on state a restart loses (a supervised Run's observer, a
+  // host-bound admission, a linked Repair) or on a process that may still run keeps the restart rule it always had.
+  restartGatesPass(run, blocked) {
+    if (blocked || this.hostAuthority || this.hostVerificationOnly || run.kind !== 'workflow' || run.journal_version < 2) return false;
+    if (this.isLinkedRun(run.id) || this.store.get(`SELECT 1 FROM control_grants WHERE run_id = ? AND state = 'active'`, run.id)) return false;
+    // Queued Runs take this shortcut before canContinueRun. Keep unsupported execution classes on the pre-P1 restart rule here too.
+    if (allNodesDeep(this.store.readJson(run.workflow_snapshot_artifact_id).nodes).some(node => ['loop', 'map', 'task'].includes(node.type))) return false;
+    const workspace = this.store.get('SELECT w.cwd FROM workspaces w JOIN runs r ON r.workspace_id = w.id WHERE r.id = ?', run.id);
+    return !this.unconfirmedOverlapping(workspace?.cwd ?? null);
+  }
+
+  // P1: the scheduler state of a continued Run is rebuilt from its captured definition and durable attempts, and the continuation is journaled.
+  // A Run whose state cannot be rebuilt is not continued: it keeps the restart rule, and startup is not blocked by it.
+  rebuildRunState(run) {
+    try {
+      this.ensureRunState(run.id);
+      this.store.transaction(() => this.store.appendEvents(run.id, [{ type: 'continuation.reconciled', payload: { origin: 'ENGINE', pass: 'startup', scheduler: 'rebuilt' }, nodeInstanceId: null, attemptId: null }]));
+      return true;
+    } catch (error) {
+      this.runs.delete(run.id);
+      process.stderr.write(`Run ${run.id} is not continued after restart: ${error.message}\n`);
+      return false;
+    }
+  }
+
+  // P1: an ordinary workflow Run continues after a restart only while nothing of it can still be executing and no launch of it has an
+  // unknown outcome. Anything else keeps the restart rules it always had: running work is interrupted, never relaunched.
+  canContinueRun(run, intact, blocked) {
+    if (!intact || !['running', 'draining', 'waiting_for_user'].includes(run.state) || !this.restartGatesPass(run, blocked)) return false;
+    // An attempt that may still execute, or whose launch may have happened without a recorded outcome. An attempt the restart or a
+    // runtime shutdown interrupted has an unknown outcome as well: its Run is interrupted, not offered for a decision.
+    if (this.store.get(`SELECT 1 FROM attempts WHERE run_id = ? AND (state IN ('running', 'interrupted')
+      OR (state IN ('scheduled', 'waiting') AND (invocation_artifact_id IS NOT NULL OR id IN (SELECT attempt_id FROM attempt_custody))))`, run.id)) return false;
+    if (this.store.get(`SELECT 1 FROM context_bindings b JOIN run_context_bindings m ON m.binding_id = b.id WHERE m.run_id = ? AND b.state = 'writing'`, run.id)) return false;
+    // Loops, Maps and Managed Tasks keep their existing restart rules; their recovery is not part of P1.
+    const workflow = this.store.readJson(run.workflow_snapshot_artifact_id);
+    return !allNodesDeep(workflow.nodes).some(node => ['loop', 'map', 'task'].includes(node.type));
+  }
+
   // ---------- Capabilities and settings ----------
-  async detect(provider, { fresh = false } = {}) {
+  async detect(provider, { fresh = false, processCustody = false } = {}) {
     if(this.hostVerificationOnly)return{provider,available:false,cliVersion:null,supportsNew:false,supportsResume:false,supportsJson:false,supportsInheritedConfiguration:false,reason:'Provider operations are unavailable during native verification.'};
-    const cached = this.detections.get(provider);
+    const cacheKey = `${provider}:${processCustody ? 'custody' : 'standard'}`;
+    const cached = this.detections.get(cacheKey);
     if (!fresh && cached && Date.now() - cached.at < this.detectionTtlMs) return cached.value;
-    const value = await this.adapters.detect(provider);
-    this.detections.set(provider, { at: Date.now(), value });
+    const value = await this.adapters.detect(provider, { processCustody });
+    this.detections.set(cacheKey, { at: Date.now(), value });
     return value;
   }
 
@@ -1547,6 +1623,8 @@ export class Engine {
       }
     }
     if (!to) return;
+    // Crash point: every node is accepted and the Run's terminal state is not yet recorded.
+    if (TERMINAL_RUN.has(to)) custodyFaultPoint('before_run_settle');
     // ADR-0008: a linked repair's outcome is recorded in the same transaction as its terminal state.
     this.store.transaction(() => {
       this.store.appendEvents(state.id, [this.runEvent(row, to, reason)]);
@@ -2064,9 +2142,10 @@ export class Engine {
 
   async executeAgent(state, scope, node, attempt, workspace, mapping, record, spec = null) {
     const config = node.config;
+    const processCustody = this.custodyScopeAllows(node, record);
     const requestedEffort = resolveEffort(config.effort);
     const nativeConfiguration = state.workflow.settings.nativeConfiguration;
-    const detection = await this.detect(config.provider);
+    const detection = await this.detect(config.provider, { processCustody });
     attempt = this.store.get('SELECT * FROM attempts WHERE id = ?', attempt.id);
     if (this.runState(state.id) !== 'running' || !UNSTARTED.has(attempt.state) || !this.scopeActive(state, scope)) return;
     let binding = mapping ? this.store.get('SELECT * FROM context_bindings WHERE id = ?', mapping.binding_id) : null;
@@ -2075,6 +2154,8 @@ export class Engine {
       const code = /login|authentication|account/i.test(detection.reason || '') ? 'authentication' : /billing|credits|modelProvider/i.test(detection.reason || '') ? 'billing_policy' : 'provider_unavailable';
       return this.failAttempt(state, attempt, code, detection.reason || `${config.provider} is unavailable.`);
     }
+    if (processCustody && config.provider === 'codex' && detection.fixture !== true && detection.supportsCustodyExec !== true)
+      return this.failAttempt(state, attempt, 'unsupported_cli', detection.custodyReason || 'The installed Codex CLI does not support the required Process Custody invocation options.');
     if (nativeConfiguration === 'inherit' && !detection.supportsInheritedConfiguration) return this.failAttempt(state, attempt, 'provider_unavailable', `${config.provider} cannot inherit native configuration.`);
     const configurationHash = canonicalHash({ provider: config.provider, accountIdentity: detection.accountIdentity, cwdIdentity: workspace.cwd_identity, nativeConfiguration, adapterVersion: ADAPTER_VERSION });
     if (binding && binding.state === 'ready') {
@@ -2120,7 +2201,8 @@ export class Engine {
     const promptArtifact = this.store.putText(prompt);
     const schemaPath = transport ? join(tmp, 'output.schema.json') : null;
     const invocation = this.adapters.buildInvocation({ provider: config.provider, cliPath: detection.cliPath, model: config.model, effort: requestedEffort, prompt, cwd: workspace.cwd,
-      nativeSessionId, output: transport ? { ...config.output, schema: transport.schema } : config.output, nativeConfiguration, timeoutSeconds: config.timeoutSeconds, schemaPath });
+      nativeSessionId, output: transport ? { ...config.output, schema: transport.schema } : config.output, nativeConfiguration, timeoutSeconds: config.timeoutSeconds, schemaPath,
+      processCustody, windowsSandboxMode: detection.windowsSandboxMode });
     invocation.env = { ...(invocation.env || process.env), DESZO_MANAGED_INVOCATION: this.runtimeInstanceId };
     let managedToolIsolation;
     try {
@@ -2153,6 +2235,8 @@ export class Engine {
       }
       this.store.appendEvents(state.id, events);
     });
+    // Crash point: the invocation is durable, and the provider has not been launched.
+    custodyFaultPoint('after_invocation_commit');
     const isolationIssue = this.linkedRepairWorkspaceIssueForRun(state.id);
     if (isolationIssue) {
       this.refuseLinkedRepairExecution(state, isolationIssue);
@@ -2182,7 +2266,8 @@ export class Engine {
       if (state.linkedRepairIsolationFailure) return;
       // A Stop that arrived before the launch is a cancellation, not a provider failure.
       if (record.stopRequested) return this.store.transaction(() => this.store.appendEvents(state.id, this.attemptTransition(current, 'canceled', record.stopReason || 'Stopped by the user.')));
-      return this.failAttempt(state, current, 'provider_unavailable', `The CLI could not be started: ${outcome.error}`);
+      return this.failAttempt(state, current, ATTEMPT_ERROR_CODES.has(outcome.errorCode) ? outcome.errorCode : 'provider_unavailable', `The CLI could not be started: ${outcome.error}`,
+        { evidence: ref(this.store.putJson({ errorCode: outcome.errorCode ?? null, error: outcome.error ?? null })) });
     }
     const parser = outcome.parser.state;
     if (outcome.captureError) {
@@ -2203,13 +2288,16 @@ export class Engine {
     if (['spool_limit_exceeded', 'spool_failed', 'spool_incomplete'].includes(outcome.signal)) {
       return this.failAttempt(state, current, 'capture_failed', 'The Host could not keep the complete output of the CLI, so the attempt is not accepted.');
     }
-    if (outcome.signal === 'tree_not_ended') {
+    // F3: a Host stop is a stop outcome, never a result. An end whose tree is unproven is classified as such first, as before, unless it is a Host
+    // stop; a Host stop keeps the Engine's own Stop and timeout outcomes, settled below.
+    const hostStop = STOP_FAMILY.has(outcome.signal) || (outcome.signal === 'tree_not_ended' && STOP_FAMILY.has(outcome.custody));
+    if (outcome.signal === 'tree_not_ended' && !hostStop) {
       return this.failAttempt(state, current, 'process', 'The CLI exited, but the Host has not proven that its process tree ended, so the attempt is not accepted; its workspace stays held until the Host proves the end.',
         binding ? { binding, bindingTo: 'needs_review', bindingReason: 'The CLI may still have written before the Host proved its end; native history may have advanced.' } : {});
     }
     const reported = parser.sessionId && binding && !this.bindingRecord(binding).nativeSessionId ? { nativeSessionId: parser.sessionId } : {};
     const native = binding ? { binding, bindingTo: 'needs_review', bindingReason: 'The invocation did not complete normally; native history may have advanced.', bindingChanges: reported } : {};
-    const succeeded = outcome.code === 0 && !parser.error && parser.terminal && parser.finalText !== null;
+    const succeeded = outcome.code === 0 && outcome.signal == null && !parser.error && parser.terminal && parser.finalText !== null;
     if (record.stopRequested && !succeeded) {
       // A managed runtime shutdown is not a user Stop: the attempt's outcome is unknown, so it is interrupted, not canceled.
       return this.store.transaction(() => {
@@ -2222,10 +2310,23 @@ export class Engine {
     }
     const lastDiagnostic = parser.diagnostics?.at(-1);
     if (record.timedOut) return this.failAttempt(state, current, 'timeout', `The attempt exceeded ${config.timeoutSeconds} seconds of active process time.${lastDiagnostic ? ` Last provider diagnostic: ${lastDiagnostic}` : ''}`, { evidence: evidence(), ...native });
+    // A Host stop the Engine did not ask for is not settled as a result: an unproven tree is named as such, a deadline is a timeout, and any other
+    // stop is a cancellation.
+    if (outcome.signal === 'tree_not_ended') {
+      return this.failAttempt(state, current, 'process', `The Host stopped the CLI (${outcome.custody}), but has not proven that its process tree ended, so the attempt is not accepted; its workspace stays held until the Host proves the end.`, { evidence: evidence(), ...native });
+    }
+    if (STOP_FAMILY.has(outcome.signal)) {
+      if (outcome.signal === 'deadline_terminated') return this.failAttempt(state, current, 'timeout', 'The Host ended the CLI at its admitted deadline, so the attempt is not accepted.', { evidence: evidence(), ...native });
+      return this.store.transaction(() => {
+        const events = this.attemptTransition(current, 'canceled', `The Host stopped the CLI (${outcome.signal}) without a Stop from this Engine.`);
+        if (binding) events.push(this.bindingTransition(binding, 'needs_review', native.bindingReason, reported)[0]);
+        this.store.appendEvents(state.id, events);
+      });
+    }
     if (!succeeded) {
       const text = [parser.error, outcome.stderrTail, lastDiagnostic].filter(Boolean).join('\n');
       if (outcome.code === 0 && !parser.error) return this.failAttempt(state, current, 'output_contract', parser.formatError || (parser.terminal ? 'The CLI reported no final answer.' : 'The CLI exited without a terminal event.'), { evidence: evidence(), ...native });
-      return this.failAttempt(state, current, this.adapters.classifyFailure(text), text.trim().slice(0, 4000) || `The CLI exited with code ${outcome.code}.`, { evidence: evidence(), ...native });
+      return this.failAttempt(state, current, parser.protocolError ? 'provider_protocol' : this.adapters.classifyFailure(text), text.trim().slice(0, 4000) || `The CLI exited with code ${outcome.code}.`, { evidence: evidence(), ...native });
     }
     if (binding && !parser.sessionId) return this.failAttempt(state, current, 'output_contract', 'The CLI did not report a native session ID, so continuation is unavailable.', { evidence: evidence(), ...native });
     let jsonArtifact = null, captured = null, parsed;
@@ -2269,6 +2370,7 @@ export class Engine {
     });
     // Crash point: the outputs and the attempt's success are durable, and nothing after them has run yet.
     custodyFaultPoint('after_settle');
+    custodyFaultPoint(`after_settle:${node.id}`);
     if (lifecycle.kind === 'intent' && this.lifecycleHost) {
       const request = this.lifecycleHostRequest(state.id);
       if (request) this.emit('lifecycle.operation_requested', request);
@@ -2307,12 +2409,12 @@ export class Engine {
         if (record.custodyResume) child = this.attachCustody(state.id, attempt, { provider: node.config.provider, deadlineMs: custodyDeadlineMs });
         else if (this.custodyScopeAllows(node, record)) {
           // A Custody-scoped attempt never falls back to an ordinary launch: when the Host is unavailable it fails here, closed.
-          if (this.custodyUnavailable) throw new Error(this.custodyUnavailable);
+          if (this.custodyUnavailable) throw Object.assign(new Error(this.custodyUnavailable), { code: 'custody_unavailable' });
           child = this.launchCustody(state.id, attempt, invocation, { provider: node.config.provider, deadlineMs: custodyDeadlineMs });
         }
         else child = this.launchContained(state.id, invocation);
       }
-      catch (error) { resolvePromise({ launched: false, error: error.message, parser }); return; }
+      catch (error) { resolvePromise({ launched: false, error: error.message, errorCode: error.code || null, parser }); return; }
       record.child = child;
       // A Host-owned CLI is acknowledged only for bytes these recorders have committed: flush first, then report the absolute
       // committed offsets. Journal-derived offsets make the resume cursor exact even if this acknowledgement is lost.
@@ -2331,7 +2433,7 @@ export class Engine {
         catch (error) { fault(error); }
         resolvePromise({ ...result, parser, stderrTail: stderrTail.slice(-8000), captureError: record.captureError ?? null, streams: manifests });
       };
-      child.once('error', error => { if (!record.launched) finish({ launched: false, error: error.message }); });
+      child.once('error', error => { if (!record.launched) finish({ launched: false, error: error.message, errorCode: error.code || null }); });
       child.once('spawn', () => { try {
         record.launched = true;
         this.markTaskWorkLaunched(record.workId);
@@ -2414,10 +2516,17 @@ export class Engine {
   observe(parser, line, normalizedBatch) {
     if (!line.trim()) return;
     let event;
-    try { event = JSON.parse(line); } catch { return; }
+    try { event = JSON.parse(line); } catch {
+      const message = 'Malformed JSONL protocol event; exact provider bytes remain in the raw stdout stream.';
+      parser.state.protocolError = true;
+      parser.state.error ??= message;
+      normalizedBatch.add(Buffer.from(JSON.stringify({ protocolError: message }) + '\n'));
+      return;
+    }
     const normalized = parser.feed(event);
     const observation = { sessionId: normalized.sessionId || undefined, text: normalized.text || undefined, model: normalized.model || undefined,
-      diagnostic: normalized.diagnostic || undefined, terminal: parser.state.terminal || undefined, error: parser.state.error || undefined };
+      diagnostic: normalized.diagnostic || undefined, terminal: parser.state.terminal || undefined, error: parser.state.error || undefined,
+      protocolError: normalized.protocolError || undefined, providerEvent: normalized.providerEvent };
     if (Object.values(observation).some(value => value !== undefined)) normalizedBatch.add(Buffer.from(JSON.stringify(observation) + '\n'));
   }
 

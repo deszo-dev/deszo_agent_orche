@@ -1,0 +1,453 @@
+{
+  "schemaVersion": 2,
+  "status": "verified",
+  "verdict": "REAL CODEX CUSTODY VERIFIED — STAGE 1 COMPLETE",
+  "verifiedAt": "2026-10-26T04:23:20.090Z",
+  "environment": {
+    "windows": "Microsoft Windows NT 10.0.26300.0",
+    "node": "v22.20.0",
+    "verifiedNodeExecutable": "C:\\Program Files\\nodejs\\node.exe",
+    "rust": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+    "codexCliVersion": "codex-cli 0.164.0-alpha.11.1",
+    "codexExecutable": "%LOCALAPPDATA%/OpenAI/Codex/bin/2993767bd1dfb009/codex.exe",
+    "codexSha256": "1103e9e09c71fa2cd0afd6d8f3b9a2d63174fe8efd7cb5bd09f1cb14ef58a098",
+    "hostSha256": "65f0e26ea5840c8ebd78c0ec5dc0a58d2116e135c8861eb2a7ae81bf2171d5ff",
+    "authenticationMode": "Existing ChatGPT sign-in; credentials are not recorded.",
+    "selectedProtocol": "codex exec --json over Host-owned stdin/stdout/stderr pipes",
+    "selectedModel": "gpt-6-luna"
+  },
+  "workflow": {
+    "runId": "70280dab-7f0f-46f5-a05b-61f1b2ee2c49",
+    "attemptId": "4aefdb8e-2448-46d9-b3e1-a439a331e56e",
+    "custodyInvocationId": "c74e5723-33b1-4fc7-9846-5793d0b9678e",
+    "publishedVersionId": "dab881b0-aa38-4156-aa29-ed51e02c47f7",
+    "finalRunState": "succeeded",
+    "finalAttemptState": "succeeded"
+  },
+  "processes": {
+    "hostPid": 26032,
+    "engineAPid": 27428,
+    "engineBPid": 16076,
+    "codexPid": 24432,
+    "codexProcessCreationIdentity": 134374621348492020,
+    "codexPowerShellCreationIdentity": "2026-10-26T04:22:14.8492018Z",
+    "gatePid": 26060,
+    "gateParentPid": 21912,
+    "gateProcessCreationIdentity": "2026-10-26T04:22:25.7775091Z",
+    "gateWasCodexDescendant": true,
+    "engineAIdentity": "2026-10-26T04:21:11.6862902Z",
+    "engineBIdentity": "2026-10-26T04:22:34.9143404Z",
+    "engineAEpoch": 1,
+    "engineBEpoch": 2,
+    "runnerLockOwnerA": {
+      "pid": 27428,
+      "id": "9bf85524-df44-42a2-aec5-42e0c5f78110"
+    },
+    "runnerLockOwnerB": {
+      "pid": 16076,
+      "id": "24d0fd86-e6ba-4083-886d-2915341237bc"
+    },
+    "hostAdmissionStateAtLaunch": "running",
+    "hostRecordCreatedAt": "1792988504031",
+    "hostRecordUpdatedAt": "1792988534860",
+    "hostLaunchCount": 1,
+    "deszoBridgeProcessesAtReplacement": 0
+  },
+  "barrier": {
+    "readyObserved": true,
+    "readyStartedAt": "2026-10-26T04:22:25.840Z",
+    "readyObservedWhileCodexAlive": true,
+    "codexSurvivedEngineA": true,
+    "engineATerminated": true,
+    "engineBReattached": true,
+    "engineBReattachedBeforeRelease": true,
+    "releaseWrittenAt": "2026-10-26T04:22:37.387Z",
+    "gateReleasedAt": "2026-10-26T04:22:37.488Z",
+    "gateExitCode": 0
+  },
+  "streams": {
+    "providerEventTypes": [
+      "thread.started",
+      "turn.started",
+      "item.completed",
+      "item.started",
+      "item.completed",
+      "item.completed",
+      "item.started",
+      "item.completed",
+      "item.started",
+      "item.started",
+      "item.started",
+      "item.completed",
+      "item.completed",
+      "item.completed",
+      "item.started",
+      "item.completed",
+      "item.completed",
+      "item.started",
+      "item.completed",
+      "item.started",
+      "item.completed",
+      "item.completed",
+      "turn.completed"
+    ],
+    "normalizedEventTypes": [
+      "thread.started",
+      "turn.started",
+      "item.completed",
+      "item.started",
+      "item.completed",
+      "item.completed",
+      "item.started",
+      "item.completed",
+      "item.started",
+      "item.started",
+      "item.started",
+      "item.completed",
+      "item.completed",
+      "item.completed",
+      "item.started",
+      "item.completed",
+      "item.completed",
+      "item.started",
+      "item.completed",
+      "item.started",
+      "item.completed",
+      "item.completed",
+      "turn.completed"
+    ],
+    "providerEventCount": 23,
+    "normalizedEventCount": 23,
+    "normalizedEventsExactlyOnceInOrder": true,
+    "stdoutBytesCommittedAtCutover": 630,
+    "stdoutBytesAckedAtCutover": 630,
+    "stdoutBytesCommittedAtReattach": 630,
+    "stdoutBytesAckedAtReattach": 630,
+    "stdoutBytesCommittedFinal": 17111,
+    "stdoutBytesAcknowledgedFinal": 17111,
+    "stderrBytesCommittedFinal": 158,
+    "stderrBytesAcknowledgedFinal": 158,
+    "stdoutBytesDurableFinal": 17111,
+    "stderrBytesDurableFinal": 158,
+    "stdoutSha256": "e344e0856440af92e16501752723b8a176b50777d5c3aefb34239f4e671a6678",
+    "stderrSha256": "a8fab59fba0a65e8abcf47d2757d64d10856ccd7b9ab5bfc75fd5298a66e354b",
+    "stdoutSpoolPath": ".deszo/tests/custody-real-codex-stage1-cmVZ3R/custody-state/custody/spool/c74e5723-33b1-4fc7-9846-5793d0b9678e/stdout.bin",
+    "stderrSpoolPath": ".deszo/tests/custody-real-codex-stage1-cmVZ3R/custody-state/custody/spool/c74e5723-33b1-4fc7-9846-5793d0b9678e/stderr.bin",
+    "spoolComplete": true,
+    "exactHostSpoolReconciliation": true
+  },
+  "settlement": {
+    "terminalAttemptSettlementCount": 1,
+    "committedInvocationCount": 1,
+    "hostProcessTreeEnded": true,
+    "finalHostState": "exited",
+    "finalHostExitCode": 0,
+    "workspaceHoldState": "released",
+    "workspaceHoldReleasedAtObserved": "2026-10-26T04:23:17.142Z",
+    "workspaceHoldEvidence": {
+      "hostState": "exited",
+      "processTreeEnded": true,
+      "exitCode": 0,
+      "terminationReason": null
+    },
+    "requestedModel": "gpt-6-luna"
+  },
+  "project": {
+    "baselineTreeSha256": "5a80dacf79464aaedf44989bfeaf5f769620efafa5959c63cd7536ff2af1bf74",
+    "finalTreeSha256": "30cd0725c522c23dc4c39257627b3ab5ff77a34b2a020b083c2b646b03e9f7be",
+    "modifiedFiles": [
+      "README.md",
+      "src/normalize.mjs",
+      "test/normalize.test.mjs"
+    ],
+    "codexCommandItems": [
+      "\"C:\\\\Users\\\\jusse\\\\.cache\\\\codex-runtimes\\\\codex-primary-runtime\\\\dependencies\\\\native\\\\powershell\\\\pwsh.exe\" -Command 'node tools/engine-replacement-gate.mjs'",
+      "\"C:\\\\Users\\\\jusse\\\\.cache\\\\codex-runtimes\\\\codex-primary-runtime\\\\dependencies\\\\native\\\\powershell\\\\pwsh.exe\" -Command 'node tools/engine-replacement-gate.mjs'",
+      "\"C:\\\\Users\\\\jusse\\\\.cache\\\\codex-runtimes\\\\codex-primary-runtime\\\\dependencies\\\\native\\\\powershell\\\\pwsh.exe\" -Command \"Get-ChildItem -Force; rg --files -g AGENTS.md -g 'normalize.mjs' -g 'normalize.test.mjs' -g README.md\"",
+      "\"C:\\\\Users\\\\jusse\\\\.cache\\\\codex-runtimes\\\\codex-primary-runtime\\\\dependencies\\\\native\\\\powershell\\\\pwsh.exe\" -Command \"Get-ChildItem -Force; rg --files -g AGENTS.md -g 'normalize.mjs' -g 'normalize.test.mjs' -g README.md\"",
+      "\"C:\\\\Users\\\\jusse\\\\.cache\\\\codex-runtimes\\\\codex-primary-runtime\\\\dependencies\\\\native\\\\powershell\\\\pwsh.exe\" -Command 'Get-Content test/normalize.test.mjs'",
+      "\"C:\\\\Users\\\\jusse\\\\.cache\\\\codex-runtimes\\\\codex-primary-runtime\\\\dependencies\\\\native\\\\powershell\\\\pwsh.exe\" -Command 'Get-Content src/normalize.mjs'",
+      "\"C:\\\\Users\\\\jusse\\\\.cache\\\\codex-runtimes\\\\codex-primary-runtime\\\\dependencies\\\\native\\\\powershell\\\\pwsh.exe\" -Command 'Get-Content README.md'",
+      "\"C:\\\\Users\\\\jusse\\\\.cache\\\\codex-runtimes\\\\codex-primary-runtime\\\\dependencies\\\\native\\\\powershell\\\\pwsh.exe\" -Command 'Get-Content test/normalize.test.mjs'",
+      "\"C:\\\\Users\\\\jusse\\\\.cache\\\\codex-runtimes\\\\codex-primary-runtime\\\\dependencies\\\\native\\\\powershell\\\\pwsh.exe\" -Command 'Get-Content src/normalize.mjs'",
+      "\"C:\\\\Users\\\\jusse\\\\.cache\\\\codex-runtimes\\\\codex-primary-runtime\\\\dependencies\\\\native\\\\powershell\\\\pwsh.exe\" -Command 'Get-Content README.md'",
+      "\"C:\\\\Users\\\\jusse\\\\.cache\\\\codex-runtimes\\\\codex-primary-runtime\\\\dependencies\\\\native\\\\powershell\\\\pwsh.exe\" -Command 'node --test'",
+      "\"C:\\\\Users\\\\jusse\\\\.cache\\\\codex-runtimes\\\\codex-primary-runtime\\\\dependencies\\\\native\\\\powershell\\\\pwsh.exe\" -Command 'node --test'",
+      "\"C:\\\\Users\\\\jusse\\\\.cache\\\\codex-runtimes\\\\codex-primary-runtime\\\\dependencies\\\\native\\\\powershell\\\\pwsh.exe\" -Command 'git status --short; git diff -- src/normalize.mjs test/normalize.test.mjs README.md'",
+      "\"C:\\\\Users\\\\jusse\\\\.cache\\\\codex-runtimes\\\\codex-primary-runtime\\\\dependencies\\\\native\\\\powershell\\\\pwsh.exe\" -Command 'git status --short; git diff -- src/normalize.mjs test/normalize.test.mjs README.md'"
+    ],
+    "codexTestCommandExecution": {
+      "itemId": "item_9",
+      "command": "node --test",
+      "status": "completed",
+      "exitCode": 0
+    },
+    "codexFinalGitInspection": {
+      "itemId": "item_10",
+      "command": "git status --short; git diff -- src/normalize.mjs test/normalize.test.mjs README.md",
+      "status": "failed",
+      "exitCode": 1,
+      "reason": "Git rejected the disposable workspace as dubious ownership under the Codex sandbox identity; no Git mutation was requested or performed."
+    },
+    "baselineTestExitCode": 0,
+    "codexTestCommand": "node --test",
+    "independentFinalTestExitCode": 0,
+    "independentTestSummary": {
+      "tests": 3,
+      "passed": 3,
+      "failed": 0
+    },
+    "gitDiffCheckExitCode": 0,
+    "baselineComparisonWhitespaceCheck": {
+      "files": [
+        "README.md",
+        "src/normalize.mjs",
+        "test/normalize.test.mjs"
+      ],
+      "noIndexChecks": 3,
+      "diagnostics": 0
+    },
+    "stagedFiles": [],
+    "commitCreated": false,
+    "npmUsed": false,
+    "outsideDeszoRepository": true,
+    "outsideUserProfile": true
+  },
+  "realCodexDesktopReplacement": "not_performed; this proof covers Node Engine A-to-B reattachment only",
+  "priorRealProviderAttempt": {
+    "artifact": "2026-10-25-codex-custody-real-prior.json",
+    "verdict": "REAL CODEX CUSTODY NOT VERIFIED",
+    "reason": "The original task ended before a deterministic barrier; its npm test command failed because the user-level npm shim referenced a missing npm-cli.js."
+  },
+  "priorHarnessFailures": [
+    {
+      "artifact": "2026-10-26-codex-custody-real-preflight.json",
+      "providerLaunchCount": 0,
+      "resolution": "Reduced the rejected workflow timeout from 900 seconds to the published 600-second maximum."
+    },
+    {
+      "artifact": "2026-10-26-codex-custody-real-cutover-failure.json",
+      "providerLaunchCount": 1,
+      "resolution": "Refreshed the Host record and waited for ACK to match committed bytes before cutover; this failure stopped before Engine A replacement."
+    }
+  ],
+  "custodyStateRoot": ".deszo/tests/custody-real-codex-stage1-cmVZ3R",
+  "workspacePath": "C:\\my\\2026\\deszo-codex-custody-workspace-i7v0XC",
+  "timeline": [
+    {
+      "event": "node-test-command-verified",
+      "observedAt": "2026-10-26T04:21:10.958Z",
+      "command": "node --test",
+      "executable": "C:\\Program Files\\nodejs\\node.exe",
+      "version": "v22.20.0",
+      "baselineTestExitCode": 0,
+      "baselineTestSummary": {
+        "tests": 2,
+        "passed": 2,
+        "failed": 0
+      }
+    },
+    {
+      "event": "disposable-project-created",
+      "observedAt": "2026-10-26T04:21:11.414Z",
+      "workspaceOutsideDeszo": true,
+      "workspaceOutsideUserProfile": true,
+      "baselineTreeSha256": "5a80dacf79464aaedf44989bfeaf5f769620efafa5959c63cd7536ff2af1bf74",
+      "initialStagedFiles": 0,
+      "initialCommitCount": 0
+    },
+    {
+      "event": "host-started",
+      "observedAt": "2026-10-26T04:21:11.560Z",
+      "hostPid": 26032,
+      "hostSha256": "65f0e26ea5840c8ebd78c0ec5dc0a58d2116e135c8861eb2a7ae81bf2171d5ff"
+    },
+    {
+      "event": "engine-a-started",
+      "observedAt": "2026-10-26T04:21:13.345Z",
+      "engineAPid": 27428,
+      "engineAIdentity": "2026-10-26T04:21:11.6862902Z",
+      "runnerLockOwner": {
+        "pid": 27428,
+        "id": "9bf85524-df44-42a2-aec5-42e0c5f78110"
+      }
+    },
+    {
+      "event": "run-admitted",
+      "observedAt": "2026-10-26T04:21:14.445Z",
+      "runId": "70280dab-7f0f-46f5-a05b-61f1b2ee2c49",
+      "publishedVersionId": "dab881b0-aa38-4156-aa29-ed51e02c47f7",
+      "launchRequested": true
+    },
+    {
+      "event": "codex-launched",
+      "observedAt": "2026-10-26T04:22:15.820Z",
+      "hostPid": 26032,
+      "engineAPid": 27428,
+      "codexPid": 24432,
+      "codexProcessCreationIdentity": 134374621348492020,
+      "codexPowerShellCreationIdentity": "2026-10-26T04:22:14.8492018Z",
+      "hostAdmissionState": "running",
+      "hostRecordCreatedAt": "1792988504031",
+      "hostRecordUpdatedAt": "1792988534860",
+      "custodyInvocationId": "c74e5723-33b1-4fc7-9846-5793d0b9678e",
+      "attemptId": "4aefdb8e-2448-46d9-b3e1-a439a331e56e",
+      "runId": "70280dab-7f0f-46f5-a05b-61f1b2ee2c49",
+      "hostLaunchCount": 1
+    },
+    {
+      "event": "gate-ready-observed",
+      "observedAt": "2026-10-26T04:22:27.446Z",
+      "gatePid": 26060,
+      "gateParentPid": 21912,
+      "gateStartedAt": "2026-10-26T04:22:25.840Z",
+      "gateObservedCreationIdentity": "2026-10-26T04:22:25.7775091Z",
+      "codexAlive": true,
+      "codexProcessCreationIdentity": "2026-10-26T04:22:14.8492018Z",
+      "codexIsGateAncestor": true
+    },
+    {
+      "event": "barrier-confirmed",
+      "observedAt": "2026-10-26T04:22:30.627Z",
+      "ready": true,
+      "codexAlive": true,
+      "gateAlive": true,
+      "attemptState": "running",
+      "workspaceHoldState": "held",
+      "terminalEvents": [],
+      "stdoutCommittedBytes": 630,
+      "stdoutAckedBytes": 630,
+      "stdoutDurableBytes": 630,
+      "normalizedCommittedBytes": 881,
+      "projectTreeUnchanged": true,
+      "engineAEpoch": 1
+    },
+    {
+      "event": "engine-a-terminated",
+      "observedAt": "2026-10-26T04:22:32.561Z",
+      "engineAPid": 27428,
+      "engineAIdentity": "2026-10-26T04:21:11.6862902Z",
+      "engineAEnded": true
+    },
+    {
+      "event": "codex-survived-engine-a",
+      "observedAt": "2026-10-26T04:22:34.908Z",
+      "codexPid": 24432,
+      "codexProcessCreationIdentity": "2026-10-26T04:22:14.8492018Z",
+      "gatePid": 26060,
+      "gateProcessCreationIdentity": "2026-10-26T04:22:25.7775091Z",
+      "hostRecordState": "running"
+    },
+    {
+      "event": "engine-b-started",
+      "observedAt": "2026-10-26T04:22:35.898Z",
+      "engineBPid": 16076,
+      "engineBIdentity": "2026-10-26T04:22:34.9143404Z"
+    },
+    {
+      "event": "engine-b-host-reattached",
+      "observedAt": "2026-10-26T04:22:35.898Z",
+      "engineBPid": 16076,
+      "engineBIdentity": "2026-10-26T04:22:34.9143404Z",
+      "runnerLockOwner": {
+        "pid": 16076,
+        "id": "24d0fd86-e6ba-4083-886d-2915341237bc"
+      },
+      "engineBEpoch": 2
+    },
+    {
+      "event": "engine-b-custody-reattached",
+      "observedAt": "2026-10-26T04:22:37.384Z",
+      "resumedProcess": {
+        "attemptId": "4aefdb8e-2448-46d9-b3e1-a439a331e56e",
+        "pid": 24432,
+        "launched": true,
+        "stopRequested": false,
+        "alive": true
+      },
+      "engineBEpoch": 2,
+      "runnerLockOwner": {
+        "pid": 16076,
+        "id": "24d0fd86-e6ba-4083-886d-2915341237bc"
+      },
+      "stdoutCommittedBytes": 630,
+      "stdoutAckedBytes": 630,
+      "stdoutDurableBytes": 630,
+      "normalizedCommittedBytes": 881,
+      "workspaceHoldState": "held",
+      "codexAlive": true,
+      "gateAlive": true,
+      "terminalEvents": []
+    },
+    {
+      "event": "gate-release-written",
+      "observedAt": "2026-10-26T04:22:37.387Z",
+      "engineBPid": 16076,
+      "engineBEpoch": 2,
+      "releasedAt": "2026-10-26T04:22:37.384Z"
+    },
+    {
+      "event": "gate-released-and-exited",
+      "observedAt": "2026-10-26T04:22:37.731Z",
+      "gatePid": 26060,
+      "gateExitCode": 0,
+      "gateReleasedAt": "2026-10-26T04:22:37.488Z",
+      "engineBReattachedBeforeRelease": true
+    },
+    {
+      "event": "run-terminal-observed",
+      "observedAt": "2026-10-26T04:23:17.043Z",
+      "runId": "70280dab-7f0f-46f5-a05b-61f1b2ee2c49",
+      "finalRunState": "succeeded"
+    },
+    {
+      "event": "host-process-tree-complete",
+      "observedAt": "2026-10-26T04:23:17.050Z",
+      "hostState": "exited",
+      "processTreeEnded": true,
+      "exitCode": 0,
+      "spoolComplete": true
+    },
+    {
+      "event": "workspace-hold-released",
+      "observedAt": "2026-10-26T04:23:17.142Z",
+      "state": "released",
+      "processTreeEnded": true,
+      "hostState": "exited",
+      "terminalAttemptSettlementCount": 1
+    },
+    {
+      "event": "project-verified-independently",
+      "observedAt": "2026-10-26T04:23:20.089Z",
+      "command": "node --test",
+      "exitCode": 0,
+      "testSummary": {
+        "tests": 3,
+        "passed": 3,
+        "failed": 0
+      },
+      "changedFiles": [
+        "README.md",
+        "src/normalize.mjs",
+        "test/normalize.test.mjs"
+      ],
+      "gitDiffCheckExitCode": 0,
+      "baselineComparisonWhitespaceErrors": 0,
+      "stagedFiles": 0,
+      "commitCount": 0
+    },
+    {
+      "event": "real-codex-engine-replacement-proof-complete",
+      "observedAt": "2026-10-26T04:23:20.690Z",
+      "verdict": "REAL CODEX CUSTODY VERIFIED — STAGE 1 COMPLETE",
+      "runId": "70280dab-7f0f-46f5-a05b-61f1b2ee2c49",
+      "attemptId": "4aefdb8e-2448-46d9-b3e1-a439a331e56e",
+      "custodyId": "c74e5723-33b1-4fc7-9846-5793d0b9678e"
+    }
+  ],
+  "cleanup": {
+    "engineAStopped": true,
+    "engineBStopped": true,
+    "hostStopped": true
+  }
+}

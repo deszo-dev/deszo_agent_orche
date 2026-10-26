@@ -1,0 +1,287 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-26T08:01:20.183Z",
+  "verdict": "P1 REAL CODEX CONTINUATION VERIFIED",
+  "model": "gpt-6-luna",
+  "provider": {
+    "cliPath": "C:\\Users\\jusse\\AppData\\Local\\OpenAI\\Codex\\bin\\2993767bd1dfb009\\codex.exe",
+    "cliVersion": "codex-cli 0.164.0-alpha.11.1",
+    "executableSha256": "1103e9e09c71fa2cd0afd6d8f3b9a2d63174fe8efd7cb5bd09f1cb14ef58a098"
+  },
+  "host": {
+    "pid": 35512,
+    "executableSha256": "671835698a0d24c9dc739aef742fc0173d04beb87dfa10d635f17f7f7e237919"
+  },
+  "engineA": {
+    "pid": 25804,
+    "identity": "2026-10-26T08:01:18.0715017Z",
+    "epoch": 1
+  },
+  "workspace": "C:\\my\\2026\\deszo-p1-codex-workspace-CbnXNr",
+  "timeline": [
+    {
+      "at": "2026-10-26T08:01:21.317Z",
+      "event": "run-admitted",
+      "runId": "25a2c75d-bd27-4cab-bf63-ad8f4ba393bb",
+      "publishedVersionId": "f5dd712c-a96f-40a0-a92f-3f1b1d548f03"
+    },
+    {
+      "at": "2026-10-26T08:02:42.122Z",
+      "event": "codex-ready",
+      "codexPid": 31904,
+      "codexIdentity": "2026-10-26T08:02:30.0660772Z",
+      "gatePid": 32976
+    },
+    {
+      "at": "2026-10-26T08:02:42.643Z",
+      "event": "engine-a-terminated",
+      "hostAlive": true,
+      "codexAlive": true
+    },
+    {
+      "at": "2026-10-26T08:02:44.000Z",
+      "event": "engine-b-reattached",
+      "engineBPid": 29852,
+      "epochB": 2,
+      "codexPid": 31904
+    },
+    {
+      "at": "2026-10-26T08:02:44.003Z",
+      "event": "gate-released"
+    },
+    {
+      "at": "2026-10-26T08:03:23.476Z",
+      "event": "run-final",
+      "state": "succeeded"
+    }
+  ],
+  "run": {
+    "runId": "25a2c75d-bd27-4cab-bf63-ad8f4ba393bb",
+    "publishedVersionId": "f5dd712c-a96f-40a0-a92f-3f1b1d548f03",
+    "finalState": "succeeded",
+    "nodes": {
+      "a": "node-a",
+      "b": "node-b",
+      "c": "node-c"
+    }
+  },
+  "attempts": {
+    "a": "90bd0140-f33c-45a4-bc0b-95cddada6873",
+    "b": "91f0c783-a514-4892-8c1f-f880ccc1a7ab",
+    "c": "8acca161-5e2a-419a-bb85-c5dc00d73e07"
+  },
+  "codex": {
+    "pid": 31904,
+    "identity": "2026-10-26T08:02:30.0660772Z",
+    "custodyId": "1af85b77-594f-47fa-bc9d-205da2431492",
+    "hostRecords": 1
+  },
+  "settlements": {
+    "a": 1,
+    "b": 1,
+    "c": 1
+  },
+  "independent": {
+    "projectTests": "pass",
+    "normalizeCountProbe": [
+      12,
+      0,
+      4,
+      0,
+      0,
+      0
+    ]
+  },
+  "journal": [
+    {
+      "sequence": 2,
+      "type": "run.state_changed",
+      "node": null,
+      "attemptId": null,
+      "from": null,
+      "to": "queued",
+      "reason": "Run captured."
+    },
+    {
+      "sequence": 10,
+      "type": "attempt.state_changed",
+      "node": "node-a",
+      "attemptId": "90bd0140-f33c-45a4-bc0b-95cddada6873",
+      "from": null,
+      "to": "scheduled",
+      "reason": "Planned before dispatch."
+    },
+    {
+      "sequence": 11,
+      "type": "attempt.state_changed",
+      "node": "node-b-prompt",
+      "attemptId": "ac999907-9079-4982-a560-ec1a49072d39",
+      "from": null,
+      "to": "scheduled",
+      "reason": "Planned before dispatch."
+    },
+    {
+      "sequence": 12,
+      "type": "attempt.state_changed",
+      "node": "node-b",
+      "attemptId": "91f0c783-a514-4892-8c1f-f880ccc1a7ab",
+      "from": null,
+      "to": "scheduled",
+      "reason": "Planned before dispatch."
+    },
+    {
+      "sequence": 13,
+      "type": "attempt.state_changed",
+      "node": "result",
+      "attemptId": "4b5c5163-2009-4ce4-a851-3a1f2f30033a",
+      "from": null,
+      "to": "scheduled",
+      "reason": "Planned before dispatch."
+    },
+    {
+      "sequence": 14,
+      "type": "attempt.state_changed",
+      "node": "node-c",
+      "attemptId": "8acca161-5e2a-419a-bb85-c5dc00d73e07",
+      "from": null,
+      "to": "scheduled",
+      "reason": "Planned before dispatch."
+    },
+    {
+      "sequence": 15,
+      "type": "attempt.state_changed",
+      "node": "result-c",
+      "attemptId": "bc3bf42a-2a42-441b-8898-7d6a4d0d2528",
+      "from": null,
+      "to": "scheduled",
+      "reason": "Planned before dispatch."
+    },
+    {
+      "sequence": 16,
+      "type": "run.state_changed",
+      "node": null,
+      "attemptId": null,
+      "from": "queued",
+      "to": "running",
+      "reason": "Scheduler started."
+    },
+    {
+      "sequence": 18,
+      "type": "attempt.state_changed",
+      "node": "node-a",
+      "attemptId": "90bd0140-f33c-45a4-bc0b-95cddada6873",
+      "from": "scheduled",
+      "to": "running",
+      "reason": "Static node started."
+    },
+    {
+      "sequence": 20,
+      "type": "attempt.state_changed",
+      "node": "node-a",
+      "attemptId": "90bd0140-f33c-45a4-bc0b-95cddada6873",
+      "from": "running",
+      "to": "succeeded",
+      "reason": "Static node committed its outputs."
+    },
+    {
+      "sequence": 22,
+      "type": "attempt.state_changed",
+      "node": "node-b-prompt",
+      "attemptId": "ac999907-9079-4982-a560-ec1a49072d39",
+      "from": "scheduled",
+      "to": "running",
+      "reason": "Static node started."
+    },
+    {
+      "sequence": 24,
+      "type": "attempt.state_changed",
+      "node": "node-b-prompt",
+      "attemptId": "ac999907-9079-4982-a560-ec1a49072d39",
+      "from": "running",
+      "to": "succeeded",
+      "reason": "Static node committed its outputs."
+    },
+    {
+      "sequence": 27,
+      "type": "attempt.state_changed",
+      "node": "node-b",
+      "attemptId": "91f0c783-a514-4892-8c1f-f880ccc1a7ab",
+      "from": "scheduled",
+      "to": "running",
+      "reason": "CLI process launched."
+    },
+    {
+      "sequence": 58,
+      "type": "attempt.state_changed",
+      "node": "node-b",
+      "attemptId": "91f0c783-a514-4892-8c1f-f880ccc1a7ab",
+      "from": "running",
+      "to": "succeeded",
+      "reason": "Outputs committed after a successful terminal event and process exit."
+    },
+    {
+      "sequence": 60,
+      "type": "attempt.state_changed",
+      "node": "result",
+      "attemptId": "4b5c5163-2009-4ce4-a851-3a1f2f30033a",
+      "from": "scheduled",
+      "to": "running",
+      "reason": "Static node started."
+    },
+    {
+      "sequence": 62,
+      "type": "attempt.state_changed",
+      "node": "result",
+      "attemptId": "4b5c5163-2009-4ce4-a851-3a1f2f30033a",
+      "from": "running",
+      "to": "succeeded",
+      "reason": "Static node committed its outputs."
+    },
+    {
+      "sequence": 64,
+      "type": "attempt.state_changed",
+      "node": "node-c",
+      "attemptId": "8acca161-5e2a-419a-bb85-c5dc00d73e07",
+      "from": "scheduled",
+      "to": "running",
+      "reason": "Static node started."
+    },
+    {
+      "sequence": 66,
+      "type": "attempt.state_changed",
+      "node": "node-c",
+      "attemptId": "8acca161-5e2a-419a-bb85-c5dc00d73e07",
+      "from": "running",
+      "to": "succeeded",
+      "reason": "Static node committed its outputs."
+    },
+    {
+      "sequence": 68,
+      "type": "attempt.state_changed",
+      "node": "result-c",
+      "attemptId": "bc3bf42a-2a42-441b-8898-7d6a4d0d2528",
+      "from": "scheduled",
+      "to": "running",
+      "reason": "Static node started."
+    },
+    {
+      "sequence": 70,
+      "type": "attempt.state_changed",
+      "node": "result-c",
+      "attemptId": "bc3bf42a-2a42-441b-8898-7d6a4d0d2528",
+      "from": "running",
+      "to": "succeeded",
+      "reason": "Static node committed its outputs."
+    },
+    {
+      "sequence": 71,
+      "type": "run.state_changed",
+      "node": null,
+      "attemptId": null,
+      "from": "running",
+      "to": "succeeded",
+      "reason": "Every planned node succeeded, was reused, or was skipped by a Route."
+    }
+  ],
+  "storeRoot": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\custody-p1-codex-real-3imdM2"
+}

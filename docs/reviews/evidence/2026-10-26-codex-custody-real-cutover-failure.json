@@ -1,0 +1,182 @@
+{
+  "schemaVersion": 2,
+  "status": "not_verified",
+  "verdict": "REAL CODEX CUSTODY NOT VERIFIED",
+  "verifiedAt": "2026-10-26T04:19:45.625Z",
+  "failure": {
+    "message": "Engine A committed Codex JSONL before replacement"
+  },
+  "environment": {
+    "node": "v22.20.0",
+    "codexCliVersion": "codex-cli 0.164.0-alpha.11.1",
+    "selectedModel": "gpt-6-luna",
+    "authenticationMode": "Existing ChatGPT sign-in; credentials are not recorded.",
+    "selectedProtocol": "codex exec --json"
+  },
+  "workflow": {
+    "runId": "334e7556-a157-4d95-a07c-b8b373ade806",
+    "attemptId": "1ba66a8c-3662-4234-9aa6-21190e70a09f",
+    "custodyId": "bc01be0c-4bad-4ed0-aef2-b583b25304e3",
+    "publishedVersionId": "29e70bf0-cb75-40a4-9f66-b523420910ee",
+    "runState": "running",
+    "attemptState": "running"
+  },
+  "processes": {
+    "hostPid": 20252,
+    "engineAPid": 12128,
+    "engineBPid": null,
+    "codexPid": 32468,
+    "codexProcessCreationIdentity": 134374619708723570,
+    "codexPowerShellCreationIdentity": "2026-10-26T04:19:30.8723567Z",
+    "gatePid": 25968,
+    "gateProcessCreationIdentity": "2026-10-26T04:19:40.4932948Z",
+    "gateAliveAtCapture": false,
+    "engineAIdentity": "2026-10-26T04:18:32.6006949Z",
+    "engineBIdentity": null,
+    "hostRecordState": "host_stopped",
+    "hostExitCode": 1,
+    "hostLaunchCount": 1
+  },
+  "barrier": {
+    "readyObserved": true,
+    "readyStartedAt": "2026-10-26T04:19:40.551Z",
+    "readyObservedWhileCodexAlive": false,
+    "gateWasCodexDescendant": false,
+    "engineAEnded": true,
+    "codexSurvivedEngineA": false,
+    "engineBReattachedAt": null,
+    "releaseWrittenAt": null,
+    "releasedAt": null
+  },
+  "streams": {
+    "stdoutBytesObserved": 626,
+    "stderrBytesObserved": 158,
+    "stdoutEventTypes": [
+      "thread.started",
+      "turn.started",
+      "item.completed",
+      "item.started"
+    ],
+    "stdoutSha256": "c4129978a1a5b844e8ac4c95f69235ad64e078e1801a4f56ffe7ba4f99ab4af8",
+    "stderrSha256": "22bd7abc41750d5ab7af94ccb632d063590e3e41b14db546996b47890216747f",
+    "stdoutSpoolPath": ".deszo/tests/custody-real-codex-stage1-wQPBa2/custody-state/custody/spool/bc01be0c-4bad-4ed0-aef2-b583b25304e3/stdout.bin",
+    "stderrSpoolPath": ".deszo/tests/custody-real-codex-stage1-wQPBa2/custody-state/custody/spool/bc01be0c-4bad-4ed0-aef2-b583b25304e3/stderr.bin",
+    "stdoutEventSummaries": [
+      {
+        "index": 0,
+        "type": "thread.started",
+        "itemType": null
+      },
+      {
+        "index": 1,
+        "type": "turn.started",
+        "itemType": null
+      },
+      {
+        "index": 2,
+        "type": "item.completed",
+        "itemType": "agent_message"
+      },
+      {
+        "index": 3,
+        "type": "item.started",
+        "itemType": "command_execution",
+        "command": "\"C:\\\\Users\\\\jusse\\\\.cache\\\\codex-runtimes\\\\codex-primary-runtime\\\\dependencies\\\\native\\\\powershell\\\\pwsh.exe\" -Command 'node tools/engine-replacement-gate.mjs'"
+      }
+    ],
+    "stdoutBytesCommittedAtCutover": 626,
+    "stdoutAckedAtCutover": 0
+  },
+  "timeline": [
+    {
+      "event": "node-test-command-verified",
+      "observedAt": "2026-10-26T04:18:32.200Z",
+      "command": "node --test",
+      "executable": "C:\\Program Files\\nodejs\\node.exe",
+      "version": "v22.20.0",
+      "baselineTestExitCode": 0,
+      "baselineTestSummary": {
+        "tests": 2,
+        "passed": 2,
+        "failed": 0
+      }
+    },
+    {
+      "event": "disposable-project-created",
+      "observedAt": "2026-10-26T04:18:32.451Z",
+      "workspaceOutsideDeszo": true,
+      "workspaceOutsideUserProfile": true,
+      "baselineTreeSha256": "5a80dacf79464aaedf44989bfeaf5f769620efafa5959c63cd7536ff2af1bf74",
+      "initialStagedFiles": 0,
+      "initialCommitCount": 0
+    },
+    {
+      "event": "host-started",
+      "observedAt": "2026-10-26T04:18:32.595Z",
+      "hostPid": 20252,
+      "hostSha256": "65f0e26ea5840c8ebd78c0ec5dc0a58d2116e135c8861eb2a7ae81bf2171d5ff"
+    },
+    {
+      "event": "engine-a-started",
+      "observedAt": "2026-10-26T04:18:34.093Z",
+      "engineAPid": 12128,
+      "engineAIdentity": "2026-10-26T04:18:32.6006949Z",
+      "runnerLockOwner": {
+        "pid": 12128,
+        "id": "054b7c7e-588f-4931-8a96-e8943f8843aa"
+      }
+    },
+    {
+      "event": "run-admitted",
+      "observedAt": "2026-10-26T04:18:34.793Z",
+      "runId": "334e7556-a157-4d95-a07c-b8b373ade806",
+      "publishedVersionId": "29e70bf0-cb75-40a4-9f66-b523420910ee",
+      "launchRequested": true
+    },
+    {
+      "event": "codex-launched",
+      "observedAt": "2026-10-26T04:19:31.430Z",
+      "hostPid": 20252,
+      "engineAPid": 12128,
+      "codexPid": 32468,
+      "codexProcessCreationIdentity": 134374619708723570,
+      "codexPowerShellCreationIdentity": "2026-10-26T04:19:30.8723567Z",
+      "hostAdmissionState": "running",
+      "hostRecordCreatedAt": "1792988344113",
+      "hostRecordUpdatedAt": "1792988370879",
+      "custodyInvocationId": "bc01be0c-4bad-4ed0-aef2-b583b25304e3",
+      "attemptId": "1ba66a8c-3662-4234-9aa6-21190e70a09f",
+      "runId": "334e7556-a157-4d95-a07c-b8b373ade806",
+      "hostLaunchCount": 1
+    },
+    {
+      "event": "gate-ready-observed",
+      "observedAt": "2026-10-26T04:19:42.293Z",
+      "gatePid": 25968,
+      "gateParentPid": 15264,
+      "gateStartedAt": "2026-10-26T04:19:40.551Z",
+      "gateObservedCreationIdentity": "2026-10-26T04:19:40.4932948Z",
+      "codexAlive": true,
+      "codexProcessCreationIdentity": "2026-10-26T04:19:30.8723567Z",
+      "codexIsGateAncestor": true
+    },
+    {
+      "event": "proof-not-verified",
+      "observedAt": "2026-10-26T04:19:43.997Z",
+      "message": "Engine A committed Codex JSONL before replacement"
+    }
+  ],
+  "custodyStateRoot": ".deszo/tests/custody-real-codex-stage1-wQPBa2",
+  "workspace": {
+    "isolatedOutsideDeszo": true,
+    "isolatedOutsideUserProfile": true,
+    "path": "C:\\my\\2026\\deszo-codex-custody-workspace-goLj6P",
+    "baselineTreeSha256": "5a80dacf79464aaedf44989bfeaf5f769620efafa5959c63cd7536ff2af1bf74",
+    "changedFilesObserved": []
+  },
+  "cleanup": {
+    "engineAStopped": true,
+    "engineBStopped": true,
+    "hostStopped": true
+  }
+}

@@ -66,7 +66,8 @@ export async function custodyRequest(host, command, payload = {}) {
     const [address, port] = host.address.split(':');
     const socket = net.createConnection({ host: address, port: Number(port) });
     let data = '';
-    socket.setTimeout(10_000, () => { socket.destroy(); reject(new Error(`custody ${command} timed out`)); });
+    const timeoutMs = command === 'custody.reserve' || command === 'custody.launch' ? 120_000 : 10_000;
+    socket.setTimeout(timeoutMs, () => { socket.destroy(); reject(new Error(`custody ${command} timed out`)); });
     socket.once('error', reject);
     // A Host that crashes mid-request closes the connection without a reply; the caller learns that at once.
     socket.once('close', () => reject(new Error(`custody ${command}: the Host closed the connection without a reply`)));
@@ -125,7 +126,8 @@ export async function attachEngine(host, runtimeInstanceId = randomUUID()) {
 
 // A real Engine runtime. It is started from runtime/runner.mjs, reads its custody bootstrap from the environment, and
 // publishes a connection descriptor. Its provider fixture is found on PATH.
-export async function startEngine(root, host, { custody = true, fixtureStateDir, extraEnv = {} } = {}) {
+export async function startEngine(root, host, { custody = true, fixtureStateDir, extraEnv = {}, fixtureProvider = true, isolateCodexHome = true,
+  devTestConfirmationOff = false } = {}) {
   const connectionFile = join(root, 'runtime', 'connection.json');
   mkdirSync(join(root, 'runtime'), { recursive: true });
   if (existsSync(connectionFile)) unlinkSync(connectionFile);
@@ -133,11 +135,16 @@ export async function startEngine(root, host, { custody = true, fixtureStateDir,
   // developer's own configuration (which may hold Deszo bridge entries) must not decide the outcome of a fixture run.
   const codexHome = join(root, 'codex-home');
   mkdirSync(codexHome, { recursive: true });
-  const env = { ...process.env, PATH: `${fixtureDir}${delimiter}${process.env.PATH}`, DESZO_PROCESS_CUSTODY: custody ? '1' : '0',
-    CUSTODY_FIXTURE_STATE_DIR: fixtureStateDir, CODEX_HOME: codexHome, ...extraEnv };
+  const env = { ...process.env, DESZO_PROCESS_CUSTODY: custody ? '1' : '0', ...extraEnv };
+  if (fixtureProvider) env.PATH = `${fixtureDir}${delimiter}${process.env.PATH}`;
+  if (fixtureStateDir) env.CUSTODY_FIXTURE_STATE_DIR = fixtureStateDir;
+  else delete env.CUSTODY_FIXTURE_STATE_DIR;
+  if (isolateCodexHome) env.CODEX_HOME = codexHome;
   if (custody) Object.assign(env, { DESZO_CUSTODY_ADDRESS: host.address, DESZO_CUSTODY_CAPABILITY: host.capability, DESZO_CUSTODY_GENERATION: host.generation });
   else for (const name of ['DESZO_CUSTODY_ADDRESS', 'DESZO_CUSTODY_CAPABILITY', 'DESZO_CUSTODY_GENERATION']) delete env[name];
-  const child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', join(repo, 'runtime/runner.mjs'), '--root', root, '--connection-file', connectionFile],
+  const args = ['--disable-warning=ExperimentalWarning', join(repo, 'runtime/runner.mjs'), '--root', root, '--connection-file', connectionFile,
+    ...(devTestConfirmationOff ? ['--dev-test-confirmation-off'] : [])];
+  const child = spawn(process.execPath, args,
     { cwd: repo, env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
   let stderr = '';
   child.stderr.on('data', chunk => { stderr += chunk; });
@@ -201,13 +208,13 @@ export function runEventTypes(root, runId) {
 }
 
 // Saves, validates and publishes one single-agent workflow, then starts a Run of its exact published version.
-export async function startAgentRun(engine, { workflowId, model, requestText, workspaceId = 'main', workspaceCwd }) {
+export async function startAgentRun(engine, { workflowId, model, requestText, workspaceId = 'main', workspaceCwd, timeoutSeconds = 120 }) {
   const ws = await engine.api('PUT', `/api/v2/workspaces/${workspaceId}`, { cwd: workspaceCwd });
   if (ws.status !== 200) throw new Error(`workspace refused: ${JSON.stringify(ws.body)}`);
   const definition = {
     schemaVersion: 1, workflowId, capabilities: ['core-v1'], settings: { nativeConfiguration: 'restricted' },
     nodes: [{ id: 'request', type: 'text', config: { value: requestText } },
-      { id: 'agent', type: 'agent', config: { provider: 'codex', model, timeoutSeconds: 120, output: { format: 'text' } } },
+      { id: 'agent', type: 'agent', config: { provider: 'codex', model, timeoutSeconds, output: { format: 'text' } } },
       { id: 'result', type: 'result-viewer', config: {} }],
     edges: [{ id: 'request-agent', source: { nodeId: 'request', port: 'text' }, target: { nodeId: 'agent', port: 'prompt' } },
       { id: 'agent-result', source: { nodeId: 'agent', port: 'text' }, target: { nodeId: 'result', port: 'value' } }],

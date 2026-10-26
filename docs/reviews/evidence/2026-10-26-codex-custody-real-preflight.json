@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 2,
+  "status": "not_verified",
+  "verdict": "REAL CODEX CUSTODY NOT VERIFIED",
+  "verifiedAt": "2026-10-26T04:17:36.968Z",
+  "failure": {
+    "message": "validation refused: {\"workflowId\":\"real-codex-custody-stage1\",\"revision\":1,\"etag\":\"\\\"draft-1-cb02f08f2b4bf36eb80539f475172d236cfe816b5d1573f4144d5ae90af90427\\\"\",\"definitionDigest\":\"cb02f08f2b4bf36eb80539f475172d236cfe816b5d1573f4144d5ae90af90427\",\"validation\":{\"valid\":false,\"issues\":[{\"path\":\"/nodes/1/config/timeoutSeconds\",\"message\":\"Timeout exceeds the advertised maximum of 600 seconds.\"}]}}"
+  },
+  "environment": {
+    "node": "v22.20.0",
+    "codexCliVersion": "codex-cli 0.164.0-alpha.11.1",
+    "selectedModel": "gpt-6-luna",
+    "authenticationMode": "Existing ChatGPT sign-in; credentials are not recorded.",
+    "selectedProtocol": "codex exec --json"
+  },
+  "workflow": {
+    "runId": null,
+    "attemptId": null,
+    "custodyId": null,
+    "publishedVersionId": null,
+    "runState": null,
+    "attemptState": null
+  },
+  "processes": {
+    "hostPid": 18544,
+    "engineAPid": 34244,
+    "engineBPid": null,
+    "codexPid": null,
+    "codexProcessCreationIdentity": null,
+    "codexPowerShellCreationIdentity": null,
+    "gatePid": null,
+    "gateProcessCreationIdentity": null,
+    "gateAliveAtCapture": false,
+    "engineAIdentity": "2026-10-26T04:17:34.5545931Z",
+    "engineBIdentity": null,
+    "hostRecordState": null,
+    "hostExitCode": null,
+    "hostLaunchCount": 0
+  },
+  "barrier": {
+    "readyObserved": false,
+    "readyStartedAt": null,
+    "readyObservedWhileCodexAlive": false,
+    "gateWasCodexDescendant": false,
+    "engineAEnded": true,
+    "codexSurvivedEngineA": false,
+    "engineBReattachedAt": null,
+    "releaseWrittenAt": null,
+    "releasedAt": null
+  },
+  "streams": {
+    "stdoutBytesObserved": 0,
+    "stderrBytesObserved": 0,
+    "stdoutEventTypes": [],
+    "stdoutSha256": null,
+    "stderrSha256": null,
+    "stdoutSpoolPath": null,
+    "stderrSpoolPath": null,
+    "stdoutEventSummaries": [],
+    "stdoutBytesCommittedAtCutover": null,
+    "stdoutAckedAtCutover": null
+  },
+  "timeline": [
+    {
+      "event": "node-test-command-verified",
+      "observedAt": "2026-10-26T04:17:34.194Z",
+      "command": "node --test",
+      "executable": "C:\\Program Files\\nodejs\\node.exe",
+      "version": "v22.20.0",
+      "baselineTestExitCode": 0,
+      "baselineTestSummary": {
+        "tests": 2,
+        "passed": 2,
+        "failed": 0
+      }
+    },
+    {
+      "event": "disposable-project-created",
+      "observedAt": "2026-10-26T04:17:34.413Z",
+      "workspaceOutsideDeszo": true,
+      "workspaceOutsideUserProfile": true,
+      "baselineTreeSha256": "5a80dacf79464aaedf44989bfeaf5f769620efafa5959c63cd7536ff2af1bf74",
+      "initialStagedFiles": 0,
+      "initialCommitCount": 0
+    },
+    {
+      "event": "host-started",
+      "observedAt": "2026-10-26T04:17:34.549Z",
+      "hostPid": 18544,
+      "hostSha256": "65f0e26ea5840c8ebd78c0ec5dc0a58d2116e135c8861eb2a7ae81bf2171d5ff"
+    },
+    {
+      "event": "engine-a-started",
+      "observedAt": "2026-10-26T04:17:36.187Z",
+      "engineAPid": 34244,
+      "engineAIdentity": "2026-10-26T04:17:34.5545931Z",
+      "runnerLockOwner": {
+        "pid": 34244,
+        "id": "1c0c4052-359a-449c-9be2-512a462ef3b9"
+      }
+    },
+    {
+      "event": "proof-not-verified",
+      "observedAt": "2026-10-26T04:17:36.566Z",
+      "message": "validation refused: {\"workflowId\":\"real-codex-custody-stage1\",\"revision\":1,\"etag\":\"\\\"draft-1-cb02f08f2b4bf36eb80539f475172d236cfe816b5d1573f4144d5ae90af90427\\\"\",\"definitionDigest\":\"cb02f08f2b4bf36eb80539f475172d236cfe816b5d1573f4144d5ae90af90427\",\"validation\":{\"valid\":false,\"issues\":[{\"path\":\"/nodes/1/config/timeoutSeconds\",\"message\":\"Timeout exceeds the advertised maximum of 600 seconds.\"}]}}"
+    }
+  ],
+  "custodyStateRoot": ".deszo/tests/custody-real-codex-stage1-zG5g5b",
+  "workspace": {
+    "isolatedOutsideDeszo": true,
+    "isolatedOutsideUserProfile": true,
+    "path": "C:\\my\\2026\\deszo-codex-custody-workspace-t5qfh2",
+    "baselineTreeSha256": "5a80dacf79464aaedf44989bfeaf5f769620efafa5959c63cd7536ff2af1bf74",
+    "changedFilesObserved": []
+  },
+  "cleanup": {
+    "engineAStopped": true,
+    "engineBStopped": true,
+    "hostStopped": true
+  }
+}

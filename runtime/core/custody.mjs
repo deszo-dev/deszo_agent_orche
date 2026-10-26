@@ -27,6 +27,9 @@ export const HOLD_RECONCILE_MS = 2_000;
 const HOST_ENDED = new Set(['host_lost', 'host_stopped', 'refused_host_restart']);
 // Host states whose spool is not a complete record of the process; the attempt fails at its capture, not at its result.
 const CAPTURE_FAULTS = new Set(['spool_limit_exceeded', 'spool_failed']);
+// The Host's own stops: a Stop the Engine or the emergency credential asked for, or the admitted deadline. Such an end is a stop outcome and never a
+// result, whatever its exit code (F3).
+export const STOP_FAMILY = new Set(['stopped', 'deadline_terminated', 'emergency_stopped']);
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -370,9 +373,12 @@ class CustodyChild extends EventEmitter {
     if (HOST_ENDED.has(status.state)) outcomeSignal = status.state;
     else if (CAPTURE_FAULTS.has(status.state)) outcomeSignal = status.state;
     // A process that exited with an incomplete spool (a stream that failed or was cut short) is not a complete result.
-    else if (status.state === 'exited' && status.spoolComplete === false) outcomeSignal = 'spool_incomplete';
-    // A leader that exited while the Host has not proven its process tree ended is not an accepted result (S5); its hold waits for the proof.
-    else if (status.state === 'exited' && status.processTreeEnded !== true) outcomeSignal = 'tree_not_ended';
+    else if (status.state === 'exited' && status.spoolComplete !== true) outcomeSignal = 'spool_incomplete';
+    // F3: the Host's proof that the process tree ended gates every end that could be read as a result, whatever its state and exit code. A
+    // leader that exited while the Host has not proven its process tree ended is not an accepted result (S5); its hold waits for the proof.
+    else if (status.processTreeEnded !== true) outcomeSignal = 'tree_not_ended';
+    // A stop the Host performed is a stop outcome, not a result, even when its tree is proven and its exit code is zero.
+    else if (STOP_FAMILY.has(status.state)) outcomeSignal = status.state;
     else code = status.exitCode;
     this.engine.custodyReleaseIfEnded(this.custodyId, status);
     this.engine.custodyChildren?.delete(this.attemptId);
@@ -636,7 +642,8 @@ export function installCustody(Engine) {
   // existing launch path, so Custody never owns a process whose recovery it cannot reconstruct.
   // `mapped` attempts are Map-step steps, which have their own dispatch and settlement and are never Host-owned in this PoC.
   P.custodyScopeAllows = function custodyScopeAllows(node, record) {
-    return Boolean(this.custodyHost) && !this.hostAuthority && !record.mapped && !record.taskExecutionId
+    // An explicit Custody requirement stays fail-closed even if its Host bootstrap is missing.
+    return Boolean(this.custodyHost || this.processCustodyRequired) && !this.hostAuthority && !record.mapped && !record.taskExecutionId
       && record.loops.length === 0 && !node.config.contextId;
   };
 

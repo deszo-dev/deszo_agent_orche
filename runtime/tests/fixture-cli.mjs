@@ -27,7 +27,19 @@ if (schemaPath) {
   if (problems.length) { event({ type: 'error', message: `Invalid schema for response_format 'codex_output_schema': ${problems.join('; ')}` }); process.exit(1); }
 }
 if (scenario === 'fail') { event({ type: 'error', message: 'Simulated process failure.' }); process.exit(1); }
+const delayedFailure = /^fail-after-(\d+)$/.exec(scenario);
+if (delayedFailure) { await sleep(Number(delayedFailure[1]) * 1000); event({ type: 'error', message: 'Simulated delayed process failure.' }); process.exit(1); }
 if (scenario === 'quota') { event({ type: 'error', message: 'Usage limit reached. Quota exhausted.' }); process.exit(1); }
+if (scenario === 'rate-limited') { event({ type: 'error', message: 'Rate limit exceeded. HTTP 429.' }); process.exit(1); }
+if (scenario === 'auth-required') { event({ type: 'error', message: 'Authentication required. HTTP 401.' }); process.exit(1); }
+if (scenario === 'service-unavailable') { event({ type: 'error', message: 'Service temporarily unavailable. HTTP 503.' }); process.exit(1); }
+if (scenario === 'malformed-jsonl') { process.stdout.write('{"type":\n'); process.exit(0); }
+if (scenario === 'no-final-newline') {
+  event({ type: 'item.completed', item: { type: 'agent_message', text: 'Final line without a newline.' } });
+  process.stdout.write(JSON.stringify({ type: 'turn.completed', usage: { input_tokens: prompt.length, output_tokens: 5 } }));
+  process.exit(0);
+}
+if (scenario === 'unknown-event') event({ type: 'future.provider_event', payload: { retained: true } });
 if (scenario === 'no-terminal') { answer('{"message":"partial"}'); process.exit(0); }
 if (scenario === 'bad-json') { answer('{"wrong": 42}'); done(); process.exit(0); }
 if (scenario === 'not-json') { answer('plain words'); done(); process.exit(0); }

@@ -100,9 +100,9 @@ test('SP-04: an acknowledged prefix is never missing after the Engine reconnects
 test('SP-06: a terminal outcome applied before the Engine ends is not applied again', async () => {
   buildArtifacts();
   const result = await crashThenFinish('after_settle', 'sp06', { ticks: 4 });
-  // The attempt's outcome is settled once and is never repeated. The Run itself follows the existing restart policy: a Run with no
-  // running attempt after a restart is interrupted, with or without Custody, so it is not reported as a success it did not finish.
-  assert.equal(result.final, 'interrupted', 'the Run follows the existing restart policy; it is not reported as succeeded');
+  // The attempt's outcome is settled once and is never repeated. Its outcome was accepted before the Engine ended, and every other node of
+  // the Run is deterministic, so the replacement Engine finishes the Run from its durable state (P1 continuation) without rerunning it.
+  assert.equal(result.final, 'succeeded', 'the accepted outcome is not repeated, and the Run finishes from its durable state');
   assert.equal(result.settlements.length, 1, 'the attempt settled exactly once');
   assert.equal(result.launches, 1, 'the CLI was not launched again after its outcome was applied');
   assert.equal(result.span.ok, true);

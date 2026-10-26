@@ -12,6 +12,7 @@ import {
   killProcessTree, newScratch, readInvocations, runEventTypes, runState, sha256File, startAgentRun, startCustodyHost, startEngine,
   testsRoot, waitForRunState,
 } from './custody-support.mjs';
+import { singleAgent, startTestRunner } from './helpers.mjs';
 
 const evidence = { schemaVersion: 1, generatedAt: new Date().toISOString(), cases: {} };
 const evidenceDir = join(testsRoot, 'custody-evidence');
@@ -26,6 +27,26 @@ const STEADY = '[ticks=24]';
 
 // A Run whose attempt's terminal state a Run reports as waiting for a decision when the attempt failed.
 const SETTLED = ['succeeded', 'failed', 'canceled', 'interrupted', 'waiting_for_user'];
+
+test('an explicit Process Custody requirement fails closed without a Host bridge', async () => {
+  const previous = process.env.DESZO_PROCESS_CUSTODY;
+  process.env.DESZO_PROCESS_CUSTODY = '1';
+  const api = await startTestRunner({ runner: { devTestConfirmationOff: true } });
+  try {
+    await api.workspace();
+    const created = await api.run(singleAgent({ id: 'custody-required-without-host', model: 'fixture-echo', context: null }));
+    const snapshot = await api.waitFor(created.body.run.runId);
+    assert.equal(snapshot.run.state, 'waiting_for_user');
+    await api.closeRun(snapshot.run.runId);
+    const error = (await api.events(snapshot.run.runId)).find(event => event.type === 'attempt.error');
+    assert.equal(error.payload.code, 'custody_unavailable');
+    assert.deepEqual(readInvocations(api.stateDir), [], 'the fixture never ran through the ordinary Node launch path');
+  } finally {
+    await api.close();
+    if (previous === undefined) delete process.env.DESZO_PROCESS_CUSTODY;
+    else process.env.DESZO_PROCESS_CUSTODY = previous;
+  }
+});
 
 // Launches a steady run (or the named fixture model) and waits until the Host reports the CLI running.
 async function launchSteady(engine, scratch, { workflowId, requestText = STEADY, model = 'custody-steady' }) {

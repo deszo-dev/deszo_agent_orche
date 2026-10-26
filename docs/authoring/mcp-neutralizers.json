@@ -1,7 +1,7 @@
 {
   "version": 1,
   "status": "verified-for-listed-versions-and-scopes",
-  "updatedAt": "2026-10-15",
+  "updatedAt": "2026-10-25",
   "entries": [
     {
       "provider": "codex",
@@ -17,6 +17,20 @@
       },
       "evidence": "../pilots/evidence/2026-10-15-authoring-compatibility.json",
       "notes": "Exact version only: Restricted exec --ignore-user-config omits observed user/project MCP transports; Inherit needs exec-level explicit child markers for each simple named server. Injecting env-only overrides into omitted transports fails config parsing. New and Continue are verified for both profiles."
+    },
+    {
+      "provider": "codex",
+      "testedVersion": "codex-cli 0.164.0-alpha.11.1",
+      "status": "verified",
+      "neutralizer": {
+        "id": "codex-0.164-alpha11-restricted-user-config-omission",
+        "kind": "codex-restricted-config-omission",
+        "scopes": [
+          "user"
+        ]
+      },
+      "evidence": "../reviews/evidence/2026-10-25-codex-custody-real.json",
+      "notes": "Exact version and user scope only. The installed exec help states --ignore-user-config omits user configuration while authentication still uses CODEX_HOME. A real bounded Custody attempt used this invocation and changed only its disposable workspace. That attempt did not reach Engine replacement because the workspace npm command resolved to a missing user-level npm-cli.js; see the evidence for exact limits. This verifies invocation/config handling, not Stage 1 completion. Project scopes remain unsupported by this entry."
     },
     {
       "provider": "claude",

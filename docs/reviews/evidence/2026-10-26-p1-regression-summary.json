@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "candidate": "P1 frozen candidate (uncommitted working tree on HEAD 4165707)",
+  "generatedAt": "2026-10-26T09:41:38.699Z",
+  "sourceSha256": {
+    "runtime/core/engine.mjs": "454d939f2dd65cc19af51ff4bbee72f154cfcfe847ad836bf2075f9cd80703ed",
+    "runtime/tests/custody-replay.test.mjs": "d06f9c0779023b4f733ae3e1504c877288f50b4a62960ac45d87cc13922cc34b",
+    "runtime/tests/workflow-p1-continuation.test.mjs": "b17916776bbef34554612fa4ff3ba3f2034f91c29b6a7a848916f9c531ad08d1",
+    "runtime/tests/workflow-p1-published-and-ordinary.test.mjs": "244715baf341c194562c3b075442efbb06c2002c42956eb24368a76a699e74c8",
+    "runtime/tests/p1-codex-continuation-real.mjs": "08c4a559121e1a29dcb0b6cd0908d72406b3f94af4a3570eb13f31e306f70498"
+  },
+  "regression": {
+    "command": "npm test",
+    "baselineBeforeP1": {
+      "tests": 790,
+      "pass": 790,
+      "fail": 0
+    },
+    "frozenCandidate": {
+      "tests": 803,
+      "pass": 803,
+      "fail": 0,
+      "cancelled": 0,
+      "exitCode": 0
+    },
+    "note": "The first regression with P1 (before review fixes) had 799 tests and 6 failures, all addressed (see review section 18)."
+  },
+  "rust": {
+    "command": "cargo test --manifest-path lifecycle-host/Cargo.toml",
+    "passed": 23,
+    "failed": 0,
+    "exitCode": 0
+  },
+  "build": {
+    "command": "npm run build",
+    "exitCode": 0
+  },
+  "docsCheck": {
+    "command": "npm run docs:check",
+    "exitCode": 0
+  },
+  "diffCheck": {
+    "command": "git diff --check",
+    "exitCode": 0,
+    "note": "Only line-ending warnings for files modified before this task"
+  },
+  "realCodex": {
+    "verdictFile": "2026-10-26-p1-codex-continuation-real.json",
+    "verdict": "P1 REAL CODEX CONTINUATION VERIFIED",
+    "model": "gpt-6-luna"
+  }
+}

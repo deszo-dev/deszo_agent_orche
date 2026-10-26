@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-26T13:36:00.302Z",
+  "candidate": {
+    "head": "4165707f2099006af41c4f0d32170f613abde7fb",
+    "branch": "codex/adr-0003-0005-completion",
+    "state": "uncommitted working-tree candidate"
+  },
+  "scope": "Direct P1.5 recovery implementation, test, fixture, and journal-schema dependencies.",
+  "sourceSha256": {
+    "runtime/core/engine.mjs": "6e79d45d5c1ac5aecd3592a9b31a94811d97aa92becd99af6d296f2484c1bbc3",
+    "runtime/core/canonical.mjs": "466a93536b30b95d922897e1ce8149bef95bc43cc7a3f16b9acad3e71fac0803",
+    "runtime/core/schemas.mjs": "b38a8171bc9b159f0ba12e39cd97efa91f0e679bd6e151191c9a0aeeff059ba0",
+    "runtime/tests/workflow-p1-coverage-closure.test.mjs": "3665ebee5e5f7c5373dfa454113ee876b1fd4ec9d8ed4feaebc15e86d966c10e",
+    "runtime/tests/workflow-p1-recovery-boundaries.test.mjs": "51dd7fa1e77415da1a4762eefc2ec446845b69d69277bd9162c5dbc4d6420472",
+    "runtime/tests/workflow-p1-continuation.test.mjs": "ac7a46ff0e275a2577032d5a4ba09427ca861a6903d4ebc64e1e8d51d71e8a8d",
+    "runtime/tests/workflow-p1-published-and-ordinary.test.mjs": "b2a5554f76c0fb1470a04d2026546da85c4c120b6976792974f7186b3f2b7d03",
+    "runtime/tests/linked-repair-isolation.test.mjs": "1a8136f5678b78bf4b6b8c8f10469470f47fb629c78a46cb1d188389ed279693",
+    "runtime/tests/custody-support.mjs": "5988a261b6f14f95f162fdb357f4ccd067b9cc3e0f291606a415d3216ca81851",
+    "runtime/tests/fixture-cli.mjs": "136134d51fd6ccb781365d6708df81d00db59ccece9379dcf9c200ddc4986acb",
+    "runtime/tests/fixtures/custody-cli.rs": "b29b56757fd4d12ecb2f06e70fc444268faace2d654a0e865598116f93e110ba",
+    "runtime/tests/custody-replay.test.mjs": "d06f9c0779023b4f733ae3e1504c877288f50b4a62960ac45d87cc13922cc34b",
+    "docs/schemas/journal-event.schema.json": "4202eb9bc073acb00cd95176874b4c8cc6e63be34a685480b93d8398225fc8a9",
+    "docs/schemas/journal-event-v2.schema.json": "1198f620d78e8ddfe2874ccf63152637192617f02899d2097390185e6e23badd"
+  }
+}

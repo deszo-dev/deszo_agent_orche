@@ -94,7 +94,7 @@ function query(url, allowed, integers = []) {
   return result;
 }
 
-export async function startRunner({ root, connectionFile, bridgeFile, port = 0, supervised = false, adapters, maximumAgentTimeoutSeconds, loopMinuteMs, extraOrigins = [], runtimeInstanceId = randomUUID(), nodeExecutable = process.execPath, devTestConfirmationOff = false, exposeHostRequestForTests = false, judgeAttentionEnabled = false } = {}) {
+export async function startRunner({ root, connectionFile, bridgeFile, port = 0, supervised = false, adapters, maximumAgentTimeoutSeconds, loopMinuteMs, extraOrigins = [], runtimeInstanceId = randomUUID(), nodeExecutable = process.execPath, devTestConfirmationOff = false, exposeHostRequestForTests = false, judgeAttentionEnabled = false, custodyHost: scriptedCustodyHost = null } = {}) {
   const origins = new Set([...ORIGINS, ...extraOrigins]);
   const defaultRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '.deszo');
   root = resolve(root || defaultRoot);
@@ -124,7 +124,10 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
       externalRunConfirmationOverride: devTestConfirmationOff ? false : null,
       lifecycleHost: lifecycleHost?.context ?? null,
       // Process Custody is an explicit experimental opt-in; without it every CLI keeps the existing launch path.
-      custodyHost: process.env.DESZO_PROCESS_CUSTODY === '1' ? (lifecycleHost ?? custodyBridgeFromEnvironment(process.env)) : null,
+      // A test-only seam: a scripted Host answers in place of the bridge, so the Engine's own Custody path runs with no real process.
+      custodyHost: scriptedCustodyHost ?? (process.env.DESZO_PROCESS_CUSTODY === '1' ? (lifecycleHost ?? custodyBridgeFromEnvironment(process.env)) : null),
+      // Preserve the explicit requirement so a missing Host bootstrap cannot fall through to a Node-launched provider.
+      processCustodyRequired: scriptedCustodyHost != null || process.env.DESZO_PROCESS_CUSTODY === '1',
       processContainment: supervised ? 'tauri-job' : 'standalone-best-effort', ...(maximumAgentTimeoutSeconds ? { maximumAgentTimeoutSeconds } : {}), ...(loopMinuteMs ? { loopMinuteMs } : {}) });
     await engine.initialize();
     engine.closePendingRunRequestsAtOwnerCutover();

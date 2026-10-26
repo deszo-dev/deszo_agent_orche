@@ -14,14 +14,22 @@ export function subscriptionEnvironment(source = process.env) {
   const env = { ...source };
   const forbidden = new Set([
     'OPENAI_API_KEY', 'CODEX_API_KEY', 'ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN',
+    'DESZO_PROCESS_CUSTODY', 'DESZO_OWNER_TOKEN', 'OWNER_TOKEN', 'FIRST_PARTY_TOKEN', 'HOST_TOKEN',
     'GEMINI_API_KEY', 'GOOGLE_API_KEY', 'GOOGLE_GEMINI_BASE_URL',
     'CLAUDE_CODE_USE_BEDROCK', 'CLAUDE_CODE_USE_VERTEX', 'CLAUDE_CODE_USE_FOUNDRY',
     'ANTHROPIC_BASE_URL', 'ANTHROPIC_PROFILE', 'ANTHROPIC_FEDERATION_RULE_ID',
     'ANTHROPIC_ORGANIZATION_ID', 'ANTHROPIC_MODEL', 'ANTHROPIC_DEFAULT_OPUS_MODEL',
     'ANTHROPIC_DEFAULT_SONNET_MODEL', 'ANTHROPIC_DEFAULT_HAIKU_MODEL',
-    'CLAUDE_CODE_EFFORT_LEVEL',
+    'CLAUDE_CODE_EFFORT_LEVEL', 'CODEX_VERSION',
   ].map(key => key.toLowerCase()));
-  for (const key of Object.keys(env)) if (forbidden.has(key.toLowerCase())) delete env[key];
+  const forbiddenPrefixes = ['deszo_lifecycle_', 'deszo_supervisor_', 'deszo_launch_shim', 'deszo_custody_',
+    'deszo_test_duplicate_lifecycle', 'deszo_judge_', 'deszo_host_', 'codex_app_', 'codex_internal_',
+    'codex_permission_', 'codex_session_', 'codex_task_', 'codex_thread_', 'codex_tool_', 'codex_mcp_',
+    'codex_sage_', 'codex_apply_patch_', 'codex_windows_sandbox_'];
+  for (const key of Object.keys(env)) {
+    const lower = key.toLowerCase();
+    if (forbidden.has(lower) || forbiddenPrefixes.some(prefix => lower.startsWith(prefix))) delete env[key];
+  }
   return env;
 }
 
@@ -69,7 +77,7 @@ async function antigravitySettings() {
 }
 
 // Detection never issues a model request.
-export async function detectProvider(provider) {
+export async function detectProvider(provider, { processCustody = false } = {}) {
   const base = {
     provider, available: false, cliPath: null, cliVersion: null, accountIdentity: null,
     supportsNew: true, supportsResume: true, supportsJson: true,
@@ -80,10 +88,17 @@ export async function detectProvider(provider) {
   const version = await capture(cliPath, ['--version']);
   const info = { ...base, cliPath, cliVersion: version.stdout.trim() || null };
   if (provider === 'codex') {
+    let windowsSandboxMode = null;
+    try { windowsSandboxMode = await codexWindowsSandboxModeForRun(processCustody); }
+    catch { return { ...info, reason: 'Codex Windows sandbox configuration could not be read safely.' }; }
+    const [rootHelp, execHelp] = await Promise.all([capture(cliPath, ['--help']), capture(cliPath, ['exec', '--help'])]);
+    const custodySupport = codexCustodySupport(`${rootHelp.stdout}\n${rootHelp.stderr}`, `${execHelp.stdout}\n${execHelp.stderr}`);
     const status = await capture(cliPath, ['login', 'status']);
     const text = `${status.stdout}${status.stderr}`;
-    if (!/Logged in using ChatGPT/i.test(text)) return { ...info, reason: 'Run "codex login" with a ChatGPT account.' };
-    return { ...info, available: true, accountIdentity: canonicalHash({ provider, home: process.env.CODEX_HOME || join(homedir(), '.codex'), status: text.trim() }) };
+    if (status.code !== 0 || !/Logged in using ChatGPT/i.test(text)) return { ...info, windowsSandboxMode, supportsCustodyExec: custodySupport.supported,
+      custodyReason: custodySupport.reason, reason: 'Run "codex login" with a ChatGPT account.' };
+    return { ...info, available: true, windowsSandboxMode, supportsCustodyExec: custodySupport.supported, custodyReason: custodySupport.reason,
+      accountIdentity: canonicalHash({ provider, home: process.env.CODEX_HOME || join(homedir(), '.codex'), status: text.trim() }) };
   }
   if (provider === 'claude') {
     const status = await capture(cliPath, ['auth', 'status', '--json']);
@@ -101,6 +116,47 @@ export async function detectProvider(provider) {
   return { ...info, available: true, accountIdentity: canonicalHash({ provider, home: homedir() }), reason: 'Authentication is confirmed by the first invocation. Native-configuration inheritance is not supported.' };
 }
 
+// These options are verified from the installed CLI help before a Custody invocation can start.
+export function codexCustodySupport(rootHelp, execHelp) {
+  const missing = [];
+  for (const option of ['--ask-for-approval']) if (!rootHelp.includes(option)) missing.push(option);
+  for (const option of ['--json', '--sandbox', '--ephemeral', '--ignore-user-config', '--ignore-rules', '--skip-git-repo-check'])
+    if (!execHelp.includes(option)) missing.push(option);
+  return missing.length
+    ? { supported: false, reason: `Installed Codex CLI does not support required Custody options: ${missing.join(', ')}.` }
+    : { supported: true, reason: null };
+}
+
+// Restricted execution ignores user config so a user's MCP bridges cannot start inside the managed CLI. Preserve only
+// the configured Windows sandbox backend explicitly; it selects the OS implementation while --sandbox still limits the
+// Codex filesystem policy to workspace-write.
+export function codexWindowsSandboxMode(configText) {
+  let section = '';
+  for (const line of String(configText || '').split(/\r?\n/)) {
+    const table = line.match(/^\s*\[([^\]]+)\]\s*(?:#.*)?$/);
+    if (table) { section = table[1].trim(); continue; }
+    if (section !== 'windows') continue;
+    const setting = line.match(/^\s*sandbox\s*=\s*(?:"([^"]+)"|'([^']+)'|([A-Za-z0-9_-]+))\s*(?:#.*)?$/);
+    if (!setting) continue;
+    const mode = setting[1] || setting[2] || setting[3];
+    return ['elevated', 'unelevated', 'mxc'].includes(mode) ? mode : null;
+  }
+  return null;
+}
+
+async function configuredCodexWindowsSandboxMode() {
+  if (process.platform !== 'win32') return null;
+  const home = process.env.CODEX_HOME || join(homedir(), '.codex');
+  try { return codexWindowsSandboxMode(await readFile(join(home, 'config.toml'), 'utf8')); }
+  catch (error) { if (error.code === 'ENOENT') return null; throw error; }
+}
+
+// Only Process Custody needs to restore the selected Windows sandbox backend after user config is omitted.
+export async function codexWindowsSandboxModeForRun(processCustody, readConfiguredMode = configuredCodexWindowsSandboxMode) {
+  if (processCustody !== true) return null;
+  return await readConfiguredMode();
+}
+
 // The prompt carries the complete contract; the native flag carries only its transport form.
 export const outputContractText = output => output.format === 'json'
   ? `\n\nOutput contract: return only one JSON value${output.schema ? ` that validates against this complete JSON Schema after native transport decoding:\n${JSON.stringify(output.schema)}\nNative transport encoding: choose exactly one allowed object shape from the complete contract. Every required field must have its declared type. For a required non-nullable string or array with no applicable content, use an empty string or empty array only if the contract permits it; never substitute null. Null is allowed only when the native schema explicitly permits it. Native transport can merge alternative shapes and add nullable fields: use null for fields absent or forbidden in your chosen contract shape, and do not invent content for those fields. Use the same encoded JSON object in your final response and native finish tool; do not add a separate reason or commentary to either. If finish reports a validation error, correct the named fields before calling finish again; repeating the rejected object does not complete the task.\n` : '. '}Do not wrap it in a code fence or add commentary.`
@@ -114,18 +170,21 @@ function antigravityPrintTimeout(timeoutSeconds) {
   return `${Math.max(1, Math.floor(processMs - graceMs))}ms`;
 }
 
-export function buildInvocation({ provider, cliPath, model, effort, prompt, cwd, nativeSessionId, output, nativeConfiguration, timeoutSeconds, schemaPath }) {
+export function buildInvocation({ provider, cliPath, model, effort, prompt, cwd, nativeSessionId, output, nativeConfiguration, timeoutSeconds, schemaPath,
+  processCustody = false, windowsSandboxMode = null }) {
   const requestedEffort = resolveEffort(effort);
   const restricted = nativeConfiguration !== 'inherit';
   const schema = output.format === 'json' && output.schema ? output.schema : null;
   let args, stdin = null;
   if (provider === 'codex') {
     args = [
-      '-C', cwd, 'exec', ...(nativeSessionId ? ['resume', nativeSessionId] : []),
+      '-C', cwd, ...(processCustody ? ['--ask-for-approval', 'never'] : []), 'exec', ...(nativeSessionId ? ['resume', nativeSessionId] : []),
       '--json', '--skip-git-repo-check', ...(restricted ? ['--ignore-user-config', '--ignore-rules'] : []),
       '-c', 'forced_login_method="chatgpt"', '-c', 'model_provider="openai"',
+      ...(processCustody && ['elevated', 'unelevated', 'mxc'].includes(windowsSandboxMode) ? ['-c', `windows.sandbox="${windowsSandboxMode}"`] : []),
       '-c', `model_reasoning_effort="${requestedEffort}"`,
-      '--model', model, '--dangerously-bypass-approvals-and-sandbox',
+      '--model', model,
+      ...(processCustody ? ['--sandbox', 'workspace-write', '--ephemeral'] : ['--dangerously-bypass-approvals-and-sandbox']),
       ...(schema ? ['--output-schema', schemaPath] : []), '-',
     ];
     stdin = prompt;
@@ -151,10 +210,13 @@ export function buildInvocation({ provider, cliPath, model, effort, prompt, cwd,
 }
 
 export function classifyFailure(text) {
-  if (/quota|usage.?limit|rate.?limit|credits.?exhaust|resource.?exhaust|limit.?reached|hit your limit|\b429\b/i.test(text)) return 'quota';
+  if (/rate[ -]?limit|too many requests|\b429\b/i.test(text)) return 'rate_limited';
+  if (/quota|usage.?limit|credits.?exhaust|resource.?exhaust|limit.?reached|hit your limit/i.test(text)) return 'quota';
   if (/billing|paid credits|api key mode/i.test(text)) return 'billing_policy';
   if (/not logged|not authenticated|unauthorized|authentication|auth.?required|login required|please.*(log.?in|sign.?in)|invalid.*(token|credential)|\b401\b|run.*\/login/i.test(text)) return 'authentication';
   if (/permission.*(denied|required)|soft.denied|requires approval|waiting.*approval/i.test(text)) return 'permission';
+  if (/malformed JSONL|JSONL protocol|invalid provider event/i.test(text)) return 'provider_protocol';
+  if (/temporarily unavailable|service unavailable|gateway timeout|upstream error|\b50[0-4]\b/i.test(text)) return 'provider_unavailable';
   if (/no conversation found|session.*not found|unknown session|could not resume/i.test(text)) return 'context_unavailable';
   return 'process';
 }
@@ -212,11 +274,23 @@ export function createParser(provider, { output = { format: 'text' } } = {}) {
   const expectedTransport = provider === 'antigravity' && output.format === 'json' && output.schema ? transportSchema(output.schema) : null;
   const expectedNativeSchema = expectedTransport?.schema;
   // error: a provider/process failure; formatError: an answer that violates the output contract.
-  const state = { sessionId: null, finalText: null, error: null, formatError: null, terminal: false, model: null, usage: null, diagnostics: [] };
+  const state = { sessionId: null, finalText: null, error: null, formatError: null, protocolError: false, terminal: false, model: null, usage: null, diagnostics: [] };
   const feed = event => {
     const normalized = { sessionId: null, text: '', model: null };
+    if (!event || typeof event !== 'object' || Array.isArray(event)) {
+      const message = 'Invalid provider event: each JSONL record must be a JSON object.';
+      state.protocolError = true;
+      state.error ??= message;
+      normalized.protocolError = message;
+      normalized.providerEvent = event;
+      return normalized;
+    }
     if (provider === 'codex') {
+      // Keep each structured event in the normalized stream; raw stdout remains the exact byte-level evidence.
+      normalized.providerEvent = event;
       if (event.type === 'thread.started') normalized.sessionId = event.thread_id;
+      if (event.type === 'turn.started') normalized.model = event.model || event.turn?.model || event.turn?.model_slug || null;
+      if (event.type === 'item.updated' && event.item?.type === 'agent_message') normalized.text = event.item.text || '';
       if (event.type === 'item.completed' && event.item?.type === 'agent_message') { normalized.text = event.item.text || ''; state.finalText = event.item.text ?? ''; }
       if (event.type === 'turn.completed') { state.usage = event.usage ?? null; state.terminal = true; }
       if (event.type === 'turn.failed' || event.type === 'error') {

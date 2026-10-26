@@ -30,6 +30,14 @@ fn fixture_dir() -> PathBuf {
 
 fn main() {
     let args = env::args().skip(1).collect::<Vec<_>>();
+    if args.as_slice() == ["--help"] {
+        println!("Usage: codex [OPTIONS] <COMMAND>\n--ask-for-approval <policy>");
+        return;
+    }
+    if args.as_slice() == ["exec", "--help"] {
+        println!("Usage: codex exec [OPTIONS] [PROMPT]\n--json\n--sandbox <sandbox>\n--ephemeral\n--ignore-user-config\n--ignore-rules\n--skip-git-repo-check");
+        return;
+    }
     if args.iter().any(|arg| arg == "--version") {
         println!("Deszo Proof B local fixture CLI 1.0");
         return;

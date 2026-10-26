@@ -65,6 +65,38 @@ test('managed-run isolation finds configured bridge entries and requires an exac
   }
 });
 
+test('Codex restricted config omission neutralizes only the exact verified user-config scope', async () => {
+  const root = mkdtempSync(join(testsRoot, 'codex-restricted-config-'));
+  const cwd = join(root, 'project');
+  const bridgeScript = join(root, 'mcp', 'bridge.mjs');
+  const projectConfig = join(cwd, '.codex', 'config.toml');
+  const userConfig = join(root, 'user', 'config.toml');
+  mkdirSync(join(cwd, '.codex'), { recursive: true });
+  mkdirSync(join(root, 'mcp'), { recursive: true });
+  mkdirSync(join(root, 'user'), { recursive: true });
+  writeFileSync(bridgeScript, '');
+  writeFileSync(userConfig, bridgeConfig(bridgeScript));
+  const previous = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = join(root, 'user');
+  try {
+    const registry = { entries: [{ provider: 'codex', status: 'verified', testedVersion: 'codex-native-restricted', neutralizer: {
+      id: 'codex-native-restricted-user-config-omission', kind: 'codex-restricted-config-omission', scopes: ['user'],
+    } }] };
+    const input = { provider: 'codex', cliVersion: 'codex-native-restricted', cwd, bridgeScript, registry,
+      args: ['-C', cwd, '--ask-for-approval', 'never', 'exec', '--ignore-user-config', '--sandbox', 'workspace-write', '-'] };
+    const isolated = await inspectManagedToolIsolation(input);
+    assert.equal(isolated.neutralizerId, 'codex-native-restricted-user-config-omission');
+    assert.deepEqual(isolated.bridgeEntries.map(item => item.scope), ['user']);
+    await assert.rejects(inspectManagedToolIsolation({ ...input, cliVersion: 'codex-next-version' }), { code: 'managed_tool_isolation_unavailable' });
+    await assert.rejects(inspectManagedToolIsolation({ ...input, args: ['-C', cwd, 'exec', '--sandbox', 'workspace-write', '-'] }), { code: 'managed_tool_isolation_unavailable' });
+    writeFileSync(projectConfig, bridgeConfig(bridgeScript));
+    await assert.rejects(inspectManagedToolIsolation(input), { code: 'managed_tool_isolation_unavailable' },
+      'user-config omission must not be treated as project-config neutralization');
+  } finally {
+    if (previous === undefined) delete process.env.CODEX_HOME; else process.env.CODEX_HOME = previous;
+  }
+});
+
 test('Antigravity managed preflight scans the workspace project configuration and requires a verified neutralizer', async () => {
   const root = mkdtempSync(join(testsRoot, 'antigravity-preflight-'));
   const cwd = join(root, 'project');

@@ -33,8 +33,14 @@ const DEFAULT_PERMIT_TTL: Duration = Duration::from_secs(60);
 const DEFAULT_SPOOL_LIMIT: u64 = 512 * 1024 * 1024;
 const DRAIN: Duration = Duration::from_secs(5);
 const TICK: Duration = Duration::from_millis(100);
-// Environment names that carry lifecycle, supervisor or Custody authority. A provider never receives them.
-const DENIED_ENV_PREFIXES: [&str; 5] = ["DESZO_LIFECYCLE_", "DESZO_SUPERVISOR_", "DESZO_LAUNCH_SHIM", "DESZO_CUSTODY_", "DESZO_TEST_DUPLICATE_LIFECYCLE"];
+// Credential and internal-authority variables are removed again at the Host boundary. Windows environment names are
+// case-insensitive, so both the exact names and prefixes are compared in uppercase even if an Engine sends a lowercase key.
+const DENIED_ENV_NAMES: [&str; 16] = ["OPENAI_API_KEY", "CODEX_API_KEY", "CODEX_VERSION", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "GEMINI_API_KEY",
+    "GOOGLE_API_KEY", "DESZO_PROCESS_CUSTODY", "DESZO_OWNER_TOKEN", "OWNER_TOKEN", "FIRST_PARTY_TOKEN", "HOST_TOKEN",
+    "DESZO_TEST_DUPLICATE_LIFECYCLE", "DESZO_JUDGE_TOKEN", "DESZO_HOST_TOKEN", "DESZO_LAUNCH_SHIM"];
+const DENIED_ENV_PREFIXES: [&str; 19] = ["DESZO_LIFECYCLE_", "DESZO_SUPERVISOR_", "DESZO_LAUNCH_SHIM", "DESZO_CUSTODY_", "DESZO_TEST_DUPLICATE_LIFECYCLE",
+    "DESZO_JUDGE_", "DESZO_HOST_", "DESZO_OWNER_", "CODEX_APP_", "CODEX_INTERNAL_", "CODEX_PERMISSION_", "CODEX_SESSION_", "CODEX_TASK_",
+    "CODEX_THREAD_", "CODEX_TOOL_", "CODEX_MCP_", "CODEX_SAGE_", "CODEX_APPLY_PATCH_", "CODEX_WINDOWS_SANDBOX_"];
 const TERMINAL_STATES: [&str; 12] = ["exited", "stopped", "deadline_terminated", "spool_limit_exceeded", "spool_failed", "emergency_stopped",
     "launch_failed", "permit_expired", "refused_host_restart", "host_lost", "host_stopped", "admission_cancelled"];
 const STOP_STATES: [&str; 6] = ["stopped", "deadline_terminated", "spool_limit_exceeded", "spool_failed", "emergency_stopped", "host_stopped"];
@@ -313,8 +319,6 @@ impl CustodyRegistry {
 
     fn reserve(&self, payload: &Value) -> Result<Value, Refusal> {
         self.check_generation(payload)?;
-        let mut inner = self.guard()?;
-        Self::check_epoch(&inner, payload)?;
         let attempt_id = text(payload, "attemptId")?;
         if attempt_id.is_empty() || attempt_id.len() > 128 || !attempt_id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
             return refuse("invalid_request", "attemptId is malformed");
@@ -345,6 +349,10 @@ impl CustodyRegistry {
         env_names.sort_unstable();
         let digest = sha256_hex(&serde_json::to_vec(&json!({ "provider": provider, "executable": executable_text, "args": args, "cwd": cwd_text,
             "stdinSha256": sha256_hex(&stdin), "envNames": env_names })).map_err(|e| storage(e.to_string()))?);
+        // Hashing a native CLI can take seconds in an unoptimized Host build. Keep the registry lock free while checking
+        // the allowlist so status, Stop, and Engine-epoch commands for already running invocations remain responsive.
+        let mut inner = self.guard()?;
+        Self::check_epoch(&inner, payload)?;
         if let Some(existing_id) = inner.by_attempt.get(attempt_id).cloned() {
             let existing = inner.records.get(&existing_id).ok_or_else(|| storage("custody index is inconsistent".into()))?;
             if existing.invocation_digest != digest {
@@ -460,10 +468,18 @@ impl CustodyRegistry {
                 entry.process_creation_time = Some(spawned.creation_time);
                 entry.drained = Some(drained);
             }
+            // The drain verdict counts only once the record that carries it is durable. If that write fails, the verdict is withdrawn and the Job
+            // is kept, so that a later status proves the drain durably (recheck_drain), as supervise does.
+            if let Err(error) = finish_record(&mut inner, &self.root, &custody_id, "launch_failed", Some(&message), None, false) {
+                if let Some(entry) = inner.records.get_mut(&custody_id) {
+                    entry.drained = Some(false);
+                }
+                inner.undrained.insert(custody_id.clone(), Arc::clone(&live.job));
+                return Err(error);
+            }
             if !drained {
                 inner.undrained.insert(custody_id.clone(), Arc::clone(&live.job));
             }
-            finish_record(&mut inner, &self.root, &custody_id, "launch_failed", Some(&message), None, false)?;
             return refuse("launch_failed", message);
         }
         // Inserted under the same lock the supervisor needs to finish, so it cannot remove the entry before it exists. It is inserted
@@ -935,7 +951,8 @@ fn environment_pairs(payload: &Value) -> Result<Vec<(String, String)>, Refusal> 
         if name.is_empty() || name.contains('=') || name.contains('\0') || value.contains('\0') {
             return refuse("invalid_request", "an environment entry is malformed");
         }
-        if DENIED_ENV_PREFIXES.iter().any(|prefix| name.starts_with(prefix)) {
+        let upper_name = name.to_ascii_uppercase();
+        if DENIED_ENV_NAMES.contains(&upper_name.as_str()) || DENIED_ENV_PREFIXES.iter().any(|prefix| upper_name.starts_with(prefix)) {
             continue;
         }
         pairs.push((name.clone(), value.to_string()));
@@ -1412,12 +1429,26 @@ mod tests {
     #[test]
     fn provider_environment_never_carries_lifecycle_or_custody_authority() {
         let payload = json!({ "env": { "PATH": "C:\\bin", "DESZO_LIFECYCLE_HOST_CAPABILITY": "secret", "DESZO_SUPERVISOR_TOKEN": "t",
-            "DESZO_LAUNCH_SHIM": "shim", "DESZO_CUSTODY_PERMIT": "p", "DESZO_MANAGED_INVOCATION": "ok" } });
+            "DESZO_LAUNCH_SHIM": "shim", "DESZO_CUSTODY_PERMIT": "p", "DESZO_MANAGED_INVOCATION": "ok", "OPENAI_API_KEY": "api",
+            "codex_api_key": "lowercase-api", "DESZO_OWNER_TOKEN": "owner", "OWNER_TOKEN": "owner", "FIRST_PARTY_TOKEN": "owner",
+            "HOST_TOKEN": "host", "DESZO_JUDGE_SECRET": "judge", "DESZO_HOST_CAPABILITY": "host", "deszo_custody_epoch": "1",
+            "CODEX_HOME": "profile", "CODEX_PERMISSION_PROFILE": ":danger-full-access", "CODEX_SESSION_ID": "outer-session",
+            "CODEX_APP_TOOLS_PIPE_PATH": "internal-pipe", "CODEX_TASK_WORKSPACE_VERIFYING_IDENTITY": "outer-task",
+            "CODEX_WINDOWS_SANDBOX_PACKAGE_FAMILY": "outer-family" } });
         let names: Vec<String> = environment_pairs(&payload).unwrap().into_iter().map(|(name, _)| name).collect();
         assert!(names.contains(&"PATH".to_string()));
         assert!(names.contains(&"DESZO_MANAGED_INVOCATION".to_string()));
-        assert!(!names.iter().any(|name| name.starts_with("DESZO_LIFECYCLE_") || name.starts_with("DESZO_SUPERVISOR_")
-            || name.starts_with("DESZO_LAUNCH_SHIM") || name.starts_with("DESZO_CUSTODY_")));
+        assert!(names.contains(&"CODEX_HOME".to_string()), "the supported Codex auth home remains available");
+        assert!(!names.iter().any(|name| ["OPENAI_API_KEY", "CODEX_API_KEY", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "GEMINI_API_KEY",
+            "GOOGLE_API_KEY", "DESZO_PROCESS_CUSTODY", "DESZO_OWNER_TOKEN", "OWNER_TOKEN", "FIRST_PARTY_TOKEN", "HOST_TOKEN"]
+            .contains(&name.to_ascii_uppercase().as_str())));
+        assert!(!names.iter().any(|name| {
+            let upper = name.to_ascii_uppercase();
+            ["DESZO_LIFECYCLE_", "DESZO_SUPERVISOR_", "DESZO_LAUNCH_SHIM", "DESZO_CUSTODY_", "DESZO_TEST_DUPLICATE_LIFECYCLE",
+                "DESZO_JUDGE_", "DESZO_HOST_", "DESZO_OWNER_", "CODEX_APP_", "CODEX_INTERNAL_", "CODEX_PERMISSION_", "CODEX_SESSION_",
+                "CODEX_TASK_", "CODEX_THREAD_", "CODEX_TOOL_", "CODEX_MCP_", "CODEX_SAGE_", "CODEX_APPLY_PATCH_", "CODEX_WINDOWS_SANDBOX_"]
+                .iter().any(|prefix| upper.starts_with(prefix))
+        }));
     }
 
     #[test]
