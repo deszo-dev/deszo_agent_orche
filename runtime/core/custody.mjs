@@ -152,10 +152,18 @@ class CustodyChild extends EventEmitter {
     const reserved = await this.reserveUntilAnswered(request);
     if (!reserved.permit) {
       // The admission exists at the Host without its permit: it is withdrawn, so that it can never become a process.
-      if (reserved.custodyId) await this.engine.custodyCall('custody.cancel', { custodyId: reserved.custodyId }).catch(() => {});
+      if (reserved.custodyId) await this.withdrawAdmissionUntilConfirmed(reserved.custodyId);
+      if (this.engine.parentRepairDispatchPaused?.(this.runId))
+        throw refusal('parent_suspension_requested', 'The Parent was suspended before this provider process could be launched.');
       throw refusal('custody_admission_lost', 'This invocation was admitted earlier and its launch permit is gone; it was not launched again.');
     }
     this.custodyId = reserved.custodyId;
+    // Parent repair may be requested while Host admission is in flight. Withdraw the unlaunched admission before
+    // writing a Custody binding or asking the Host to launch it; the coordinator will resume this attempt after Repair.
+    if (this.engine.parentRepairDispatchPaused?.(this.runId)) {
+      await this.withdrawAdmissionUntilConfirmed(reserved.custodyId);
+      throw refusal('parent_suspension_requested', 'The Parent was suspended before this provider process could be launched.');
+    }
     // Durable before anything can run: the binding, so a restarted Engine finds the process the Host started, and the workspace hold,
     // so that no other Run uses the workspace while the Host-owned process may still run in it. Both commit together, before the launch.
     // The hold is the root the Host admitted (its canonical cwd), not the path requested, so a retarget between the two cannot move the hold.
@@ -171,7 +179,8 @@ class CustodyChild extends EventEmitter {
       this.engine.assertLinkedRepairLaunch(this.runId);
     } catch (error) {
       // The admission is withdrawn, so the Host can never turn it into a process; the guard's refusal is what the Run records.
-      await this.engine.custodyCall('custody.cancel', { custodyId: this.custodyId }).catch(() => {});
+      const canceled = await this.engine.custodyCall('custody.cancel', { custodyId: this.custodyId }).catch(() => null);
+      if (canceled) this.engine.custodyReleaseIfEnded(this.custodyId, canceled);
       throw error;
     }
     // A Stop that arrived while the admission was in flight: the admission is withdrawn, so the Host can never turn it into a process.
@@ -187,6 +196,27 @@ class CustodyChild extends EventEmitter {
     this.spawned = true;
     this.emit('spawn');
     this.pump();
+  }
+
+  // A prelaunch admission is safe to classify as withdrawn only after the Host proves that it can never launch.
+  // A lost response is retried idempotently; while the Host is unavailable, Parent suspension stays pending.
+  async withdrawAdmissionUntilConfirmed(custodyId) {
+    for (;;) {
+      let status;
+      try { status = await this.engine.custodyCall('custody.cancel', { custodyId }); }
+      catch (error) {
+        if (fenced(error)) throw error;
+        if (!transient(error)) throw error;
+        await sleep(RETRY_MS);
+        continue;
+      }
+      if (status?.state === 'admission_cancelled' && status.terminal === true && status.processTreeEnded === true) return status;
+      if (status?.state === 'admitted' && status.processId == null) {
+        await sleep(POLL_MS);
+        continue;
+      }
+      throw refusal('custody_withdrawal_unconfirmed', 'The Host did not prove that the prelaunch admission was withdrawn.');
+    }
   }
 
   // An admission is idempotent for its attempt, so a reserve whose reply was lost is asked again. The repeated answer carries no permit when
@@ -455,12 +485,19 @@ export function installCustody(Engine) {
   // Releases a durable hold only on the Host's proof that the invocation's process tree has ended. Any other status keeps it held.
   P.custodyReleaseIfEnded = function custodyReleaseIfEnded(custodyId, status) {
     if (status?.processTreeEnded !== true) return false;
+    const hold = this.store.get("SELECT run_id FROM custody_workspace_holds WHERE custody_id = ? AND state = 'held'", custodyId);
     custodyFaultPoint('before_hold_release');
     const evidence = { hostState: status.state, processTreeEnded: true, exitCode: status.exitCode ?? null, terminationReason: status.terminationReason ?? null };
     this.store.run(`UPDATE custody_workspace_holds SET state = 'released', evidence_json = ?, released_at = ? WHERE custody_id = ? AND state = 'held'`,
       JSON.stringify(evidence), nowIso(), custodyId);
     // A workspace this release frees may let waiting work dispatch.
-    queueMicrotask(() => this.pump());
+    queueMicrotask(() => {
+      const parentLink = hold && this.store.get(`SELECT * FROM run_links WHERE continuation_contract = 'logical_policy'
+        AND parent_run_id = ? AND state IN ('open','repair_accepted') ORDER BY created_at DESC LIMIT 1`, hold.run_id);
+      if (parentLink?.state === 'open') this.settleParentRepairSuspension(parentLink.id);
+      else if (parentLink?.state === 'repair_accepted') this.resumeLogicalRepairParent(parentLink);
+      this.pump();
+    });
     return true;
   };
 

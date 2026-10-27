@@ -254,9 +254,13 @@ export class Engine {
       if (run.state === 'queued' && intact && this.restartGatesPass(run, blocked)) continue;
       // A Host-owned CLI is reattached only when the Run passes the same restart gates as ordinary continuation. Otherwise its
       // custody process is stopped through the Host, and the Run keeps its existing restart outcome.
-      const custodyRows = this.store.all(`SELECT a.id AS attempt_id, c.custody_id FROM attempts a JOIN attempt_custody c ON c.attempt_id = a.id WHERE a.run_id = ? AND a.state = 'running'`, run.id);
+      const custodyRows = this.store.all(`SELECT a.id AS attempt_id, a.state, c.custody_id FROM attempts a JOIN attempt_custody c ON c.attempt_id = a.id
+        WHERE a.run_id = ? AND (a.state = 'running' OR (a.state IN ('scheduled','waiting') AND a.invocation_artifact_id IS NOT NULL
+          AND EXISTS (SELECT 1 FROM run_links l WHERE l.continuation_contract = 'logical_policy' AND (l.parent_run_id = a.run_id OR l.repair_run_id = a.run_id))
+          AND NOT EXISTS (SELECT 1 FROM journal_events j WHERE j.run_id = a.run_id AND j.attempt_id = a.id AND j.event_type = 'attempt.launch_withdrawn')))`, run.id);
       const custodyIds = new Set(custodyRows.map(row => row.attempt_id));
       const resumable = intact && this.restartGatesPass(run, blocked) && custodyRows.length > 0
+        && custodyRows.every(row => row.state === 'running')
         && this.store.all(`SELECT id FROM attempts WHERE run_id = ? AND state = 'running'`, run.id).every(row => custodyIds.has(row.id));
       if (resumable) for (const row of custodyRows) this.custodyResumes.push({ run_id: run.id, attempt_id: row.attempt_id });
       else for (const row of custodyRows) this.custodyAbandon.push(row.custody_id);
@@ -305,13 +309,17 @@ export class Engine {
       && publication.execution_hash === run.execution_hash;
   }
 
-  isLinkedRun(runId) { return Boolean(this.store.get('SELECT 1 FROM run_links WHERE parent_run_id = ? OR repair_run_id = ?', runId, runId)); }
+  // ADR-0008 lifecycle links retain P1's conservative restart exclusion. P2 logical-policy links
+  // enter recovery only through the explicit association and published-workflow checks below.
+  isLinkedRun(runId) { return Boolean(this.store.get("SELECT 1 FROM run_links WHERE continuation_contract <> 'logical_policy' AND (parent_run_id = ? OR repair_run_id = ?)", runId, runId)); }
 
   // The conditions every restart continuation shares. Anything that depends on state a restart loses (a supervised Run's observer, a
   // host-bound admission, a linked Repair) or on a process that may still run keeps the restart rule it always had.
   restartGatesPass(run, blocked) {
     if (blocked || this.hostAuthority || this.hostVerificationOnly || run.kind !== 'workflow' || run.journal_version < 2) return false;
     if (this.isLinkedRun(run.id) || this.store.get(`SELECT 1 FROM control_grants WHERE run_id = ? AND state = 'active'`, run.id)) return false;
+    const logicalRepair = this.logicalRepairLinkForRun(run.id);
+    if (logicalRepair && !this.logicalRepairLinkIntact(logicalRepair, run)) return false;
     // Queued Runs take this shortcut before canContinueRun. Keep unsupported execution classes on the pre-P1 restart rule here too.
     if (allNodesDeep(this.store.readJson(run.workflow_snapshot_artifact_id).nodes).some(node => ['loop', 'map', 'task'].includes(node.type))) return false;
     const workspace = this.store.get('SELECT w.cwd FROM workspaces w JOIN runs r ON r.workspace_id = w.id WHERE r.id = ?', run.id);
@@ -338,8 +346,9 @@ export class Engine {
     if (!intact || !['running', 'draining', 'waiting_for_user'].includes(run.state) || !this.restartGatesPass(run, blocked)) return false;
     // An attempt that may still execute, or whose launch may have happened without a recorded outcome. An attempt the restart or a
     // runtime shutdown interrupted has an unknown outcome as well: its Run is interrupted, not offered for a decision.
-    if (this.store.get(`SELECT 1 FROM attempts WHERE run_id = ? AND (state IN ('running', 'interrupted')
-      OR (state IN ('scheduled', 'waiting') AND (invocation_artifact_id IS NOT NULL OR id IN (SELECT attempt_id FROM attempt_custody))))`, run.id)) return false;
+    if (this.store.get(`SELECT 1 FROM attempts a WHERE a.run_id = ? AND (a.state IN ('running', 'interrupted')
+      OR (a.state IN ('scheduled', 'waiting') AND (a.invocation_artifact_id IS NOT NULL OR a.id IN (SELECT attempt_id FROM attempt_custody))
+        AND NOT EXISTS (SELECT 1 FROM journal_events j WHERE j.run_id = a.run_id AND j.attempt_id = a.id AND j.event_type = 'attempt.launch_withdrawn')))`, run.id)) return false;
     if (this.store.get(`SELECT 1 FROM context_bindings b JOIN run_context_bindings m ON m.binding_id = b.id WHERE m.run_id = ? AND b.state = 'writing'`, run.id)) return false;
     // Loops, Maps and Managed Tasks keep their existing restart rules; their recovery is not part of P1.
     const workflow = this.store.readJson(run.workflow_snapshot_artifact_id);
@@ -1428,6 +1437,7 @@ export class Engine {
   startRun() {
     if (this.closing) return;
     for (const row of this.store.all(`SELECT * FROM runs WHERE state = 'queued' ORDER BY created_at`)) {
+      if (!this.logicalRepairCanStart(row.id)) continue;
       if (this.runs.has(row.id)) continue;
       const state = this.loadRunState(row);
       this.runs.set(row.id, state);
@@ -1569,6 +1579,14 @@ export class Engine {
       else this.finishRunIfDone(state);
       return;
     }
+    const logicalParent = this.logicalRepairLinkForRun(state.id);
+    if (logicalParent?.parent_run_id === state.id && logicalParent.parent_suspension_state !== 'resumed' && this.runState(state.id) !== 'stopping') {
+      if (this.runState(state.id) === 'draining'
+        && !this.store.get("SELECT id FROM attempts WHERE run_id = ? AND state IN ('running','draining')", state.id)) this.finishRunIfDone(state);
+      if (logicalParent.state === 'repair_accepted') this.resumeLogicalRepairParent(logicalParent);
+      else this.settleParentRepairSuspension(logicalParent.id);
+      return;
+    }
     // A missed controller acknowledgement pauses new dispatch only; work already running keeps its own timeouts.
     // Nothing launches for a supervised run until its observer is armed, and a paused controller stops new dispatch.
     // A controller pause must not prevent Root Stop from completing.
@@ -1629,6 +1647,7 @@ export class Engine {
     this.store.transaction(() => {
       this.store.appendEvents(state.id, [this.runEvent(row, to, reason)]);
       if (TERMINAL_RUN.has(to)) this.recordRepairOutcome(state.id, to);
+      else if (to === 'waiting_for_user' && this.logicalRepairWaitingForDecision(state.id)) this.recordRepairOutcome(state.id, 'failed');
     });
     if (row.state === 'stopping') this.recordTerminationProof(state.id).catch(error => process.stderr.write(`Termination proof for run ${state.id} failed: ${error.message}\n`));
     if (TERMINAL_RUN.has(to)) { this.endControl(state.id); this.forget(state); this.releaseHostRun(state.id, to); this.afterRepairRunTerminal(state.id, to); }
@@ -2148,6 +2167,9 @@ export class Engine {
     const detection = await this.detect(config.provider, { processCustody });
     attempt = this.store.get('SELECT * FROM attempts WHERE id = ?', attempt.id);
     if (this.runState(state.id) !== 'running' || !UNSTARTED.has(attempt.state) || !this.scopeActive(state, scope)) return;
+    // P2 can arrive while provider detection is in flight. The process record was registered synchronously before this await,
+    // so the coordinator waits for this dispatch and this check prevents the prelaunch attempt from escaping suspension.
+    if (this.parentRepairDispatchPaused(state.id)) return;
     let binding = mapping ? this.store.get('SELECT * FROM context_bindings WHERE id = ?', mapping.binding_id) : null;
     if (binding && !['unbound', 'ready'].includes(binding.state)) return this.failAttempt(state, attempt, 'context_unavailable', `Context binding is ${binding.state}; it cannot be used for a new write.`);
     if (!detection.available || !detection.cliPath) {
@@ -2213,7 +2235,13 @@ export class Engine {
     } catch (error) {
       rmSync(tmp, { recursive: true, force: true });
       rmSync(join(this.store.workdirs, 'attachments', attempt.id), { recursive: true, force: true });
+      if (this.parentRepairDispatchPaused(state.id)) return;
       return this.failAttempt(state, attempt, error.code === 'managed_tool_isolation_unavailable' ? error.code : 'managed_tool_isolation_unavailable', error.message);
+    }
+    if (this.parentRepairDispatchPaused(state.id)) {
+      rmSync(tmp, { recursive: true, force: true });
+      rmSync(join(this.store.workdirs, 'attachments', attempt.id), { recursive: true, force: true });
+      return;
     }
     if (transport) { mkdirSync(tmp, { recursive: true }); writeFileSync(schemaPath, JSON.stringify(transport.schema)); }
     const sessionBefore = nativeSessionId ? ref(this.store.putJson({ provider: config.provider, nativeSessionId })) : null;
@@ -2237,6 +2265,12 @@ export class Engine {
     });
     // Crash point: the invocation is durable, and the provider has not been launched.
     custodyFaultPoint('after_invocation_commit');
+    if (this.parentRepairDispatchPaused(state.id)) {
+      if (!this.recordParentRepairLaunchWithdrawn(state.id, attempt.id, null, binding)) this.restoreBindingBeforeLaunch(state, binding);
+      rmSync(tmp, { recursive: true, force: true });
+      rmSync(join(this.store.workdirs, 'attachments', attempt.id), { recursive: true, force: true });
+      return;
+    }
     const isolationIssue = this.linkedRepairWorkspaceIssueForRun(state.id);
     if (isolationIssue) {
       this.refuseLinkedRepairExecution(state, isolationIssue);
@@ -2247,7 +2281,22 @@ export class Engine {
     }
     // ADR-0006: a host-bound runtime charges every provider invocation to the shared ledger before its CLI is launched.
     const providerPermit = await this.reserveHostProviderInvocation(state.id, attempt.id);
-    if (providerPermit?.refused) return this.failAttempt(state, current, 'host_refused', `The Local Control Host refused this provider invocation: ${providerPermit.reason}.`);
+    if (providerPermit?.refused) {
+      if (this.parentRepairDispatchPaused(state.id)) {
+        if (!this.recordParentRepairLaunchWithdrawn(state.id, attempt.id, null, binding)) this.restoreBindingBeforeLaunch(state, binding);
+        rmSync(tmp, { recursive: true, force: true });
+        rmSync(join(this.store.workdirs, 'attachments', attempt.id), { recursive: true, force: true });
+        return;
+      }
+      return this.failAttempt(state, current, 'host_refused', `The Local Control Host refused this provider invocation: ${providerPermit.reason}.`);
+    }
+    if (this.parentRepairDispatchPaused(state.id)) {
+      await this.settleHostProviderInvocation(providerPermit, { launched: false, evidence: 'Parent suspension was recorded before provider launch.' });
+      if (!this.recordParentRepairLaunchWithdrawn(state.id, attempt.id, null, binding)) this.restoreBindingBeforeLaunch(state, binding);
+      rmSync(tmp, { recursive: true, force: true });
+      rmSync(join(this.store.workdirs, 'attachments', attempt.id), { recursive: true, force: true });
+      return;
+    }
     let outcome;
     try { outcome = await this.runProcess(state, current, node, invocation, record); }
     catch (error) { await this.settleHostProviderInvocation(providerPermit, { launched: true, evidence: `provider invocation ended with an exception: ${error.message}` }); throw error; }
@@ -2262,8 +2311,12 @@ export class Engine {
   async settleAgentProcess(state, node, attempt, { config, requestedEffort, workspace, binding, transport, spec, record }, outcome) {
     let current = this.store.get('SELECT * FROM attempts WHERE id = ?', attempt.id);
     if (!outcome.launched) {
-      this.restoreBindingBeforeLaunch(state, binding);
       if (state.linkedRepairIsolationFailure) return;
+      if (outcome.errorCode === 'parent_suspension_requested' && this.parentRepairDispatchPaused(state.id)) {
+        if (!this.recordParentRepairLaunchWithdrawn(state.id, attempt.id, record.child?.custodyId ?? null, binding)) this.restoreBindingBeforeLaunch(state, binding);
+        return;
+      }
+      this.restoreBindingBeforeLaunch(state, binding);
       // A Stop that arrived before the launch is a cancellation, not a provider failure.
       if (record.stopRequested) return this.store.transaction(() => this.store.appendEvents(state.id, this.attemptTransition(current, 'canceled', record.stopReason || 'Stopped by the user.')));
       return this.failAttempt(state, current, ATTEMPT_ERROR_CODES.has(outcome.errorCode) ? outcome.errorCode : 'provider_unavailable', `The CLI could not be started: ${outcome.error}`,
@@ -2569,6 +2622,7 @@ export class Engine {
         record.abortController?.abort();
         if (record.launched) this.terminateLaunched(record.child);
       }
+      this.afterLogicalParentStop(runId);
       queueMicrotask(() => this.pump());
     });
   }
@@ -2631,6 +2685,9 @@ export class Engine {
       const row = this.requireRun(runId);
       const state = this.runs.get(runId);
       if (row.state !== 'waiting_for_user' || !state) throw new ApiError(409, 'conflict', `Recovery needs a run that is waiting for the user (state is ${row.state}).`);
+      const logicalParentLink = this.logicalRepairLinkForRun?.(runId);
+      if (body.action !== 'close' && logicalParentLink?.parent_run_id === runId && logicalParentLink.parent_suspension_state !== 'resumed')
+        throw new ApiError(409, 'parent_repair_pending', 'The Parent is held by its durable Repair coordination; only that coordinator may resume or retry its checkpoint.');
       if (body.action !== 'close') {
         const link = this.openLinkOfRepair(runId);
         const isolationIssue = link ? this.linkedRepairWorkspaceIssueForLink(link) : null;
@@ -2664,7 +2721,10 @@ export class Engine {
         this.store.appendEvents(runId, events);
         return { status: 202, body: { runId, state: 'running', requestId: body.requestId } };
       });
-    }, () => queueMicrotask(() => this.pump()));
+    }, () => {
+      if (body.action === 'close') this.afterLogicalParentClose(runId);
+      queueMicrotask(() => this.pump());
+    });
   }
 
   retry(state, body, events) {

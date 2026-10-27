@@ -519,6 +519,37 @@
     {
       "properties": {
         "type": {
+          "const": "attempt.launch_withdrawn"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "custodyId": {
+              "anyOf": [
+                { "type": "string", "format": "uuid" },
+                { "type": "null" }
+              ]
+            },
+            "reason": { "const": "parent_suspension" },
+            "launchRequestSent": { "const": false }
+          },
+          "required": ["custodyId", "reason", "launchRequestSent"],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": ["type", "payload"]
+    },
+    {
+      "properties": {
+        "type": {
           "const": "attempt.log_chunk"
         },
         "payload": {
@@ -2239,7 +2270,12 @@
             "continuation.lifecycle_verified",
             "continuation.lifecycle_released",
             "continuation.workspace_isolation_refused",
-            "continuation.reconciled"
+            "continuation.reconciled",
+            "continuation.parent_suspension_requested",
+            "continuation.parent_suspended_for_repair",
+            "continuation.repair_result_accepted",
+            "continuation.repair_result_rejected",
+            "continuation.parent_resumption_blocked"
           ]
         },
         "payload": {

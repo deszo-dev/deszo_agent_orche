@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "scenario": "P2-E2E-01",
+  "generatedAt": "2026-10-26T18:20:04.975Z",
+  "sourceBaseHead": "40fa26a",
+  "engineA": {
+    "pid": 35268,
+    "exited": true
+  },
+  "engineB": {
+    "pid": 20768,
+    "exited": false
+  },
+  "host": {
+    "pid": 10668,
+    "alive": true
+  },
+  "parentRunId": "357bd8af-7085-4e9a-984c-e8c45ed60b3f",
+  "repairRunId": "9b043e6a-52f8-446d-983b-531cae4c3bc9",
+  "incidentId": "ad67757b-6229-4c34-9250-98e1afd029b7",
+  "parentPublishedVersionId": "d778d386-e8cd-4dbe-aa14-042dcb5f2541",
+  "parentV2PublishedVersionId": "2e85489b-b377-46d3-be55-3aa39de4e5ef",
+  "repairPublishedVersionId": "eb3af7e7-80a2-4733-97b3-f2fb9b3bc9dd",
+  "repairV2PublishedVersionId": "33930e16-7531-451f-a527-60967d89913c",
+  "repairAttemptId": "9adca5be-02a8-476e-9c86-d1ba3541fa3d",
+  "repairCustodyInvocationId": "d6195e5d-4f3e-405e-93be-c74f8abc1422",
+  "repairPid": 9024,
+  "repairProcessIdentity": "2026-10-26T18:19:59.0531722Z",
+  "parentBAttemptId": "cf18b9f4-035a-4c71-b66a-5973a5f7baa5",
+  "parentBProcessId": 5748,
+  "finalParentState": "succeeded",
+  "finalRepairState": "succeeded",
+  "linkState": "resumed",
+  "parentContinuationEvents": 1,
+  "acceptedAttempts": {
+    "parentA": 1,
+    "parentB": 1,
+    "parentC": 1,
+    "repairVerification": 1
+  },
+  "sideEffects": {
+    "parentA": 1,
+    "parentBAccepted": 1,
+    "parentC": 1,
+    "repair": 1
+  },
+  "physicalWorkspaces": {
+    "parent_root": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\custody-p2-e2e01-LKsygy\\workspace",
+    "repair_root": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\custody-p2-e2e01-LKsygy\\repair-workspace"
+  },
+  "hostRepairProof": {
+    "state": "exited",
+    "drained": true,
+    "spoolComplete": true,
+    "stdoutAcked": 213,
+    "stdoutDurable": 213,
+    "stderrAcked": 0,
+    "stderrDurable": 0
+  }
+}

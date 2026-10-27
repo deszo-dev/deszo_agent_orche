@@ -118,6 +118,96 @@ fn main() {
 
     event(r#"{"type":"thread.started","thread_id":"custody-fixture"}"#);
     match model.as_str() {
+        "custody-p2-parent-a" => {
+            let marker = env::current_dir().expect("working directory").join("p2-parent-a.log");
+            let mut file = OpenOptions::new().create(true).append(true).open(marker).expect("open Parent A side-effect marker");
+            writeln!(file, "{} accepted", std::process::id()).expect("record Parent A side effect");
+            answer("P2_PARENT_A_OK gate=P2_PARENT_B");
+        }
+        "custody-p2-fail-once" => {
+            let cwd = env::current_dir().expect("working directory");
+            let attempts = cwd.join("p2-parent-b-attempts.log");
+            let prior = fs::read_to_string(&attempts).unwrap_or_default().lines().count();
+            let ordinal = prior + 1;
+            let mut log = OpenOptions::new().create(true).append(true).open(&attempts).expect("open Parent B attempt marker");
+            writeln!(log, "{} {ordinal}", std::process::id()).expect("record Parent B invocation");
+            if ordinal == 1 {
+                eprintln!("P2 Parent B deterministic first-attempt failure before its side effect");
+                event(r#"{"type":"error","message":"P2 Parent B first attempt failed before side effect."}"#);
+                std::process::exit(6);
+            }
+            if prompt.contains("gate=P2_PARENT_B") {
+                let ready = cwd.join("READY-P2_PARENT_B.marker");
+                let release = cwd.join("RELEASE-P2_PARENT_B.marker");
+                fs::write(&ready, format!("{} ready\n", std::process::id())).expect("write Parent B READY marker");
+                let started = std::time::Instant::now();
+                while !release.exists() {
+                    if started.elapsed() > Duration::from_secs(180) {
+                        eprintln!("P2 Parent B gated Custody invocation exceeded its bounded wait");
+                        std::process::exit(7);
+                    }
+                    thread::sleep(Duration::from_millis(50));
+                }
+            }
+            let mut accepted = OpenOptions::new().create(true).append(true).open(cwd.join("p2-parent-b-accepted.log"))
+                .expect("open Parent B accepted side-effect marker");
+            writeln!(accepted, "{} accepted", std::process::id()).expect("record Parent B accepted side effect");
+            answer("P2_PARENT_B_OK");
+        }
+        "custody-p2-parent-c" => {
+            let cwd = env::current_dir().expect("working directory");
+            let count = |name: &str| fs::read_to_string(cwd.join(name)).unwrap_or_default().lines().count();
+            let a_count = count("p2-parent-a.log");
+            let b_count = count("p2-parent-b-accepted.log");
+            if a_count != 1 || b_count != 1 || !prompt.contains("P2_PARENT_B_OK") {
+                eprintln!("P2 Parent C verification failed: A effects={a_count}, B effects={b_count}, B output present={}", prompt.contains("P2_PARENT_B_OK"));
+                std::process::exit(8);
+            }
+            let mut file = OpenOptions::new().create(true).append(true).open(cwd.join("p2-parent-c.log"))
+                .expect("open Parent C side-effect marker");
+            writeln!(file, "{} verified", std::process::id()).expect("record Parent C side effect");
+            answer("P2_PARENT_C_OK");
+        }
+        "custody-p2-gated-repair" => {
+            let cwd = env::current_dir().expect("working directory");
+            let ready = cwd.join("READY-P2_REPAIR.marker");
+            let release = cwd.join("RELEASE-P2_REPAIR.marker");
+            fs::write(&ready, format!("{} ready\n", std::process::id())).expect("write Repair READY marker");
+            let started = std::time::Instant::now();
+            while !release.exists() {
+                if started.elapsed() > Duration::from_secs(180) {
+                    eprintln!("P2 Repair gated Custody invocation exceeded its bounded wait");
+                    std::process::exit(9);
+                }
+                thread::sleep(Duration::from_millis(50));
+            }
+            let mut file = OpenOptions::new().create(true).append(true).open(cwd.join("p2-repair-executed.log"))
+                .expect("open Repair side-effect marker");
+            writeln!(file, "{} verified", std::process::id()).expect("record Repair execution");
+            answer("P2_REPAIR_VERIFIED");
+        }
+        "custody-p2-repair-fail" => {
+            eprintln!("P2 deterministic Repair failure");
+            event(r#"{"type":"error","message":"P2 Repair failed."}"#);
+            std::process::exit(10);
+        }
+        "custody-p2-gated-repair-fail" => {
+            let cwd = env::current_dir().expect("working directory");
+            let ready = cwd.join("READY-P2_REPAIR.marker");
+            let release = cwd.join("RELEASE-P2_REPAIR.marker");
+            fs::write(&ready, format!("{} ready\n", std::process::id())).expect("write Repair READY marker");
+            let started = std::time::Instant::now();
+            while !release.exists() {
+                if started.elapsed() > Duration::from_secs(180) {
+                    eprintln!("P2 failed Repair gate exceeded its bounded wait");
+                    std::process::exit(11);
+                }
+                thread::sleep(Duration::from_millis(50));
+            }
+            eprintln!("P2 Repair failed after Engine absence");
+            event(r#"{"type":"error","message":"P2 Repair failed while Engine was absent."}"#);
+            std::process::exit(12);
+        }
         "custody-steady" => {
             let ticks = directive(&prompt, "ticks", 20);
             for tick in 0..ticks {
