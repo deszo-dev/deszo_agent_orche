@@ -196,6 +196,12 @@ test('negative: a Developer cannot propose a lifecycle action', async () => {
     const v = view(api.root);
     const developer = v.errors.find(e => e.run_id === repairRunId && e.node_id === 'developer');
     assert.ok(developer, 'the Developer attempt failed');
+    const developerAttempt = api.runner.engine.latestAttempt(repairRunId, 'developer');
+    const typed = api.runner.engine.store.get('SELECT outcome_json FROM failure_outcomes WHERE attempt_id = ?', developerAttempt.id);
+    const outcome = JSON.parse(typed.outcome_json);
+    assert.equal(outcome.source, 'workflow');
+    assert.equal(outcome.category, 'task_failure');
+    assert.equal(outcome.canonicalCode, 'lifecycle_unauthorized');
     const errorRow = (await api.call('GET', `/api/v2/runs/${repairRunId}/events/page?afterSequence=0&limit=200`)).body;
     const codes = JSON.stringify(errorRow);
     assert.ok(codes.includes('lifecycle_unauthorized'), 'the refusal is named');

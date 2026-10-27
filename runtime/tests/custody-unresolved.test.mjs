@@ -85,6 +85,13 @@ test('NR-01, NR-02, NR-04 to NR-06: a not_found refusal leaves the attempt unres
     // The pump reads, then acknowledges committed bytes; whichever command the refusal lands on, it came from the streaming cycle.
     assert.ok(['custody.read', 'custody.ack'].includes(condition.command), `the refusal came from the stream pump (${condition.command})`);
     assert.equal(unresolvedEvents(scratch.root, runId).length, 1, 'the operator is told once');
+    const db = database(scratch.root);
+    let typed;
+    try { typed = JSON.parse(db.prepare('SELECT outcome_json FROM failure_outcomes WHERE attempt_id = ?').get(attempt.id).outcome_json); }
+    finally { db.close(); }
+    assert.equal(typed.observedState.hostState, 'refused', 'a reachable Host refusal is not reported as Host unavailability');
+    assert.match(typed.message, /Host refused a custody command/);
+    assert.equal(typed.rawCode, 'not_found');
 
     // The read cycle stopped: over 10 seconds the old cycle asked about 20 times; now only the hold reconciler asks, every 2 seconds, by status.
     const windowStart = Date.now();

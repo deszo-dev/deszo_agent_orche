@@ -21,6 +21,7 @@ import { installTaskProcesses } from './taskProcesses.mjs';
 import { installJudgeAttention } from './judgeAttention.mjs';
 import { installLinkedRepair } from './linkedRepair.mjs';
 import { afterBarrierWork, crashBeforeIdentityPoint, custodyFaultPoint, installCustody, STOP_FAMILY } from './custody.mjs';
+import { deterministicOutcomeId, makeFailureOutcome, normalizeAttemptErrorCode, sameOutcome, sourceForErrorCode } from './failureOutcomes.mjs';
 import { shimFailureOf } from './supervisor-client.mjs';
 import { StreamRecorder } from './streams.mjs';
 import { prepareManagedToolIsolation } from './managed-isolation.mjs';
@@ -35,10 +36,6 @@ export class ApiError extends Error {
   constructor(status, code, message, details = []) { super(message); this.status = status; this.code = code; this.details = details; }
 }
 
-// The attempt-error codes that both journal schema versions accept. A launch error whose own code is not among them is recorded as a provider
-// that did not start, so that the journal stays valid.
-const ATTEMPT_ERROR_CODES = new Set(['authentication', 'quota', 'billing_policy', 'provider_unavailable', 'rate_limited', 'provider_protocol',
-  'unsupported_cli', 'custody_unavailable', 'permission', 'timeout', 'process', 'output_contract', 'context_unavailable', 'corruption', 'interrupted']);
 const TERMINAL_RUN = new Set(['succeeded', 'failed', 'canceled', 'interrupted']);
 const ACTIVE_RUN = new Set(['queued', 'running', 'draining', 'waiting_for_user', 'stopping']);
 const ACTIVE_SQL = `('queued','running','draining','waiting_for_user','stopping')`;
@@ -264,6 +261,15 @@ export class Engine {
         && this.store.all(`SELECT id FROM attempts WHERE run_id = ? AND state = 'running'`, run.id).every(row => custodyIds.has(row.id));
       if (resumable) for (const row of custodyRows) this.custodyResumes.push({ run_id: run.id, attempt_id: row.attempt_id });
       else for (const row of custodyRows) this.custodyAbandon.push(row.custody_id);
+      // A committed Root Stop is itself durable intent. If no attempt or Host admission remains in flight, finish that intent
+      // through the ordinary canceled settlement instead of rewriting it as an unrelated runtime interruption.
+      const pendingStopWork = this.store.get(`SELECT 1 FROM attempts WHERE run_id = ? AND state IN ('running','draining','scheduled','waiting') LIMIT 1`, run.id);
+      if (run.state === 'stopping' && custodyRows.length === 0 && !pendingStopWork) {
+        const state = this.loadRunState(run);
+        this.runs.set(run.id, state);
+        this.finishRunIfDone(state);
+        continue;
+      }
       // P1: an ordinary Run with no attempt in flight, and no launch of unknown outcome, continues from its durable state.
       if (!resumable && this.canContinueRun(run, intact, blocked) && this.rebuildRunState(run)) continue;
       this.store.transaction(() => {
@@ -281,7 +287,16 @@ export class Engine {
         this.store.run(`UPDATE loop_iterations SET outcome = 'interrupted', ended_at = ? WHERE run_id = ? AND outcome IN ('running','paused')`, nowIso(), run.id);
         for (const binding of this.store.all(`SELECT b.* FROM context_bindings b JOIN run_context_bindings m ON m.binding_id = b.id WHERE m.run_id = ? AND b.state = 'writing'`, run.id))
           events.push(this.bindingTransition(binding, 'needs_review', 'Runtime restarted during a native write; native history may have advanced.')[0]);
-        if (!resumable) events.push(this.runEvent(run, 'interrupted', intact ? 'Runtime restarted or lost process supervision.' : 'Recovery refused: the published workflow definition of this Run is missing or inconsistent.'));
+        if (!resumable) {
+          const reason = intact ? 'Runtime restarted or lost process supervision.' : 'Recovery refused: the published workflow definition of this Run is missing or inconsistent.';
+          events.push(this.runEvent(run, 'interrupted', reason));
+          if (!intact) {
+            const outcome = this.failureOutcomeEvent(null, { runId: run.id,
+              outcomeId: deterministicOutcomeId(run.id, 'published_definition_integrity'), source: 'recovery', code: 'corruption',
+              causeKnowledge: 'direct_fact', executionCertainty: 'unknown', sideEffectCertainty: 'unknown', runState: 'interrupted' });
+            if (outcome) events.push(outcome);
+          }
+        }
         this.store.appendEvents(run.id, events);
       });
     }
@@ -1247,6 +1262,28 @@ export class Engine {
     return { items, nextCursor: more ? items.at(-1).sequence : null };
   }
 
+  listFailureOutcomes(runId, { afterSequence = 0, limit = 100 } = {}) {
+    const run = this.requireRun(runId);
+    if (!Number.isInteger(afterSequence) || afterSequence < 0 || afterSequence > run.last_sequence)
+      throw new ApiError(400, 'invalid_request', 'afterSequence must be a valid nonnegative outcome cursor.');
+    if (!Number.isInteger(limit) || limit < 1 || limit > 200) throw new ApiError(400, 'invalid_request', 'limit must be between 1 and 200.');
+    const rows = this.store.all(`SELECT outcome_json, first_sequence, latest_sequence FROM failure_outcomes
+      WHERE run_id = ? AND latest_sequence > ? ORDER BY latest_sequence, outcome_id LIMIT ?`, runId, afterSequence, limit + 1);
+    const more = rows.length > limit;
+    const items = rows.slice(0, limit).map(row => ({ outcome: parseStrictJson(row.outcome_json),
+      firstSequence: row.first_sequence, latestSequence: row.latest_sequence }));
+    const legacyUntypedFailureCount = this.store.get(`SELECT COUNT(DISTINCT e.attempt_id) AS count FROM journal_events e
+      WHERE e.run_id = ? AND e.attempt_id IS NOT NULL
+        AND (e.event_type = 'attempt.error'
+          OR (e.event_type = 'attempt.execution_evidence' AND json_extract(e.envelope_json, '$.payload.outcome')
+            IN ('failed','spawn_failed','timed_out','interrupted','capture_failed','invalid_source'))
+          OR (e.event_type = 'attempt.state_changed' AND json_extract(e.envelope_json, '$.payload.to')
+            IN ('failed','canceled','interrupted','blocked')))
+        AND NOT EXISTS (SELECT 1 FROM failure_outcomes f WHERE f.attempt_id = e.attempt_id)`, runId).count;
+    return { items, nextCursor: more ? items.at(-1).latestSequence : null, cursor: run.last_sequence,
+      legacyCoverage: { status: 'untyped', source: 'journal', untypedFailureCount: legacyUntypedFailureCount } };
+  }
+
   artifactProvenance(artifactId) {
     const artifact = this.store.artifactRow(artifactId);
     if (!artifact) throw new ApiError(404, 'not_found', 'Unknown artifact.');
@@ -1480,11 +1517,100 @@ export class Engine {
     return { type: 'run.state_changed', payload: { from, to, reason } };
   }
 
-  attemptTransition(attempt, to, reason, process = null) {
+  attemptTransition(attempt, to, reason, process = null, outcomeDetails = null) {
     const current = this.store.get('SELECT state FROM attempts WHERE id = ?', attempt.id);
     this.store.run('UPDATE attempts SET state = ?, ended_at = CASE WHEN ? THEN ? ELSE ended_at END WHERE id = ?', to, TERMINAL_ATTEMPT.has(to) ? 1 : 0, nowIso(), attempt.id);
     this.store.run('UPDATE node_instances SET state = ? WHERE run_id = ? AND id = ?', to, attempt.run_id, attempt.node_instance_id);
-    return [{ type: 'attempt.state_changed', nodeInstanceId: attempt.node_instance_id, attemptId: attempt.id, payload: { from: current.state, to, reason, process } }];
+    const events = [{ type: 'attempt.state_changed', nodeInstanceId: attempt.node_instance_id, attemptId: attempt.id, payload: { from: current.state, to, reason, process } }];
+    if (['failed', 'canceled', 'blocked', 'interrupted'].includes(to)) {
+      const canceledBeforeLaunch = to === 'canceled' && UNSTARTED.has(attempt.state) && !attempt.process_id
+        && !this.store.get('SELECT custody_id FROM attempt_custody WHERE attempt_id = ?', attempt.id);
+      const defaults = to === 'canceled'
+        ? { source: 'recovery', code: 'interrupted', causeKnowledge: 'direct_fact',
+          executionCertainty: canceledBeforeLaunch ? 'not_started' : 'unknown', sideEffectCertainty: canceledBeforeLaunch ? 'none_proven' : 'unknown' }
+        : to === 'interrupted' || to === 'blocked'
+          ? { source: 'recovery', code: 'interrupted', causeKnowledge: 'unknown', executionCertainty: 'unresolved' }
+          : { source: 'recovery', code: 'process', causeKnowledge: 'unknown', executionCertainty: 'unknown' };
+      const outcome = this.failureOutcomeEvent(attempt, { ...defaults, ...outcomeDetails, attemptState: to });
+      if (outcome) events.push(outcome);
+    }
+    return events;
+  }
+
+  failureOutcomeEvent(attempt = null, details = {}) {
+    const attemptId = attempt?.id || details.attemptId || null;
+    const currentAttempt = attemptId ? this.store.get('SELECT * FROM attempts WHERE id = ?', attemptId) : null;
+    const runId = details.runId || currentAttempt?.run_id || attempt?.run_id;
+    if (!runId) return null;
+    if (!currentAttempt && !details.outcomeId) throw new TypeError('Run-scoped failure outcomes require a stable outcomeId.');
+    const run = this.store.get('SELECT * FROM runs WHERE id = ?', runId);
+    if (!run || run.journal_version < 2) return null;
+    const nodeInstanceId = currentAttempt?.node_instance_id || details.nodeInstanceId || null;
+    const binding = currentAttempt ? this.store.get('SELECT custody_id FROM attempt_custody WHERE attempt_id = ?', currentAttempt.id) : null;
+    const hold = binding ? this.store.get('SELECT evidence_json FROM custody_workspace_holds WHERE custody_id = ?', binding.custody_id) : null;
+    const link = this.store.get(`SELECT incident_id,parent_run_id,repair_run_id FROM run_links
+      WHERE parent_run_id = ? OR repair_run_id = ? ORDER BY created_at DESC LIMIT 1`, run.id, run.id);
+    const artifact = details.evidence?.artifactId ? this.store.artifactRow(details.evidence.artifactId)
+      : currentAttempt?.invocation_artifact_id ? this.store.artifactRow(currentAttempt.invocation_artifact_id) : null;
+    const references = [
+      ...(details.journalEventId ? [{ type: 'journal_event', id: details.journalEventId }] : []),
+      ...(artifact ? [{ type: 'artifact', id: artifact.id, sha256: artifact.sha256 }] : []),
+      ...(binding ? [{ type: 'custody_invocation', id: binding.custody_id }, { type: 'workspace_hold', id: binding.custody_id }] : []),
+      ...(run.published_version_id ? [{ type: 'published_version', id: run.published_version_id }] : []),
+      ...(link?.incident_id ? [{ type: 'p2_incident', id: link.incident_id }] : []),
+    ];
+    const observedState = { ...(details.observedState || {}) };
+    if (hold?.evidence_json) {
+      try {
+        const evidence = parseStrictJson(hold.evidence_json);
+        if (observedState.processTreeEnded === undefined && typeof evidence.processTreeEnded === 'boolean') observedState.processTreeEnded = evidence.processTreeEnded;
+        if (observedState.hostState === undefined && typeof evidence.hostState === 'string') observedState.hostState = evidence.hostState;
+        if (observedState.exitCode === undefined && Number.isInteger(evidence.exitCode)) observedState.exitCode = evidence.exitCode;
+        if (observedState.spoolComplete === undefined && typeof evidence.spoolComplete === 'boolean') observedState.spoolComplete = evidence.spoolComplete;
+      } catch { /* A malformed optional hold projection cannot erase the typed outcome. */ }
+    }
+    let executionCertainty = details.executionCertainty || 'unknown';
+    if (executionCertainty === 'unknown' && observedState.processTreeEnded === true) executionCertainty = 'completed';
+    if (executionCertainty === 'unknown' && currentAttempt && details.attemptState && UNSTARTED.has(currentAttempt.state) && !currentAttempt.process_id && !binding)
+      executionCertainty = 'not_started';
+    const source = details.source || sourceForErrorCode(details.code || 'process');
+    const normalized = normalizeAttemptErrorCode(details.code || 'process', { source, operation: details.operation || 'execution' });
+    const existing = details.outcomeId
+      ? this.store.get('SELECT * FROM failure_outcomes WHERE outcome_id = ?', details.outcomeId)
+      : currentAttempt ? this.store.get('SELECT * FROM failure_outcomes WHERE attempt_id = ?', currentAttempt.id) : null;
+    const previous = existing ? parseStrictJson(existing.outcome_json) : null;
+    const recordedAt = previous?.recordedAt || nowIso();
+    const outcome = makeFailureOutcome({
+      run: { ...run, custody_invocation_id: binding?.custody_id || null, incident_id: link?.incident_id || null,
+        parent_run_id: link?.parent_run_id || null, repair_run_id: link?.repair_run_id || null },
+      attempt: currentAttempt,
+      outcomeId: previous?.outcomeId || details.outcomeId || currentAttempt?.id,
+      source,
+      code: normalized.canonicalCode,
+      rawCode: details.rawCode ?? normalized.rawCode,
+      attemptState: details.attemptState || currentAttempt?.state,
+      runState: run.state,
+      observedState,
+      executionCertainty,
+      sideEffectCertainty: details.sideEffectCertainty || (executionCertainty === 'not_started' ? 'none_proven' : 'unknown'),
+      causeKnowledge: details.causeKnowledge || 'unknown',
+      evidenceReferences: [...(previous?.evidenceReferences || []), ...references],
+      recordedAt,
+      updatedAt: previous ? nowIso() : undefined,
+    });
+    if (previous) {
+      outcome.revision = previous.revision + 1;
+      outcome.observedState = { ...previous.observedState, ...outcome.observedState };
+      if (sameOutcome(previous, outcome)) return null;
+    }
+    return {
+      type: currentAttempt
+        ? previous ? 'attempt.failure_outcome_updated' : 'attempt.failure_outcome'
+        : previous ? 'run.failure_outcome_updated' : 'run.failure_outcome',
+      nodeInstanceId,
+      attemptId: currentAttempt?.id ?? null,
+      payload: { outcome },
+    };
   }
 
   bindingTransition(binding, to, reason, changes = {}) {
@@ -1664,11 +1790,18 @@ export class Engine {
     if (row.state === 'running') events.push(this.runEvent(row, 'draining', 'An attempt failed; no new dispatch until recovery.'));
   }
 
-  failAttempt(state, attempt, code, message, { evidence = null, binding = null, bindingTo = null, bindingReason = '', bindingChanges = {} } = {}) {
+  failAttempt(state, attempt, code, message, { evidence = null, binding = null, bindingTo = null, bindingReason = '', bindingChanges = {},
+    source = sourceForErrorCode(code), operation = 'execution', rawCode = null, executionCertainty = 'unknown', sideEffectCertainty,
+    causeKnowledge, observedState = {} } = {}) {
     this.store.transaction(() => {
       const current = this.store.get('SELECT * FROM attempts WHERE id = ?', attempt.id);
-      const events = [{ type: 'attempt.error', nodeInstanceId: current.node_instance_id, attemptId: current.id, payload: { code, message, evidence } }];
-      events.push(...this.attemptTransition(current, 'failed', message));
+      if (!current || TERMINAL_ATTEMPT.has(current.state)) return;
+      const normalized = normalizeAttemptErrorCode(code, { source, operation });
+      const outcomeDetails = { source, code: normalized.canonicalCode, rawCode: rawCode ?? normalized.rawCode, executionCertainty,
+        sideEffectCertainty, causeKnowledge: causeKnowledge || (code === normalized.canonicalCode ? 'deterministic_interpretation' : 'unknown'), observedState, evidence };
+      const events = [{ type: 'attempt.error', nodeInstanceId: current.node_instance_id, attemptId: current.id,
+        payload: { code: normalized.canonicalCode, message, evidence } }];
+      events.push(...this.attemptTransition(current, 'failed', message, null, outcomeDetails));
       if (binding && bindingTo && binding.state !== bindingTo) events.push(this.bindingTransition(binding, bindingTo, bindingReason, bindingChanges)[0]);
       const { loopInstance } = parseInstance(current.node_instance_id);
       if (loopInstance) this.pauseLoop(state, loopInstance, 'body_failure', `Body node ${current.node_instance_id} failed: ${message}`, events);
@@ -1948,7 +2081,8 @@ export class Engine {
     for (const id of topologicalOrder(body).filter(item => required.has(item))) {
       if (restart) {
         const latest = this.latestAttempt(state.id, scope.prefix + id);
-        if (latest && UNSTARTED.has(latest.state)) events.push(...this.attemptTransition(latest, 'canceled', 'Superseded by an iteration restart.'));
+        if (latest && UNSTARTED.has(latest.state)) events.push(...this.attemptTransition(latest, 'canceled', 'Superseded by an iteration restart.', null,
+          { source: 'workflow', code: 'interrupted', causeKnowledge: 'direct_fact', executionCertainty: 'not_started', sideEffectCertainty: 'none_proven' }));
       }
       this.planAttempt(state, scope.prefix + id, id, nodes.get(id).type, { loopNodeId: loopInstance, iteration }, events, restart ? 'Iteration restarted.' : 'Planned for this iteration.');
     }
@@ -1991,6 +2125,9 @@ export class Engine {
       const events = [];
       if (problem) {
         events.push({ type: 'attempt.error', nodeInstanceId: loopInstance, attemptId: loopAttempt.id, payload: { code: 'output_contract', message: `Iteration ${row.iteration} returned an invalid value: ${problem}.`, evidence: null } });
+        const outcome = this.failureOutcomeEvent(loopAttempt, { source: 'workflow', code: 'output_contract', causeKnowledge: 'direct_fact',
+          attemptState: loopAttempt.state, executionCertainty: 'completed' });
+        if (outcome) events.push(outcome);
         this.pauseLoop(state, loopInstance, 'body_failure', `Invalid loop return: ${problem}.`, events);
         this.latchFailure(state, events);
         this.store.appendEvents(state.id, events);
@@ -2083,12 +2220,17 @@ export class Engine {
     runtime.pending = ['time_limit', `Active time exceeded ${row.max_active_minutes} minute(s).`];
     this.stopLoopBody(state, loopInstance);
   }
-  stopLoopBody(state, loopInstance) {
-    const taskEvents = [];
-    for (const execution of this.taskState(state).executions.values()) if (execution.row.node_instance_id.startsWith(`${loopInstance}/`)) this.cancelManagedTasks(state.id, taskEvents, 'Managed task canceled when its enclosing loop stopped.', execution.row.node_instance_id);
-    if (taskEvents.length) this.store.appendEvents(state.id, taskEvents);
+  stopLoopBody(state, loopInstance, source = 'workflow') {
+    this.store.transaction(() => {
+      const taskEvents = [];
+      for (const execution of this.taskState(state).executions.values()) if (execution.row.node_instance_id.startsWith(`${loopInstance}/`))
+        this.cancelManagedTasks(state.id, taskEvents, 'Managed task canceled when its enclosing loop stopped.', execution.row.node_instance_id, source);
+      if (taskEvents.length) this.store.appendEvents(state.id, taskEvents);
+    });
     for (const record of this.liveIn(state).filter(item => item.loops.includes(loopInstance))) {
       record.stopRequested = true;
+      record.stopSource = source;
+      record.stopReason = source === 'external_control' ? 'Stopped by the user through scoped Stop.' : 'Stopped by its enclosing loop execution policy.';
       record.abortController?.abort();
       if (record.launched) this.terminateLaunched(record.child);
     }
@@ -2288,7 +2430,8 @@ export class Engine {
         rmSync(join(this.store.workdirs, 'attachments', attempt.id), { recursive: true, force: true });
         return;
       }
-      return this.failAttempt(state, current, 'host_refused', `The Local Control Host refused this provider invocation: ${providerPermit.reason}.`);
+      return this.failAttempt(state, current, 'host_refused', `The Local Control Host refused this provider invocation: ${providerPermit.reason}.`,
+        { source: 'host', causeKnowledge: 'direct_fact', executionCertainty: 'not_started', sideEffectCertainty: 'none_proven', rawCode: 'host_refused' });
     }
     if (this.parentRepairDispatchPaused(state.id)) {
       await this.settleHostProviderInvocation(providerPermit, { launched: false, evidence: 'Parent suspension was recorded before provider launch.' });
@@ -2318,9 +2461,19 @@ export class Engine {
       }
       this.restoreBindingBeforeLaunch(state, binding);
       // A Stop that arrived before the launch is a cancellation, not a provider failure.
-      if (record.stopRequested) return this.store.transaction(() => this.store.appendEvents(state.id, this.attemptTransition(current, 'canceled', record.stopReason || 'Stopped by the user.')));
-      return this.failAttempt(state, current, ATTEMPT_ERROR_CODES.has(outcome.errorCode) ? outcome.errorCode : 'provider_unavailable', `The CLI could not be started: ${outcome.error}`,
-        { evidence: ref(this.store.putJson({ errorCode: outcome.errorCode ?? null, error: outcome.error ?? null })) });
+      if (record.stopRequested) return this.store.transaction(() => this.store.appendEvents(state.id, this.attemptTransition(current, 'canceled', record.stopReason || 'Stopped by the user.', null,
+        { source: 'external_control', code: 'interrupted', causeKnowledge: 'direct_fact', executionCertainty: 'not_started', sideEffectCertainty: 'none_proven' })));
+      const rawCode = typeof outcome.errorCode === 'string' ? outcome.errorCode : null;
+      const launchSource = rawCode && (/^(custody|host_)/i.test(rawCode) || rawCode === 'launch_failed') ? 'host' : 'provider';
+      const launchError = normalizeAttemptErrorCode(rawCode, { source: launchSource, operation: 'provider_launch' });
+      // Preserve the existing canonical attempt.error value for this Host refusal while the new outcome records its Host provenance.
+      if (rawCode === 'launch_failed') launchError.canonicalCode = 'provider_unavailable';
+      const definitelyNotStarted = launchSource === 'provider' || ['launch_failed', 'custody_not_launched', 'custody_admission_lost'].includes(rawCode);
+      return this.failAttempt(state, current, launchError.canonicalCode, `The CLI could not be started: ${outcome.error}`,
+        { evidence: ref(this.store.putJson({ errorCode: outcome.errorCode ?? null, error: outcome.error ?? null })), source: launchSource,
+          operation: 'provider_launch', rawCode, executionCertainty: definitelyNotStarted ? 'not_started' : 'unresolved',
+          sideEffectCertainty: definitelyNotStarted ? 'none_proven' : 'unknown',
+          observedState: launchSource === 'host' ? { hostState: definitelyNotStarted ? 'launch_failed' : 'unavailable' } : {} });
     }
     const parser = outcome.parser.state;
     if (outcome.captureError) {
@@ -2333,20 +2486,23 @@ export class Engine {
       ...(parser.diagnostics?.length ? { providerDiagnostics: parser.diagnostics } : {}) }));
     if (['host_lost', 'host_stopped', 'refused_host_restart'].includes(outcome.signal)) {
       return this.store.transaction(() => {
-        const events = this.attemptTransition(current, 'interrupted', `The Host ended the CLI without a recorded result (${outcome.signal}); the attempt outcome is unknown.`);
+        const events = this.attemptTransition(current, 'interrupted', `The Host ended the CLI without a recorded result (${outcome.signal}); the attempt outcome is unknown.`, null,
+          { source: 'host', code: 'interrupted', causeKnowledge: 'direct_fact', executionCertainty: 'unresolved', observedState: { hostState: outcome.signal } });
         if (binding) events.push(this.bindingTransition(binding, 'needs_review', 'The Host stopped the CLI during a native write; native history may have advanced.')[0]);
         this.store.appendEvents(state.id, events);
       });
     }
     if (['spool_limit_exceeded', 'spool_failed', 'spool_incomplete'].includes(outcome.signal)) {
-      return this.failAttempt(state, current, 'capture_failed', 'The Host could not keep the complete output of the CLI, so the attempt is not accepted.');
+      return this.failAttempt(state, current, 'capture_failed', 'The Host could not keep the complete output of the CLI, so the attempt is not accepted.',
+        { source: 'host', executionCertainty: 'unresolved', observedState: { hostState: outcome.signal } });
     }
     // F3: a Host stop is a stop outcome, never a result. An end whose tree is unproven is classified as such first, as before, unless it is a Host
     // stop; a Host stop keeps the Engine's own Stop and timeout outcomes, settled below.
     const hostStop = STOP_FAMILY.has(outcome.signal) || (outcome.signal === 'tree_not_ended' && STOP_FAMILY.has(outcome.custody));
     if (outcome.signal === 'tree_not_ended' && !hostStop) {
       return this.failAttempt(state, current, 'process', 'The CLI exited, but the Host has not proven that its process tree ended, so the attempt is not accepted; its workspace stays held until the Host proves the end.',
-        binding ? { binding, bindingTo: 'needs_review', bindingReason: 'The CLI may still have written before the Host proved its end; native history may have advanced.' } : {});
+        { ...(binding ? { binding, bindingTo: 'needs_review', bindingReason: 'The CLI may still have written before the Host proved its end; native history may have advanced.' } : {}),
+          source: 'host', executionCertainty: 'unresolved', observedState: { hostState: 'exited', processTreeEnded: false } });
     }
     const reported = parser.sessionId && binding && !this.bindingRecord(binding).nativeSessionId ? { nativeSessionId: parser.sessionId } : {};
     const native = binding ? { binding, bindingTo: 'needs_review', bindingReason: 'The invocation did not complete normally; native history may have advanced.', bindingChanges: reported } : {};
@@ -2356,22 +2512,33 @@ export class Engine {
       return this.store.transaction(() => {
         const events = record.runtimeShutdown
           ? this.attemptTransition(current, 'interrupted', 'Runtime shutdown; the attempt outcome is unknown.')
-          : this.attemptTransition(current, 'canceled', record.stopReason || 'Stopped by the user.');
+          : this.attemptTransition(current, 'canceled', record.stopReason || 'Stopped by the user.', null,
+            { source: record.stopSource || 'external_control', code: 'interrupted', causeKnowledge: 'direct_fact',
+              executionCertainty: Number.isInteger(outcome.code) || outcome.processTreeEnded === true ? 'completed' : 'unresolved',
+              sideEffectCertainty: 'unknown', observedState: { ...(outcome.signal ? { hostState: outcome.signal } : {}),
+                ...(outcome.processTreeEnded === true ? { processTreeEnded: true } : {}), ...(Number.isInteger(outcome.code) ? { exitCode: outcome.code } : {}) } });
         if (binding) events.push(this.bindingTransition(binding, 'needs_review', native.bindingReason, reported)[0]);
         this.store.appendEvents(state.id, events);
       });
     }
     const lastDiagnostic = parser.diagnostics?.at(-1);
-    if (record.timedOut) return this.failAttempt(state, current, 'timeout', `The attempt exceeded ${config.timeoutSeconds} seconds of active process time.${lastDiagnostic ? ` Last provider diagnostic: ${lastDiagnostic}` : ''}`, { evidence: evidence(), ...native });
+    if (record.timedOut) return this.failAttempt(state, current, 'timeout', `The attempt exceeded ${config.timeoutSeconds} seconds of active process time.${lastDiagnostic ? ` Last provider diagnostic: ${lastDiagnostic}` : ''}`,
+      { evidence: evidence(), ...native, source: 'workflow', executionCertainty: 'completed', observedState: Number.isInteger(outcome.code) ? { exitCode: outcome.code } : {} });
     // A Host stop the Engine did not ask for is not settled as a result: an unproven tree is named as such, a deadline is a timeout, and any other
     // stop is a cancellation.
     if (outcome.signal === 'tree_not_ended') {
-      return this.failAttempt(state, current, 'process', `The Host stopped the CLI (${outcome.custody}), but has not proven that its process tree ended, so the attempt is not accepted; its workspace stays held until the Host proves the end.`, { evidence: evidence(), ...native });
+      return this.failAttempt(state, current, 'process', `The Host stopped the CLI (${outcome.custody}), but has not proven that its process tree ended, so the attempt is not accepted; its workspace stays held until the Host proves the end.`,
+        { evidence: evidence(), ...native, source: 'host', executionCertainty: 'unresolved', observedState: { hostState: outcome.custody || 'unknown', processTreeEnded: false } });
     }
     if (STOP_FAMILY.has(outcome.signal)) {
-      if (outcome.signal === 'deadline_terminated') return this.failAttempt(state, current, 'timeout', 'The Host ended the CLI at its admitted deadline, so the attempt is not accepted.', { evidence: evidence(), ...native });
+      if (outcome.signal === 'deadline_terminated') return this.failAttempt(state, current, 'timeout', 'The Host ended the CLI at its admitted deadline, so the attempt is not accepted.',
+        { evidence: evidence(), ...native, source: 'workflow', executionCertainty: 'completed',
+          observedState: { hostState: outcome.signal, processTreeEnded: true, ...(Number.isInteger(outcome.code) ? { exitCode: outcome.code } : {}) } });
       return this.store.transaction(() => {
-        const events = this.attemptTransition(current, 'canceled', `The Host stopped the CLI (${outcome.signal}) without a Stop from this Engine.`);
+        const events = this.attemptTransition(current, 'canceled', `The Host stopped the CLI (${outcome.signal}) without a Stop from this Engine.`, null,
+          { source: 'host', code: 'interrupted', causeKnowledge: 'direct_fact', executionCertainty: 'completed', sideEffectCertainty: 'unknown',
+            observedState: { hostState: outcome.signal, processTreeEnded: outcome.processTreeEnded === true,
+              ...(Number.isInteger(outcome.code) ? { exitCode: outcome.code } : {}) } });
         if (binding) events.push(this.bindingTransition(binding, 'needs_review', native.bindingReason, reported)[0]);
         this.store.appendEvents(state.id, events);
       });
@@ -2379,7 +2546,8 @@ export class Engine {
     if (!succeeded) {
       const text = [parser.error, outcome.stderrTail, lastDiagnostic].filter(Boolean).join('\n');
       if (outcome.code === 0 && !parser.error) return this.failAttempt(state, current, 'output_contract', parser.formatError || (parser.terminal ? 'The CLI reported no final answer.' : 'The CLI exited without a terminal event.'), { evidence: evidence(), ...native });
-      return this.failAttempt(state, current, parser.protocolError ? 'provider_protocol' : this.adapters.classifyFailure(text), text.trim().slice(0, 4000) || `The CLI exited with code ${outcome.code}.`, { evidence: evidence(), ...native });
+      return this.failAttempt(state, current, parser.protocolError ? 'provider_protocol' : this.adapters.classifyFailure(text), text.trim().slice(0, 4000) || `The CLI exited with code ${outcome.code}.`,
+        { evidence: evidence(), ...native, source: 'provider', executionCertainty: 'completed', observedState: { exitCode: outcome.code, processTreeEnded: true } });
     }
     if (binding && !parser.sessionId) return this.failAttempt(state, current, 'output_contract', 'The CLI did not report a native session ID, so continuation is unavailable.', { evidence: evidence(), ...native });
     let jsonArtifact = null, captured = null, parsed;
@@ -2417,6 +2585,11 @@ export class Engine {
         events.push(event); binding = updated;
       }
       spec?.commit?.(parsed, events, current, { provider: config.provider, requestedModel: config.model, observedModel: parser.model });
+      if (this.store.get('SELECT outcome_id FROM failure_outcomes WHERE attempt_id = ?', current.id)) {
+        const reconciled = this.failureOutcomeEvent(current, { source: 'host', code: 'custody_unresolved', causeKnowledge: 'direct_fact', attemptState: 'succeeded',
+          executionCertainty: 'completed', observedState: { hostState: 'exited', processTreeEnded: true, exitCode: outcome.code, spoolComplete: true } });
+        if (reconciled) events.push(reconciled);
+      }
       events.push(...this.attemptTransition(current, 'succeeded', 'Outputs committed after a successful terminal event and process exit.'));
       if (lifecycle.kind === 'intent') events.push(...this.openLifecycleIntent(state, current, current.node_instance_id, lifecycle.proposal));
       this.store.appendEvents(state.id, events);
@@ -2589,7 +2762,10 @@ export class Engine {
       this.store.run(`UPDATE loop_executions SET state = 'canceled', pause_reason = NULL WHERE run_id = ? AND loop_node_id = ?`, runId, loop.loop_node_id);
       this.store.run(`UPDATE loop_iterations SET outcome = 'canceled', ended_at = ? WHERE run_id = ? AND loop_node_id = ? AND outcome IN ('running','paused')`, nowIso(), runId, loop.loop_node_id);
       const attempt = this.store.get('SELECT * FROM attempts WHERE id = ?', loop.attempt_id);
-      if (!TERMINAL_ATTEMPT.has(attempt.state)) events.push(...this.attemptTransition(attempt, 'canceled', reason));
+      if (!TERMINAL_ATTEMPT.has(attempt.state)) events.push(...this.attemptTransition(attempt, 'canceled', reason, null,
+        { source: 'external_control', code: 'interrupted', causeKnowledge: 'direct_fact',
+          executionCertainty: UNSTARTED.has(attempt.state) ? 'not_started' : 'unknown',
+          sideEffectCertainty: UNSTARTED.has(attempt.state) ? 'none_proven' : 'unknown' }));
     }
   }
 
@@ -2605,7 +2781,8 @@ export class Engine {
           const events = [this.runEvent(row, 'stopping', 'Root Stop requested.')];
           const loopAttempts = new Set([...this.store.all('SELECT attempt_id FROM loop_executions WHERE run_id = ?', runId).map(item => item.attempt_id), ...this.mapAttemptIds(runId)]);
           for (const attempt of this.latestAttempts(runId).filter(item => UNSTARTED.has(item.state) && !this.processes.get(item.id)?.launching && !loopAttempts.has(item.id)))
-            events.push(...this.attemptTransition(attempt, 'canceled', 'Canceled by root Stop before it started.'));
+            events.push(...this.attemptTransition(attempt, 'canceled', 'Canceled by root Stop before it started.', null,
+              { source: 'external_control', code: 'interrupted', causeKnowledge: 'direct_fact', executionCertainty: 'not_started', sideEffectCertainty: 'none_proven' }));
           this.cancelLoops(runId, events, 'Loop canceled by root Stop.');
           this.cancelMaps(runId, events, 'Map canceled by root Stop.');
           this.cancelManagedTasks(runId, events, 'Managed task canceled by root Stop.');
@@ -2619,6 +2796,8 @@ export class Engine {
         pids: [...this.processes.entries()].filter(([, record]) => record.runId === runId && record.launched && record.child?.pid).map(([attemptId, record]) => ({ attemptId, pid: record.child.pid, custodyId: record.child.custody ? record.child.custodyId ?? null : null })) });
       if (shouldSignalProcesses) for (const record of this.processes.values()) if (record.runId === runId) {
         record.stopRequested = true;
+        record.stopSource = 'external_control';
+        record.stopReason = 'Stopped by root Stop.';
         record.abortController?.abort();
         if (record.launched) this.terminateLaunched(record.child);
       }
@@ -2653,18 +2832,21 @@ export class Engine {
       return { status: 202, body: { runId, state: row.state, requestId: body.requestId } };
     }, () => {
       if (taskToStop) {
-        const events = [];
-        this.cancelManagedTasks(runId, events, 'Managed task canceled by scoped Stop.', instanceId);
-        this.store.appendEvents(runId, events);
+        this.store.transaction(() => {
+          const events = [];
+          this.cancelManagedTasks(runId, events, 'Managed task canceled by scoped Stop.', instanceId);
+          if (events.length) this.store.appendEvents(runId, events);
+        });
         for (const record of this.processes.values()) if (record.taskExecutionId === this.store.get('SELECT id FROM managed_tasks WHERE run_id=? AND node_instance_id=? ORDER BY created_at DESC LIMIT 1', runId, instanceId)?.id) {
           if (record.launched) this.terminateLaunched(record.child);
         }
         queueMicrotask(() => this.pump());
       } else if (loopToStop) {
         this.loopRuntime(loopToStop.state, loopToStop.instanceId).pending = ['stopped', 'Stopped by the user.'];
-        this.stopLoopBody(loopToStop.state, loopToStop.instanceId);
+        this.stopLoopBody(loopToStop.state, loopToStop.instanceId, 'external_control');
       } else if (processToStop) {
         processToStop.stopRequested = true;
+        processToStop.stopSource = 'external_control';
         processToStop.stopReason = 'Stopped by the user (scoped Stop).';
         processToStop.abortController?.abort();
         if (processToStop.parentAttemptId) {
@@ -2700,7 +2882,8 @@ export class Engine {
         if (body.action === 'close') {
           const loopAttempts = new Set([...this.store.all('SELECT attempt_id FROM loop_executions WHERE run_id = ?', runId).map(item => item.attempt_id), ...this.mapAttemptIds(runId)]);
           for (const attempt of this.latestAttempts(runId).filter(item => UNSTARTED.has(item.state) && !loopAttempts.has(item.id)))
-            events.push(...this.attemptTransition(attempt, 'canceled', 'Closed by the user.'));
+            events.push(...this.attemptTransition(attempt, 'canceled', 'Closed by the user.', null,
+              { source: 'external_control', code: 'interrupted', causeKnowledge: 'direct_fact', executionCertainty: 'not_started', sideEffectCertainty: 'none_proven' }));
           this.cancelLoops(runId, events, 'Loop canceled when the run was closed.');
           this.cancelMaps(runId, events, 'Map canceled when the run was closed.');
           this.cancelManagedTasks(runId, events, 'Managed task canceled when the run was closed.');

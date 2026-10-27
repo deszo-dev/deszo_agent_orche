@@ -331,6 +331,10 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
       const params = query(url, ['afterSequence', 'limit'], ['afterSequence', 'limit']);
       return [200, engine.listRunEvents(match[1], params)];
     }],
+    ['GET', 'public', new RegExp(`^/api/v2/runs/(${UUID})/failure-outcomes/page$`), ({ match, url }) => {
+      const params = query(url, ['afterSequence', 'limit'], ['afterSequence', 'limit']);
+      return [200, engine.listFailureOutcomes(match[1], params)];
+    }],
     ['GET', 'public', new RegExp(`^/api/v2/runs/(${UUID})$`), ({ match }) => [200, engine.runSnapshot(match[1])]],
     ['POST', 'public', new RegExp(`^/api/v2/runs/(${UUID})/stop$`), async ({ req, match }) => { const result = engine.stopRun(match[1], parse(await bodyText(req))); return [result.status, result.body]; }],
     ['POST', 'public', new RegExp(`^/api/v2/runs/(${UUID})/recovery$`), async ({ req, match }) => { const result = engine.recoverRun(match[1], parse(await bodyText(req))); return [result.status, result.body]; }],

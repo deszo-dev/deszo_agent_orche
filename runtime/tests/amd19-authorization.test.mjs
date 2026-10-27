@@ -22,9 +22,9 @@ test('AMD-19 inventories every route and Owner Token survives rotation and resta
     const inventory = api.runner.routeInventory;
     const counts = Object.groupBy(inventory, route => route.classification);
     assert.deepEqual(Object.fromEntries(Object.entries(counts).map(([key, value]) => [key, value.length])), {
-      public: 89, 'internal-host': 5, retired: 4,
+      public: 90, 'internal-host': 5, retired: 4,
     });
-    assert.equal(inventory.length, 98);
+    assert.equal(inventory.length, 99);
     assert.equal(inventory.filter(route => route.preflight).length, 1);
     assert.equal(inventory.filter(route => route.hostVariant).length, 1);
     assert.equal(new Set(inventory.map(route => `${route.method} ${route.pattern}`)).size, inventory.length);

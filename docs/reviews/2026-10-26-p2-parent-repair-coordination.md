@@ -12,9 +12,7 @@ P2 supports sequential workflow definitions without Loop, Map, or Task nodes. An
 
 ## Verdict
 
-**P2 PARENT/REPAIR COORDINATION VERIFIED**
-
-The required Parent→Repair→Parent lifecycle is proven through real Engine replacement, durable SQLite coordination, the Rust Lifecycle Host, isolated workspace roots, immutable published-version pins, accepted logical resolution, and exactly-once Parent continuation. P2-E2E-01 through P2-E2E-05 cover active Repair recovery, Host completion while Engine is absent, accepted-outcome recovery, failed Repair, and repeated Engine replacement. The independent review found no blocking issue. The separate Parent-Stop callback-loss scenario passes deterministic Host-backed reconciliation, with the test-depth caveat documented under limitations.
+The 2026-10-26 P2 baseline verdict and test totals below are historical. D25 is now proven by P2-E2E-06: Parent Stop commits durably, Engine A exits before the original after-commit callback body runs, and Engine B recovers the same Parent/Repair relationship while the original Repair remains owned by the Rust Lifecycle Host. The refreshed focused P2 suite passed 25/25. The exact current-candidate full Node run completed with 824/847 passing, 22 failing and one canceled, so the overall result is `D25 VERIFIED WITH LIMITATIONS`; the broader regression gate is not clean.
 
 ## 2. Baseline architecture and existing Parent/Repair mechanisms
 
@@ -123,7 +121,7 @@ P2-E2E-01 publishes Parent v2 and Repair v2 while the v1 Runs are active, replac
 | CB-14: Parent Stop during Repair | Link becomes stopped and Repair Stop is requested; no resume | P2-D12 and P2-D25 |
 | CB-15: Host temporarily unreachable | Existing Custody hold/unknown state keeps workspace unavailable; P2 does not weaken it | Existing P1 Host-unresolved suites; no additional P2 outage injection |
 | CB-16: duplicate/stale completion | Unique incident, idempotency receipts, link-state CAS, and Engine generation fencing prevent repeated logical continuation | P2-D01 and P2-E2E-05; duplicate completion event not synthetically injected |
-| CB-17: Parent Stop commits before its callback | Startup reconciliation finds the terminal Parent, marks the link stopped, and stops a still-running Repair | P2-D25; callback loss and reconciliation are covered in one live Engine, not by a second-Engine replacement |
+| CB-17: Parent Stop commits before its callback | Engine replacement recovers the durable Stop, closes the original link, and stops the same Host-owned Repair; no Parent resume | Historical same-Engine proof: P2-D25. Real Engine A-to-B boundary: P2-E2E-06 (2026-10-27) |
 
 ## 11. Deterministic and Host-backed tests
 
@@ -138,6 +136,7 @@ The Rust Host-backed E2E tests are in `runtime/tests/parent-repair-custody-e2e.t
 | P2-E2E-03: Engine crash after Repair acceptance and before Parent scheduling | Passed; `repair_accepted` survives and Engine C resumes Parent once |
 | P2-E2E-04: Repair fails while Engine is absent | Passed; Engine B records failed Repair; Parent stays suspended |
 | P2-E2E-05: two Engine replacements at distinct coordination boundaries | Passed; active Repair and then resumed Parent B each retain the same Custody invocation |
+| P2-E2E-06: Parent Stop callback loss across real Engine replacement | Passed; Engine A exited after durable Stop and before the original callback body, Engine B stopped the same Host-owned Repair, and Engine C reconciliation was idempotent |
 
 P2-D19 verifies that an accepted Repair remains pending while a durable Parent `custody_workspace_holds` row is held, then resumes only after `custodyReleaseIfEnded` receives `processTreeEnded: true`. P2-D21 injects a temporary Host outage during admission cancellation and verifies that Parent suspension remains pending and no withdrawal marker is committed until the Host returns terminal `admission_cancelled` proof. P2-D24 verifies that the `attempt.launch_withdrawn` marker and Context binding restoration commit together.
 
@@ -151,7 +150,7 @@ P2 does not promise exactly-once behavior for arbitrary external APIs. An Attemp
 
 ## 13. Independent review
 
-**Status:** Completed; no blocking findings remain. The first independent review identified four gaps: no-launch classification depended on detection-versus-reserve timing; a Parent Owner recovery call could bypass `failedNodeRetry=never`; Context binding restoration was separate from the durable withdrawal marker; and hold-release proof used only an in-memory simulation. The implementation now preserves a never-launched attempt as auditable, creates a fresh Attempt ID for Custody's single-use admission, blocks manual Parent recovery while the logical link has not resumed, checks the checkpoint's target Attempt identity until the authorized resume transition, restores Context state in the same transaction as the withdrawal event, and tests release of a durable Host hold. A further review also asked that temporary Host cancellation failure not be treated as withdrawal; the Engine now retries transient cancellation errors and keeps Parent in `suspension_requested` until the Host confirms terminal admission cancellation. The final review then found a missed Parent-Stop callback crash window; startup reconciliation now closes the link and stops a live Repair, and the reviewer confirmed the fix with no other blocking issue. D19, D21, D23, D24, and D25 cover these dispositions. The remaining review caveat is a proof-depth gap: D25 simulates a lost callback and invokes reconciliation on the same live Engine rather than replacing Engine A with Engine B while the Repair Host process is active. The core Parent→Repair→Parent lifecycle does have repeated real Engine-replacement coverage in P2-E2E-01 through P2-E2E-05.
+**Status:** Completed; no blocking findings remain. The first independent review identified four gaps: no-launch classification depended on detection-versus-reserve timing; a Parent Owner recovery call could bypass `failedNodeRetry=never`; Context binding restoration was separate from the durable withdrawal marker; and hold-release proof used only an in-memory simulation. The implementation now preserves a never-launched attempt as auditable, creates a fresh Attempt ID for Custody's single-use admission, blocks manual Parent recovery while the logical link has not resumed, checks the checkpoint's target Attempt identity until the authorized resume transition, restores Context state in the same transaction as the withdrawal event, and tests release of a durable Host hold. A further review also asked that temporary Host cancellation failure not be treated as withdrawal; the Engine now retries transient cancellation errors and keeps Parent in `suspension_requested` until the Host confirms terminal admission cancellation. The final review then found a missed Parent-Stop callback crash window; startup reconciliation now closes the link and stops a live Repair, and the reviewer confirmed the fix with no other blocking issue. D19, D21, D23, D24, and D25 cover these dispositions. Historical proof-depth caveat recorded 2026-10-26: D25 simulated a lost callback and reconciled on the same live Engine. P2-E2E-06 closes that caveat with real Engine A-to-B replacement while the Repair Host process remains active; the 2026-10-27 narrow review found no blocking issue.
 
 ## 14. Verification and frozen candidate
 
@@ -173,7 +172,7 @@ The production build retains a non-blocking Vite warning that the main minified 
 - P2 resumes only sequential workflow graphs without Loop, Map, or Task nodes.
 - Parent retry policy is chosen explicitly at initiation; arbitrary failure classification is deferred to P3.
 - If a Host admission must be withdrawn while the Host is temporarily unavailable, P2 remains at `suspension_requested` and retries the idempotent cancellation until the Host proves the admission terminal. Repair is not dispatched during that uncertainty.
-- D25 verifies a missed Parent-Stop callback and startup reconciliation with an active Host-backed Repair in one live Engine. A second-Engine replacement at that specific Parent-Stop crash boundary is not separately simulated; repeated Engine replacement is proven for the core Parent→Repair→Parent lifecycle in P2-E2E-01 through P2-E2E-05.
+- Historical limitation recorded 2026-10-26 and superseded by P2-E2E-06 on 2026-10-27: the original P2-D25 test reconciled a missed callback in one live Engine; it did not replace Engine A while the Host-backed Repair was active.
 - P2 has no workflow-native Judge authority. P4 will need a trusted Engine-mediated decision path that does not expose Owner credentials to a provider; it can call this typed coordination contract without redesigning the durable link, scheduler gate, or recovery semantics.
 - Protected Self-Repair definition and privileges are deferred to P5.
 - Build activation is deferred to P6.
@@ -197,3 +196,123 @@ P2 files:
 - Evidence: `docs/reviews/evidence/2026-10-26-p2-parent-repair-e2e.json`.
 - Frozen inventory: `docs/reviews/evidence/2026-10-26-p2-source-manifest.json`.
 
+## 18. D25 — Parent Stop Callback Loss Across Real Engine Replacement
+
+**Current verdict:** `D25 VERIFIED WITH LIMITATIONS`
+
+The D25 crash boundary is verified by the new Host-backed `P2-E2E-06`. The targeted P2 suite passes on the final D25 source manifest. The complete current-candidate Node regression has 22 failures and one canceled test, so this report does not claim a clean full regression or `P2 COVERAGE CLOSED`.
+
+### 18.1 Previous proof limitation and test-first result
+
+The limitation recorded on 2026-10-26 was precise: P2-D25 suppressed a lost Parent-Stop callback and called reconciliation on the same live Engine. It did not prove recovery after Engine A exited while the linked Repair was still active under the Rust Host. P2-E2E-06 adds that real process boundary. The older P2-D25 test remains valid evidence for its same-Engine case.
+
+The first pre-fix run showed that startup recovery could reclassify an idle durable Parent `stopping` state as an unrelated interruption. The minimal production correction is in `runtime/core/engine.mjs`: when a recovered Run is `stopping`, has no Custody rows, and has no pending in-flight or admission work, recovery loads its ordinary Run state and settles it through `finishRunIfDone()` so the durable Stop reaches the normal canceled outcome.
+
+### 18.2 Test and deterministic callback barrier
+
+The test uses real SQLite persistence, the Owner Stop route, Engine A, Engine B, a separate Engine C for idempotence, the real Rust Lifecycle Host, the existing Rust fixture CLI, immutable Parent/Repair publications, and disjoint disposable workspaces. It starts the original linked Repair and records its Host binding and process identity before requesting Parent Stop.
+
+A test-only Node preload wraps `Engine.prototype.afterLogicalParentStop`. Once the actual Stop transaction commits, it writes a barrier event and blocks before calling the original hook. The test observes Parent `stopping`, link `open`, Stop journal sequence 46, and the barrier event, then terminates Engine A without releasing the barrier. Evidence confirms `originalCallbackEntered=false` and `originalCallbackCompleted=false`. Engine B and C start without the preload.
+
+### 18.3 Causal trace and identities
+
+| Item | Observed identity or state |
+|---|---|
+| Parent Run | `8bb005a1-3959-407c-8901-f8d1dd6ea822` |
+| Repair Run / link / incident | `36f65e81-c4e5-41c3-a1bb-32ee23aa14f8` / `6da20bcd-09db-4e99-afbe-cf4170d43e76` / `ce628847-aa7c-4de6-84dc-667aeaca7cc9` |
+| Parent / Repair publication | `a37b4caf-11f5-45a8-811a-f987bbf73c8b` / `792e491b-b599-4a6d-93da-f7f0a5f6f5ad` |
+| Repair Attempt / Custody invocation | `1fbefcb0-a45d-406f-a626-5f77b40aa42d` / `253941f6-bd65-47c0-a8e8-812143b61194` |
+| Engine A | PID `25444`, process identity `2026-10-27T06:29:51.6022777Z`; exited after Stop commit with original callback body unentered |
+| Rust Host / Repair | Host PID `18820`; Repair PID `20868`, process identity `2026-10-27T06:29:56.5342906Z`, unchanged across Engine A exit |
+| Engine B | PID `34608`, new runner lock `d4598541-1b62-4760-8ad5-845fd3753be5`; recovered Parent Stop at journal sequence 52 |
+| Engine C | PID `28984`, runner lock `41e2b348-156e-4dc4-af0a-960a357e79f4`; repeated reconciliation remained idempotent |
+| Stop request | `POST /runs/8bb005a1-3959-407c-8901-f8d1dd6ea822/stop`, request `4a112c5b-19d6-4df9-8075-acddca24155f`; durable Parent state `stopping`, link `open`, journal sequence 46 |
+
+The recorded causal order is: Owner Stop request → durable Stop commit and callback barrier → Engine A exit with Host and Repair still alive → Engine B lock acquisition → recovered Parent Stop/link closure → Host Stop and tree proof → Engine C idempotence.
+
+### 18.4 Host Stop and workspace safety
+
+Engine B stopped the original Repair Attempt and Custody invocation; it did not launch another Repair. The Rust Host reported `stopped`, `drained=true`, and `processTreeEnded=true`. The durable workspace hold changed from `held` with no evidence to `released` only after that proof. The captured termination evidence has a complete spool and records the authorized Stop reason. Parent and Repair roots were confirmed physically disjoint.
+
+Final state is Parent `canceled`, Repair `canceled`, link `parent_stopped`; provider launch count is 1, Parent resume count is 0, duplicate settlement count is 0, and Repair accepted effects are 0. Parent A’s earlier accepted effect remains exactly once; Parent B and C did not continue.
+
+### 18.5 Independent review
+
+The final narrow read-only review found no blocking D25 issue. It confirmed that the updated shared `launchCase` helper keeps `extraArgs` optional and empty by default, only Engine A in D25 receives the barrier preload, and Engine B/C use ordinary startup. The reviewer verified callback suppression, real replacement, original Host/Repair identity, process-tree proof before hold release, no Parent resume, and idempotent repeated reconciliation.
+
+### 18.6 D25 source changes and evidence
+
+| Category | Files |
+|---|---|
+| Production correction | `runtime/core/engine.mjs` |
+| Test support and coverage | `runtime/tests/custody-support.mjs`; `runtime/tests/parent-repair-custody-e2e.test.mjs`; `runtime/tests/fixtures/p2-d25-stop-commit-barrier.mjs` |
+| Final evidence | [D25 Engine replacement evidence](evidence/2026-10-27-p2-d25-engine-replacement.json); [final D25 source manifest](evidence/2026-10-27-p2-d25-final-source-manifest.json) |
+| Preserved initial D25 proof snapshot | [initial D25 evidence](evidence/2026-10-27-p2-d25-engine-replacement-initial.json); [initial D25 source manifest](evidence/2026-10-27-p2-d25-source-manifest.json) |
+| Report | `docs/reviews/2026-10-26-p2-parent-repair-coordination.md` |
+
+The final manifest SHA-256 is `05d2ad4faf2a79dac00a0c02e61a540c16a7f0f9ef87bc72743d25a7b74b1ace`. The current evidence binds that same SHA-256, and the post-run audit found 0 mismatches among its 21 input files. The earlier D25 evidence was preserved separately; the 2026-10-26 P2 baseline evidence was not overwritten.
+
+### 18.7 Verification and remaining regression limits
+
+| Check | Result | Exit |
+|---|---|---:|
+| Focused P2/D25: `node --disable-warning=ExperimentalWarning --test --test-concurrency=1 runtime/tests/p2-migration.test.mjs runtime/tests/parent-repair-coordination.test.mjs runtime/tests/parent-repair-custody-e2e.test.mjs` | 25 passed, 0 failed; 128,402.8873 ms | 0 |
+| Full Node suite: `npm test` on the current manifest-bound candidate | 847 tests: 824 passed, 22 failed, 1 canceled; 5,823,380.8879 ms | 1 |
+| Rust Lifecycle Host: `cargo test --manifest-path lifecycle-host/Cargo.toml` with the local process/filesystem privileges required by Windows Host tests | 23 passed, 0 failed; main/doc targets had 0 tests | 0 |
+| Documentation: `npm run docs:check` | 32 schemas; 141 positive, 82 negative and 42 semantic-negative cases; 1,250 local links; 15 Mermaid diagrams; 0 errors | 0 |
+| Production build: `npm run build` | TypeScript and Vite succeeded; 1,763 modules transformed; Vite reports the 691.67 kB main chunk advisory | 0 |
+| Whitespace: `git diff --check` | Passed | 0 |
+
+The full Node failures include Custody fixture builds that report `LNK1104` opening the shared test `codex.exe`; F7-06 Race A/B/C and F7-08 runs that ended `waiting_for_user` instead of `succeeded`; SP-02, SP-03, SP-04, SP-06, and SP-07 crash-barrier timeouts while waiting for Engine/Host exit; and Proof B timing out at its 900,000 ms limit. The D25 E2E passed in that full run as test 651. The regression is therefore incomplete even though the D25 crash boundary is directly proven.
+
+### 18.8 Current Git state
+
+Branch: `codex/adr-0003-0005-completion`
+
+HEAD: `abb7295e6339912b5be16fc4db2a8e244e0c1bfc`
+
+Staged changes: none. Nothing was committed, pushed, merged, rebased, reset, or cleaned. The working tree also contains concurrent P1.5/P3 changes; those were preserved. Full current modified/untracked inventory:
+
+```text
+ M docs/reviews/2026-10-26-p2-parent-repair-coordination.md
+ M docs/schemas/journal-event-v2.schema.json
+ M docs/schemas/runtime-api-v2.schema.json
+ M mcp/bridge.mjs
+ M runtime/core/custody.mjs
+ M runtime/core/engine.mjs
+ M runtime/core/linkedRepair.mjs
+ M runtime/core/mapRuntime.mjs
+ M runtime/core/migrations.mjs
+ M runtime/core/schemas.mjs
+ M runtime/core/store.mjs
+ M runtime/core/taskProcesses.mjs
+ M runtime/core/taskRuntime.mjs
+ M runtime/runner.mjs
+ M runtime/tests/amd19-authorization.test.mjs
+ M runtime/tests/custody-replay.test.mjs
+ M runtime/tests/custody-support.mjs
+ M runtime/tests/custody-terminal-settlement.test.mjs
+ M runtime/tests/custody-unresolved.test.mjs
+ M runtime/tests/fixtures/custody-cli.rs
+ M runtime/tests/integrity.test.mjs
+ M runtime/tests/loops.test.mjs
+ M runtime/tests/map.test.mjs
+ M runtime/tests/p2-migration.test.mjs
+ M runtime/tests/parent-repair-coordination.test.mjs
+ M runtime/tests/parent-repair-custody-e2e.test.mjs
+ M runtime/tests/workflow-continuation-negative.test.mjs
+ M runtime/tests/workflow-p1-continuation.test.mjs
+?? docs/reviews/2026-10-27-p3-typed-failure-outcomes.md
+?? docs/reviews/evidence/2026-10-27-p2-d25-engine-replacement-initial.json
+?? docs/reviews/evidence/2026-10-27-p2-d25-engine-replacement.json
+?? docs/reviews/evidence/2026-10-27-p2-d25-final-source-manifest.json
+?? docs/reviews/evidence/2026-10-27-p2-d25-source-manifest.json
+?? docs/reviews/evidence/2026-10-27-p3-regression-recovery-source-manifest.json
+?? docs/reviews/evidence/2026-10-27-p3-typed-failure-outcomes-e2e.json
+?? docs/reviews/evidence/2026-10-27-p3-typed-failure-outcomes-source-manifest.json
+?? docs/schemas/failure-outcome.schema.json
+?? docs/storage/m20.sql
+?? runtime/core/failureOutcomes.mjs
+?? runtime/tests/failure-outcomes.test.mjs
+?? runtime/tests/fixtures/p2-d25-stop-commit-barrier.mjs
+```

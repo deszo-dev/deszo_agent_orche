@@ -56,6 +56,11 @@ function attempts(engine, runId, nodeId) {
   return engine.store.all('SELECT * FROM attempts WHERE run_id = ? AND node_instance_id = ? ORDER BY ordinal', runId, nodeId);
 }
 
+function failureOutcome(engine, attemptId) {
+  const row = engine.store.get('SELECT outcome_json FROM failure_outcomes WHERE attempt_id = ?', attemptId);
+  return row ? JSON.parse(row.outcome_json) : null;
+}
+
 test('P2-D01..08: exact incident replay creates one Repair, accepts its exact result and resumes the original Parent once', async () => {
   const api = await startTestRunner();
   try {
@@ -67,6 +72,10 @@ test('P2-D01..08: exact incident replay creates one Repair, accepts its exact re
     assert.equal(attempts(engine, context.parentRunId, 'c')[0].state, 'scheduled');
 
     const request = requestFor(context);
+    const parentTarget = attempts(engine, context.parentRunId, 'b')[0];
+    const parentOutcomeBeforeLink = failureOutcome(engine, parentTarget.id);
+    assert.ok(parentOutcomeBeforeLink);
+    assert.equal(parentOutcomeBeforeLink.incidentId, undefined);
     const startRun = engine.startRun.bind(engine);
     engine.startRun = () => {}; // Retain the durable queued boundary while checking duplicate admission.
     const started = await api.call('POST', `/api/v2/runs/${context.parentRunId}/linked-repair`, request);
@@ -76,6 +85,10 @@ test('P2-D01..08: exact incident replay creates one Repair, accepts its exact re
     assert.equal(sameReceipt.body.repairRunId, started.body.repairRunId);
     assert.equal(engine.store.get('SELECT COUNT(*) AS n FROM run_links WHERE incident_id = ?', request.incidentId).n, 1);
     assert.equal(engine.store.get('SELECT COUNT(*) AS n FROM runs WHERE id = ?', started.body.repairRunId).n, 1);
+    const parentOutcomeAfterLink = failureOutcome(engine, parentTarget.id);
+    assert.equal(parentOutcomeAfterLink.outcomeId, parentOutcomeBeforeLink.outcomeId);
+    assert.equal(parentOutcomeAfterLink.incidentId, request.incidentId);
+    assert.equal(parentOutcomeAfterLink.repairRunId, started.body.repairRunId);
 
     const replay = await api.call('POST', `/api/v2/runs/${context.parentRunId}/linked-repair`, { ...request, requestId: randomUUID() });
     assert.equal(replay.status, 200, JSON.stringify(replay.body));
@@ -132,6 +145,12 @@ test('P2-D09: a successful Repair with an unauthorized exact result digest does 
     assert.equal(engine.store.get('SELECT state FROM runs WHERE id = ?', context.parentRunId).state, 'waiting_for_user');
     assert.equal(attempts(engine, context.parentRunId, 'b').length, 1);
     assert.equal(attempts(engine, context.parentRunId, 'c')[0].state, 'scheduled');
+    const rejectedAttempt = attempts(engine, started.body.repairRunId, 'verified')[0];
+    const mismatch = failureOutcome(engine, rejectedAttempt.id);
+    assert.equal(mismatch.source, 'workflow');
+    assert.equal(mismatch.category, 'task_failure');
+    assert.equal(mismatch.canonicalCode, 'lifecycle_candidate_mismatch');
+    assert.equal(mismatch.incidentId, request.incidentId);
     assert.equal(engine.store.get("SELECT COUNT(*) AS n FROM journal_events WHERE run_id = ? AND event_type = 'continuation.repair_result_rejected'", context.parentRunId).n, 1);
   } finally { await api.close(); }
 });
@@ -155,6 +174,11 @@ test('P2-D10: Repair failure remains durable and never resumes Parent', async ()
     assert.equal(link.parent_suspension_state, 'suspended_for_repair');
     assert.equal(engine.store.get('SELECT state FROM runs WHERE id = ?', context.parentRunId).state, 'waiting_for_user');
     assert.equal(attempts(engine, context.parentRunId, 'b').length, 1);
+    const repairAttempt = attempts(engine, started.body.repairRunId, 'verified')[0];
+    const repairFailure = failureOutcome(engine, repairAttempt.id);
+    assert.equal(repairFailure.source, 'provider');
+    assert.equal(repairFailure.category, 'provider_failure');
+    assert.equal(repairFailure.attemptId, repairAttempt.id);
     assert.equal(engine.store.get("SELECT COUNT(*) AS n FROM journal_events WHERE run_id = ? AND event_type = 'continuation.parent_resumed'", context.parentRunId).n, 0);
   } finally { await api.close(); }
 });

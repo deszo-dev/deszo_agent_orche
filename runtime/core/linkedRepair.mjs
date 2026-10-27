@@ -166,7 +166,8 @@ export function installLinkedRepair(Engine, { ApiError }) {
         code: issue.code, message })];
       for (const attempt of this.latestAttempts(state.id).filter(item => ['scheduled', 'waiting'].includes(item.state))) {
         events.push({ type: 'attempt.error', nodeInstanceId: attempt.node_instance_id, attemptId: attempt.id, payload: { code: issue.code, message, evidence: null } });
-        events.push(...this.attemptTransition(attempt, 'blocked', message));
+        events.push(...this.attemptTransition(attempt, 'blocked', message, null, { source: 'engine', code: issue.code,
+          causeKnowledge: 'direct_fact', executionCertainty: 'not_started', sideEffectCertainty: 'none_proven' }));
       }
       const current = this.requireRun(state.id);
       if (current.state !== 'draining') events.push(this.runEvent(current, 'draining', 'Linked repair workspace isolation could not be established; dispatch is blocked.'));
@@ -380,7 +381,11 @@ export function installLinkedRepair(Engine, { ApiError }) {
         parent_suspension_state = 'suspended_for_repair', updated_at = ? WHERE id = ? AND state = 'open'`, at, link.id).changes;
       if (changed) {
         const payload = { linkId: link.id, incidentId: link.incident_id, code: 'repair_result_mismatch', expectedSha256: link.expected_repair_result_sha256, actualSha256: actualDigest };
-        this.store.appendEvents(link.repair_run_id, [event('continuation.repair_result_rejected', payload)]);
+        const attempt = this.latestAttempt(link.repair_run_id, link.repair_result_node_instance_id);
+        const mismatch = attempt ? this.failureOutcomeEvent(attempt, { source: 'workflow', code: 'lifecycle_candidate_mismatch',
+          rawCode: 'repair_result_mismatch', attemptState: 'succeeded', causeKnowledge: 'direct_fact', executionCertainty: 'completed',
+          sideEffectCertainty: 'unknown', evidence: attempt.outputs_artifact_id ? { artifactId: attempt.outputs_artifact_id } : null }) : null;
+        this.store.appendEvents(link.repair_run_id, [event('continuation.repair_result_rejected', payload), ...(mismatch ? [mismatch] : [])]);
         this.store.appendEvents(link.parent_run_id, [event('continuation.repair_result_rejected', payload), event('continuation.repair_failed', { ...payload, repairRunId: link.repair_run_id, repairState: 'succeeded' })]);
       }
       return null;
@@ -423,7 +428,8 @@ export function installLinkedRepair(Engine, { ApiError }) {
           // A Host admission is single-use per Attempt ID, even when the launch request was never sent. Preserve that
           // no-effect Attempt as canceled and plan a new one atomically; this is not a retry of an operation that ran.
           const located = this.locate(state, link.resume_node_instance_id);
-          events.push(...this.attemptTransition(attempt, 'canceled', 'Parent suspension withdrew this attempt before provider launch; no operation ran.'));
+          events.push(...this.attemptTransition(attempt, 'canceled', 'Parent suspension withdrew this attempt before provider launch; no operation ran.', null,
+            { source: 'external_control', code: 'interrupted', causeKnowledge: 'direct_fact', executionCertainty: 'not_started', sideEffectCertainty: 'none_proven' }));
           this.planAttempt(state, link.resume_node_instance_id, located.node.id, located.node.type, null, events,
             'Continue after Parent suspension withdrew the prior attempt before provider launch.');
         } else if (['failed', 'canceled'].includes(attempt?.state)) {
@@ -580,6 +586,15 @@ export function installLinkedRepair(Engine, { ApiError }) {
         link.id, parentRunId, repairRunId, parent.workspace_id, repairWorkspace.id, body.failedNodeInstanceId, checkpoint.artifactId,
         body.incidentId, activeParentWork ? 'suspension_requested' : 'suspended_for_repair', authorization.artifactId,
         body.repairResultNodeInstanceId, body.expectedRepairResultSha256, body.failedNodeRetry, at, at);
+      const priorOutcomeRow = this.store.get('SELECT outcome_json FROM failure_outcomes WHERE attempt_id = ?', target.id);
+      if (priorOutcomeRow) {
+        const priorOutcome = parseStrictJson(priorOutcomeRow.outcome_json);
+        const association = this.failureOutcomeEvent(target, { source: priorOutcome.source, code: priorOutcome.canonicalCode,
+          rawCode: priorOutcome.rawCode, attemptState: priorOutcome.observedState.attemptState || target.state,
+          causeKnowledge: priorOutcome.causeKnowledge, executionCertainty: priorOutcome.executionCertainty,
+          sideEffectCertainty: priorOutcome.sideEffectCertainty, observedState: priorOutcome.observedState });
+        if (association) this.store.appendEvents(parentRunId, [association]);
+      }
       linkId = link.id;
       this.store.appendEvents(parentRunId, [event('continuation.linked_repair_opened', { linkId: link.id, incidentId: body.incidentId,
         repairRunId, resumeNodeInstanceId: body.failedNodeInstanceId, checkpoint: checkpoint.artifactId, contract: 'logical_policy' }),

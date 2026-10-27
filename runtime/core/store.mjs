@@ -186,16 +186,50 @@ export class Store extends EventEmitter {
       const written = [];
       for (const event of events) {
         sequence += 1;
+        let payload = event.payload;
+        if (['attempt.failure_outcome', 'attempt.failure_outcome_updated', 'run.failure_outcome', 'run.failure_outcome_updated'].includes(event.type)) {
+          const matchingEvents = [...written].filter(item => item.attemptId === (event.attemptId ?? null));
+          const relatedEvidence = [...matchingEvents].reverse().find(item => item.type === 'attempt.error')
+            || [...matchingEvents].reverse().find(item => item.type === 'attempt.execution_evidence')
+            || [...matchingEvents].reverse().find(item => item.type === 'attempt.state_changed')
+            || (!event.attemptId ? [...matchingEvents].reverse().find(item => item.type === 'run.state_changed') : null);
+          if (relatedEvidence && event.payload?.outcome) {
+            const refs = event.payload.outcome.evidenceReferences || [];
+            if (!refs.some(item => item.type === 'journal_event' && item.id === relatedEvidence.id))
+              payload = { outcome: { ...event.payload.outcome, evidenceReferences: [...refs, { type: 'journal_event', id: relatedEvidence.id }] } };
+          }
+        }
         const envelope = {
           schemaVersion: version, id: randomUUID(), runId, sequence, timestamp: event.timestamp || nowIso(),
           nodeInstanceId: event.nodeInstanceId ?? null, attemptId: event.attemptId ?? null,
-          type: event.type, payload: event.payload,
+          type: event.type, payload,
         };
         assertValid(version === 1 ? 'journal-event.schema.json' : 'journal-event-v2.schema.json', null, envelope, `Journal event ${event.type}`);
         const json = canonicalize(envelope);
         const bytes = Buffer.from(json, 'utf8');
         this.run(`INSERT INTO journal_events(run_id, sequence, id, event_type, node_instance_id, attempt_id, envelope_json, envelope_sha256, envelope_byte_size, timestamp)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, runId, sequence, envelope.id, envelope.type, envelope.nodeInstanceId, envelope.attemptId, json, sha256(bytes), bytes.length, envelope.timestamp);
+        if (['attempt.failure_outcome', 'run.failure_outcome'].includes(event.type)) {
+          const outcome = envelope.payload.outcome;
+          if ((outcome.attemptId ?? null) !== envelope.attemptId || (outcome.nodeInstanceId ?? null) !== envelope.nodeInstanceId)
+            throw new Error(`Failure outcome ${outcome.outcomeId} does not match its journal event identity.`);
+          if (outcome.attemptId && outcome.outcomeId !== outcome.attemptId)
+            throw new Error(`Attempt failure outcome ${outcome.outcomeId} must use its stable Attempt identity.`);
+          if (this.get('SELECT outcome_id FROM failure_outcomes WHERE outcome_id = ?', outcome.outcomeId))
+            throw new Error(`Failure outcome ${outcome.outcomeId} already exists.`);
+          this.run(`INSERT INTO failure_outcomes(outcome_id,run_id,attempt_id,node_instance_id,first_sequence,latest_sequence,revision,outcome_json,recorded_at,updated_at)
+            VALUES(?,?,?,?,?,?,?,?,?,?)`, outcome.outcomeId, runId, outcome.attemptId ?? null, outcome.nodeInstanceId ?? null, sequence, sequence,
+          outcome.revision, canonicalize(outcome), outcome.recordedAt, outcome.updatedAt || outcome.recordedAt);
+        } else if (['attempt.failure_outcome_updated', 'run.failure_outcome_updated'].includes(event.type)) {
+          const outcome = envelope.payload.outcome;
+          if ((outcome.attemptId ?? null) !== envelope.attemptId || (outcome.nodeInstanceId ?? null) !== envelope.nodeInstanceId)
+            throw new Error(`Failure outcome ${outcome.outcomeId} does not match its journal event identity.`);
+          if (outcome.attemptId && outcome.outcomeId !== outcome.attemptId)
+            throw new Error(`Attempt failure outcome ${outcome.outcomeId} must use its stable Attempt identity.`);
+          const updated = this.run(`UPDATE failure_outcomes SET latest_sequence = ?, revision = ?, outcome_json = ?, updated_at = ? WHERE outcome_id = ? AND run_id = ?`,
+            sequence, outcome.revision, canonicalize(outcome), outcome.updatedAt || outcome.recordedAt, outcome.outcomeId, runId);
+          if (!updated.changes) throw new Error(`Failure outcome ${outcome.outcomeId} cannot be updated before its initial record.`);
+        }
         written.push(envelope);
       }
       this.run('UPDATE runs SET last_sequence = ? WHERE id = ?', sequence, runId);

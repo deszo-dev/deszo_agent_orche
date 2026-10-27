@@ -314,17 +314,21 @@ export function installTaskRuntime(Engine, { ApiError }) {
     afterBarrierWork(this.testBarrier, 'delivery-claimed', { runId: state.id, phase: execution.data.current.phase, workspaceCwd: this.workspaceOf(state).cwd },
       () => this.executeManagedTaskUtility(state, execution, attempt, controller.signal)).then(() => {
       if (controller.signal.aborted || record.stopRequested || this.runState(state.id) === 'stopping') {
-        const current = this.store.get('SELECT * FROM attempts WHERE id=?', attempt.id);
-        if (current.state === 'running') this.store.appendEvents(state.id, this.attemptTransition(current, 'canceled', 'Managed utility stopped.'));
-        this.saveManagedTask(execution);
+        this.store.transaction(() => {
+          const current = this.store.get('SELECT * FROM attempts WHERE id=?', attempt.id);
+          if (current.state === 'running') this.store.appendEvents(state.id, this.attemptTransition(current, 'canceled', 'Managed utility stopped.'));
+          this.saveManagedTask(execution);
+        });
         return;
       }
       this.store.appendEvents(state.id, this.attemptTransition(attempt, 'succeeded', 'Managed task utility completed.'));
     }).catch(error => {
       if (this.runState(state.id) === 'stopping' || controller.signal.aborted) {
-        const current = this.store.get('SELECT * FROM attempts WHERE id=?', attempt.id);
-        if (current.state === 'running') this.store.appendEvents(state.id, this.attemptTransition(current, 'canceled', 'Managed utility stopped.'));
-        this.saveManagedTask(execution);
+        this.store.transaction(() => {
+          const current = this.store.get('SELECT * FROM attempts WHERE id=?', attempt.id);
+          if (current.state === 'running') this.store.appendEvents(state.id, this.attemptTransition(current, 'canceled', 'Managed utility stopped.'));
+          this.saveManagedTask(execution);
+        });
         return;
       }
       this.failAttempt(state, attempt, 'input_unavailable', error.message);
@@ -578,15 +582,19 @@ export function installTaskRuntime(Engine, { ApiError }) {
     }
     return changed;
   };
-  P.cancelManagedTasks = function cancelManagedTasks(runId, events, reason, instance = null) {
+  P.cancelManagedTasks = function cancelManagedTasks(runId, events, reason, instance = null, source = 'external_control') {
     const state = this.runs.get(runId); if (!state) return;
     for (const execution of this.taskState(state).executions.values()) {
       if (!ACTIVE.has(execution.row.state) || (instance && execution.row.node_instance_id !== instance)) continue;
       execution.row.state = 'canceled'; execution.data.incompleteReason = reason;
       const parent = this.store.get('SELECT * FROM attempts WHERE id=?', execution.row.attempt_id);
-      if (!['canceled', 'failed', 'succeeded', 'interrupted'].includes(parent.state)) events.push(...this.attemptTransition(parent, 'canceled', reason));
+      if (!['canceled', 'failed', 'succeeded', 'interrupted'].includes(parent.state)) events.push(...this.attemptTransition(parent, 'canceled', reason, null,
+        { source, code: 'interrupted', causeKnowledge: 'direct_fact', executionCertainty: pending.has(parent.state) ? 'not_started' : 'unknown',
+          sideEffectCertainty: pending.has(parent.state) ? 'none_proven' : 'unknown' }));
       this.saveManagedTask(execution, events);
-      for (const record of this.processes.values()) if (record.taskExecutionId === execution.row.id) { record.stopRequested = true; record.abortController?.abort(); }
+      for (const record of this.processes.values()) if (record.taskExecutionId === execution.row.id) {
+        record.stopRequested = true; record.stopSource = source; record.stopReason = reason; record.abortController?.abort();
+      }
     }
   };
   P.retryManagedTaskStep = function retryManagedTaskStep(state, body, events) {

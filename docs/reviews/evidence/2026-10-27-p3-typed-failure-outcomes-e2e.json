@@ -1,0 +1,162 @@
+{
+  "schemaVersion": 1,
+  "verificationDate": "2026-10-27",
+  "candidate": {
+    "branch": "codex/adr-0003-0005-completion",
+    "head": "abb7295e6339912b5be16fc4db2a8e244e0c1bfc",
+    "sourceManifest": {
+      "path": "docs/reviews/evidence/2026-10-27-p3-typed-failure-outcomes-source-manifest.json",
+      "sha256": "67f04ff7afab525dbeab1a2d634d403b9efc431ec1ba7edb611b86ad5bc6f3d3",
+      "filesHashed": 28,
+      "mismatches": 0
+    }
+  },
+  "focusedSuite": {
+    "path": "runtime/tests/failure-outcomes.test.mjs",
+    "result": "passed",
+    "passed": 7,
+    "failed": 0,
+    "includesRealRustHostBackedE2E": true
+  },
+  "e2e": [
+    {
+      "id": "P3-E2E-01",
+      "status": "passed",
+      "testName": "P3-E2E-01: a settled provider failure retains the same typed outcome and evidence after Engine replacement",
+      "testFile": "runtime/tests/failure-outcomes.test.mjs",
+      "execution": {
+        "engine": "actual Deszo Engine",
+        "persistence": "actual SQLite store",
+        "hostFixture": "real Rust Lifecycle Host with deterministic custody fixture",
+        "provider": "deterministic fixture; no model inference"
+      },
+      "assertions": [
+        "The Run and Attempt identity is preserved across Engine replacement.",
+        "The typed outcome identity and classification remain stable.",
+        "Evidence references still resolve after replacement.",
+        "No duplicate terminal outcome is created.",
+        "No provider process is relaunched."
+      ],
+      "persistedRunId": null,
+      "scratchStoreCleaned": true
+    },
+    {
+      "id": "P3-03/P3-22",
+      "status": "passed",
+      "testName": "P3-03/P3-22: provider authentication failure is typed without copying credential-shaped diagnostics",
+      "testFile": "runtime/tests/failure-outcomes.test.mjs",
+      "execution": {
+        "engine": "actual Deszo Engine",
+        "persistence": "actual SQLite store",
+        "hostFixture": "real Rust Lifecycle Host with deterministic custody fixture",
+        "provider": "deterministic auth-failure fixture"
+      },
+      "assertions": [
+        "The authentication failure produces a typed provider outcome.",
+        "Credential-shaped diagnostic text is excluded from the typed summary."
+      ],
+      "persistedRunId": null,
+      "scratchStoreCleaned": true
+    },
+    {
+      "id": "P3-E2E-02",
+      "status": "passed",
+      "testName": "P3-E2E-02: Rust Host failure evidence reconciles after Engine absence without a second launch",
+      "testFile": "runtime/tests/failure-outcomes.test.mjs",
+      "execution": {
+        "engine": "actual Deszo Engine",
+        "persistence": "actual SQLite store",
+        "hostFixture": "real Rust Lifecycle Host with deterministic custody fixture",
+        "provider": "deterministic fixture; no model inference"
+      },
+      "assertions": [
+        "The same Custody invocation is reconciled after Engine replacement.",
+        "Host terminal and spool evidence are retained.",
+        "The appropriate typed outcome is durable.",
+        "No second provider launch or duplicate outcome occurs."
+      ],
+      "persistedRunId": null,
+      "scratchStoreCleaned": true
+    },
+    {
+      "id": "P3-E2E-03",
+      "status": "passed",
+      "testName": "P3-E2E-03: a temporary Host outage stays uncertain, then reconciles the same outcome when the process completes",
+      "testFile": "runtime/tests/failure-outcomes.test.mjs",
+      "execution": {
+        "engine": "actual Deszo Engine",
+        "persistence": "actual SQLite store",
+        "hostFixture": "real Rust Lifecycle Host with deterministic custody fixture",
+        "provider": "deterministic fixture; no model inference"
+      },
+      "assertions": [
+        "Host unavailability does not create terminal proof.",
+        "Execution and side-effect uncertainty remain explicit and the workspace stays held.",
+        "Later authoritative Host evidence updates the same outcome identity.",
+        "No blind replay or duplicate launch occurs."
+      ],
+      "persistedRunId": null,
+      "scratchStoreCleaned": true
+    }
+  ],
+  "compatibilityFollowUps": [
+    {
+      "test": "P2-E2E-05",
+      "status": "passed_in_pair",
+      "selection": "P2-E2E-05|P2-E2E-06",
+      "result": "Passed before the following selected test failed."
+    },
+    {
+      "test": "P2-E2E-06",
+      "status": "passed_standalone_after_pair_failure",
+      "command": "node --disable-warning=ExperimentalWarning --test --test-concurrency=1 --test-name-pattern=\"P2-E2E-06\" runtime/tests/parent-repair-custody-e2e.test.mjs",
+      "passed": 1,
+      "failed": 0,
+      "exitCode": 0,
+      "sourceState": "Original P2 test source restored before this isolated run.",
+      "limitation": "The test failed after P2-E2E-05 in the paired selector and in the interrupted full suite; the order-sensitive interaction remains unresolved."
+    }
+  ],
+  "fullNodeRegression": {
+    "command": "npm test",
+    "status": "interrupted_after_silent_stall",
+    "shellExitCode": 1,
+    "aggregateTapSummaryAvailable": false,
+    "lastNumberedTopLevelResultObserved": 791,
+    "topLevelPassesObserved": 786,
+    "failuresObserved": [
+      {
+        "test": "SP-04: an acknowledged prefix is never missing after the Engine reconnects",
+        "failure": "Timed out waiting for the Engine to end at after_ack."
+      },
+      {
+        "test": "SP-06: a terminal outcome applied before the Engine ends is not applied again",
+        "failure": "Timed out waiting for the Engine to end at after_settle."
+      },
+      {
+        "test": "SP-07: a Host that dies during a spool write leaves a valid durable prefix and reports the tail honestly",
+        "failure": "Timed out waiting for the Host to end during the spool write."
+      },
+      {
+        "test": "P2-E2E-05: two Engine replacements at Repair and resumed-Parent boundaries preserve one association and invocation",
+        "failure": "Expected Parent A side effect count 1 before Repair; observed 0."
+      },
+      {
+        "test": "P2-E2E-06: Parent Stop callback loss is recovered across real Engine replacement",
+        "failure": "Expected Parent A side effect count 1 before Repair; observed 0."
+      }
+    ],
+    "interruptionReason": "No TAP output for over eleven minutes after test 791; the attached test session was interrupted before it emitted an aggregate summary."
+  },
+  "otherRegression": {
+    "command": "cargo test --manifest-path lifecycle-host/Cargo.toml",
+    "status": "passed_on_elevated_rerun",
+    "passed": 23,
+    "failed": 0,
+    "exitCode": 0,
+    "initialSandboxRun": {
+      "exitCode": 1,
+      "reason": "Windows sandbox denied atomic replacement and symlink privileges required by tests."
+    }
+  }
+}

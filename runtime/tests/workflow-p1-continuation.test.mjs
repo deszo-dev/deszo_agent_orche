@@ -75,9 +75,9 @@ const attemptsOf = (root, runId, node) => rows(root,
   runId, node);
 const runRow = (root, runId) => rows(root, 'SELECT id, state, published_version_id AS publishedVersionId, execution_hash AS executionHash FROM runs WHERE id = ?', runId)[0];
 function journal(root, runId) {
-  return rows(root, 'SELECT sequence, event_type, envelope_json FROM journal_events WHERE run_id = ? ORDER BY sequence', runId).map(row => {
+  return rows(root, 'SELECT id, sequence, event_type, envelope_json FROM journal_events WHERE run_id = ? ORDER BY sequence', runId).map(row => {
     const envelope = JSON.parse(row.envelope_json);
-    return { sequence: row.sequence, type: row.event_type, node: envelope.nodeInstanceId, attemptId: envelope.attemptId, payload: envelope.payload };
+    return { id: row.id, sequence: row.sequence, type: row.event_type, node: envelope.nodeInstanceId, attemptId: envelope.attemptId, payload: envelope.payload };
   });
 }
 const settledCount = (root, runId, node) => journal(root, runId)
@@ -295,6 +295,16 @@ test('P1-13: a Run whose published definition is inconsistent is not continued; 
       assert.equal(await waitForRunState(engineB, runId, SETTLED, 120_000), 'interrupted');
       const reason = journal(scratch.root, runId).filter(event => event.type === 'run.state_changed' && event.payload?.to === 'interrupted').at(-1).payload.reason;
       assert.match(reason, /published workflow definition/, 'the refusal names the cause');
+      const outcomes = await engineB.api('GET', `/api/v2/runs/${runId}/failure-outcomes/page?afterSequence=0&limit=10`);
+      assert.equal(outcomes.status, 200);
+      const runOutcomes = outcomes.body.items.filter(item => !item.outcome.attemptId);
+      assert.equal(runOutcomes.length, 1, 'the Engine recovery refusal has a durable run-scoped outcome');
+      assert.equal(runOutcomes[0].outcome.category, 'orchestrator_failure');
+      assert.equal(runOutcomes[0].outcome.canonicalCode, 'corruption');
+      assert.equal(runOutcomes[0].outcome.observedState.runState, 'interrupted');
+      const runTransitionRef = runOutcomes[0].outcome.evidenceReferences.find(reference => reference.type === 'journal_event');
+      assert.ok(runTransitionRef && journal(scratch.root, runId).some(event => event.id === runTransitionRef.id && event.type === 'run.state_changed'),
+        'the run-scoped outcome resolves to the recovery refusal transition');
       assert.equal(launchesOf(scratch, 'custody-steady').length, 1, 'nothing is relaunched or substituted');
       record('P1-13', { runId, providerPid: bBefore.pid, finalRunState: 'interrupted', reason });
     } finally { await stopAll(engineB); }

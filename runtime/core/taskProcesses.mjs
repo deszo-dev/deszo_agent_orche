@@ -66,11 +66,28 @@ export function installTaskProcesses(Engine) {
               streams: { stdout: closed.stdout.manifestRef, stderr: closed.stderr.manifestRef }, captureVerdict, reason: reason.slice(0, 1000) };
             assertValid('execution-evidence.schema.json', 'executionEvidence', evidence);
             evidenceRef = ref(this.store.putJson(evidence));
-            this.store.run('INSERT INTO execution_evidence(id,run_id,attempt_id,outcome,evidence_artifact_id,created_at) VALUES(?,?,?,?,?,?)', randomUUID(), state.id, attempt.id, outcome, evidenceRef.artifactId, nowIso());
-            this.store.appendEvents(state.id, [{ type: 'attempt.execution_evidence', nodeInstanceId: instance, attemptId: attempt.id,
-              payload: { evidence: evidenceRef, outcome, ...(options.checkId ? { checkId: options.checkId } : {}) } }]);
             const current = this.store.get('SELECT * FROM attempts WHERE id = ?', attempt.id);
-            this.store.appendEvents(state.id, this.attemptTransition(current, aborted ? 'canceled' : outcome === 'passed' ? 'succeeded' : 'failed', reason));
+            const failedDetails = outcome === 'passed' || aborted ? null : {
+              source: ['spawn_failed', 'capture_failed'].includes(outcome) ? 'engine' : 'workflow',
+              code: outcome === 'timed_out' ? 'timeout' : outcome === 'capture_failed' ? 'capture_failed' : 'process',
+              rawCode: error?.code,
+              causeKnowledge: 'direct_fact',
+              executionCertainty: outcome === 'spawn_failed' ? 'not_started' : outcome === 'capture_failed' ? 'unknown' : 'completed',
+              sideEffectCertainty: outcome === 'spawn_failed' ? 'none_proven' : 'unknown',
+              observedState: { ...(Number.isInteger(status) ? { exitCode: status } : {}), ...(captureVerdict === 'complete' ? { spoolComplete: true } : {}) },
+              evidence: evidenceRef,
+            };
+            const canceledDetails = aborted ? { source: record.stopSource || 'recovery', code: 'interrupted', causeKnowledge: 'direct_fact',
+              executionCertainty: complete ? 'completed' : 'unresolved', sideEffectCertainty: 'unknown' } : failedDetails;
+            this.store.transaction(() => {
+              this.store.run('INSERT INTO execution_evidence(id,run_id,attempt_id,outcome,evidence_artifact_id,created_at) VALUES(?,?,?,?,?,?)',
+                randomUUID(), state.id, attempt.id, outcome, evidenceRef.artifactId, nowIso());
+              this.store.appendEvents(state.id, [
+                { type: 'attempt.execution_evidence', nodeInstanceId: instance, attemptId: attempt.id,
+                  payload: { evidence: evidenceRef, outcome, ...(options.checkId ? { checkId: options.checkId } : {}) } },
+                ...this.attemptTransition(current, aborted ? 'canceled' : outcome === 'passed' ? 'succeeded' : 'failed', reason, null, canceledDetails),
+              ]);
+            });
           } catch (captureError) { this.storageUnavailable(captureError); error = captureError; }
           const bytes = name => encoding === 'buffer' ? Buffer.concat(chunks[name]) : Buffer.concat(chunks[name]).toString('utf8');
           resolve({ status, signal: childSignal, error: error || record.captureError || null, timedOut: record.timedOut, aborted, truncated,
@@ -114,7 +131,9 @@ export function installTaskProcesses(Engine) {
       return result;
     } catch (error) {
       const current = this.store.get('SELECT * FROM attempts WHERE id=?', attempt.id);
-      if (['scheduled', 'waiting', 'running'].includes(current.state)) this.store.appendEvents(state.id, this.attemptTransition(current, 'failed', error.message));
+      if (['scheduled', 'waiting', 'running'].includes(current.state)) this.store.transaction(() => this.store.appendEvents(state.id,
+        this.attemptTransition(current, 'failed', error.message, null,
+          { source: 'engine', code: 'process', causeKnowledge: 'unknown', executionCertainty: 'unknown' })));
       this.finishTaskWork(record.workId, null, record.outputBytes);
       throw error;
     } finally {

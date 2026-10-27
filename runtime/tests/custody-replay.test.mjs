@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import {
   attachEngine, attemptsOf, buildArtifacts, cleanup, committedChunks, custodyBindings, database, eventually, exited, hostRecords, newScratch,
-  readInvocations, runEventTypes, startAgentRun, startCustodyHost, startEngine, testsRoot, waitForRunState, custodyRequest,
+  processIdentity, readInvocations, runEventTypes, startAgentRun, startCustodyHost, startEngine, testsRoot, waitForRunState, custodyRequest,
 } from './custody-support.mjs';
 import { writeFileSync } from 'node:fs';
 
@@ -35,10 +35,26 @@ async function crashThenFinish(point, label, { ticks = 12 } = {}) {
   const scratch = newScratch(`sp-${label}`);
   const host = await startCustodyHost(scratch.root);
   const engineA = await startEngine(scratch.root, host, { fixtureStateDir: scratch.fixtureState, extraEnv: { DESZO_CUSTODY_TEST_FAULT: point } });
+  const engineAIdentity = processIdentity(engineA.pid);
+  const hostIdentity = processIdentity(host.pid);
   let engineB = null;
   try {
     const { runId } = await startAgentRun(engineA, { workflowId: `custody-${label}`, model: 'custody-steady', requestText: `[ticks=${ticks}]`, workspaceCwd: scratch.workspace });
-    await eventually(() => engineA.child.exitCode === FAULT_EXIT, `the Engine to end at ${point}`, 90_000, 50);
+    try {
+      await eventually(() => {
+        if (engineA.child.exitCode === FAULT_EXIT) return true;
+        if (exited(engineA.child)) throw new Error('Engine exited before the requested replay fault point; point=' + point
+          + '; pid=' + engineA.pid + '; processIdentity=' + engineAIdentity + '; exitCode=' + engineA.child.exitCode
+          + '; signalCode=' + engineA.child.signalCode + '; stderr=' + engineA.stderr());
+        return false;
+      }, 'the Engine to end at ' + point, 90_000, 50);
+    } catch (error) {
+      if (exited(engineA.child)) throw error;
+      throw new Error(error.message + ' runId=' + runId + '; enginePid=' + engineA.pid + '; engineProcessIdentity=' + engineAIdentity
+        + '; engineExitCode=' + engineA.child.exitCode + '; engineSignalCode=' + engineA.child.signalCode
+        + '; hostPid=' + host.pid + '; hostProcessIdentity=' + hostIdentity + '; hostStderr=' + host.stderr()
+        + '; engineStderr=' + engineA.stderr());
+    }
     const bindingBeforeRestart = custodyBindings(scratch.root, runId);
     const committedAtCrash = bindingBeforeRestart.length
       ? committedChunks(scratch.root, attemptsOf(scratch.root, runId).find(row => row.process_id).id, 'stdout').reduce((sum, chunk) => sum + chunk.byteLength, 0)
@@ -115,10 +131,19 @@ test('SP-07: a Host that dies during a spool write leaves a valid durable prefix
   const scratch = newScratch('sp07');
   const crashing = await startCustodyHost(scratch.root, { testCrashAfterSpoolBytes: 60 });
   const engine = await startEngine(scratch.root, crashing, { fixtureStateDir: scratch.fixtureState });
+  const crashingHostIdentity = processIdentity(crashing.pid);
+  const engineIdentity = processIdentity(engine.pid);
   let replacement = null, engineB = null;
   try {
     const { runId } = await startAgentRun(engine, { workflowId: 'custody-sp07', model: 'custody-steady', requestText: '[ticks=12]', workspaceCwd: scratch.workspace });
-    await eventually(() => exited(crashing.child), 'the Host to end during the spool write', 90_000, 50);
+    try {
+      await eventually(() => exited(crashing.child), 'the Host to end during the spool write', 90_000, 50);
+    } catch (error) {
+      throw new Error(error.message + ' runId=' + runId + '; hostPid=' + crashing.pid + '; hostProcessIdentity=' + crashingHostIdentity
+        + '; hostExitCode=' + crashing.child.exitCode + '; hostSignalCode=' + crashing.child.signalCode
+        + '; enginePid=' + engine.pid + '; engineProcessIdentity=' + engineIdentity + '; engineExitCode=' + engine.child.exitCode
+        + '; engineSignalCode=' + engine.child.signalCode + '; hostStderr=' + crashing.stderr() + '; engineStderr=' + engine.stderr());
+    }
     engine.kill();
     const custodyId = custodyBindings(scratch.root, runId)[0].custody_id;
     const spoolPath = join(crashing.state, 'custody', 'spool', custodyId, 'stdout.bin');

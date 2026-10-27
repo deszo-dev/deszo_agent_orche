@@ -1076,6 +1076,38 @@
       ],
       "additionalProperties": false
     },
+    "failureOutcomePage": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "outcome": { "$ref": "failure-outcome.schema.json" },
+              "firstSequence": { "type": ["integer", "null"], "minimum": 1 },
+              "latestSequence": { "type": ["integer", "null"], "minimum": 1 }
+            },
+            "required": ["outcome", "firstSequence", "latestSequence"],
+            "additionalProperties": false
+          }
+        },
+        "nextCursor": { "type": ["integer", "null"], "minimum": 1 },
+        "cursor": { "type": "integer", "minimum": 0 },
+        "legacyCoverage": {
+          "type": "object",
+          "properties": {
+            "status": { "const": "untyped" },
+            "source": { "const": "journal" },
+            "untypedFailureCount": { "type": "integer", "minimum": 0 }
+          },
+          "required": ["status", "source", "untypedFailureCount"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["items", "nextCursor", "cursor", "legacyCoverage"],
+      "additionalProperties": false
+    },
     "mapExecution": {
       "type": "object",
       "properties": {

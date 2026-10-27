@@ -127,7 +127,7 @@ export async function attachEngine(host, runtimeInstanceId = randomUUID()) {
 // A real Engine runtime. It is started from runtime/runner.mjs, reads its custody bootstrap from the environment, and
 // publishes a connection descriptor. Its provider fixture is found on PATH.
 export async function startEngine(root, host, { custody = true, fixtureStateDir, extraEnv = {}, fixtureProvider = true, isolateCodexHome = true,
-  devTestConfirmationOff = false } = {}) {
+  devTestConfirmationOff = false, extraArgs = [] } = {}) {
   const connectionFile = join(root, 'runtime', 'connection.json');
   mkdirSync(join(root, 'runtime'), { recursive: true });
   if (existsSync(connectionFile)) unlinkSync(connectionFile);
@@ -142,7 +142,7 @@ export async function startEngine(root, host, { custody = true, fixtureStateDir,
   if (isolateCodexHome) env.CODEX_HOME = codexHome;
   if (custody) Object.assign(env, { DESZO_CUSTODY_ADDRESS: host.address, DESZO_CUSTODY_CAPABILITY: host.capability, DESZO_CUSTODY_GENERATION: host.generation });
   else for (const name of ['DESZO_CUSTODY_ADDRESS', 'DESZO_CUSTODY_CAPABILITY', 'DESZO_CUSTODY_GENERATION']) delete env[name];
-  const args = ['--disable-warning=ExperimentalWarning', join(repo, 'runtime/runner.mjs'), '--root', root, '--connection-file', connectionFile,
+  const args = ['--disable-warning=ExperimentalWarning', ...extraArgs, join(repo, 'runtime/runner.mjs'), '--root', root, '--connection-file', connectionFile,
     ...(devTestConfirmationOff ? ['--dev-test-confirmation-off'] : [])];
   const child = spawn(process.execPath, args,
     { cwd: repo, env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });

@@ -73,8 +73,14 @@ function outcomeOf(root, runId) {
     const hold = attempt ? db.prepare('SELECT state, evidence_json FROM custody_workspace_holds WHERE attempt_id = ?').get(attempt.id) : null;
     const transitions = attempt ? db.prepare(`SELECT envelope_json FROM journal_events WHERE run_id = ? AND attempt_id = ? AND event_type = 'attempt.state_changed' ORDER BY sequence`)
       .all(runId, attempt.id).map(row => JSON.parse(row.envelope_json).payload.to) : [];
+    const stateChangeEventIds = attempt ? db.prepare(`SELECT id FROM journal_events WHERE run_id = ? AND attempt_id = ? AND event_type = 'attempt.state_changed' ORDER BY sequence`)
+      .all(runId, attempt.id).map(row => row.id) : [];
     const failure = attempt ? db.prepare(`SELECT envelope_json FROM journal_events WHERE run_id = ? AND attempt_id = ? AND event_type = 'attempt.error' ORDER BY sequence DESC LIMIT 1`)
       .get(runId, attempt.id) : null;
+    const outcomeRow = attempt ? db.prepare('SELECT outcome_json FROM failure_outcomes WHERE attempt_id = ?').get(attempt.id) : null;
+    const outcomeEvents = attempt ? db.prepare(`SELECT event_type,envelope_json FROM journal_events WHERE run_id = ? AND attempt_id = ?
+      AND event_type IN ('attempt.failure_outcome','attempt.failure_outcome_updated') ORDER BY sequence`).all(runId, attempt.id)
+      .map(row => ({ type: row.event_type, ...JSON.parse(row.envelope_json).payload.outcome })) : [];
     return {
       attempt: attempt?.state ?? null,
       settlements: transitions.filter(to => ['succeeded', 'failed', 'canceled', 'interrupted'].includes(to)),
@@ -83,6 +89,9 @@ function outcomeOf(root, runId) {
       failureCode: failure ? JSON.parse(failure.envelope_json).payload.code ?? null : null,
       failureEvidence: failure ? JSON.parse(failure.envelope_json).payload.evidence ?? null : null,
       failureMessage: failure ? JSON.parse(failure.envelope_json).payload.message ?? null : null,
+      failureOutcome: outcomeRow ? JSON.parse(outcomeRow.outcome_json) : null,
+      outcomeEvents,
+      stateChangeEventIds,
       run: db.prepare('SELECT state FROM runs WHERE id = ?').get(runId)?.state ?? null,
     };
   } finally { db.close(); }
@@ -148,10 +157,19 @@ test('F3 terminal: exited, tree not proven, exit 0 is not a success; the hold wa
     assert.deepEqual(before.settlements, ['failed'], 'the attempt settles exactly once, as failed');
     assert.match(before.failureMessage, /has not proven that its process tree ended/);
     assert.equal(before.hold, 'held', 'no proof, no release');
+    assert.equal(before.failureOutcome.category, 'execution_uncertain');
+    assert.equal(before.failureOutcome.executionCertainty, 'unresolved');
+    assert.equal(before.failureOutcome.observedState.processTreeEnded, false);
     host.prove();
     const after = await eventually(() => { const next = outcome(); return next.hold === 'released' ? next : null; }, 'the hold to be released on the proof', 15_000, 200);
     assert.equal(after.holdEvidence.processTreeEnded, true);
     assert.equal(after.attempt, 'failed', 'a late proof does not turn the failed attempt into a success');
+    assert.equal(after.failureOutcome.outcomeId, before.failureOutcome.outcomeId, 'a late proof updates the original outcome identity');
+    assert.equal(after.failureOutcome.executionCertainty, 'completed');
+    assert.equal(after.failureOutcome.observedState.processTreeEnded, true);
+    assert.equal(after.failureOutcome.observedState.spoolComplete, true);
+    assert.equal(after.outcomeEvents.filter(event => event.type === 'attempt.failure_outcome').length, 1);
+    assert.equal(after.outcomeEvents.filter(event => event.type === 'attempt.failure_outcome_updated').length, 1);
   } finally { await api.close(); }
 });
 
@@ -217,6 +235,10 @@ test('F3 terminal: deadline_terminated, tree proven, exit 0 is a timeout, not a 
     assert.deepEqual(result.settlements, ['failed']);
     assert.match(result.failureMessage, /admitted deadline/);
     assert.equal(result.hold, 'released');
+    assert.equal(result.failureOutcome.source, 'workflow');
+    assert.equal(result.failureOutcome.category, 'task_failure');
+    assert.equal(result.failureOutcome.canonicalCode, 'timeout');
+    assert.equal(result.failureOutcome.observedState.hostState, 'deadline_terminated');
   } finally { await api.close(); }
 });
 
@@ -239,6 +261,10 @@ test('F3 terminal: exited, tree proven, exit 0 with an incomplete spool is not a
     assert.notEqual(result.run, 'succeeded');
     assert.deepEqual(result.settlements, ['failed']);
     assert.equal(result.hold, 'released', 'the proof releases the hold even when the answer is not accepted');
+    assert.equal(result.failureOutcome.source, 'host');
+    assert.equal(result.failureOutcome.category, 'execution_uncertain');
+    assert.equal(result.failureOutcome.observedState.spoolComplete, false);
+    assert.equal(result.failureOutcome.executionCertainty, 'unresolved');
   } finally { await api.close(); }
 });
 
@@ -254,6 +280,12 @@ test('F3 launch refusal: a refused launch fails the attempt with a journal-valid
     assert.equal(result.failureCode, 'provider_unavailable', 'a Host code the journal does not name is recorded as a provider that did not start');
     assert.match(result.failureMessage, /could not be started/);
     assert.notEqual(result.failureEvidence, null, 'the raw Host code is kept as the attempt evidence');
+    assert.equal(result.failureOutcome.executionCertainty, 'not_started');
+    assert.equal(result.failureOutcome.sideEffectCertainty, 'none_proven');
+    assert.equal(result.failureOutcome.source, 'host');
+    assert.equal(result.failureOutcome.category, 'orchestrator_failure');
+    assert.equal(result.failureOutcome.canonicalCode, 'provider_unavailable', 'the existing journal code remains valid while typed provenance identifies the Host refusal');
+    assert.equal(result.failureOutcome.observedState.hostState, 'launch_failed');
     assert.deepEqual(result.settlements, ['failed'], 'the attempt settles exactly once');
     const released = await eventually(() => { const next = outcomeOf(api.root, runId); return next.hold === 'released' ? next : null; },
       'the hold to be released on the Host record', 15_000, 200);
@@ -287,6 +319,11 @@ test('F3 terminal: an Engine Stop of a proven stop with exit 0 is canceled, not 
     assert.notEqual(result.run, 'succeeded');
     assert.deepEqual(result.settlements, ['canceled']);
     assert.equal(result.hold, 'released');
+    assert.equal(result.failureOutcome.source, 'external_control');
+    assert.equal(result.failureOutcome.category, 'control_outcome');
+    assert.equal(result.failureOutcome.canonicalCode, 'interrupted');
+    assert.ok(result.failureOutcome.evidenceReferences.some(ref => ref.type === 'journal_event' && result.stateChangeEventIds.includes(ref.id)),
+      'the explicit stop outcome references its journaled Attempt transition');
   } finally { await api.close(); }
 });
 

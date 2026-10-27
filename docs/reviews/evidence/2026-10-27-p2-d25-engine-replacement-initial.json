@@ -1,0 +1,1474 @@
+{
+  "schemaVersion": 1,
+  "testId": "P2-E2E-06",
+  "scenario": "Parent Stop callback loss across real Engine A-to-B replacement",
+  "generatedAt": "2026-10-27T05:12:58.112Z",
+  "sourceManifest": "docs/reviews/evidence/2026-10-27-p2-d25-source-manifest.json",
+  "sourceManifestSha256": "4135bcde8fd3edc0bf55b1f39a9b29deaf4cee2dfa4b236bb741dd54af1b5271",
+  "baseHead": "abb7295e6339912b5be16fc4db2a8e244e0c1bfc",
+  "processes": {
+    "engineA": {
+      "pid": 9700,
+      "processIdentity": "2026-10-27T05:12:38.1365951Z",
+      "runnerLock": {
+        "pid": 9700,
+        "id": "89310515-b61e-4370-942c-78fe76f06a90"
+      },
+      "exitIdentity": null,
+      "exited": true
+    },
+    "engineB": {
+      "pid": 22144,
+      "processIdentity": "2026-10-27T05:12:52.4122413Z",
+      "runnerLock": {
+        "pid": 22144,
+        "id": "ab02f17a-2929-4af3-9fec-bba635a10e36"
+      }
+    },
+    "engineC": {
+      "pid": 21868,
+      "runnerLock": {
+        "pid": 21868,
+        "id": "3f0f0e05-c2c2-4e64-8acf-78ec5b60be9d"
+      }
+    },
+    "host": {
+      "pid": 20660,
+      "processIdentity": "2026-10-27T05:12:38.0059407Z",
+      "aliveAfterEngineAExit": true,
+      "aliveAfterEngineCRecovery": true
+    },
+    "repair": {
+      "pid": 32388,
+      "processIdentityBeforeEngineAExit": "2026-10-27T05:12:42.7448659Z",
+      "processIdentityAfterEngineAExit": "2026-10-27T05:12:42.7448659Z",
+      "hostProcessCreationTime": 134375515627448660,
+      "hostFinalProcessId": 32388
+    }
+  },
+  "identities": {
+    "parentRunId": "da6a61ea-e8f0-4793-8c7e-1046abdf2218",
+    "repairRunId": "61fa7c8d-0f93-41a3-b830-35316c72ef1c",
+    "linkId": "4689c5b0-b05b-4d6f-b163-adec22eb0f89",
+    "incidentId": "059a1ae4-973a-4ae8-9454-1ef6504dc838",
+    "parentPublicationId": "ceb8ca6f-4d42-441a-9e58-00058479df05",
+    "repairPublicationId": "55039fd0-a3a5-4de7-b846-7cc487c147c7",
+    "repairAttemptId": "6b5f8309-4e7b-4b32-a4f8-716ab8622b5a",
+    "custodyInvocationId": "40e7f184-237b-473c-bdb2-5710c1e991a6"
+  },
+  "stopCommit": {
+    "requestId": "3a0ab4d2-bc9b-4d7e-9fd4-bd7346469daa",
+    "command": "POST /runs/da6a61ea-e8f0-4793-8c7e-1046abdf2218/stop",
+    "journalSequence": 46,
+    "parentStateAtCommit": "stopping",
+    "linkStateAtCommit": "open"
+  },
+  "callbackBarrier": {
+    "event": "parent_stop_callback_entered",
+    "parentRunId": "da6a61ea-e8f0-4793-8c7e-1046abdf2218",
+    "enginePid": 9700,
+    "monotonicNs": "664769709490700",
+    "originalCallbackEntered": false,
+    "originalCallbackCompleted": false
+  },
+  "recovery": {
+    "engineBPid": 22144,
+    "parentStoppedEventSequence": 52,
+    "parentState": "canceled",
+    "repairStopEventSequence": 30,
+    "repairAttemptId": "6b5f8309-4e7b-4b32-a4f8-716ab8622b5a",
+    "repairState": "canceled",
+    "linkState": "parent_stopped"
+  },
+  "hostStop": {
+    "state": "stopped",
+    "drained": true,
+    "terminationReason": "Stopped by an authorized Stop request.",
+    "processTreeEnded": true,
+    "holdState": "released",
+    "holdEvidence": {
+      "hostState": "stopped",
+      "processTreeEnded": true,
+      "exitCode": 1,
+      "spoolComplete": true,
+      "terminationReason": "Stopped by an authorized Stop request."
+    }
+  },
+  "workspaceIsolation": {
+    "parentRoot": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\custody-p2-e2e06-c3ONO0\\workspace",
+    "repairRoot": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\custody-p2-e2e06-c3ONO0\\repair-workspace",
+    "rootsAreDisjoint": true
+  },
+  "final": {
+    "parentState": "canceled",
+    "repairState": "canceled",
+    "linkState": "parent_stopped",
+    "providerLaunchCount": 1,
+    "parentResumeCount": 0,
+    "duplicateSettlementCount": 0,
+    "parentAcceptedEffects": {
+      "a": 1,
+      "b": 0,
+      "c": 0
+    },
+    "repairAcceptedEffects": 0
+  },
+  "causalTrace": [
+    {
+      "ordinal": 1,
+      "event": "owner_stop_request_sent",
+      "engineAPid": 9700,
+      "parentRunId": "da6a61ea-e8f0-4793-8c7e-1046abdf2218"
+    },
+    {
+      "ordinal": 2,
+      "event": "parent_stop_commit_observed",
+      "journalSequence": 46,
+      "callbackBarrier": "parent_stop_callback_entered",
+      "repairPid": 32388
+    },
+    {
+      "ordinal": 3,
+      "event": "engine_a_termination_requested",
+      "pid": 9700,
+      "identity": "2026-10-27T05:12:38.1365951Z"
+    },
+    {
+      "ordinal": 4,
+      "event": "engine_a_exit_verified",
+      "pid": 9700,
+      "identity": "2026-10-27T05:12:38.1365951Z",
+      "exited": true,
+      "exitIdentity": null,
+      "hostPid": 20660,
+      "repairPid": 32388,
+      "callbackExecuted": false
+    },
+    {
+      "ordinal": 5,
+      "event": "stop_receipt_verified_after_engine_a_exit",
+      "requestId": "3a0ab4d2-bc9b-4d7e-9fd4-bd7346469daa",
+      "command": "POST /runs/da6a61ea-e8f0-4793-8c7e-1046abdf2218/stop"
+    },
+    {
+      "ordinal": 6,
+      "event": "engine_b_started_and_lock_acquired",
+      "pid": 22144,
+      "identity": "2026-10-27T05:12:52.4122413Z",
+      "lockId": "ab02f17a-2929-4af3-9fec-bba635a10e36"
+    },
+    {
+      "ordinal": 7,
+      "event": "engine_b_recovered_parent_stop",
+      "parentState": "canceled",
+      "linkId": "4689c5b0-b05b-4d6f-b163-adec22eb0f89",
+      "journalSequence": 52,
+      "code": "parent_stopped"
+    },
+    {
+      "ordinal": 8,
+      "event": "repair_host_stop_and_tree_proof_observed",
+      "custodyId": "40e7f184-237b-473c-bdb2-5710c1e991a6",
+      "state": "stopped",
+      "drained": true,
+      "processId": 32388,
+      "holdState": "released",
+      "holdProof": {
+        "hostState": "stopped",
+        "processTreeEnded": true,
+        "exitCode": 1,
+        "spoolComplete": true,
+        "terminationReason": "Stopped by an authorized Stop request."
+      }
+    },
+    {
+      "ordinal": 9,
+      "event": "terminal_state_and_no_resume_verified",
+      "parentState": "canceled",
+      "repairState": "canceled",
+      "linkState": "parent_stopped",
+      "providerLaunchCount": 1,
+      "parentResumeCount": 0,
+      "duplicateSettlementCount": 0
+    },
+    {
+      "ordinal": 10,
+      "event": "engine_c_reconciliation_remained_idempotent",
+      "pid": 21868,
+      "lockId": "3f0f0e05-c2c2-4e64-8acf-78ec5b60be9d",
+      "linkState": "parent_stopped",
+      "parentResumeCount": 0,
+      "providerLaunchCount": 1,
+      "duplicateSettlementCount": 0
+    }
+  ],
+  "journal": {
+    "parent": [
+      {
+        "sequence": 1,
+        "type": "run.created",
+        "payload": {
+          "executionHash": "1005901e61703a4541aadcbaf8311070c740a40a1eca36db50cea71cbd4a5a2d",
+          "publishedVersion": {
+            "authorityPolicyVersion": "designated-judge/1",
+            "definitionDigest": "1005901e61703a4541aadcbaf8311070c740a40a1eca36db50cea71cbd4a5a2d",
+            "publishedVersionId": "ceb8ca6f-4d42-441a-9e58-00058479df05",
+            "version": 1
+          },
+          "settingsSnapshot": {
+            "artifactId": "7f939480-ae82-40e6-a6a2-dccf82ba0204",
+            "sha256": "7aa742bfb16af83ce59e5dcf412c84e08624ae1d98e3cc927bea5a2fe483cab8"
+          },
+          "workflowSnapshot": {
+            "artifactId": "461daae1-0d3a-413a-a0ff-46fc214361e7",
+            "sha256": "1005901e61703a4541aadcbaf8311070c740a40a1eca36db50cea71cbd4a5a2d"
+          }
+        }
+      },
+      {
+        "sequence": 2,
+        "type": "run.state_changed",
+        "payload": {
+          "from": null,
+          "reason": "Run captured.",
+          "to": "queued"
+        }
+      },
+      {
+        "sequence": 3,
+        "type": "run.planned",
+        "payload": {
+          "mode": "workflow",
+          "plan": {
+            "artifactId": "bddaa0f2-5b34-4103-86fa-f7070a79a959",
+            "sha256": "39900aa0880a52da339bebf8016c8325c3b1d2ea29500e39448b3ea185e010e5"
+          },
+          "targets": [
+            "result"
+          ]
+        }
+      },
+      {
+        "sequence": 4,
+        "type": "node.planned",
+        "payload": {
+          "nodeId": "a-request",
+          "nodeType": "text",
+          "scope": null
+        }
+      },
+      {
+        "sequence": 5,
+        "type": "node.planned",
+        "payload": {
+          "nodeId": "a",
+          "nodeType": "agent",
+          "scope": null
+        }
+      },
+      {
+        "sequence": 6,
+        "type": "node.planned",
+        "payload": {
+          "nodeId": "b",
+          "nodeType": "agent",
+          "scope": null
+        }
+      },
+      {
+        "sequence": 7,
+        "type": "node.planned",
+        "payload": {
+          "nodeId": "c",
+          "nodeType": "agent",
+          "scope": null
+        }
+      },
+      {
+        "sequence": 8,
+        "type": "node.planned",
+        "payload": {
+          "nodeId": "result",
+          "nodeType": "result-viewer",
+          "scope": null
+        }
+      },
+      {
+        "sequence": 9,
+        "type": "attempt.state_changed",
+        "payload": {
+          "from": null,
+          "ordinal": 1,
+          "process": null,
+          "reason": "Planned before dispatch.",
+          "to": "scheduled"
+        }
+      },
+      {
+        "sequence": 10,
+        "type": "attempt.state_changed",
+        "payload": {
+          "from": null,
+          "ordinal": 1,
+          "process": null,
+          "reason": "Planned before dispatch.",
+          "to": "scheduled"
+        }
+      },
+      {
+        "sequence": 11,
+        "type": "attempt.state_changed",
+        "payload": {
+          "from": null,
+          "ordinal": 1,
+          "process": null,
+          "reason": "Planned before dispatch.",
+          "to": "scheduled"
+        }
+      },
+      {
+        "sequence": 12,
+        "type": "attempt.state_changed",
+        "payload": {
+          "from": null,
+          "ordinal": 1,
+          "process": null,
+          "reason": "Planned before dispatch.",
+          "to": "scheduled"
+        }
+      },
+      {
+        "sequence": 13,
+        "type": "attempt.state_changed",
+        "payload": {
+          "from": null,
+          "ordinal": 1,
+          "process": null,
+          "reason": "Planned before dispatch.",
+          "to": "scheduled"
+        }
+      },
+      {
+        "sequence": 14,
+        "type": "run.state_changed",
+        "payload": {
+          "from": "queued",
+          "reason": "Scheduler started.",
+          "to": "running"
+        }
+      },
+      {
+        "sequence": 15,
+        "type": "attempt.inputs_committed",
+        "payload": {
+          "contextBindingId": null,
+          "manifest": {
+            "artifactId": "f8840a9c-9553-404d-8cc3-5ee0bf67e46b",
+            "sha256": "4d3e1b89351f0f0e3a66faf20886758c84eed9c2f4bed78cc845a68980e8f283"
+          },
+          "prompt": null
+        }
+      },
+      {
+        "sequence": 16,
+        "type": "attempt.state_changed",
+        "payload": {
+          "from": "scheduled",
+          "process": null,
+          "reason": "Static node started.",
+          "to": "running"
+        }
+      },
+      {
+        "sequence": 17,
+        "type": "attempt.outputs_committed",
+        "payload": {
+          "manifest": {
+            "artifactId": "e5cd8fdf-c69c-438f-ace2-fdd9bc568561",
+            "sha256": "a1e6e8daf62ffd4db06b6bfba151953c4898d26063ae2b337fe381f5f55d09e4"
+          }
+        }
+      },
+      {
+        "sequence": 18,
+        "type": "attempt.state_changed",
+        "payload": {
+          "from": "running",
+          "process": null,
+          "reason": "Static node committed its outputs.",
+          "to": "succeeded"
+        }
+      },
+      {
+        "sequence": 19,
+        "type": "attempt.inputs_committed",
+        "payload": {
+          "contextBindingId": null,
+          "manifest": {
+            "artifactId": "98bde219-4f93-4449-bb7e-60b1b2a9b0c9",
+            "sha256": "d5ee1e06133389349527116ecc2e99547eed447d1044541029d341f08c7cfea2"
+          },
+          "prompt": {
+            "artifactId": "6743496b-85d3-4793-8089-bcbd5309037e",
+            "sha256": "b1ee23a99a2c2d0bc05826e61261dbc9740d0ca78c3aec433405703cf56cde4c"
+          }
+        }
+      },
+      {
+        "sequence": 20,
+        "type": "attempt.invocation_committed",
+        "payload": {
+          "manifest": {
+            "artifactId": "e7107f68-3d4c-4134-9f51-f6159d92c72c",
+            "sha256": "ba6b3c58f542b85d3475ed17eb706707f6340af151ecf73c84eb2bd78050acdd"
+          }
+        }
+      },
+      {
+        "sequence": 21,
+        "type": "attempt.state_changed",
+        "payload": {
+          "from": "scheduled",
+          "process": {
+            "pid": 29044,
+            "startIdentity": "custody:134375515614188420",
+            "supervisorGeneration": "f76162c4-42cb-4371-ae27-7d9b568d6dfd"
+          },
+          "reason": "CLI process launched.",
+          "to": "running"
+        }
+      },
+      {
+        "sequence": 22,
+        "type": "attempt.log_chunk",
+        "payload": {
+          "byteLength": 226,
+          "byteOffset": 0,
+          "chunk": {
+            "artifactId": "9e7b0428-a7fc-422c-a265-a15b8c3a8dfc",
+            "sha256": "a261173034efca0db519583fa75938b16789ead6593c3211a77643afe1305d0d"
+          },
+          "chunkIndex": 0,
+          "stream": "stdout"
+        }
+      },
+      {
+        "sequence": 23,
+        "type": "attempt.log_chunk",
+        "payload": {
+          "byteLength": 367,
+          "byteOffset": 0,
+          "chunk": {
+            "artifactId": "79ddc08f-a03c-4da6-84f6-f9a461a108c3",
+            "sha256": "8138a17649a4c0b85e1c28d8900c39535c37a931b1b040d4395fb2397f48b652"
+          },
+          "chunkIndex": 0,
+          "stream": "normalized"
+        }
+      },
+      {
+        "sequence": 24,
+        "type": "attempt.log_stream_closed",
+        "payload": {
+          "chunkCount": 1,
+          "committedBytes": 226,
+          "complete": true,
+          "endingReason": "process exited with code 0",
+          "integrity": "complete",
+          "manifest": {
+            "artifactId": "fb709fc4-1d44-4292-9f75-909723ac2e42",
+            "sha256": "4bb845e79ec16caf9c9ca44e351102e696ded2d37e4cd482b77beccc90f76b09"
+          },
+          "receivedBytes": 226,
+          "stream": "stdout"
+        }
+      },
+      {
+        "sequence": 25,
+        "type": "attempt.log_stream_closed",
+        "payload": {
+          "chunkCount": 0,
+          "committedBytes": 0,
+          "complete": true,
+          "endingReason": "process exited with code 0",
+          "integrity": "complete",
+          "manifest": {
+            "artifactId": "0aebf12a-776e-4911-9002-ecc233c738e2",
+            "sha256": "be311c165bf8d810e0bd5984cdad2b44e1d87c0e20bd1fa2e4fe1743958c4b3c"
+          },
+          "receivedBytes": 0,
+          "stream": "stderr"
+        }
+      },
+      {
+        "sequence": 26,
+        "type": "attempt.log_stream_closed",
+        "payload": {
+          "chunkCount": 1,
+          "committedBytes": 367,
+          "complete": true,
+          "endingReason": "process exited with code 0",
+          "integrity": "complete",
+          "manifest": {
+            "artifactId": "e2c6c648-1fb0-4cf1-b672-d728328135c4",
+            "sha256": "561fe95c4e08e435e834d9eed9c1dadf174ed76343c62a7b3f75a21b3fa518cf"
+          },
+          "receivedBytes": 367,
+          "stream": "normalized"
+        }
+      },
+      {
+        "sequence": 27,
+        "type": "attempt.outputs_committed",
+        "payload": {
+          "manifest": {
+            "artifactId": "675c8ece-a61e-4f39-9f09-f9abe92276ef",
+            "sha256": "6365ee544eb2acddb572cbab166f6fa65b5ce95ae3faeeb00b94f72aceac62de"
+          }
+        }
+      },
+      {
+        "sequence": 28,
+        "type": "attempt.state_changed",
+        "payload": {
+          "from": "running",
+          "process": null,
+          "reason": "Outputs committed after a successful terminal event and process exit.",
+          "to": "succeeded"
+        }
+      },
+      {
+        "sequence": 29,
+        "type": "attempt.inputs_committed",
+        "payload": {
+          "contextBindingId": null,
+          "manifest": {
+            "artifactId": "92cb6ed2-7ee4-4951-9751-8e78b44d6f41",
+            "sha256": "3437a541e4196b023be9a7a5b3aa276ecbbc955e64c1b08c20242a85187c9551"
+          },
+          "prompt": {
+            "artifactId": "6743496b-85d3-4793-8089-bcbd5309037e",
+            "sha256": "b1ee23a99a2c2d0bc05826e61261dbc9740d0ca78c3aec433405703cf56cde4c"
+          }
+        }
+      },
+      {
+        "sequence": 30,
+        "type": "attempt.invocation_committed",
+        "payload": {
+          "manifest": {
+            "artifactId": "327fab5a-95ad-4d56-9784-96f127458730",
+            "sha256": "9ffcd209c4d63c6810ecff90d6b63eb299848c4742901a57146d2aa04400b240"
+          }
+        }
+      },
+      {
+        "sequence": 31,
+        "type": "attempt.state_changed",
+        "payload": {
+          "from": "scheduled",
+          "process": {
+            "pid": 2504,
+            "startIdentity": "custody:134375515620533540",
+            "supervisorGeneration": "f76162c4-42cb-4371-ae27-7d9b568d6dfd"
+          },
+          "reason": "CLI process launched.",
+          "to": "running"
+        }
+      },
+      {
+        "sequence": 32,
+        "type": "attempt.log_chunk",
+        "payload": {
+          "byteLength": 71,
+          "byteOffset": 0,
+          "chunk": {
+            "artifactId": "4882ae30-0359-41b7-ac08-854bbf3a2458",
+            "sha256": "95de753858971dadbfe8efdc448e3ef5fda08f6a6fe3b80ac07b180a17a16b00"
+          },
+          "chunkIndex": 0,
+          "stream": "stderr"
+        }
+      },
+      {
+        "sequence": 33,
+        "type": "attempt.log_chunk",
+        "payload": {
+          "byteLength": 138,
+          "byteOffset": 0,
+          "chunk": {
+            "artifactId": "5c8686e0-a714-459b-b8bd-abe40a7e7569",
+            "sha256": "20e72d185057dfef1abf8f60fef8e9c3a524bb50b20ae3e194b2e5eb5c877bda"
+          },
+          "chunkIndex": 0,
+          "stream": "stdout"
+        }
+      },
+      {
+        "sequence": 34,
+        "type": "attempt.log_chunk",
+        "payload": {
+          "byteLength": 267,
+          "byteOffset": 0,
+          "chunk": {
+            "artifactId": "3d4b49d5-c938-4f2c-92e4-be90ab66c8f4",
+            "sha256": "c7ac80110b1090f4c3d99147ce9c9862d6d22950b323423b1edd5f7be579f6a3"
+          },
+          "chunkIndex": 0,
+          "stream": "normalized"
+        }
+      },
+      {
+        "sequence": 35,
+        "type": "attempt.log_stream_closed",
+        "payload": {
+          "chunkCount": 1,
+          "committedBytes": 138,
+          "complete": true,
+          "endingReason": "process exited with code 6",
+          "integrity": "complete",
+          "manifest": {
+            "artifactId": "1d338f83-b38b-4002-bb0d-8dbd5496e210",
+            "sha256": "185be74eaf9019b9e94aadc173fff383ac8bd2ebc17adf6239189dba9334fdd7"
+          },
+          "receivedBytes": 138,
+          "stream": "stdout"
+        }
+      },
+      {
+        "sequence": 36,
+        "type": "attempt.log_stream_closed",
+        "payload": {
+          "chunkCount": 1,
+          "committedBytes": 71,
+          "complete": true,
+          "endingReason": "process exited with code 6",
+          "integrity": "complete",
+          "manifest": {
+            "artifactId": "0029e0ff-502c-4959-ac86-aaeafae9b803",
+            "sha256": "f973e3df239dfbb0e9d9e7560d11ba21d454b3ddc4d414bdcf7c93767fdfe515"
+          },
+          "receivedBytes": 71,
+          "stream": "stderr"
+        }
+      },
+      {
+        "sequence": 37,
+        "type": "attempt.log_stream_closed",
+        "payload": {
+          "chunkCount": 1,
+          "committedBytes": 267,
+          "complete": true,
+          "endingReason": "process exited with code 6",
+          "integrity": "complete",
+          "manifest": {
+            "artifactId": "5ee26be3-0327-4ed1-9437-d9f174eb3436",
+            "sha256": "b67bd61f1d5b0270695cac1e58902cc33f3a0ae5a8ab18b5c3e8cf29f4f5fcf4"
+          },
+          "receivedBytes": 267,
+          "stream": "normalized"
+        }
+      },
+      {
+        "sequence": 38,
+        "type": "attempt.error",
+        "payload": {
+          "code": "process",
+          "evidence": {
+            "artifactId": "61b400e6-fb31-4c2f-bb27-72b1a678d968",
+            "sha256": "1ce4486e58cbd5b16b4caac89973e657920aeca50fddd1e3135f933aafcc925b"
+          },
+          "message": "P2 Parent B first attempt failed before side effect.\nP2 Parent B deterministic first-attempt failure before its side effect"
+        }
+      },
+      {
+        "sequence": 39,
+        "type": "attempt.state_changed",
+        "payload": {
+          "from": "running",
+          "process": null,
+          "reason": "P2 Parent B first attempt failed before side effect.\nP2 Parent B deterministic first-attempt failure before its side effect",
+          "to": "failed"
+        }
+      },
+      {
+        "sequence": 40,
+        "type": "attempt.failure_outcome",
+        "payload": {
+          "outcome": {
+            "attemptId": "42ac3925-7ef5-476b-923e-6be76ceef82a",
+            "canonicalCode": "process",
+            "category": "provider_failure",
+            "causeKnowledge": "deterministic_interpretation",
+            "custodyInvocationId": "706cc02a-ba58-4fe2-b39a-16179fb6dd9f",
+            "evidenceReferences": [
+              {
+                "id": "61b400e6-fb31-4c2f-bb27-72b1a678d968",
+                "sha256": "1ce4486e58cbd5b16b4caac89973e657920aeca50fddd1e3135f933aafcc925b",
+                "type": "artifact"
+              },
+              {
+                "id": "706cc02a-ba58-4fe2-b39a-16179fb6dd9f",
+                "type": "custody_invocation"
+              },
+              {
+                "id": "706cc02a-ba58-4fe2-b39a-16179fb6dd9f",
+                "type": "workspace_hold"
+              },
+              {
+                "id": "ceb8ca6f-4d42-441a-9e58-00058479df05",
+                "type": "published_version"
+              },
+              {
+                "id": "e4c69192-8cff-4bd4-ba2d-836ef2b13f8c",
+                "type": "journal_event"
+              }
+            ],
+            "executionCertainty": "completed",
+            "message": "The provider did not complete the requested operation.",
+            "nodeInstanceId": "b",
+            "observedState": {
+              "attemptState": "failed",
+              "exitCode": 6,
+              "hostState": "exited",
+              "processTreeEnded": true,
+              "runState": "running",
+              "spoolComplete": true
+            },
+            "outcomeId": "42ac3925-7ef5-476b-923e-6be76ceef82a",
+            "publishedVersionId": "ceb8ca6f-4d42-441a-9e58-00058479df05",
+            "recordedAt": "2026-10-27T05:12:42.410Z",
+            "revision": 1,
+            "runId": "da6a61ea-e8f0-4793-8c7e-1046abdf2218",
+            "schemaVersion": 1,
+            "sideEffectCertainty": "unknown",
+            "source": "provider",
+            "workspaceId": "p2-e2e06-parent"
+          }
+        }
+      },
+      {
+        "sequence": 41,
+        "type": "run.state_changed",
+        "payload": {
+          "from": "running",
+          "reason": "An attempt failed; no new dispatch until recovery.",
+          "to": "draining"
+        }
+      },
+      {
+        "sequence": 42,
+        "type": "run.state_changed",
+        "payload": {
+          "from": "draining",
+          "reason": "Running attempts finished after a failure; recovery is needed.",
+          "to": "waiting_for_user"
+        }
+      },
+      {
+        "sequence": 43,
+        "type": "attempt.failure_outcome_updated",
+        "payload": {
+          "outcome": {
+            "attemptId": "42ac3925-7ef5-476b-923e-6be76ceef82a",
+            "canonicalCode": "process",
+            "category": "provider_failure",
+            "causeKnowledge": "deterministic_interpretation",
+            "custodyInvocationId": "706cc02a-ba58-4fe2-b39a-16179fb6dd9f",
+            "evidenceReferences": [
+              {
+                "id": "61b400e6-fb31-4c2f-bb27-72b1a678d968",
+                "sha256": "1ce4486e58cbd5b16b4caac89973e657920aeca50fddd1e3135f933aafcc925b",
+                "type": "artifact"
+              },
+              {
+                "id": "706cc02a-ba58-4fe2-b39a-16179fb6dd9f",
+                "type": "custody_invocation"
+              },
+              {
+                "id": "706cc02a-ba58-4fe2-b39a-16179fb6dd9f",
+                "type": "workspace_hold"
+              },
+              {
+                "id": "ceb8ca6f-4d42-441a-9e58-00058479df05",
+                "type": "published_version"
+              },
+              {
+                "id": "e4c69192-8cff-4bd4-ba2d-836ef2b13f8c",
+                "type": "journal_event"
+              },
+              {
+                "id": "327fab5a-95ad-4d56-9784-96f127458730",
+                "sha256": "9ffcd209c4d63c6810ecff90d6b63eb299848c4742901a57146d2aa04400b240",
+                "type": "artifact"
+              },
+              {
+                "id": "059a1ae4-973a-4ae8-9454-1ef6504dc838",
+                "type": "p2_incident"
+              }
+            ],
+            "executionCertainty": "completed",
+            "incidentId": "059a1ae4-973a-4ae8-9454-1ef6504dc838",
+            "message": "The provider did not complete the requested operation.",
+            "nodeInstanceId": "b",
+            "observedState": {
+              "attemptState": "failed",
+              "exitCode": 6,
+              "hostState": "exited",
+              "processTreeEnded": true,
+              "runState": "running",
+              "spoolComplete": true
+            },
+            "outcomeId": "42ac3925-7ef5-476b-923e-6be76ceef82a",
+            "parentRunId": "da6a61ea-e8f0-4793-8c7e-1046abdf2218",
+            "publishedVersionId": "ceb8ca6f-4d42-441a-9e58-00058479df05",
+            "recordedAt": "2026-10-27T05:12:42.410Z",
+            "repairRunId": "61fa7c8d-0f93-41a3-b830-35316c72ef1c",
+            "revision": 2,
+            "runId": "da6a61ea-e8f0-4793-8c7e-1046abdf2218",
+            "schemaVersion": 1,
+            "sideEffectCertainty": "unknown",
+            "source": "provider",
+            "updatedAt": "2026-10-27T05:12:42.494Z",
+            "workspaceId": "p2-e2e06-parent"
+          }
+        }
+      },
+      {
+        "sequence": 44,
+        "type": "continuation.linked_repair_opened",
+        "payload": {
+          "checkpoint": "5bd78ea3-4cb1-43f1-84fb-5517f03099a5",
+          "contract": "logical_policy",
+          "incidentId": "059a1ae4-973a-4ae8-9454-1ef6504dc838",
+          "linkId": "4689c5b0-b05b-4d6f-b163-adec22eb0f89",
+          "origin": "ENGINE",
+          "repairRunId": "61fa7c8d-0f93-41a3-b830-35316c72ef1c",
+          "resumeNodeInstanceId": "b"
+        }
+      },
+      {
+        "sequence": 45,
+        "type": "continuation.parent_suspension_requested",
+        "payload": {
+          "activeParentWork": false,
+          "checkpoint": "5bd78ea3-4cb1-43f1-84fb-5517f03099a5",
+          "incidentId": "059a1ae4-973a-4ae8-9454-1ef6504dc838",
+          "linkId": "4689c5b0-b05b-4d6f-b163-adec22eb0f89",
+          "origin": "ENGINE",
+          "repairRunId": "61fa7c8d-0f93-41a3-b830-35316c72ef1c"
+        }
+      },
+      {
+        "sequence": 46,
+        "type": "run.state_changed",
+        "payload": {
+          "from": "waiting_for_user",
+          "reason": "Root Stop requested.",
+          "to": "stopping"
+        }
+      },
+      {
+        "sequence": 47,
+        "type": "attempt.state_changed",
+        "payload": {
+          "from": "scheduled",
+          "process": null,
+          "reason": "Canceled by root Stop before it started.",
+          "to": "canceled"
+        }
+      },
+      {
+        "sequence": 48,
+        "type": "attempt.failure_outcome",
+        "payload": {
+          "outcome": {
+            "attemptId": "a147d232-cdc9-45a6-84e0-5896f66dc8d0",
+            "canonicalCode": "interrupted",
+            "category": "control_outcome",
+            "causeKnowledge": "direct_fact",
+            "evidenceReferences": [
+              {
+                "id": "ceb8ca6f-4d42-441a-9e58-00058479df05",
+                "type": "published_version"
+              },
+              {
+                "id": "059a1ae4-973a-4ae8-9454-1ef6504dc838",
+                "type": "p2_incident"
+              },
+              {
+                "id": "f393ea06-d040-48a4-9678-d43430287f2e",
+                "type": "journal_event"
+              }
+            ],
+            "executionCertainty": "not_started",
+            "incidentId": "059a1ae4-973a-4ae8-9454-1ef6504dc838",
+            "message": "Execution ended through an explicit lifecycle control transition.",
+            "nodeInstanceId": "c",
+            "observedState": {
+              "attemptState": "canceled",
+              "runState": "stopping"
+            },
+            "outcomeId": "a147d232-cdc9-45a6-84e0-5896f66dc8d0",
+            "parentRunId": "da6a61ea-e8f0-4793-8c7e-1046abdf2218",
+            "publishedVersionId": "ceb8ca6f-4d42-441a-9e58-00058479df05",
+            "recordedAt": "2026-10-27T05:12:45.156Z",
+            "repairRunId": "61fa7c8d-0f93-41a3-b830-35316c72ef1c",
+            "revision": 1,
+            "runId": "da6a61ea-e8f0-4793-8c7e-1046abdf2218",
+            "schemaVersion": 1,
+            "sideEffectCertainty": "none_proven",
+            "source": "external_control",
+            "workspaceId": "p2-e2e06-parent"
+          }
+        }
+      },
+      {
+        "sequence": 49,
+        "type": "attempt.state_changed",
+        "payload": {
+          "from": "scheduled",
+          "process": null,
+          "reason": "Canceled by root Stop before it started.",
+          "to": "canceled"
+        }
+      },
+      {
+        "sequence": 50,
+        "type": "attempt.failure_outcome",
+        "payload": {
+          "outcome": {
+            "attemptId": "a94c8405-54db-49cc-bf22-e13b4da44f3a",
+            "canonicalCode": "interrupted",
+            "category": "control_outcome",
+            "causeKnowledge": "direct_fact",
+            "evidenceReferences": [
+              {
+                "id": "ceb8ca6f-4d42-441a-9e58-00058479df05",
+                "type": "published_version"
+              },
+              {
+                "id": "059a1ae4-973a-4ae8-9454-1ef6504dc838",
+                "type": "p2_incident"
+              },
+              {
+                "id": "42ca1afb-ecba-4b3b-981b-53038cdf213c",
+                "type": "journal_event"
+              }
+            ],
+            "executionCertainty": "not_started",
+            "incidentId": "059a1ae4-973a-4ae8-9454-1ef6504dc838",
+            "message": "Execution ended through an explicit lifecycle control transition.",
+            "nodeInstanceId": "result",
+            "observedState": {
+              "attemptState": "canceled",
+              "runState": "stopping"
+            },
+            "outcomeId": "a94c8405-54db-49cc-bf22-e13b4da44f3a",
+            "parentRunId": "da6a61ea-e8f0-4793-8c7e-1046abdf2218",
+            "publishedVersionId": "ceb8ca6f-4d42-441a-9e58-00058479df05",
+            "recordedAt": "2026-10-27T05:12:45.156Z",
+            "repairRunId": "61fa7c8d-0f93-41a3-b830-35316c72ef1c",
+            "revision": 1,
+            "runId": "da6a61ea-e8f0-4793-8c7e-1046abdf2218",
+            "schemaVersion": 1,
+            "sideEffectCertainty": "none_proven",
+            "source": "external_control",
+            "workspaceId": "p2-e2e06-parent"
+          }
+        }
+      },
+      {
+        "sequence": 51,
+        "type": "run.state_changed",
+        "payload": {
+          "from": "stopping",
+          "reason": "Root Stop completed after every child process exited.",
+          "to": "canceled"
+        }
+      },
+      {
+        "sequence": 52,
+        "type": "continuation.parent_resumption_blocked",
+        "payload": {
+          "code": "parent_stopped",
+          "incidentId": "059a1ae4-973a-4ae8-9454-1ef6504dc838",
+          "linkId": "4689c5b0-b05b-4d6f-b163-adec22eb0f89",
+          "message": "The Parent is canceled.",
+          "origin": "ENGINE",
+          "repairRunId": "61fa7c8d-0f93-41a3-b830-35316c72ef1c"
+        }
+      },
+      {
+        "sequence": 53,
+        "type": "run.termination_proof",
+        "payload": {
+          "containment": "none",
+          "controlMode": "unsupervised",
+          "outcome": "termination_unconfirmed",
+          "proof": {
+            "artifactId": "a29fa336-57b0-4de3-adb7-9c5ef925bd1c",
+            "sha256": "ca7d1b2252fd5536822a950e699e6040278a383b9c0aaa741e8897834ad610a7"
+          }
+        }
+      }
+    ],
+    "repair": [
+      {
+        "sequence": 1,
+        "type": "run.created",
+        "payload": {
+          "executionHash": "b418411d7e1319c629370fc5fee05bf1214480176c02b41e2c55454021d62e1d",
+          "publishedVersion": {
+            "authorityPolicyVersion": "designated-judge/1",
+            "definitionDigest": "b418411d7e1319c629370fc5fee05bf1214480176c02b41e2c55454021d62e1d",
+            "publishedVersionId": "55039fd0-a3a5-4de7-b846-7cc487c147c7",
+            "version": 1
+          },
+          "settingsSnapshot": {
+            "artifactId": "556d3fd8-7887-48ee-9cab-24b409053359",
+            "sha256": "38db0af44828a4d9d15ce049506c57e18994af2ea8a763e9a4f9e788b7e2c2a1"
+          },
+          "workflowSnapshot": {
+            "artifactId": "054eac6a-9fb9-4880-92dd-0248da6e63fe",
+            "sha256": "b418411d7e1319c629370fc5fee05bf1214480176c02b41e2c55454021d62e1d"
+          }
+        }
+      },
+      {
+        "sequence": 2,
+        "type": "run.state_changed",
+        "payload": {
+          "from": null,
+          "reason": "Run captured.",
+          "to": "queued"
+        }
+      },
+      {
+        "sequence": 3,
+        "type": "run.planned",
+        "payload": {
+          "mode": "workflow",
+          "plan": {
+            "artifactId": "391ba35a-e0b2-442a-bcbd-15d8829d1cc5",
+            "sha256": "89a01c91a79ce8b7d5d09884418e67816da50b04dbf2c2c6f5f93b8ace664c0b"
+          },
+          "targets": [
+            "result"
+          ]
+        }
+      },
+      {
+        "sequence": 4,
+        "type": "node.planned",
+        "payload": {
+          "nodeId": "request",
+          "nodeType": "text",
+          "scope": null
+        }
+      },
+      {
+        "sequence": 5,
+        "type": "node.planned",
+        "payload": {
+          "nodeId": "verified",
+          "nodeType": "agent",
+          "scope": null
+        }
+      },
+      {
+        "sequence": 6,
+        "type": "node.planned",
+        "payload": {
+          "nodeId": "result",
+          "nodeType": "result-viewer",
+          "scope": null
+        }
+      },
+      {
+        "sequence": 7,
+        "type": "attempt.state_changed",
+        "payload": {
+          "from": null,
+          "ordinal": 1,
+          "process": null,
+          "reason": "Planned before dispatch.",
+          "to": "scheduled"
+        }
+      },
+      {
+        "sequence": 8,
+        "type": "attempt.state_changed",
+        "payload": {
+          "from": null,
+          "ordinal": 1,
+          "process": null,
+          "reason": "Planned before dispatch.",
+          "to": "scheduled"
+        }
+      },
+      {
+        "sequence": 9,
+        "type": "attempt.state_changed",
+        "payload": {
+          "from": null,
+          "ordinal": 1,
+          "process": null,
+          "reason": "Planned before dispatch.",
+          "to": "scheduled"
+        }
+      },
+      {
+        "sequence": 10,
+        "type": "continuation.linked_repair_started",
+        "payload": {
+          "contract": "logical_policy",
+          "incidentId": "059a1ae4-973a-4ae8-9454-1ef6504dc838",
+          "linkId": "4689c5b0-b05b-4d6f-b163-adec22eb0f89",
+          "origin": "ENGINE",
+          "parentRunId": "da6a61ea-e8f0-4793-8c7e-1046abdf2218"
+        }
+      },
+      {
+        "sequence": 11,
+        "type": "run.state_changed",
+        "payload": {
+          "from": "queued",
+          "reason": "Scheduler started.",
+          "to": "running"
+        }
+      },
+      {
+        "sequence": 12,
+        "type": "attempt.inputs_committed",
+        "payload": {
+          "contextBindingId": null,
+          "manifest": {
+            "artifactId": "fef6322f-9aa6-48e8-b482-cd7ad491244f",
+            "sha256": "29d463a5052d877e057989db992bb23bc99dfdcc263e9f9fd15a83052158f932"
+          },
+          "prompt": null
+        }
+      },
+      {
+        "sequence": 13,
+        "type": "attempt.state_changed",
+        "payload": {
+          "from": "scheduled",
+          "process": null,
+          "reason": "Static node started.",
+          "to": "running"
+        }
+      },
+      {
+        "sequence": 14,
+        "type": "attempt.outputs_committed",
+        "payload": {
+          "manifest": {
+            "artifactId": "cc5b0899-fb3b-4fc7-ba27-88dc7c562643",
+            "sha256": "b801f8d097fbe99f9dcc3b2ccc69797326d054e2960c7f26d30927dc9eada6eb"
+          }
+        }
+      },
+      {
+        "sequence": 15,
+        "type": "attempt.state_changed",
+        "payload": {
+          "from": "running",
+          "process": null,
+          "reason": "Static node committed its outputs.",
+          "to": "succeeded"
+        }
+      },
+      {
+        "sequence": 16,
+        "type": "attempt.inputs_committed",
+        "payload": {
+          "contextBindingId": null,
+          "manifest": {
+            "artifactId": "4f03437a-4822-40af-828f-8773d17f1f9a",
+            "sha256": "4720349927bd96dd44f6f17da66049c834c1fb1be6defd45499fa8f92d02b0ef"
+          },
+          "prompt": {
+            "artifactId": "47beab2c-8063-4757-9601-955156b758ef",
+            "sha256": "3368bfb37bb9d912e949a3c906c9ecebdba04249743f0b0a183e96708bfc3555"
+          }
+        }
+      },
+      {
+        "sequence": 17,
+        "type": "attempt.invocation_committed",
+        "payload": {
+          "manifest": {
+            "artifactId": "f51e553e-1841-4e66-bd32-30515fe47329",
+            "sha256": "cc045a3e57aae3dd1587c2ae7ae0851e3ef07d53adf244a360647007f08b6959"
+          }
+        }
+      },
+      {
+        "sequence": 18,
+        "type": "attempt.state_changed",
+        "payload": {
+          "from": "scheduled",
+          "process": {
+            "pid": 32388,
+            "startIdentity": "custody:134375515627448660",
+            "supervisorGeneration": "f76162c4-42cb-4371-ae27-7d9b568d6dfd"
+          },
+          "reason": "CLI process launched.",
+          "to": "running"
+        }
+      },
+      {
+        "sequence": 19,
+        "type": "attempt.log_chunk",
+        "payload": {
+          "byteLength": 56,
+          "byteOffset": 0,
+          "chunk": {
+            "artifactId": "04c07837-233f-4aa7-8c62-a69d8bd04ad3",
+            "sha256": "d0263d385a22041f68c1109337b7c9f98e727495ee280370bbf5a1356440f25a"
+          },
+          "chunkIndex": 0,
+          "stream": "stdout"
+        }
+      },
+      {
+        "sequence": 20,
+        "type": "attempt.log_chunk",
+        "payload": {
+          "byteLength": 104,
+          "byteOffset": 0,
+          "chunk": {
+            "artifactId": "f6bb7721-1e1b-40f9-b3c1-e809cb698533",
+            "sha256": "661f255328224d86d756459f333b3dba649b203508f086037c7f12e99c2840b3"
+          },
+          "chunkIndex": 0,
+          "stream": "normalized"
+        }
+      },
+      {
+        "sequence": 21,
+        "type": "continuation.parent_resumption_blocked",
+        "payload": {
+          "code": "parent_stopped",
+          "incidentId": "059a1ae4-973a-4ae8-9454-1ef6504dc838",
+          "linkId": "4689c5b0-b05b-4d6f-b163-adec22eb0f89",
+          "message": "The Parent is canceled.",
+          "origin": "ENGINE",
+          "repairRunId": "61fa7c8d-0f93-41a3-b830-35316c72ef1c"
+        }
+      },
+      {
+        "sequence": 22,
+        "type": "run.state_changed",
+        "payload": {
+          "from": "running",
+          "reason": "Root Stop requested.",
+          "to": "stopping"
+        }
+      },
+      {
+        "sequence": 23,
+        "type": "attempt.state_changed",
+        "payload": {
+          "from": "scheduled",
+          "process": null,
+          "reason": "Canceled by root Stop before it started.",
+          "to": "canceled"
+        }
+      },
+      {
+        "sequence": 24,
+        "type": "attempt.failure_outcome",
+        "payload": {
+          "outcome": {
+            "attemptId": "7ba96e6f-a7ce-44f2-adc9-bff270e1f9d5",
+            "canonicalCode": "interrupted",
+            "category": "control_outcome",
+            "causeKnowledge": "direct_fact",
+            "evidenceReferences": [
+              {
+                "id": "55039fd0-a3a5-4de7-b846-7cc487c147c7",
+                "type": "published_version"
+              },
+              {
+                "id": "059a1ae4-973a-4ae8-9454-1ef6504dc838",
+                "type": "p2_incident"
+              },
+              {
+                "id": "19c0214f-96e0-47d2-90d5-33e1ca7a0bcc",
+                "type": "journal_event"
+              }
+            ],
+            "executionCertainty": "not_started",
+            "incidentId": "059a1ae4-973a-4ae8-9454-1ef6504dc838",
+            "message": "Execution ended through an explicit lifecycle control transition.",
+            "nodeInstanceId": "result",
+            "observedState": {
+              "attemptState": "canceled",
+              "runState": "stopping"
+            },
+            "outcomeId": "7ba96e6f-a7ce-44f2-adc9-bff270e1f9d5",
+            "parentRunId": "da6a61ea-e8f0-4793-8c7e-1046abdf2218",
+            "publishedVersionId": "55039fd0-a3a5-4de7-b846-7cc487c147c7",
+            "recordedAt": "2026-10-27T05:12:54.529Z",
+            "repairRunId": "61fa7c8d-0f93-41a3-b830-35316c72ef1c",
+            "revision": 1,
+            "runId": "61fa7c8d-0f93-41a3-b830-35316c72ef1c",
+            "schemaVersion": 1,
+            "sideEffectCertainty": "none_proven",
+            "source": "external_control",
+            "workspaceId": "p2-e2e06-repair"
+          }
+        }
+      },
+      {
+        "sequence": 25,
+        "type": "attempt.log_stream_closed",
+        "payload": {
+          "chunkCount": 1,
+          "committedBytes": 56,
+          "complete": true,
+          "endingReason": "process ended by signal stopped",
+          "integrity": "complete",
+          "manifest": {
+            "artifactId": "d0684c1e-6744-4c31-8bcc-628078611fbb",
+            "sha256": "32630cdac0808fbace1098fb909a64f6ef27e2ffbb8928e1c665547e22e98e0b"
+          },
+          "receivedBytes": 56,
+          "stream": "stdout"
+        }
+      },
+      {
+        "sequence": 26,
+        "type": "attempt.log_stream_closed",
+        "payload": {
+          "chunkCount": 0,
+          "committedBytes": 0,
+          "complete": true,
+          "endingReason": "process ended by signal stopped",
+          "integrity": "complete",
+          "manifest": {
+            "artifactId": "819f1486-833a-43f7-986b-314bfa7eb916",
+            "sha256": "032fb1fa3c2750a9cbaade8c2dfdefc7285dd389ac08facfefa3c37b89570aa0"
+          },
+          "receivedBytes": 0,
+          "stream": "stderr"
+        }
+      },
+      {
+        "sequence": 27,
+        "type": "attempt.log_stream_closed",
+        "payload": {
+          "chunkCount": 1,
+          "committedBytes": 104,
+          "complete": true,
+          "endingReason": "process ended by signal stopped",
+          "integrity": "complete",
+          "manifest": {
+            "artifactId": "b2708370-183f-4daf-be5e-bf9223967535",
+            "sha256": "fbdd4c6f98711f78ce3d9662d83610219692dc31835bac758db5524f5bfd103e"
+          },
+          "receivedBytes": 104,
+          "stream": "normalized"
+        }
+      },
+      {
+        "sequence": 28,
+        "type": "attempt.state_changed",
+        "payload": {
+          "from": "running",
+          "process": null,
+          "reason": "Stopped by root Stop.",
+          "to": "canceled"
+        }
+      },
+      {
+        "sequence": 29,
+        "type": "attempt.failure_outcome",
+        "payload": {
+          "outcome": {
+            "attemptId": "6b5f8309-4e7b-4b32-a4f8-716ab8622b5a",
+            "canonicalCode": "interrupted",
+            "category": "control_outcome",
+            "causeKnowledge": "direct_fact",
+            "custodyInvocationId": "40e7f184-237b-473c-bdb2-5710c1e991a6",
+            "evidenceReferences": [
+              {
+                "id": "f51e553e-1841-4e66-bd32-30515fe47329",
+                "sha256": "cc045a3e57aae3dd1587c2ae7ae0851e3ef07d53adf244a360647007f08b6959",
+                "type": "artifact"
+              },
+              {
+                "id": "40e7f184-237b-473c-bdb2-5710c1e991a6",
+                "type": "custody_invocation"
+              },
+              {
+                "id": "40e7f184-237b-473c-bdb2-5710c1e991a6",
+                "type": "workspace_hold"
+              },
+              {
+                "id": "55039fd0-a3a5-4de7-b846-7cc487c147c7",
+                "type": "published_version"
+              },
+              {
+                "id": "059a1ae4-973a-4ae8-9454-1ef6504dc838",
+                "type": "p2_incident"
+              },
+              {
+                "id": "1615c5a9-6cfb-4c8a-88cf-63965614b965",
+                "type": "journal_event"
+              }
+            ],
+            "executionCertainty": "unresolved",
+            "incidentId": "059a1ae4-973a-4ae8-9454-1ef6504dc838",
+            "message": "Execution ended through an explicit lifecycle control transition.",
+            "nodeInstanceId": "verified",
+            "observedState": {
+              "attemptState": "canceled",
+              "exitCode": 1,
+              "hostState": "stopped",
+              "processTreeEnded": true,
+              "runState": "stopping",
+              "spoolComplete": true
+            },
+            "outcomeId": "6b5f8309-4e7b-4b32-a4f8-716ab8622b5a",
+            "parentRunId": "da6a61ea-e8f0-4793-8c7e-1046abdf2218",
+            "publishedVersionId": "55039fd0-a3a5-4de7-b846-7cc487c147c7",
+            "recordedAt": "2026-10-27T05:12:54.850Z",
+            "repairRunId": "61fa7c8d-0f93-41a3-b830-35316c72ef1c",
+            "revision": 1,
+            "runId": "61fa7c8d-0f93-41a3-b830-35316c72ef1c",
+            "schemaVersion": 1,
+            "sideEffectCertainty": "unknown",
+            "source": "external_control",
+            "workspaceId": "p2-e2e06-repair"
+          }
+        }
+      },
+      {
+        "sequence": 30,
+        "type": "run.state_changed",
+        "payload": {
+          "from": "stopping",
+          "reason": "Root Stop completed after every child process exited.",
+          "to": "canceled"
+        }
+      },
+      {
+        "sequence": 31,
+        "type": "run.termination_proof",
+        "payload": {
+          "containment": "none",
+          "controlMode": "unsupervised",
+          "outcome": "stopped",
+          "proof": {
+            "artifactId": "21a0bccf-4b4e-48c8-9940-9efc1c0dd669",
+            "sha256": "2c536996fd1818d2068dc27868aaf6549f1e109133ff201c4b49f690dd5d749b"
+          }
+        }
+      }
+    ]
+  }
+}

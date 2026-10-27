@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deszo.local/documentation/failure-outcome.schema.json",
+  "title": "Durable typed execution outcome",
+  "type": "object",
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "outcomeId": { "type": "string", "format": "uuid" },
+    "revision": { "type": "integer", "minimum": 1 },
+    "runId": { "type": "string", "format": "uuid" },
+    "attemptId": { "type": "string", "format": "uuid" },
+    "nodeInstanceId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}(/[1-9][0-9]{0,3}/[a-z][a-z0-9-]{0,63})*$" },
+    "workspaceId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+    "custodyInvocationId": { "type": "string", "format": "uuid" },
+    "publishedVersionId": { "type": "string", "format": "uuid" },
+    "incidentId": { "type": "string", "format": "uuid" },
+    "parentRunId": { "type": "string", "format": "uuid" },
+    "repairRunId": { "type": "string", "format": "uuid" },
+    "source": { "enum": ["engine", "host", "provider", "workflow", "external_control", "recovery"] },
+    "category": { "enum": ["task_failure", "provider_failure", "orchestrator_failure", "execution_uncertain", "control_outcome"] },
+    "canonicalCode": {
+      "enum": [
+        "authentication", "quota", "billing_policy", "provider_unavailable", "rate_limited", "provider_protocol",
+        "unsupported_cli", "custody_unavailable", "permission", "timeout", "process", "output_contract",
+        "context_unavailable", "corruption", "interrupted", "input_unavailable", "route_unmatched",
+        "context_prerequisite", "capture_failed", "managed_tool_isolation_unavailable", "capture_limit",
+        "lifecycle_unauthorized", "lifecycle_contract", "lifecycle_candidate_mismatch", "lifecycle_checkpoint_mismatch",
+        "workspace_overlap", "workspace_unavailable", "workspace_binding_mismatch", "custody_unresolved"
+      ]
+    },
+    "rawCode": { "type": "string", "maxLength": 64, "pattern": "^[A-Za-z0-9_.-]{1,64}$" },
+    "observedState": {
+      "type": "object",
+      "properties": {
+        "attemptState": { "enum": ["scheduled", "waiting", "running", "succeeded", "failed", "canceled", "blocked", "interrupted", "reused", "skipped"] },
+        "runState": { "enum": ["queued", "running", "draining", "waiting_for_user", "stopping", "succeeded", "failed", "canceled", "interrupted"] },
+        "hostState": { "type": "string", "maxLength": 64, "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+        "processTreeEnded": { "type": "boolean" },
+        "exitCode": { "type": "integer" },
+        "spoolComplete": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "causeKnowledge": { "enum": ["direct_fact", "deterministic_interpretation", "unknown"] },
+    "executionCertainty": { "enum": ["not_started", "completed", "unresolved", "unknown"] },
+    "sideEffectCertainty": { "enum": ["none_proven", "effect_confirmed", "unknown"] },
+    "message": { "type": "string", "minLength": 1, "maxLength": 240 },
+    "evidenceReferences": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": { "enum": ["journal_event", "artifact", "custody_invocation", "published_version", "workspace_hold", "p2_incident"] },
+          "id": { "type": "string", "format": "uuid" },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        },
+        "required": ["type", "id"],
+        "additionalProperties": false
+      },
+      "uniqueItems": true
+    },
+    "recordedAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" }
+  },
+  "required": [
+    "schemaVersion", "outcomeId", "revision", "runId", "source", "category",
+    "canonicalCode", "observedState", "causeKnowledge", "executionCertainty", "sideEffectCertainty", "message",
+    "evidenceReferences", "recordedAt"
+  ],
+  "dependentRequired": {
+    "attemptId": ["nodeInstanceId"],
+    "nodeInstanceId": ["attemptId"]
+  },
+  "allOf": [
+    {
+      "if": { "required": ["attemptId"] },
+      "then": { "properties": { "observedState": { "required": ["attemptState"] } } },
+      "else": { "properties": { "observedState": { "required": ["runState"] } } }
+    }
+  ],
+  "additionalProperties": false
+}

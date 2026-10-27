@@ -94,6 +94,13 @@ test('an invalid checker decision pauses the loop as a body failure without inve
     const events = await api.events(snapshot.run.runId);
     const error = events.find(event => event.type === 'attempt.error');
     assert.equal(error.nodeInstanceId, 'refine'); assert.match(error.payload.message, /loop-decision/);
+    const outcomes = await api.call('GET', `/api/v2/runs/${snapshot.run.runId}/failure-outcomes/page?afterSequence=0&limit=10`);
+    assert.equal(outcomes.status, 200);
+    const loopOutcome = events.find(event => event.type === 'attempt.failure_outcome' && event.attemptId === error.attemptId)?.payload.outcome;
+    assert.ok(loopOutcome, 'the loop-return failure has a typed outcome');
+    assert.equal(loopOutcome.category, 'task_failure');
+    assert.equal(loopOutcome.canonicalCode, 'output_contract');
+    assert.ok(loopOutcome.evidenceReferences.some(ref => ref.type === 'journal_event' && ref.id === error.id));
     assert.ok(!events.some(event => event.type === 'loop.iteration_returned'), 'a malformed decision never means finish');
     const final = await api.waitFor(snapshot.run.runId);
     assert.equal(final.run.state, 'failed'); assert.equal(final.loops[0].state, 'canceled');

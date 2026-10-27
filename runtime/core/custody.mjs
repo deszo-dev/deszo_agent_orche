@@ -9,6 +9,7 @@
 // unreachable Host is waited for, never settled as an outcome, and never releases a hold.
 import { EventEmitter } from 'node:events';
 import { appendFileSync, existsSync, readFileSync, unlinkSync } from 'node:fs';
+import { parseStrictJson } from './canonical.mjs';
 import { nowIso } from './store.mjs';
 import { isAlive, killTree } from './processes.mjs';
 import { transportSchema } from './transport.mjs';
@@ -236,11 +237,19 @@ class CustodyChild extends EventEmitter {
   // invocation's existing record and starts nothing. So the Engine asks again until the Host answers. It never gives up into a second
   // spawn and never stops a CLI it has not heard from. A refusal from the Host is final.
   async launchUntilAnswered(permit) {
+    let reported = false;
     for (;;) {
       try {
-        return await this.engine.custodyCall('custody.launch', { custodyId: this.custodyId, permit });
+        const launched = await this.engine.custodyCall('custody.launch', { custodyId: this.custodyId, permit });
+        if (reported) {
+          const status = await this.engine.custodyCall('custody.status', { custodyId: this.custodyId });
+          this.engine.custodyClearUnresolved(this.custodyId, status);
+        }
+        return launched;
       } catch (error) {
         if (!transient(error)) throw error;
+        if (!reported) this.engine.custodyRecordUnresolved(this.custodyId, unresolvedCondition(this.engine, error));
+        reported = true;
         await sleep(RETRY_MS);
       }
     }
@@ -298,7 +307,7 @@ class CustodyChild extends EventEmitter {
       }
     }
     this.unresolved = null;
-    this.engine.custodyClearUnresolved(this.custodyId);
+    this.engine.custodyClearUnresolved(this.custodyId, status);
     this.stopped = false;
     this.closed = false;
     this.faultReported = false;
@@ -316,7 +325,7 @@ class CustodyChild extends EventEmitter {
     // This Engine does not own the attempt any more (fenced or unauthorized): it settles nothing and the owning Engine decides.
     if (status === null) return;
     // The Host answers for the invocation, so a condition an earlier Engine recorded no longer stands.
-    this.engine.custodyClearUnresolved(this.custodyId);
+    this.engine.custodyClearUnresolved(this.custodyId, status);
     // A record that never reached a running CLI is not a process to observe; it was never launched and is never launched again.
     if (status.state === 'admitted') {
       // Withdraw the admission so that it can never launch; the workspace hold is released on the withdrawn record.
@@ -344,6 +353,10 @@ class CustodyChild extends EventEmitter {
         for (const stream of ['stdout', 'stderr']) {
           if (this.eof[stream]) continue;
           const page = await this.engine.custodyCall('custody.read', { custodyId: this.custodyId, stream, offset: this.cursor[stream], max: READ_BYTES });
+          if (this.faultReported) {
+            const status = await this.engine.custodyCall('custody.status', { custodyId: this.custodyId });
+            this.engine.custodyClearUnresolved(this.custodyId, status);
+          }
           this.faultReported = false;
           if (page.nextOffset > page.offset) {
             // Bytes are delivered to the Engine's recorders before the Host hears they are committed.
@@ -372,7 +385,10 @@ class CustodyChild extends EventEmitter {
         if (!transient(error)) return this.unresolve(error);
         // An unreachable Host is a fault in the Engine's knowledge of the process, never an outcome. The CLI keeps running under the Host,
         // and the Engine keeps asking. The first failure of each episode is reported, so that it is never silent.
-        if (!this.faultReported) process.stderr.write(`Process Custody: ${this.custodyId} ${error.code ?? 'error'}: ${error.message}\n`);
+        if (!this.faultReported) {
+          this.engine.custodyRecordUnresolved(this.custodyId, unresolvedCondition(this.engine, error));
+          process.stderr.write(`Process Custody: ${this.custodyId} ${error.code ?? 'error'}: ${error.message}\n`);
+        }
         this.faultReported = true;
         await sleep(RETRY_MS);
       }
@@ -485,11 +501,28 @@ export function installCustody(Engine) {
   // Releases a durable hold only on the Host's proof that the invocation's process tree has ended. Any other status keeps it held.
   P.custodyReleaseIfEnded = function custodyReleaseIfEnded(custodyId, status) {
     if (status?.processTreeEnded !== true) return false;
-    const hold = this.store.get("SELECT run_id FROM custody_workspace_holds WHERE custody_id = ? AND state = 'held'", custodyId);
+    const hold = this.store.get("SELECT run_id,attempt_id FROM custody_workspace_holds WHERE custody_id = ? AND state = 'held'", custodyId);
     custodyFaultPoint('before_hold_release');
-    const evidence = { hostState: status.state, processTreeEnded: true, exitCode: status.exitCode ?? null, terminationReason: status.terminationReason ?? null };
-    this.store.run(`UPDATE custody_workspace_holds SET state = 'released', evidence_json = ?, released_at = ? WHERE custody_id = ? AND state = 'held'`,
-      JSON.stringify(evidence), nowIso(), custodyId);
+    const evidence = { hostState: status.state, processTreeEnded: true, exitCode: status.exitCode ?? null,
+      spoolComplete: status.spoolComplete === true, terminationReason: status.terminationReason ?? null };
+    this.store.transaction(() => {
+      this.store.run(`UPDATE custody_workspace_holds SET state = 'released', evidence_json = ?, released_at = ? WHERE custody_id = ? AND state = 'held'`,
+        JSON.stringify(evidence), nowIso(), custodyId);
+      if (hold) {
+        const previousRow = this.store.get('SELECT outcome_json FROM failure_outcomes WHERE attempt_id = ?', hold.attempt_id);
+        const attempt = this.store.get('SELECT * FROM attempts WHERE id = ?', hold.attempt_id);
+        if (previousRow && attempt) {
+          const previous = parseStrictJson(previousRow.outcome_json);
+          const observedState = { hostState: status.state, processTreeEnded: true, spoolComplete: status.spoolComplete === true };
+          if (Number.isInteger(status.exitCode)) observedState.exitCode = status.exitCode;
+          const outcome = this.failureOutcomeEvent(attempt, { source: previous.source, code: previous.canonicalCode, rawCode: previous.rawCode,
+            causeKnowledge: previous.causeKnowledge, attemptState: previous.observedState.attemptState || attempt.state,
+            executionCertainty: previous.executionCertainty === 'not_started' ? 'not_started' : 'completed',
+            sideEffectCertainty: previous.sideEffectCertainty, observedState });
+          if (outcome) this.store.appendEvents(hold.run_id, [outcome]);
+        }
+      }
+    });
     // A workspace this release frees may let waiting work dispatch.
     queueMicrotask(() => {
       const parentLink = hold && this.store.get(`SELECT * FROM run_links WHERE continuation_contract = 'logical_policy'
@@ -513,23 +546,51 @@ export function installCustody(Engine) {
     this.custodyReported ??= new Set();
     const report = !this.custodyReported.has(key);
     this.custodyReported.add(key);
-    const attempt = this.store.get('SELECT id, node_instance_id FROM attempts WHERE id = ?', hold.attempt_id);
+    const attempt = this.store.get('SELECT id, node_instance_id, state FROM attempts WHERE id = ?', hold.attempt_id);
     const journalled = this.store.get('SELECT journal_version AS version FROM runs WHERE id = ?', hold.run_id)?.version >= 2;
     const message = `The Lifecycle Host refused ${condition.command ?? 'a custody command'} for this attempt (${condition.refusal}: ${condition.message}). Whether its CLI `
-      + 'still runs is unknown, so the attempt stays running and its workspace stays held. The Engine asks the Host again and continues or settles '
+      + `launched or is still running is unknown; the Attempt state is ${attempt?.state ?? 'unknown'}, and its workspace stays held. The Engine asks the Host again and continues or settles `
       + 'the attempt when the Host answers for it; until then a Stop is held, and no other Run can use this workspace.';
     this.store.transaction(() => {
       this.store.run(`UPDATE custody_workspace_holds SET unresolved_json = ?, unresolved_at = ? WHERE custody_id = ? AND state = 'held'`,
         JSON.stringify(condition), condition.at, custodyId);
-      if (report && journalled && attempt) this.store.appendEvents(hold.run_id, [{ type: 'attempt.error', nodeInstanceId: attempt.node_instance_id, attemptId: attempt.id,
-        payload: { code: 'custody_unresolved', message, evidence: null } }]);
+      const events = [];
+      if (report && journalled && attempt) events.push({ type: 'attempt.error', nodeInstanceId: attempt.node_instance_id, attemptId: attempt.id,
+        payload: { code: 'custody_unresolved', message, evidence: null } });
+      if (attempt) {
+        const unavailable = !condition.refusal || ['custody_unreachable', 'custody_unavailable'].includes(condition.refusal);
+        const outcome = this.failureOutcomeEvent(attempt, { source: 'host', code: 'custody_unresolved', rawCode: condition.refusal,
+          attemptState: attempt.state, causeKnowledge: 'direct_fact', executionCertainty: 'unresolved',
+          observedState: { hostState: unavailable ? 'unavailable' : 'refused' } });
+        if (outcome) events.push(outcome);
+      }
+      if (events.length) this.store.appendEvents(hold.run_id, events);
     });
     if (report) process.stderr.write(`Process Custody: ${custodyId} unresolved (${condition.refusal} on ${condition.command}); the workspace stays held.\n`);
     return true;
   };
 
-  P.custodyClearUnresolved = function custodyClearUnresolved(custodyId) {
-    this.store.run(`UPDATE custody_workspace_holds SET unresolved_json = NULL, unresolved_at = NULL WHERE custody_id = ? AND state = 'held' AND unresolved_json IS NOT NULL`, custodyId);
+  P.custodyClearUnresolved = function custodyClearUnresolved(custodyId, status = null) {
+    const hold = this.store.get(`SELECT * FROM custody_workspace_holds WHERE custody_id = ? AND state = 'held' AND unresolved_json IS NOT NULL`, custodyId);
+    if (!hold) return false;
+    const condition = (() => { try { return JSON.parse(hold.unresolved_json); } catch { return null; } })();
+    this.store.transaction(() => {
+      this.store.run(`UPDATE custody_workspace_holds SET unresolved_json = NULL, unresolved_at = NULL WHERE custody_id = ? AND state = 'held' AND unresolved_json IS NOT NULL`, custodyId);
+      if (!status) return;
+      const attempt = this.store.get('SELECT * FROM attempts WHERE id = ?', hold.attempt_id);
+      if (!attempt) return;
+      const neverLaunched = status.processId == null && ['admitted', 'launch_failed', 'permit_expired', 'refused_host_restart', 'admission_cancelled'].includes(status.state);
+      const certainEnd = status.processTreeEnded === true;
+      const observedState = { hostState: status.state };
+      if (typeof status.processTreeEnded === 'boolean') observedState.processTreeEnded = status.processTreeEnded;
+      if (Number.isInteger(status.exitCode)) observedState.exitCode = status.exitCode;
+      if (typeof status.spoolComplete === 'boolean') observedState.spoolComplete = status.spoolComplete;
+      const outcome = this.failureOutcomeEvent(attempt, { source: 'host', code: 'custody_unresolved', rawCode: condition?.refusal,
+        causeKnowledge: 'direct_fact', executionCertainty: neverLaunched ? 'not_started' : certainEnd ? 'completed' : 'unresolved',
+        sideEffectCertainty: neverLaunched ? 'none_proven' : 'unknown', observedState });
+      if (outcome) this.store.appendEvents(hold.run_id, [outcome]);
+    });
+    return true;
   };
 
   // The durable hold, if any, that overlaps this physical workspace. Overlap is decided on resolved roots: a nested directory or a
@@ -634,7 +695,7 @@ export function installCustody(Engine) {
         continue;
       }
       if (child) { child.resolveUnresolved(status); continue; }
-      if (hold.unresolved_json) this.custodyClearUnresolved(hold.custody_id);
+      if (hold.unresolved_json) this.custodyClearUnresolved(hold.custody_id, status);
       this.custodyReleaseIfEnded(hold.custody_id, status);
     }
   };

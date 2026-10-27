@@ -72,6 +72,10 @@ test('R3: a log-storage failure is contained as capture_failed; a store that can
     const error = (await api.events(runId)).find(event => event.type === 'attempt.error');
     assert.equal(error.payload.code, 'capture_failed');
     assert.match(error.payload.message, /ENOSPC/);
+    const typed = (await api.events(runId)).find(event => event.type === 'attempt.failure_outcome' && event.attemptId === error.attemptId);
+    assert.equal(typed.payload.outcome.source, 'engine');
+    assert.equal(typed.payload.outcome.category, 'orchestrator_failure');
+    assert.equal(typed.payload.outcome.canonicalCode, 'capture_failed');
 
     // When even the journal cannot be written, the runtime refuses new work and stays up.
     const appendEvents = store.appendEvents.bind(store);

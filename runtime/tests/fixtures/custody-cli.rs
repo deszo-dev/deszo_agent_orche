@@ -208,6 +208,11 @@ fn main() {
             event(r#"{"type":"error","message":"P2 Repair failed while Engine was absent."}"#);
             std::process::exit(12);
         }
+        "custody-p3-auth-fail" => {
+            eprintln!("Authentication required; invalid token codex_secret_test_value");
+            event(r#"{"type":"error","message":"Authentication required; invalid token codex_secret_test_value."}"#);
+            std::process::exit(13);
+        }
         "custody-steady" => {
             let ticks = directive(&prompt, "ticks", 20);
             for tick in 0..ticks {

@@ -31,6 +31,7 @@ import managedTask from '../../docs/schemas/managed-task.schema.json' with { typ
 import autonomyPolicy from '../../docs/schemas/autonomy-policy.schema.json' with { type: 'json' };
 import judgeControl from '../../docs/schemas/judge-control.schema.json' with { type: 'json' };
 import apiV4 from '../../docs/schemas/runtime-api-v4.schema.json' with { type: 'json' };
+import failureOutcome from '../../docs/schemas/failure-outcome.schema.json' with { type: 'json' };
 
 export const SCHEMAS = {
   'workflow.schema.json': workflow,
@@ -64,6 +65,7 @@ export const SCHEMAS = {
   'managed-task.schema.json': managedTask,
   'autonomy-policy.schema.json': autonomyPolicy,
   'judge-control.schema.json': judgeControl,
+  'failure-outcome.schema.json': failureOutcome,
 };
 
 const AjvClass = Ajv2020.default || Ajv2020;

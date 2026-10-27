@@ -13,7 +13,7 @@ test('P2-M19: existing linked-repair rows survive the additive coordination migr
   let oldStore = null;
   let migratedStore = null;
   try {
-    const version18 = MIGRATION_PATHS.slice(0, -1).map(path => readFileSync(path, 'utf8'));
+    const version18 = MIGRATION_PATHS.slice(0, -2).map(path => readFileSync(path, 'utf8'));
     oldStore = new Store(root, { migrations: version18 });
     const at = new Date().toISOString();
     const parentWorkspaceId = 'legacy-parent-workspace';
@@ -60,7 +60,8 @@ test('P2-M19: existing linked-repair rows survive the additive coordination migr
     assert.equal(link.repair_run_id, repairRunId);
     assert.equal(link.candidate_digest, candidateDigest);
     assert.equal(link.checkpoint_artifact_id, checkpointArtifact.artifactId);
-    assert.equal(migratedStore.get('SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 1').version, 19);
+    assert.equal(migratedStore.get('SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 1').version, 20);
+    assert.equal(migratedStore.get("SELECT name FROM sqlite_master WHERE type='table' AND name='failure_outcomes'").name, 'failure_outcomes');
     assert.deepEqual(migratedStore.all('PRAGMA foreign_key_check'), []);
   } finally {
     oldStore?.close();
