@@ -6,7 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
@@ -15,6 +15,7 @@ import { createServer } from 'node:net';
 import { startRunner } from '../runner.mjs';
 import { fixtureAdapters } from './fixture-adapters.mjs';
 import { buildArtifacts, fixtureDir, isAlive, processIdentity, readInvocations, repo, retargetJunction, startCustodyHost, testsRoot } from './custody-support.mjs';
+import { ownedDir } from './test-roots.mjs';
 
 const lockModule = pathToFileURL(join(repo, 'runtime/lock.mjs')).href;
 const register = pathToFileURL(join(repo, 'runtime/tests/fixtures/runner-lock-register.mjs')).href;
@@ -33,7 +34,7 @@ test.after(() => {
 
 function newRoot(label) {
   mkdirSync(testsRoot, { recursive: true });
-  const root = mkdtempSync(join(testsRoot, `runner-lock-${label}-`));
+  const root = ownedDir(join(testsRoot, `runner-lock-${label}-`));
   mkdirSync(join(root, 'runtime'), { recursive: true });
   return root;
 }

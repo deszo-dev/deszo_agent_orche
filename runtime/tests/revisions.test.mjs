@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { carryDecision } from '../core/map.mjs';
 import { project } from '../../shared/replay.mjs';
 import { startTestRunner } from './helpers.mjs';
+import { ownedPath } from './test-roots.mjs';
 
 const docs = resolve(import.meta.dirname, '../../docs');
 const read = path => readFileSync(join(docs, path), 'utf8');
@@ -114,7 +115,7 @@ test('evaluate refuses a carry request that prepare did not plan', async () => {
   const { Store } = await import('../core/store.mjs');
   const { values: valueHelpers } = await import('../core/utilities.mjs');
   const gate = await import('../core/gate.mjs');
-  const root = join(resolve(import.meta.dirname, '../../.deszo/tests'), `carry-${randomUUID()}`);
+  const root = ownedPath(join(resolve(import.meta.dirname, '../../.deszo/tests'), `carry-${randomUUID()}`));
   mkdirSync(root, { recursive: true });
   const store = new Store(root);
   try {

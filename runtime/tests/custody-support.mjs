@@ -1,31 +1,33 @@
 // Process Custody test support. Every process here is real: the Rust Lifecycle Host's custody service, Engine runtimes started
 // from runtime/runner.mjs, and the deterministic provider fixture (runtime/tests/fixtures/custody-cli.rs). Nothing is mocked.
 import { spawn, spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync, unlinkSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync, unlinkSync } from 'node:fs';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { delimiter, join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { buildRustFixture, rustFixtureDir } from './build-cache.mjs';
+import { isOwned, ownedDir, releaseOwnedDir, testsRoot, trackProcess } from './test-roots.mjs';
 
 export const repo = resolve(import.meta.dirname, '../..');
-export const testsRoot = join(repo, '.deszo/tests');
+export { testsRoot };
 const artifactsRoot = join(testsRoot, 'custody-artifacts');
 export const hostExe = join(repo, 'lifecycle-host/target/debug', 'deszo-lifecycle-host.exe');
 const fixtureSource = join(repo, 'runtime/tests/fixtures/custody-cli.rs');
-export const fixtureDir = join(artifactsRoot, 'provider-bin');
+// The fixture lives in a directory named by its source and compiler, so a build never overwrites an executable another test process runs.
+export const fixtureDir = rustFixtureDir(fixtureSource, join(artifactsRoot, 'provider-bin'));
 export const fixtureExe = join(fixtureDir, 'codex.exe');
 
 let artifacts = null;
 
-// Builds the Host and the provider fixture once per test process. A failed build fails the test that needs it.
+// Builds the Host (Cargo decides what is current) and the provider fixture (reused when its digest-named build exists) once per test
+// process. A failed build fails the test that needs it.
 export function buildArtifacts() {
   if (artifacts) return artifacts;
-  mkdirSync(fixtureDir, { recursive: true });
   const host = spawnSync('cargo', ['build', '--manifest-path', 'lifecycle-host/Cargo.toml', '--bin', 'deszo-lifecycle-host'], { cwd: repo, encoding: 'utf8', timeout: 240_000 });
   if (host.status !== 0) throw new Error(`The Rust Lifecycle Host did not build:\n${host.stdout}\n${host.stderr}`);
-  const fixture = spawnSync('rustc', ['--edition=2021', '-O', fixtureSource, '-o', fixtureExe], { cwd: repo, encoding: 'utf8', timeout: 120_000 });
-  if (fixture.status !== 0) throw new Error(`The custody provider fixture did not build:\n${fixture.stdout}\n${fixture.stderr}`);
-  artifacts = { hostExe, fixtureExe, fixtureSha256: sha256File(fixtureExe) };
+  const fixtureSha256 = buildRustFixture(fixtureSource, fixtureExe);
+  artifacts = { hostExe, fixtureExe, fixtureSha256 };
   return artifacts;
 }
 
@@ -100,6 +102,7 @@ export async function startCustodyHost(root, { generation = 'gen-1', permitTtlMs
   const endpoint = join(state, 'endpoint.json');
   if (existsSync(endpoint)) unlinkSync(endpoint);
   const child = spawn(exe, ['custody-serve', '--config', config], { cwd: repo, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
+  trackProcess(root, child);
   let stderr = '';
   child.stderr.on('data', chunk => { stderr += chunk; });
   const address = await eventually(() => {
@@ -146,6 +149,7 @@ export async function startEngine(root, host, { custody = true, fixtureStateDir,
     ...(devTestConfirmationOff ? ['--dev-test-confirmation-off'] : [])];
   const child = spawn(process.execPath, args,
     { cwd: repo, env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
+  trackProcess(root, child);
   let stderr = '';
   child.stderr.on('data', chunk => { stderr += chunk; });
   child.stdout.on('data', () => {});
@@ -250,14 +254,16 @@ export function readInvocations(fixtureStateDir) {
 
 export function newScratch(label) {
   mkdirSync(testsRoot, { recursive: true });
-  const root = mkdtempSync(join(testsRoot, `custody-${label}-`));
+  const root = ownedDir(join(testsRoot, `custody-${label}-`));
   const fixtureState = join(root, 'fixture-state');
   mkdirSync(fixtureState, { recursive: true });
   mkdirSync(join(root, 'workspace'), { recursive: true });
   return { root, fixtureState, workspace: join(root, 'workspace') };
 }
 
+// A test-owned root goes through the verified removal (its tracked processes must have exited); a failure is reported at teardown.
 export function cleanup(path) {
+  if (isOwned(path)) { releaseOwnedDir(path); return; }
   try { rmSync(path, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* A held file is reported by the proof, not hidden here. */ }
 }
 

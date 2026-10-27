@@ -2,7 +2,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, randomUUID, sign } from 'node:crypto';
-import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { canonicalBytes, canonicalize } from '../core/canonical.mjs';
@@ -10,11 +9,12 @@ import { ControlHost } from '../host/authority.mjs';
 import { ApplicationStop } from '../host/applicationStop.mjs';
 import { ControllerQueue } from '../host/controllerQueue.mjs';
 import { manualTimeSource } from '../host/timeSource.mjs';
+import { ownedDir } from './test-roots.mjs';
 
 const keyText = key => key.export({ type: 'spki', format: 'der' }).toString('base64');
 const plan = { schemaVersion: 1, kind: 'ControllerPlan', mode: 'deterministic', steps: [{ type: 'command.check', args: { commandId: 'checks', workspaceId: 'main' } }] };
 function fixture({ allowed = true, phaseTimeoutMs = 150, nativeHook = null } = {}) {
-  const root = mkdtempSync(join(tmpdir(), 'deszo-application-stop-')), time = manualTimeSource();
+  const root = ownedDir(join(tmpdir(), 'deszo-application-stop-')), time = manualTimeSource();
   const host = new ControlHost({ root, time }), key = generateKeyPairSync('ed25519'), controller = generateKeyPairSync('ed25519');
   host.enrollCredential({ credentialId: 'fixture', label: 'test only', publicKey: keyText(key.publicKey) }, { enrolledBy: 'test' });
   const scope = { dataProfile: 'main', desktop: { user: 'test-user', sessionId: 1 }, applicationMode: 'separate_preview', buildRoot: join(root, 'builds'), deliveryBoundary: 'candidate',

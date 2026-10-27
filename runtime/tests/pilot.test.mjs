@@ -2,7 +2,7 @@
 // PILOT-02 (packaged runtime path) is covered by the native tests in src-tauri/src/main.rs.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { buildInvocation, createParser } from '../core/adapters.mjs';
@@ -13,6 +13,7 @@ import { semanticIssues } from '../core/validate.mjs';
 import { project } from '../../shared/replay.mjs';
 import { fixture, singleAgent, startTestRunner } from './helpers.mjs';
 import { validatePilotDocuments } from '../../scripts/pilot-documents.mjs';
+import { ownedDir } from './test-roots.mjs';
 
 const docs = resolve(import.meta.dirname, '../../docs');
 const read = path => JSON.parse(readFileSync(join(docs, path), 'utf8'));
@@ -136,7 +137,7 @@ test('PILOT-01: new and resumed invocations of every provider carry only the tra
 });
 
 test('PILOT-01: the fixture CLI rejects a raw contract like the real CLIs, and a run with optional properties succeeds through the transport', async () => {
-  const dir = mkdtempSync(join(resolve(import.meta.dirname, '../../.deszo/tests'), 'schema-'));
+  const dir = ownedDir(join(resolve(import.meta.dirname, '../../.deszo/tests'), 'schema-'));
   writeFileSync(join(dir, 'raw.json'), JSON.stringify(CONTRACTS.ReviewDecision));
   const raw = spawnSync(process.execPath, [fixture, 'echo', '', dir, 'codex', join(dir, 'raw.json')], { input: 'x', encoding: 'utf8' });
   assert.equal(raw.status, 1);

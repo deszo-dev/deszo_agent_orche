@@ -7,12 +7,13 @@
 // its origin in the trace, and the test fails if a continuation transition was not caused by the Engine.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
 import net from 'node:net';
 import { join, resolve } from 'node:path';
 import { randomUUID, randomBytes, createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
+import { ownedDir } from './test-roots.mjs';
 
 const repo = resolve(import.meta.dirname, '../..');
 const testsRoot = join(repo, '.deszo/tests');
@@ -168,7 +169,7 @@ let observation;
 async function scenario() {
   if (observation) return observation;
   await mkdir(testsRoot, { recursive: true });
-  const root = await mkdtemp(join(testsRoot, 'root-strict-continuation-'));
+  const root = ownedDir(join(testsRoot, 'root-strict-continuation-'));
   const fixtureState = join(root, 'fixture-state');
   const dbPath = join(root, 'store', 'state.sqlite');
   const harness = [];

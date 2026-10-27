@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { check } from '../core/schemas.mjs';
 import { Engine, loopStep, m2Transition } from '../core/engine.mjs';
 import { startTestRunner } from './helpers.mjs';
+import { ownedDir } from './test-roots.mjs';
 
 const example = () => JSON.parse(readFileSync(resolve(import.meta.dirname, '../../docs/examples/m2-review-loop/workflow.json'), 'utf8'));
 const decisions = JSON.parse(readFileSync(resolve(import.meta.dirname, '../../docs/fixtures/decisions.json'), 'utf8'));
@@ -343,10 +344,10 @@ test('restart recovery interrupts a running loop and its body attempt without re
 
 test('an M1 store migrates to the latest migration, keeps its v1 journal and backfills M6 identities', async () => {
   const { DatabaseSync } = await import('node:sqlite');
-  const { mkdtempSync, readdirSync, writeFileSync } = await import('node:fs');
+  const { readdirSync, writeFileSync } = await import('node:fs');
   const { MIGRATION_PATHS, Store } = await import('../core/store.mjs');
   const { sha256 } = await import('../core/canonical.mjs');
-  const root = mkdtempSync(join(resolve(import.meta.dirname, '../../.deszo/tests'), 'm1-store-'));
+  const root = ownedDir(join(resolve(import.meta.dirname, '../../.deszo/tests'), 'm1-store-'));
   mkdirSync(join(root, 'store', 'objects'), { recursive: true });
   const ddl = readFileSync(resolve(import.meta.dirname, '../../docs/storage/m1.sql'), 'utf8');
   const snapshot = Buffer.from(JSON.stringify({ workflowId: 'wf', nodes: [{ id: 'cache-live', type: 'cache' }] }));

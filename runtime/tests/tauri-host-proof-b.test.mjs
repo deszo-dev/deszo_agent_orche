@@ -6,9 +6,11 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { spawn, spawnSync } from 'node:child_process';
-import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { existsSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs';
 import { delimiter, join, resolve } from 'node:path';
+import { buildRustFixture, desktopPackageKey, recordDesktopPackage, rustFixtureDir, verifiedDesktopPackage } from './build-cache.mjs';
+import { ownedDir, trackProcess } from './test-roots.mjs';
 
 const repo = resolve(import.meta.dirname, '../..');
 const testsRoot = join(repo, '.deszo/tests');
@@ -18,6 +20,8 @@ const buildAId = 'build-a';
 const buildBId = 'build-b';
 const checkpointId = 'chk-desktop-host-proof-b';
 let artifactsPromise;
+// DESZO_PROOFB_KEEP_ARTIFACTS=1 keeps every installation root, so its roots are then ordinary directories, not test-owned ones.
+const testRoot = prefix => (process.env.DESZO_PROOFB_KEEP_ARTIFACTS === '1' ? mkdtempSync(prefix) : ownedDir(prefix));
 
 const agent = (id, model, extra = {}) => ({ id, type: 'agent', config: { provider: 'codex', model, timeoutSeconds: 120, output: { format: 'text' }, ...extra } });
 const edge = (id, source, sourcePort, target, targetPort) => ({ id, source: { nodeId: source, port: sourcePort }, target: { nodeId: target, port: targetPort } });
@@ -54,45 +58,47 @@ async function makeDesktopArtifacts() {
   assert.equal(process.platform, 'win32', 'the real Tauri executable proof requires Windows and WebView2');
   await mkdir(testsRoot, { recursive: true });
   await mkdir(artifactRoot, { recursive: true });
-  if (process.env.DESZO_PROOFB_REUSE_DESKTOP_ARTIFACTS === '1') {
-    const cached = [];
-    for (const [label, buildId] of [['a', buildAId], ['b', buildBId]]) {
-      const packageRoot = join(artifactRoot, `desktop-build-${label}`);
-      const manifest = JSON.parse(await readFile(join(packageRoot, 'build.json'), 'utf8'));
-      assert.equal(manifest.buildId, buildId);
-      assert.ok((await readFile(join(artifactRoot, `desktop-${label}-build.log`), 'utf8')).includes('Built application at:'));
-      cached.push({ label, buildId, packageRoot, executable: join(packageRoot, 'deszo.exe'), runtime: join(packageRoot, 'runtime'),
-        exeSha256: await fileSha256(join(packageRoot, 'deszo.exe')), packageDigest: await digestCandidate(packageRoot) });
-    }
-    assert.notEqual(cached[0].exeSha256, cached[1].exeSha256);
-    return { packages: cached, fixtureCli: join(artifactRoot, 'provider-fixture-bin/codex.exe') };
-  }
   const hostBuild = run('cargo', ['build', '--manifest-path', 'lifecycle-host/Cargo.toml', '--bin', 'deszo-lifecycle-host'], { timeout: 120_000 });
   assert.equal(hostBuild.status, 0, `${hostBuild.stdout}\n${hostBuild.stderr}`);
-  const fixtureDir = join(artifactRoot, 'provider-fixture-bin');
-  await mkdir(fixtureDir, { recursive: true });
-  const fixtureCli = join(fixtureDir, 'codex.exe');
-  const fixtureBuild = run('rustc', ['--edition=2021', 'runtime/tests/fixtures/proofb-cli.rs', '-O', '-o', fixtureCli], { timeout: 60_000 });
-  assert.equal(fixtureBuild.status, 0, `${fixtureBuild.stdout}\n${fixtureBuild.stderr}`);
+  const fixtureSource = join(repo, 'runtime/tests/fixtures/proofb-cli.rs');
+  const fixtureCli = join(rustFixtureDir(fixtureSource, join(artifactRoot, 'provider-fixture-bin')), 'codex.exe');
+  buildRustFixture(fixtureSource, fixtureCli);
 
   const tauriConfig = JSON.parse(await readFile(join(repo, 'src-tauri/tauri.conf.json'), 'utf8'));
   tauriConfig.app.windows[0].additionalBrowserArgs = '--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --remote-debugging-port=0';
   await writeFile(join(artifactRoot, 'tauri-proofb-debug.json'), JSON.stringify(tauriConfig, null, 2));
 
+  // Build A and Build B differ only in their compiled build identity, so each needs its own release build. A package built earlier from
+  // exactly the same repository inputs, toolchain and overlay is reused after its executable and candidate digests are verified again.
+  // DESZO_TEST_REBUILD_DESKTOP=1 always builds.
   const executable = join(repo, 'src-tauri/target/release/deszo.exe');
   const runtime = join(repo, 'dist-runtime');
   const packages = [];
   for (const [label, buildId] of [['a', buildAId], ['b', buildBId]]) {
-    await runDesktopBuild(buildId, join(artifactRoot, `desktop-${label}-build.log`));
     const packageRoot = join(artifactRoot, `desktop-build-${label}`);
+    const key = desktopPackageKey({ buildId, overlay: tauriConfig });
+    const reused = process.env.DESZO_TEST_REBUILD_DESKTOP === '1' ? { hit: false, reason: 'rebuild requested' } : await verifiedDesktopPackage(packageRoot, key, digestCandidate);
+    if (reused.hit) {
+      packages.push({ label, buildId, packageRoot, executable: join(packageRoot, 'deszo.exe'), runtime: join(packageRoot, 'runtime'),
+        exeSha256: reused.exeSha256, packageDigest: reused.packageDigest, cache: { hit: true, key } });
+      continue;
+    }
+    await rm(`${packageRoot}.cache.json`, { force: true });
+    const started = Date.now();
+    await runDesktopBuild(buildId, join(artifactRoot, `desktop-${label}-build.log`));
     await rm(packageRoot, { recursive: true, force: true });
     await mkdir(packageRoot, { recursive: true });
     await cp(executable, join(packageRoot, 'deszo.exe'));
     await cp(runtime, join(packageRoot, 'runtime'), { recursive: true });
     await writeFile(join(packageRoot, 'build.json'), JSON.stringify({ schemaVersion: 1, buildId, runtimeApiVersion: 2,
       bootstrap: 'tauri', desktopExecutable: 'deszo.exe', desktopBuildId: buildId }));
-    packages.push({ label, buildId, packageRoot, executable: join(packageRoot, 'deszo.exe'), runtime: join(packageRoot, 'runtime'),
-      exeSha256: await fileSha256(join(packageRoot, 'deszo.exe')), packageDigest: await digestCandidate(packageRoot) });
+    const built = { label, buildId, packageRoot, executable: join(packageRoot, 'deszo.exe'), runtime: join(packageRoot, 'runtime'),
+      exeSha256: await fileSha256(join(packageRoot, 'deszo.exe')), packageDigest: await digestCandidate(packageRoot),
+      cache: { hit: false, key, reason: reused.reason, buildMs: Date.now() - started } };
+    // Recorded for reuse only when no input changed while the build ran.
+    if (desktopPackageKey({ buildId, overlay: tauriConfig }) === key)
+      recordDesktopPackage(packageRoot, { key, buildId, exeSha256: built.exeSha256, packageDigest: built.packageDigest });
+    packages.push(built);
   }
   assert.notEqual(packages[0].exeSha256, packages[1].exeSha256, 'build-time desktop identity changed the actual compiled executable');
   assert.notEqual(packages[0].packageDigest, packages[1].packageDigest, 'desktop package contents differ');
@@ -125,7 +131,7 @@ async function createPackage(source, destination, buildId) {
 }
 
 async function prepareInstallation(tag, artifacts, { damageCandidate = null, swapCandidateExeToA = false, readyTimeoutMs, custody = false } = {}) {
-  const root = await mkdtemp(join(testsRoot, `desktop-host-proof-b-${tag}-`));
+  const root = testRoot(join(testsRoot, `desktop-host-proof-b-${tag}-`));
   const installation = join(root, 'installation');
   const profile = join(root, 'profile-a');
   const profileB = join(root, 'profile-b');
@@ -175,6 +181,7 @@ function hostProcess(configPath, fixtureCli, fixtureState, webviewRoot, { custod
     ...(custody ? { DESZO_PROCESS_CUSTODY: '1' } : {}),
   };
   const child = spawn(hostExe, ['run', '--config', configPath], { cwd: repo, env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
+  trackProcess(configPath, child);
   child.stdout.setEncoding('utf8'); child.stderr.setEncoding('utf8');
   let stdoutText = '', stderrText = '';
   child.stdout.on('data', chunk => { stdoutText += chunk; });
@@ -722,7 +729,7 @@ test('negative desktop Host case: Build B launches but its production Engine boo
 
 test('negative desktop bootstrap: manifest Build B identity cannot be satisfied by the Build A executable', { timeout: 120_000 }, async () => {
   const artifacts = await desktopArtifacts();
-  const root = await mkdtemp(join(testsRoot, `desktop-host-proof-b-identity-${randomUUID()}-`));
+  const root = testRoot(join(testsRoot, `desktop-host-proof-b-identity-${randomUUID()}-`));
   const installation = join(root, 'installation');
   const profile = join(root, 'profile');
   const staging = join(installation, 'staging');

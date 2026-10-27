@@ -14,6 +14,7 @@ import {
   DEFAULT_DESZO_CRITICAL_AREAS,
   REFERENCE_STAGES,
 } from '../core/taskAssessment.mjs';
+import { ownedPath } from './test-roots.mjs';
 
 function createSampleAssessment(overrides = {}) {
   return {
@@ -480,7 +481,7 @@ test('A5: opening a store migrated with the earlier m9 upgrades execution plans 
 });
 
 test('R1: Store persists TaskAssessment and ExecutionPlan records into m9 tables', () => {
-  const storeRoot = join(resolve(import.meta.dirname, '../../.deszo/tests'), `task-store-${randomUUID()}`);
+  const storeRoot = ownedPath(join(resolve(import.meta.dirname, '../../.deszo/tests'), `task-store-${randomUUID()}`));
   mkdirSync(join(storeRoot, 'store'), { recursive: true });
   const store = new Store(storeRoot);
   try {

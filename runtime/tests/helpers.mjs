@@ -1,12 +1,12 @@
-import { mkdir, mkdtemp, readFile } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { startRunner } from '../runner.mjs';
 import { classifyFailure, createParser } from '../core/adapters.mjs';
 import { canonicalHash } from '../core/canonical.mjs';
+import { addStopper, ownedDir, testsRoot } from './test-roots.mjs';
 
 export const fixture = resolve(import.meta.dirname, 'fixture-cli.mjs');
-const testsRoot = resolve(import.meta.dirname, '../../.deszo/tests');
 
 export function fixtureAdapters(stateDir, { unavailable = [], managedMcpPreflight = false } = {}) {
   return {
@@ -26,7 +26,7 @@ export function fixtureAdapters(stateDir, { unavailable = [], managedMcpPrefligh
 
 export async function startTestRunner(options = {}) {
   await mkdir(testsRoot, { recursive: true });
-  const root = options.root || await mkdtemp(join(testsRoot, 'root-'));
+  const root = options.root || ownedDir(join(testsRoot, 'root-'));
   const stateDir = join(root, 'fixture-state');
   const runner = await startRunner({ root, adapters: fixtureAdapters(stateDir, options), ...options.runner });
   const { port, token, firstPartyToken } = runner.connection;
@@ -36,6 +36,8 @@ export async function startTestRunner(options = {}) {
     closed = true;
     await runner.close();
   };
+  // A test that ends without closing its runner has it closed before its root is removed.
+  addStopper(root, close);
   const callWithToken = async (bearer, method, path, body, { raw = false, headers = {} } = {}) => {
     const response = await fetch(`http://127.0.0.1:${port}${path}`, {
       method, headers: { Authorization: `Bearer ${bearer}`, ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}), ...headers },

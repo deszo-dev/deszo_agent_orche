@@ -8,6 +8,7 @@ import { randomUUID } from 'node:crypto';
 import { deliveryManifestDigest, executeBranchDelivery } from '../core/branchDelivery.mjs';
 import { canonicalHash } from '../core/canonical.mjs';
 import { Store, nowIso } from '../core/store.mjs';
+import { ownedPath } from './test-roots.mjs';
 
 function computeCandidateDigest(files = []) {
   const manifest = files.map(f => ({
@@ -24,7 +25,7 @@ function git(args, cwd) {
 }
 
 function createFixtureRepo() {
-  const root = join(tmpdir(), `deszo-test-repo-${randomUUID()}`);
+  const root = ownedPath(join(tmpdir(), `deszo-test-repo-${randomUUID()}`));
   mkdirSync(root, { recursive: true });
   git(['init', '-b', 'main'], root);
   git(['config', 'user.name', 'Fixture Author'], root);
@@ -42,7 +43,7 @@ function createFixtureRepo() {
 const CANDIDATE = [{ path: 'approved.txt', content: 'APPROVED\n' }];
 
 test('manifest v2 delivers the complete binary/deletion/executable-mode tree, including spaced Unicode paths', async () => {
-  const { root } = createFixtureRepo(), cloneDir = join(tmpdir(), `deszo-clone-${randomUUID()}`);
+  const { root } = createFixtureRepo(), cloneDir = ownedPath(join(tmpdir(), `deszo-clone-${randomUUID()}`));
   try {
     writeFileSync(join(root, 'obsolete.txt'), 'old'); writeFileSync(join(root, 'run.sh'), '#!/bin/sh\nexit 0\n');
     git(['add', '.'], root); git(['update-index', '--chmod=+x', '--', 'run.sh'], root); git(['commit', '-m', 'files and mode'], root);
@@ -85,7 +86,7 @@ function refExists(root, ref) {
 
 test('A1: delivery yields to the event loop while a verification check is running', async () => {
   const { root, baseCommit } = createFixtureRepo();
-  const cloneDir = join(tmpdir(), `deszo-clone-${randomUUID()}`);
+  const cloneDir = ownedPath(join(tmpdir(), `deszo-clone-${randomUUID()}`));
   try {
     const slow = { id: 'slow-check', command: process.execPath, args: ['-e', 'setTimeout(() => {}, 1500)'], expectedExitCode: 0 };
     let callbackAt = null;
@@ -107,7 +108,7 @@ test('A1: delivery yields to the event loop while a verification check is runnin
 
 test('A1: Stop during smoke terminates the check and prevents the ref from being published', async () => {
   const { root, baseCommit } = createFixtureRepo();
-  const cloneDir = join(tmpdir(), `deszo-clone-${randomUUID()}`);
+  const cloneDir = ownedPath(join(tmpdir(), `deszo-clone-${randomUUID()}`));
   try {
     const hung = { id: 'hung-check', command: process.execPath, args: ['-e', 'setTimeout(() => {}, 60000)'], expectedExitCode: 0 };
     const controller = new AbortController();
@@ -127,7 +128,7 @@ test('A1: Stop during smoke terminates the check and prevents the ref from being
 
 test('A6: a target checked out during smoke is refused at publication and the caller checkout stays clean', async () => {
   const { root, baseCommit } = createFixtureRepo();
-  const cloneDir = join(tmpdir(), `deszo-clone-${randomUUID()}`);
+  const cloneDir = ownedPath(join(tmpdir(), `deszo-clone-${randomUUID()}`));
   try {
     git(['branch', 'codex/audit', baseCommit], root);
     const checkout = { id: 'simulate-checkout', command: 'git', args: ['-C', root, 'checkout', 'codex/audit'], expectedExitCode: 0 };
@@ -144,7 +145,7 @@ test('A6: a target checked out during smoke is refused at publication and the ca
 
 test('A3: hooks:none covers host ref publication, so a host reference-transaction hook does not run', async () => {
   const { root, baseCommit } = createFixtureRepo();
-  const cloneDir = join(tmpdir(), `deszo-clone-${randomUUID()}`);
+  const cloneDir = ownedPath(join(tmpdir(), `deszo-clone-${randomUUID()}`));
   try {
     const hooks = join(root, '.git', 'hooks');
     const marker = join(tmpdir(), `host-hook-${randomUUID()}.txt`).replace(/\\/g, '/');
@@ -182,7 +183,7 @@ test('ADR5-02: Precondition fails if new branch already exists (destination coll
       createdAt: nowIso(),
     };
 
-    const cloneDir = join(tmpdir(), `deszo-clone-${randomUUID()}`);
+    const cloneDir = ownedPath(join(tmpdir(), `deszo-clone-${randomUUID()}`));
     const res = await executeBranchDelivery({ plan, candidateFiles: [], cloneDir });
 
     assert.equal(res.status, 'precondition_failed');
@@ -216,7 +217,7 @@ test('ADR5-02 / ADR5-06: Precondition fails if target branch moved unexpectedly 
       createdAt: nowIso(),
     };
 
-    const cloneDir = join(tmpdir(), `deszo-clone-${randomUUID()}`);
+    const cloneDir = ownedPath(join(tmpdir(), `deszo-clone-${randomUUID()}`));
     const res = await executeBranchDelivery({ plan, candidateFiles: [], cloneDir });
 
     assert.equal(res.status, 'ref_conflict');
@@ -229,7 +230,7 @@ test('ADR5-02 / ADR5-06: Precondition fails if target branch moved unexpectedly 
 
 test('ADR5-01–05: Successful branch delivery applies candidate, verifies smoke, commits and updates ref to READY_FOR_MERGE', async () => {
   const { root, baseCommit } = createFixtureRepo();
-  const cloneDir = join(tmpdir(), `deszo-clone-${randomUUID()}`);
+  const cloneDir = ownedPath(join(tmpdir(), `deszo-clone-${randomUUID()}`));
   try {
     const candidateFiles = [
       { path: 'src/index.js', content: 'console.log("hello world");\n' },
@@ -285,7 +286,7 @@ test('ADR5-01–05: Successful branch delivery applies candidate, verifies smoke
 
 test('ADR5-04: Environment smoke check failure blocks commit and merge readiness', async () => {
   const { root, baseCommit } = createFixtureRepo();
-  const cloneDir = join(tmpdir(), `deszo-clone-${randomUUID()}`);
+  const cloneDir = ownedPath(join(tmpdir(), `deszo-clone-${randomUUID()}`));
   try {
     const plan = {
       schemaVersion: 1,
@@ -327,7 +328,7 @@ test('ADR5-04: Environment smoke check failure blocks commit and merge readiness
 
 test('R2: Refuses existing destination clone directory without deleting existing files', async () => {
   const { root, baseCommit } = createFixtureRepo();
-  const cloneDir = join(tmpdir(), `deszo-clone-r2-${randomUUID()}`);
+  const cloneDir = ownedPath(join(tmpdir(), `deszo-clone-r2-${randomUUID()}`));
   mkdirSync(cloneDir, { recursive: true });
   const sentinel = join(cloneDir, 'user-data.txt');
   writeFileSync(sentinel, 'PRESERVE ME');
@@ -363,7 +364,7 @@ test('R2: Refuses existing destination clone directory without deleting existing
 
 test('R3: Candidate path traversal is rejected before write', async () => {
   const { root, baseCommit } = createFixtureRepo();
-  const cloneDir = join(tmpdir(), `deszo-clone-r3-${randomUUID()}`);
+  const cloneDir = ownedPath(join(tmpdir(), `deszo-clone-r3-${randomUUID()}`));
 
   try {
     const candidateFiles = [{ path: '../escape.txt', content: 'MALICIOUS' }];
@@ -395,7 +396,7 @@ test('R3: Candidate path traversal is rejected before write', async () => {
 
 test('R4: Working tree mutation during smoke verification is rejected', async () => {
   const { root, baseCommit } = createFixtureRepo();
-  const cloneDir = join(tmpdir(), `deszo-clone-r4-${randomUUID()}`);
+  const cloneDir = ownedPath(join(tmpdir(), `deszo-clone-r4-${randomUUID()}`));
 
   try {
     const candidateFiles = [{ path: 'valid.txt', content: 'VALID CONTENT\n' }];
@@ -436,7 +437,7 @@ test('R4: Working tree mutation during smoke verification is rejected', async ()
 
 test('R5: Existing branch delivery preserves ancestry and fast-forward history', async () => {
   const { root, baseCommit } = createFixtureRepo();
-  const cloneDir = join(tmpdir(), `deszo-clone-r5-${randomUUID()}`);
+  const cloneDir = ownedPath(join(tmpdir(), `deszo-clone-r5-${randomUUID()}`));
 
   try {
     // Create existing branch with a commit
@@ -480,7 +481,7 @@ test('R5: Existing branch delivery preserves ancestry and fast-forward history',
 });
 
 test('R1: Store persists BranchDelivery result into m9 branch_deliveries table', async () => {
-  const storeRoot = join(resolve(import.meta.dirname, '../../.deszo/tests'), `branch-store-${randomUUID()}`);
+  const storeRoot = ownedPath(join(resolve(import.meta.dirname, '../../.deszo/tests'), `branch-store-${randomUUID()}`));
   mkdirSync(join(storeRoot, 'store'), { recursive: true });
   const store = new Store(storeRoot);
   try {

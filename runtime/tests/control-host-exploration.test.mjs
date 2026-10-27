@@ -8,13 +8,14 @@
 // crashes inside a SQLite transaction (SQLite's own atomicity is assumed), clock rollback (covered by unit tests).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { copyFileSync, mkdirSync, mkdtempSync } from 'node:fs';
+import { copyFileSync, mkdirSync } from 'node:fs';
 import { generateKeyPairSync, randomUUID, sign } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { canonicalBytes } from '../core/canonical.mjs';
 import { ControlHost } from '../host/authority.mjs';
 import { manualTimeSource } from '../host/timeSource.mjs';
+import { ownedDir, releaseOwnedDir } from './test-roots.mjs';
 
 const DEPTH = 4;
 const ACTIONS = ['D', 'A', 'S', 'R', 'C', 'E', 'X'];
@@ -27,7 +28,7 @@ const signValue = (privateKey, value) => sign(null, canonicalBytes(value), priva
 
 // One authorized policy, written once and copied per sequence.
 function template() {
-  const root = mkdtempSync(join(tmpdir(), 'deszo-explore-template-'));
+  const root = ownedDir(join(tmpdir(), 'deszo-explore-template-'));
   const time = manualTimeSource();
   const host = new ControlHost({ root, time, hostInstance: 'template' });
   const authenticator = keys();
@@ -62,7 +63,7 @@ function connect(host, policyId, controller) {
 }
 
 function explore(base, sequence) {
-  const root = mkdtempSync(join(tmpdir(), 'deszo-explore-'));
+  const root = ownedDir(join(tmpdir(), 'deszo-explore-'));
   mkdirSync(root, { recursive: true });
   copyFileSync(join(base.root, 'host.sqlite'), join(root, 'host.sqlite'));
   const time = manualTimeSource(base.timeState);
@@ -126,6 +127,8 @@ function explore(base, sequence) {
   }
   // Charged units can never drop below the effects that were admitted and not proven unexecuted.
   host.close();
+  // Each sequence's store is disposable once its invariants are checked; 2,401 of them would otherwise accumulate (about 225 KB each).
+  releaseOwnedDir(root);
   return violations;
 }
 

@@ -7,9 +7,10 @@ import { join } from 'node:path';
 import { canonicalHash } from '../core/canonical.mjs';
 import { MIGRATION_PATHS, Store } from '../core/store.mjs';
 import { singleAgent, startTestRunner } from './helpers.mjs';
+import { ownedPath } from './test-roots.mjs';
 
 test('P34 migrates exact legacy definitions once without rewriting system workflows or historical Runs', async () => {
-  const root = join(process.cwd(), '.deszo', 'tests', `p34-precutover-${randomUUID()}`);
+  const root = ownedPath(join(process.cwd(), '.deszo', 'tests', `p34-precutover-${randomUUID()}`));
   const legacy = new Store(root, { migrations: MIGRATION_PATHS.slice(0, 14).map(path => readFileSync(path, 'utf8')) });
   const valid = singleAgent({ id: 'legacy-valid', context: null });
   valid.view = { request: { x: 7, y: 13 }, answer: { x: 400, y: 13, label: 'historic layout' } };

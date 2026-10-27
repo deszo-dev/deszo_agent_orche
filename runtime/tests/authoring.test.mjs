@@ -1,13 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { Engine } from '../core/engine.mjs';
 import { inspectManagedToolIsolation, prepareManagedToolIsolation } from '../core/managed-isolation.mjs';
 import { startRunner } from '../runner.mjs';
 import { managedInvocationDecision } from '../../mcp/managed-invocation.mjs';
 import { fixtureAdapters, singleAgent, startTestRunner } from './helpers.mjs';
+import { ownedDir } from './test-roots.mjs';
 
 const testsRoot = resolve(import.meta.dirname, '../../.deszo/tests');
 mkdirSync(testsRoot, { recursive: true });
@@ -28,7 +29,7 @@ test('the bridge refuses same-runtime and foreign managed markers, and ignores a
 });
 
 test('managed-run isolation finds configured bridge entries and requires an exact verified neutralizer', async () => {
-  const root = mkdtempSync(join(testsRoot, 'mcp-preflight-'));
+  const root = ownedDir(join(testsRoot, 'mcp-preflight-'));
   const cwd = join(root, 'project');
   const bridgeScript = join(root, 'mcp', 'bridge.mjs');
   const config = join(cwd, '.codex', 'config.toml');
@@ -66,7 +67,7 @@ test('managed-run isolation finds configured bridge entries and requires an exac
 });
 
 test('Codex restricted config omission neutralizes only the exact verified user-config scope', async () => {
-  const root = mkdtempSync(join(testsRoot, 'codex-restricted-config-'));
+  const root = ownedDir(join(testsRoot, 'codex-restricted-config-'));
   const cwd = join(root, 'project');
   const bridgeScript = join(root, 'mcp', 'bridge.mjs');
   const projectConfig = join(cwd, '.codex', 'config.toml');
@@ -98,7 +99,7 @@ test('Codex restricted config omission neutralizes only the exact verified user-
 });
 
 test('Antigravity managed preflight scans the workspace project configuration and requires a verified neutralizer', async () => {
-  const root = mkdtempSync(join(testsRoot, 'antigravity-preflight-'));
+  const root = ownedDir(join(testsRoot, 'antigravity-preflight-'));
   const cwd = join(root, 'project');
   const bridgeScript = join(root, 'mcp', 'bridge.mjs');
   const projectConfig = join(cwd, '.agents', 'mcp_config.json');
@@ -123,7 +124,7 @@ test('Antigravity managed preflight scans the workspace project configuration an
 });
 
 test('verified Codex preparation injects exact MCP child markers after exec and rejects unproved versions or scopes', async () => {
-  const root = mkdtempSync(join(testsRoot, 'codex-explicit-marker-'));
+  const root = ownedDir(join(testsRoot, 'codex-explicit-marker-'));
   const cwd = join(root, 'project');
   const bridgeScript = join(root, 'mcp', 'bridge.mjs');
   mkdirSync(join(cwd, '.codex'), { recursive: true });
@@ -165,7 +166,7 @@ test('verified Codex preparation injects exact MCP child markers after exec and 
 });
 
 test('Antigravity managed preflight ignores a registered authoring configuration outside the working directory', async () => {
-  const root = mkdtempSync(join(testsRoot, 'antigravity-authoring-'));
+  const root = ownedDir(join(testsRoot, 'antigravity-authoring-'));
   const cwd = join(root, 'project');
   const bridgeScript = join(root, 'mcp', 'bridge.mjs');
   const registeredConfig = join(root, 'authoring', 'mcp_config.json');
@@ -187,7 +188,7 @@ test('Antigravity managed preflight ignores a registered authoring configuration
 });
 
 test('managed-run isolation detects a Deszo bridge from any install location, not only this runtime', async () => {
-  const root = mkdtempSync(join(testsRoot, 'mcp-foreign-bridge-'));
+  const root = ownedDir(join(testsRoot, 'mcp-foreign-bridge-'));
   const cwd = join(root, 'project');
   const bridgeScript = join(root, 'mcp', 'bridge.mjs');
   mkdirSync(join(cwd, '.codex'), { recursive: true });
@@ -220,7 +221,7 @@ test('managed-run isolation detects a Deszo bridge from any install location, no
 });
 
 test('the dev confirmation override is process-only and uses a separate fixture root', async () => {
-  const root = mkdtempSync(join(testsRoot, 'confirmation-fixture-'));
+  const root = ownedDir(join(testsRoot, 'confirmation-fixture-'));
   const seed = new Engine({ root, adapters: fixtureAdapters(join(root, 'fixture-state')) });
   await seed.initialize();
   const initial = seed.currentSettings();
@@ -447,7 +448,7 @@ test('Owner Token reaches public management routes; internal Host routes remain 
 });
 
 test('Owner Run admission does not create a pending request after restart with legacy confirmation enabled', async () => {
-  const root = mkdtempSync(join(testsRoot, 'request-expiry-'));
+  const root = ownedDir(join(testsRoot, 'request-expiry-'));
   const first = await startTestRunner({ root });
   const requestId = randomUUID();
   try {

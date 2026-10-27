@@ -5,13 +5,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync } from 'node:crypto';
-import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ControlHost } from '../host/authority.mjs';
 import { manualTimeSource } from '../host/timeSource.mjs';
 import { WebAuthnConsent } from '../host/webauthn.mjs';
 import { authenticator } from './webauthn-fixture.mjs';
+import { ownedDir } from './test-roots.mjs';
 
 const ENROLL_WINDOW_MS = 300_000;
 const BROKER_USER = 'fixture-user';
@@ -20,7 +20,7 @@ const broker = (overrides = {}) => ({ pid: 123, creationTime: 'fixture-process',
 
 function setup() {
   const time = manualTimeSource();
-  const host = new ControlHost({ root: mkdtempSync(join(tmpdir(), 'deszo-consent-negatives-')), time, assurance: 'bootstrap' });
+  const host = new ControlHost({ root: ownedDir(join(tmpdir(), 'deszo-consent-negatives-')), time, assurance: 'bootstrap' });
   return { time, host, consent: new WebAuthnConsent({ host, requireBroker }) };
 }
 

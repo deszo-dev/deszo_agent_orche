@@ -79,6 +79,23 @@ npm.cmd run smoke -- --codex <model-id> --claude <model-id>
 
 `smoke` runs the documented Codex → Claude → Codex chain against the real CLIs and **consumes subscription quota**. Each invocation uses a fresh isolated root; `--root` can select an explicit unused evidence directory. Only one runtime may own a data folder.
 
+### Tests
+
+`npm test` is the complete required regression: every `runtime/tests/*.test.mjs`, one file process at a time. Three developer tiers run parts of it ([`runtime/tests/tiers.json`](runtime/tests/tiers.json); a file listed in no tier is quick, so a new file is never left out):
+
+```powershell
+npm.cmd run test:quick        # logic, schemas, journal and in-process Engine tests (a few minutes)
+npm.cmd run test:integration  # real Engine/Host, Process Custody, recovery, P1/P2/P3 integration
+npm.cmd run test:heavy        # real Tauri replacement proofs, F7 Git-scale fixtures, control-host exploration
+npm.cmd run test:tiers        # checks the tier lists against the files on disk
+npm.cmd run test:artifacts -- status      # test-owned roots, failure diagnostics, unowned legacy directories
+npm.cmd run test:artifacts -- reconcile   # removes roots left by test processes that were killed hard
+```
+
+`npm test`, `test:integration` and `test:heavy` hold a test gate (`.deszo/tests/.gate`): a second gated run is refused (exit 75) instead of sharing the Tauri and Cargo build outputs, and the gate is released however the holding process ends. Running `node --test` directly bypasses the gate.
+
+Every scratch root a test creates is test-owned (`runtime/tests/test-roots.mjs`): it is removed when its test ends, after the runner it hosts is closed and its tracked processes have exited. A failing test's root is removed too, after bounded diagnostics are copied to `.deszo/tests/failures/` (the newest 20 are kept); `DESZO_TEST_KEEP_FAILED=1` keeps the complete failing root instead. A root still held open (Windows sharing) is reported and kept with its registry until `test:artifacts -- reconcile` (also run before every `npm test`) proves its test process gone. Build outputs are reused only when verified: Rust fixtures by source and compiler digest, the two Proof B desktop packages by every repository build input, the toolchain and the configuration overlay, then their executable and candidate digests (`DESZO_TEST_REBUILD_DESKTOP=1` always rebuilds).
+
 ## Source layout
 
 - `src/`: React editor, inspector, run journal, history and Context views.

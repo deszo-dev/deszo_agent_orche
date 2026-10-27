@@ -4,8 +4,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { ownedDir } from './test-roots.mjs';
 
 const csc = 'C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe';
 // Skipped outside Windows, or where the .NET Framework C# compiler that builds the holder is not installed.
@@ -31,7 +32,7 @@ setInterval(() => {}, 1000);
 let exe = null;
 function compileHolder() {
   if (exe) return exe;
-  const dir = mkdtempSync(join(testsRoot, 'native-job-'));
+  const dir = ownedDir(join(testsRoot, 'native-job-'), { scope: 'file' });
   mkdirSync(dir, { recursive: true });
   const out = join(dir, 'jobguard.exe');
   const result = spawnSync(csc, ['/nologo', '/platform:x64', '/optimize+', `/out:${out}`, sourcePath], { encoding: 'utf8', windowsHide: true });

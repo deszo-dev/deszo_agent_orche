@@ -1,10 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { mkdtemp,writeFile } from 'node:fs/promises';
+import { writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AntigravityJudgeAdapter } from '../core/antigravityJudgeAdapter.mjs';
+import { ownedDir } from './test-roots.mjs';
+
 const registration={provider:'antigravity',model:'gemini-3.8-flash-high',effort:'high',ownership:'dedicated',billing:'subscription_only',nativeSessionId:randomUUID()};
 function proposal(){
   const attention={attentionId:randomUUID(),judgeSessionId:randomUUID(),runId:randomUUID()},invocationId=randomUUID(),readId=randomUUID();
@@ -12,7 +14,7 @@ function proposal(){
   const envelope={status:'SUCCESS',conversation_id:registration.nativeSessionId,structured_output:decision,denied_actions:[],num_turns:2,usage:{input_tokens:100,output_tokens:20,thinking_tokens:5,total_tokens:120}};
   return {attention,invocationId,readId,decision,envelope,context:{registration,attention,invocationId,requiredReadIds:[readId]},result:{exitCode:0,stdout:JSON.stringify(envelope),terminationConfirmed:true}};
 }
-async function settings(value,bytes){const root=await mkdtemp(join(tmpdir(),'deszo-judge-settings-')),path=join(root,'settings.json');await writeFile(path,bytes??JSON.stringify(value));return path;}
+async function settings(value,bytes){const root=ownedDir(join(tmpdir(),'deszo-judge-settings-')),path=join(root,'settings.json');await writeFile(path,bytes??JSON.stringify(value));return path;}
 const authenticated=async()=>({verified:true,authMethod:'consumer',subscriptionEligible:true,quotaProject:''});
 
 test('Antigravity Judge refuses real launch without an installed trusted launcher and cannot convert a managed role',async()=>{

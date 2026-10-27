@@ -13,6 +13,7 @@ import {
   handleReviewOutcomeInLoop,
   evaluateAcceptanceRecord,
 } from '../core/contextPackage.mjs';
+import { ownedPath } from './test-roots.mjs';
 
 test('ADR4-04: ContextPackage is built deterministically with canonical sorting and role inclusion', () => {
   const params = {
@@ -430,7 +431,7 @@ test('R13: Partially missing context request produces unresolved items and preve
 });
 
 test('R1: Store persists AcceptanceRecord into m9 acceptance_records table', () => {
-  const storeRoot = join(resolve(import.meta.dirname, '../../.deszo/tests'), `context-store-${randomUUID()}`);
+  const storeRoot = ownedPath(join(resolve(import.meta.dirname, '../../.deszo/tests'), `context-store-${randomUUID()}`));
   mkdirSync(join(storeRoot, 'store'), { recursive: true });
   const store = new Store(storeRoot);
   try {

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, writeFileSync, copyFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, copyFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -13,8 +13,9 @@ import { openBridge } from '../../mcp/stdio-client.mjs';
 import { connectDeszo, unwrap } from '../../mcp/controller-client.mjs';
 import { planWorkspaceSync } from '../../scripts/deszo-workspace.mjs';
 import { startTestRunner } from './helpers.mjs';
+import { ownedDir } from './test-roots.mjs';
 
-const temporary = () => mkdtempSync(join(tmpdir(), 'deszo-controller-'));
+const temporary = () => ownedDir(join(tmpdir(), 'deszo-controller-'));
 const fixture = resolve(import.meta.dirname, 'controller-stdio-fixture.mjs');
 
 test('preflight reproduces schema 12 versus runtime 11 without changing store data', () => {

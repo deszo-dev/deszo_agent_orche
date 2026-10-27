@@ -1,15 +1,16 @@
 // P2 migration proof: populated ADR-0008 links migrate without losing legacy lifecycle data.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, rmSync, readFileSync } from 'node:fs';
+import { mkdirSync, rmSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { Store } from '../core/store.mjs';
 import { MIGRATION_PATHS } from '../core/migrations.mjs';
+import { ownedDir } from './test-roots.mjs';
 
 test('P2-M19: existing linked-repair rows survive the additive coordination migration', () => {
   const scratchRoot = resolve(import.meta.dirname, '../../.deszo/tests');
   mkdirSync(scratchRoot, { recursive: true });
-  const root = mkdtempSync(join(scratchRoot, 'p2-m19-'));
+  const root = ownedDir(join(scratchRoot, 'p2-m19-'));
   let oldStore = null;
   let migratedStore = null;
   try {

@@ -8,13 +8,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { ControlHost } from '../host/authority.mjs';
 import { manualTimeSource } from '../host/timeSource.mjs';
 import { ProfileRecovery } from '../host/profileRecovery.mjs';
+import { ownedDir } from './test-roots.mjs';
 
 const WRITER = `import { DatabaseSync } from 'node:sqlite';
 const db = new DatabaseSync(process.argv[2]);
@@ -55,7 +56,7 @@ async function crashWriterMidTransaction(dir, dbPath) {
 }
 
 function fixture() {
-  const root = mkdtempSync(join(tmpdir(), 'deszo-profile-crash-'));
+  const root = ownedDir(join(tmpdir(), 'deszo-profile-crash-'));
   const profiles = join(root, 'profiles');
   const source = join(profiles, 'source');
   mkdirSync(join(source, 'store'), { recursive: true });

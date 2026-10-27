@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, randomUUID, sign } from 'node:crypto';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, symlinkSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, existsSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ControlHost } from '../host/authority.mjs';
@@ -20,10 +20,11 @@ import { installedActions } from '../host/serviceActions.mjs';
 import { reconcileStoppedPolicy } from '../host/workerReconciliation.mjs';
 import { Engine } from '../core/engine.mjs';
 import { singleAgent, startTestRunner } from './helpers.mjs';
+import { ownedDir } from './test-roots.mjs';
 
 const keyText = key => key.export({ type: 'spki', format: 'der' }).toString('base64');
 function setup({ allowRecovery = false, restarts = 3, repairs = 0 } = {}) {
-  const root = mkdtempSync(join(tmpdir(), 'deszo-adr6-completion-')), time = manualTimeSource();
+  const root = ownedDir(join(tmpdir(), 'deszo-adr6-completion-')), time = manualTimeSource();
   const host = new ControlHost({ root: join(root, 'host'), time }), authenticator = generateKeyPairSync('ed25519'), controller = generateKeyPairSync('ed25519');
   host.enrollCredential({ credentialId: 'fixture-only', label: 'test', publicKey: keyText(authenticator.publicKey) }, { enrolledBy: 'test fixture' });
   const proposal = host.proposePolicy({ controller: { controllerId: 'worker', publicKey: keyText(controller.publicKey) }, durationMs: 43200000,
@@ -193,7 +194,7 @@ test('ADR6 rollback refuses a schema downgrade, while fork restore preserves new
 });
 
 test('ADR6 manifest verification rejects substituted resource bytes and reparse points', () => {
-  const root = mkdtempSync(join(tmpdir(), 'deszo-build-')), build = join(root, 'build'), external = join(root, 'external'); mkdirSync(build); mkdirSync(external);
+  const root = ownedDir(join(tmpdir(), 'deszo-build-')), build = join(root, 'build'), external = join(root, 'external'); mkdirSync(build); mkdirSync(external);
   writeFileSync(join(build, 'deszo.exe'), 'fixture-binary'); writeFileSync(join(build, 'resource.txt'), 'reviewed');
   const manifest = createBuildManifest({ buildDir: build, buildId: 'fixture', sourceCommit: 'a'.repeat(40), inputsDigest: 'b'.repeat(64), protocolVersion: 1, storeSchemaVersion: 11, launchEntry: 'deszo.exe', createdAt: new Date().toISOString() });
   assert.equal(verifyBuildDirectory(manifest, build).verified, true);

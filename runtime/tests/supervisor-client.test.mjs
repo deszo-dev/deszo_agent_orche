@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { SUPERVISOR_ENV, supervisorFromEnvironment } from '../core/supervisor-client.mjs';
+import { ownedDir } from './test-roots.mjs';
 
 const testsRoot = resolve(import.meta.dirname, '../../.deszo/tests');
 
@@ -19,7 +20,7 @@ test('a missing launch shim refuses to start supervision, and the token is still
 
 test('a present launch shim yields a client that keeps its token in memory', () => {
   mkdirSync(testsRoot, { recursive: true });
-  const directory = mkdtempSync(join(testsRoot, 'shim-'));
+  const directory = ownedDir(join(testsRoot, 'shim-'));
   const shim = join(directory, 'deszo-launch-shim.exe');
   writeFileSync(shim, '');
   const env = { DESZO_SUPERVISOR_PIPE: '\\\\.\\pipe\\deszo-test', DESZO_SUPERVISOR_TOKEN: 'secret', DESZO_LAUNCH_SHIM: shim };

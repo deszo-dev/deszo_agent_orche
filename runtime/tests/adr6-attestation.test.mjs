@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { sha256 } from '../core/canonical.mjs';
@@ -14,12 +14,13 @@ import { createBuildManifest } from '../host/lifecycle.mjs';
 import { ALLOWED_BUILD_COMMANDS, commandAllowed, toolIdentity, verifyBuildAttestation } from '../host/buildAttestation.mjs';
 import { fixtureProcessExecutor, runAttestedBuild } from '../host/buildRunner.mjs';
 import { FIXTURE_BUILD, FIXTURE_ARTIFACT, attestFixtureBuild } from './attestation-fixture.mjs';
+import { ownedDir } from './test-roots.mjs';
 
 const gitPath = process.platform === 'win32' ? execFileSync('where.exe', ['git.exe'], { encoding: 'utf8', windowsHide: true }).trim().split(/\r?\n/)[0] : execFileSync('which', ['git'], { encoding: 'utf8' }).trim();
 const gitTool = { path: gitPath, sha256: sha256(readFileSync(gitPath)) };
 
 function fixture() {
-  const base = mkdtempSync(join(tmpdir(), 'deszo-attestation-')), root = join(base, 'source');
+  const base = ownedDir(join(tmpdir(), 'deszo-attestation-')), root = join(base, 'source');
   mkdirSync(root);
   const write = (name, text) => { mkdirSync(dirname(join(root, name)), { recursive: true }); writeFileSync(join(root, name), text); };
   write('runtime/main.mjs', "export { allow } from '../config/rules.mjs';\n");

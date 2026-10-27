@@ -8,11 +8,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { deflateSync } from 'node:zlib';
 import { SOURCE_FETCH_CONFIG, SOURCE_FETCH_OPTIONS } from '../core/branchDelivery.mjs';
-import { testsRoot } from './custody-support.mjs';
+import { ownedDir, releaseOwnedDir, testsRoot } from './test-roots.mjs';
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const MAX_BUFFER = 256 * 1024 * 1024;
@@ -24,29 +26,48 @@ function git(cwd, args) {
   return result.stdout.trim();
 }
 
+// Loose blob objects written into a repository in Git's own loose format (zlib of "blob <size>\0<content>", named by its SHA-1). Writing
+// them directly, in parallel, takes seconds; `git hash-object --stdin-paths` over 9,000 files took 90-100 s on Windows. Git then reads
+// every one back (cat-file --batch-check) and counts them (count-objects), so the fixture is proven to be what Git sees as loose objects.
+async function writeLooseBlobs(repository, count) {
+  const objects = join(repository, '.git', 'objects');
+  for (let index = 0; index < 256; index += 1) mkdirSync(join(objects, index.toString(16).padStart(2, '0')), { recursive: true });
+  const ids = [];
+  let next = 0;
+  const writer = async () => {
+    while (next < count) {
+      const index = next++;
+      const content = Buffer.from(`object ${index} ${randomUUID()}\n`);
+      const raw = Buffer.concat([Buffer.from(`blob ${content.length}\0`), content]);
+      const id = createHash('sha1').update(raw).digest('hex');
+      await writeFile(join(objects, id.slice(0, 2), id.slice(2)), deflateSync(raw), { flag: 'wx' });
+      ids.push(id);
+    }
+  };
+  await Promise.all(Array.from({ length: 16 }, writer));
+  const checked = spawnSync('git', ['cat-file', '--batch-check'], { cwd: repository, input: `${ids.join('\n')}\n`, encoding: 'utf8', windowsHide: true, maxBuffer: MAX_BUFFER });
+  assert.equal(checked.status, 0, `cat-file: ${checked.stderr}`);
+  assert.equal(checked.stdout.trim().split(/\r?\n/).filter(line => / blob \d+$/.test(line)).length, count, 'Git reads every written object as a blob');
+  const counted = Number(/^count: (\d+)$/m.exec(git(repository, ['count-objects', '-v']))?.[1]);
+  assert.ok(counted >= count, `Git counts ${counted} loose objects`);
+}
+
 // A source repository with more loose objects than the automatic maintenance threshold allows, and a clone with one commit the source lacks.
-function repositoryPair(label) {
-  const base = mkdtempSync(join(testsRoot, `f7l1-${label}-`));
-  const source = join(base, 'source'), clone = join(base, 'clone'), scratch = join(base, 'objects');
+// The clone is taken before the loose objects exist: it needs only the shared base, and cloning or committing next to 9,000 loose objects
+// cost another 30 s (the clone's own commit ran automatic maintenance).
+async function repositoryPair(label) {
+  const base = ownedDir(join(testsRoot, `f7l1-${label}-`));
+  const source = join(base, 'source'), clone = join(base, 'clone');
   mkdirSync(source, { recursive: true });
-  mkdirSync(scratch, { recursive: true });
   git(source, ['init', '-q', '-b', 'main']);
   writeFileSync(join(source, 'README.md'), 'base\n');
   git(source, ['add', 'README.md']);
   git(source, ['commit', '-q', '-m', 'base']);
-  const files = [];
-  for (let index = 0; index < 9000; index += 1) {
-    const file = join(scratch, `object-${index}.txt`);
-    writeFileSync(file, `object ${index} ${randomUUID()}\n`);
-    files.push(file);
-  }
-  const hashed = spawnSync('git', ['-c', 'core.autocrlf=false', 'hash-object', '-w', '--stdin-paths'], { cwd: source, input: `${files.join('\n')}\n`, encoding: 'utf8',
-    windowsHide: true, maxBuffer: MAX_BUFFER });
-  assert.equal(hashed.status, 0, `hash-object: ${hashed.error?.message ?? hashed.stderr}`);
   git(base, ['clone', '-q', source, clone]);
   writeFileSync(join(clone, 'change.txt'), `change ${randomUUID()}\n`);
   git(clone, ['add', 'change.txt']);
   git(clone, ['commit', '-q', '-m', 'change']);
+  await writeLooseBlobs(source, 9000);
   return { base, source, clone, sha: git(clone, ['rev-parse', 'HEAD']) };
 }
 
@@ -69,11 +90,35 @@ function gitProcesses() {
   return processes;
 }
 
-// Whether a new Git process is attributable to the fetch: started by it, a maintenance command, or working on this repository.
+const MAINTENANCE_COMMANDS = new Set(['gc', 'repack', 'maintenance', 'pack-objects', 'prune', 'pack-refs', 'prune-packed', 'commit-graph', 'multi-pack-index']);
+// Children of gc whose subcommand alone is ordinary (`git worktree list` is not maintenance; `git worktree prune` is).
+const MAINTENANCE_PAIRS = new Set(['worktree prune', 'rerere gc', 'reflog expire']);
+const OPTIONS_WITH_VALUE = new Set(['-c', '-C', '--git-dir', '--work-tree', '--namespace', '--config-env', '--super-prefix']);
+
+// The Git subcommand of a command line (the first argument after the executable and Git's own options) and the argument after it, or
+// null when they cannot be told. A word inside another argument (another application's `git diff -- f7-detached-maintenance.test.mjs`)
+// is not a maintenance command.
+function gitSubcommand(commandLine) {
+  const tokens = [...commandLine.matchAll(/"([^"]*)"|(\S+)/g)].map(match => match[1] ?? match[2]);
+  if (!tokens.length || !/(^|[\\/])git(\.exe)?$/i.test(tokens[0])) return null;
+  for (let index = 1; index < tokens.length; index += 1) {
+    const token = tokens[index];
+    if (OPTIONS_WITH_VALUE.has(token)) { index += 1; continue; }
+    if (token.startsWith('-')) continue;
+    return { name: token, next: tokens[index + 1] ?? '' };
+  }
+  return null;
+}
+
+// Whether a new Git process is attributable to the fetch: started by it, a maintenance command, or working on this repository. A command
+// line whose subcommand cannot be told is judged by the words it contains, as before.
 function attributable({ parent, commandLine }, fetchPid, repository) {
   const normalised = commandLine.toLowerCase().replace(/\\/g, '/');
-  return parent === fetchPid || /\b(gc|repack|maintenance|pack-objects|prune|pack-refs)\b/.test(commandLine)
-    || normalised.includes(repository.toLowerCase().replace(/\\/g, '/'));
+  const subcommand = gitSubcommand(commandLine);
+  const maintenanceCommand = subcommand
+    ? MAINTENANCE_COMMANDS.has(subcommand.name) || MAINTENANCE_PAIRS.has(`${subcommand.name} ${subcommand.next}`)
+    : /\b(gc|repack|maintenance|pack-objects|prune|pack-refs)\b/.test(commandLine);
+  return parent === fetchPid || maintenanceCommand || normalised.includes(repository.toLowerCase().replace(/\\/g, '/'));
 }
 
 function traced(cwd, args) {
@@ -82,10 +127,10 @@ function traced(cwd, args) {
   return { children: childCommands(result.stderr), pid: result.pid };
 }
 
-function remove(path) { rmSync(path, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
+function remove(path) { releaseOwnedDir(path); }
 
-test('F7-L1 control: the default fetch of a source repository past the threshold starts automatic maintenance', { timeout: 600_000 }, () => {
-  const pair = repositoryPair('control');
+test('F7-L1 control: the default fetch of a source repository past the threshold starts automatic maintenance', { timeout: 600_000 }, async () => {
+  const pair = await repositoryPair('control');
   try {
     const { children } = traced(pair.source, ['-c', 'core.hooksPath=/nonexistent', 'fetch', pair.clone, pair.sha]);
     assert.ok(children.some(maintenance), `the control must start automatic maintenance: ${children.join(' | ')}`);
@@ -93,7 +138,7 @@ test('F7-L1 control: the default fetch of a source repository past the threshold
 });
 
 test('F7-L1: the production source fetch starts no automatic maintenance, and leaves no Git process of its own after it returns', { timeout: 600_000 }, async () => {
-  const pair = repositoryPair('production');
+  const pair = await repositoryPair('production');
   try {
     const before = new Set(gitProcesses().keys());
     const args = ['-c', 'core.hooksPath=/nonexistent', ...SOURCE_FETCH_CONFIG, 'fetch', ...SOURCE_FETCH_OPTIONS, pair.clone, pair.sha];

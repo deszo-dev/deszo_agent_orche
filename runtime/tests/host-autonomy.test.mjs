@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, randomUUID, sign } from 'node:crypto';
-import { mkdir, mkdtemp } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { canonicalBytes } from '../core/canonical.mjs';
 import { ControlHost } from '../host/authority.mjs';
@@ -11,6 +11,7 @@ import { manualTimeSource } from '../host/timeSource.mjs';
 import { connectHost, startHostServer } from '../host/ipc.mjs';
 import { HOST_ENV } from '../host/runtimeBinding.mjs';
 import { singleAgent, startTestRunner } from './helpers.mjs';
+import { ownedDir } from './test-roots.mjs';
 
 const testsRoot = resolve(import.meta.dirname, '../../.deszo/tests');
 const der = key => key.export({ format: 'der', type: 'spki' }).toString('base64');
@@ -18,7 +19,7 @@ const signValue = (privateKey, value) => sign(null, canonicalBytes(value), priva
 
 test('ADR6-01/07: a host permit admits an external run without the confirmation pause, and only that exact run', async () => {
   await mkdir(testsRoot, { recursive: true });
-  const root = await mkdtemp(join(testsRoot, 'host-autonomy-'));
+  const root = ownedDir(join(testsRoot, 'host-autonomy-'));
   const workflow = singleAgent({ id: 'host-permitted', context: null });
 
   // A first runtime saves the workflow and workspace and turns confirmation on, as the user would.

@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, mkdir, readdir, readFile, appendFile } from 'node:fs/promises';
+import { rm, mkdir, readdir, readFile, appendFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
+import { ownedDir } from './test-roots.mjs';
 
 const testsRoot = resolve(import.meta.dirname, '../../.deszo/tests');
 
@@ -180,7 +181,7 @@ async function countInvocations(fixtureState) {
 // real process restart. It does NOT verify autonomous continuation; see workflow-continuation-strict.test.mjs and
 // docs/reviews/2026-10-22-workflow-continuation-independent-verification.md.
 test('CONT (harness-driven): committed outputs survive a real restart and are reused by harness-created mode:node runs', async () => {
-  const root = await mkdtemp(join(testsRoot, 'root-continuation-'));
+  const root = ownedDir(join(testsRoot, 'root-continuation-'));
   const fixtureState = join(root, 'fixture-state');
   const dbPath = join(root, 'store', 'state.sqlite');
   let engine1, engine2;
@@ -484,7 +485,7 @@ test('CONT (harness-driven): committed outputs survive a real restart and are re
 });
 
 test('CONT: Interrupted effectful operation is not blindly re-executed after restart', async () => {
-  const root = await mkdtemp(join(testsRoot, 'root-interrupted-'));
+  const root = ownedDir(join(testsRoot, 'root-interrupted-'));
   const fixtureState = join(root, 'fixture-state');
   const dbPath = join(root, 'store', 'state.sqlite');
   let engine1, engine2;

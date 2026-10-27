@@ -1,13 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, randomUUID, sign } from 'node:crypto';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { canonicalBytes, canonicalHash } from '../core/canonical.mjs';
 import { ControlHost, HostError } from '../host/authority.mjs';
 import { manualTimeSource, remainingAuthority } from '../host/timeSource.mjs';
 import { ApplicationLifecycle, createBuildManifest } from '../host/lifecycle.mjs';
+import { ownedDir } from './test-roots.mjs';
 
 const HOUR = 3_600_000;
 const SNAPSHOT = 'a'.repeat(64);
@@ -30,7 +31,7 @@ function scope(overrides = {}) {
 }
 const LIMITS = { attempts: 3, providerInvocations: 3, workerModelCalls: 5, operations: 20, restarts: 2, repairs: 1, builds: 2 };
 
-function setup({ time = manualTimeSource(), root = mkdtempSync(join(tmpdir(), 'deszo-host-')), limits = LIMITS, onStop = null } = {}) {
+function setup({ time = manualTimeSource(), root = ownedDir(join(tmpdir(), 'deszo-host-')), limits = LIMITS, onStop = null } = {}) {
   const host = new ControlHost({ root, time, onStop });
   const authenticator = keyPair();
   const controllerKeys = keyPair();
@@ -260,7 +261,7 @@ test('ADR6-14: the host audit chain detects altered history', () => {
 });
 
 function buildFixture() {
-  const dir = mkdtempSync(join(tmpdir(), 'deszo-build-'));
+  const dir = ownedDir(join(tmpdir(), 'deszo-build-'));
   mkdirSync(join(dir, 'runtime'));
   writeFileSync(join(dir, 'deszo.exe'), 'NEW BUILD');
   writeFileSync(join(dir, 'runtime', 'runner.mjs'), 'runner');

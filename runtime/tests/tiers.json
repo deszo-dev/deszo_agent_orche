@@ -1,0 +1,42 @@
+{
+  "description": "Developer test tiers (scripts/run-tests.mjs). npm test always runs every runtime/tests/*.test.mjs file. A file listed in neither tier is quick, so a new test file is never left out of a tier. Costs are from the P3 regression log (docs/reviews/evidence/2026-10-27-p3-clean-final-npm-test.tap.log).",
+  "heavy": [
+    "tauri-host-proof-b.test.mjs",
+    "control-host-exploration.test.mjs",
+    "f7-detached-maintenance.test.mjs"
+  ],
+  "integration": [
+    "custody-audit.test.mjs",
+    "custody-delivery.test.mjs",
+    "custody-replay.test.mjs",
+    "custody-review.test.mjs",
+    "custody-safety.test.mjs",
+    "custody-terminal-settlement.test.mjs",
+    "custody-unresolved.test.mjs",
+    "custody-workspace-hold.test.mjs",
+    "process-custody.test.mjs",
+    "runner-lock.test.mjs",
+    "rust-host-lifecycle.test.mjs",
+    "managed-task.test.mjs",
+    "branch-delivery.test.mjs",
+    "map.test.mjs",
+    "revisions.test.mjs",
+    "reference.test.mjs",
+    "pipeline.test.mjs",
+    "engine.test.mjs",
+    "loops.test.mjs",
+    "failure-outcomes.test.mjs",
+    "followup.test.mjs",
+    "parent-repair-coordination.test.mjs",
+    "parent-repair-custody-e2e.test.mjs",
+    "workflow-continuation.test.mjs",
+    "workflow-continuation-negative.test.mjs",
+    "workflow-continuation-strict.test.mjs",
+    "workflow-p1-continuation.test.mjs",
+    "workflow-p1-coverage-closure.test.mjs",
+    "workflow-p1-published-and-ordinary.test.mjs",
+    "workflow-p1-recovery-boundaries.test.mjs",
+    "adr6-regressions.test.mjs",
+    "supervision.test.mjs"
+  ]
+}

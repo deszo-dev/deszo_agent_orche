@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, randomBytes, randomUUID } from 'node:crypto';
-import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ControlHost } from '../host/authority.mjs';
 import { manualTimeSource } from '../host/timeSource.mjs';
 import { ORIGIN, WebAuthnConsent, verifyAssertion, parseAuthenticatorData } from '../host/webauthn.mjs';
 import { authenticator } from './webauthn-fixture.mjs';
+import { ownedDir } from './test-roots.mjs';
 
 test('ADR6 native consent verifier refuses forged signatures, substituted client context, absent UV, wrong RP and credential replay counters', () => {
   const a = authenticator(), client = JSON.stringify({ type: 'webauthn.get', challenge: randomUUID(), origin: ORIGIN, crossOrigin: false });
@@ -23,7 +23,7 @@ test('ADR6 native consent verifier refuses forged signatures, substituted client
 });
 
 test('ADR6 installed consent is enrolled only after proof-of-possession, binds the displayed policy, and never trusts a fixture assertion', () => {
-  const host = new ControlHost({ root: mkdtempSync(join(tmpdir(), 'deszo-webauthn-')), time: manualTimeSource(), assurance: 'bootstrap' });
+  const host = new ControlHost({ root: ownedDir(join(tmpdir(), 'deszo-webauthn-')), time: manualTimeSource(), assurance: 'bootstrap' });
   const peer = { pid: 123, creationTime: 'fixture-process', userSid: 'fixture-user', protectedBroker: true };
   const consent = new WebAuthnConsent({ host, requireBroker: p => { assert.equal(p.protectedBroker, true); } }), a = authenticator();
   try {

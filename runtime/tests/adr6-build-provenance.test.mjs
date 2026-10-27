@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,existsSync} from 'node:fs';
+import {mkdirSync,writeFileSync,readFileSync,existsSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join,dirname} from 'node:path';
 import {sha256} from '../core/canonical.mjs';
@@ -11,11 +11,12 @@ import {sourceInventory,authorityImportClosure} from '../host/sourceProvenance.m
 import {InstalledBuilds,securityClosure} from '../host/installedBuilds.mjs';
 import {InstalledEnablement,REQUIRED_NATIVE_CHECKS} from '../host/installedEnablement.mjs';
 import {FIXTURE_BUILD,attestFixtureBuild} from './attestation-fixture.mjs';
+import { ownedDir } from './test-roots.mjs';
 
 const gitPath=process.platform==='win32'?execFileSync('where.exe',['git.exe'],{encoding:'utf8',windowsHide:true}).trim().split(/\r?\n/)[0]:execFileSync('which',['git'],{encoding:'utf8'}).trim();
 const gitTool={path:gitPath,sha256:sha256(readFileSync(gitPath))};
 function fixture(){
-  const base=mkdtempSync(join(tmpdir(),'deszo-provenance-')),root=join(base,'source');mkdirSync(root);
+  const base=ownedDir(join(tmpdir(),'deszo-provenance-')),root=join(base,'source');mkdirSync(root);
   const write=(name,text)=>{mkdirSync(dirname(join(root,name)),{recursive:true});writeFileSync(join(root,name),text);};
   write('runtime/main.mjs',"export { allow } from '../config/rules.mjs';\n");write('config/rules.mjs','export const allow = true;\n');write('src/Panel.tsx','export const Panel = () => <button>Before</button>;\n');
   const git=args=>execFileSync(gitPath,['-c','core.autocrlf=false','-C',root,...args],{encoding:'utf8',windowsHide:true,timeout:10000});
@@ -58,7 +59,7 @@ test('ADR6 stage refuses invented source identity and caller-supplied baseline w
 });
 
 test('ADR6 enablement invalidates receipts when trusted configuration/tools change even if installed file hashes are identical',()=>{
-  const root=mkdtempSync(join(tmpdir(),'deszo-gate-source-')),host=new ControlHost({root});
+  const root=ownedDir(join(tmpdir(),'deszo-gate-source-')),host=new ControlHost({root});
   try{
     const installation={files:{'service-runtime.mjs':'a'.repeat(64)},tools:{git:gitTool},profileRoot:'profile-A'};
     const original=new InstalledEnablement({host,installation}),sourceDigest=original.sourceDigest;

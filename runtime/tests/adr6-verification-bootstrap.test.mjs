@@ -1,7 +1,7 @@
 // Injected authority/lifecycle tests. A real installed diagnostic policy still requires physical Windows Hello.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,mkdirSync,writeFileSync} from 'node:fs';
+import {mkdirSync,writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {generateKeyPairSync,randomUUID,sign} from 'node:crypto';
@@ -12,10 +12,11 @@ import {ControllerQueue} from '../host/controllerQueue.mjs';
 import {ApplicationLifecycle,createBuildManifest} from '../host/lifecycle.mjs';
 import {ApplicationStop} from '../host/applicationStop.mjs';
 import {Engine} from '../core/engine.mjs';
+import { ownedDir } from './test-roots.mjs';
 
 const publicText=key=>key.export({format:'der',type:'spki'}).toString('base64');
 function setup({plannedClose=false}={}){
-  const root=mkdtempSync(join(tmpdir(),'deszo-verification-bootstrap-')),time=manualTimeSource(),host=new ControlHost({root:join(root,'host'),time}),key=generateKeyPairSync('ed25519'),controller=generateKeyPairSync('ed25519');
+  const root=ownedDir(join(tmpdir(),'deszo-verification-bootstrap-')),time=manualTimeSource(),host=new ControlHost({root:join(root,'host'),time}),key=generateKeyPairSync('ed25519'),controller=generateKeyPairSync('ed25519');
   host.enrollCredential({credentialId:'fixture',publicKey:publicText(key.publicKey),label:'fixture only'},{enrolledBy:'fixture'});
   const scope={verificationOnly:true,dataProfile:'native-probe',workspaces:[{workspaceId:'main',cwdIdentity:'a'.repeat(64)}],workflows:[{workflowId:'preserved-reference',baselineSha256:'b'.repeat(64),permittedRevisions:[]}],operations:['app.verify','runtime.reregister','run.stop_and_report',...(plannedClose?['app.stop']:[])],commands:[],desktop:{user:'fixture-user',sessionId:1},buildRoot:join(root,'builds'),applicationMode:'separate_preview',deliveryBoundary:'candidate'};
   const limits={attempts:0,providerInvocations:0,workerModelCalls:0,operations:10,restarts:3,repairs:0,builds:0};
@@ -87,6 +88,6 @@ test('ADR6 diagnostic planned close needs explicit fresh scope and its exact que
   }
 });
 test('ADR6 verification capability inspection does not execute installed provider CLIs',async()=>{
-  let probes=0;const root=mkdtempSync(join(tmpdir(),'deszo-verification-capabilities-')),engine=new Engine({root,hostVerificationOnly:true,adapters:{detect:async()=>{probes++;throw new Error('Must not execute a CLI.');}}});
+  let probes=0;const root=ownedDir(join(tmpdir(),'deszo-verification-capabilities-')),engine=new Engine({root,hostVerificationOnly:true,adapters:{detect:async()=>{probes++;throw new Error('Must not execute a CLI.');}}});
   try{const c=await engine.capabilities();assert.equal(probes,0);assert.ok(c.providers.length>0);assert.ok(c.providers.every(p=>p.available===false));}finally{engine.store.close();}
 });

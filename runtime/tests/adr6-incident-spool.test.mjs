@@ -5,20 +5,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, randomUUID, sign } from 'node:crypto';
-import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ControlHost } from '../host/authority.mjs';
 import { manualTimeSource } from '../host/timeSource.mjs';
 import { canonicalBytes } from '../core/canonical.mjs';
 import { installedActions } from '../host/serviceActions.mjs';
+import { ownedDir } from './test-roots.mjs';
 
 const keyText = key => key.export({ type: 'spki', format: 'der' }).toString('base64');
 const incidentObservation = () => ({ schemaVersion: 1, kind: 'IncidentObservation', title: 'Foreground handoff missing', component: 'control-host', category: 'native_foreground_handoff_missing', severity: 'high', confidence: 'high', causeStatus: 'suspected', expected: 'Bounded foreground evidence.', actual: 'Foreground eligibility was lost.', reproduction: ['Relaunch twice.'], versions: { app: null, runtime: null, cli: null }, sourceRevision: null, runId: null, nodeInstanceId: null, attemptId: null, eventRange: null, artifacts: [], captureGaps: ['The second launch produced no foreground evidence.'], controllerCommandId: null, reporter: { authority: 'external', sessionId: null } });
 
 // An authorized policy for a profile of its own, created through the real proposal and authorization path with a fixture key.
 function authorizedPolicy() {
-  const root = mkdtempSync(join(tmpdir(), 'deszo-incident-spool-')), time = manualTimeSource();
+  const root = ownedDir(join(tmpdir(), 'deszo-incident-spool-')), time = manualTimeSource();
   const host = new ControlHost({ root: join(root, 'host'), time });
   const authenticator = generateKeyPairSync('ed25519'), controller = generateKeyPairSync('ed25519');
   host.enrollCredential({ credentialId: 'fixture-only', label: 'test', publicKey: keyText(authenticator.publicKey) }, { enrolledBy: 'test fixture' });

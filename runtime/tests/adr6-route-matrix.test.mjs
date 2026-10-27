@@ -5,7 +5,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, randomUUID, sign } from 'node:crypto';
-import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { canonicalBytes } from '../core/canonical.mjs';
@@ -14,6 +13,7 @@ import { manualTimeSource } from '../host/timeSource.mjs';
 import { startHostServer } from '../host/ipc.mjs';
 import { HOST_ENV } from '../host/runtimeBinding.mjs';
 import { singleAgent, startTestRunner } from './helpers.mjs';
+import { ownedDir } from './test-roots.mjs';
 
 const HOUR = 3_600_000;
 const keys = () => {
@@ -45,7 +45,7 @@ function policyFor(root, cwdIdentity, workflowId, snapshotSha256) {
 
 // A candidate runtime bound to the fixture host, reached over HTTP with both credentials.
 async function withHostBoundCandidate(body) {
-  const root = mkdtempSync(join(tmpdir(), 'deszo-route-matrix-'));
+  const root = ownedDir(join(tmpdir(), 'deszo-route-matrix-'));
   let api = await startTestRunner({ root });
   await api.workspace();
   const engine = api.runner.engine;

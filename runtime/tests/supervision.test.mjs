@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { Engine } from '../core/engine.mjs';
 import { StreamRecorder } from '../core/streams.mjs';
@@ -9,6 +9,7 @@ import { canonicalBytes, sha256 } from '../core/canonical.mjs';
 import { assertValid } from '../core/schemas.mjs';
 import { fixtureAdapters, singleAgent, startTestRunner } from './helpers.mjs';
 import clientTimeouts from '../../docs/authoring/client-timeouts.json' with { type: 'json' };
+import { ownedDir } from './test-roots.mjs';
 
 const testsRoot = resolve(import.meta.dirname, '../../.deszo/tests');
 const ENDED = ['succeeded', 'failed', 'canceled', 'interrupted'];
@@ -360,7 +361,7 @@ test('controller-paused Root Stop finalizes an idle supervised run without dispa
 
 test('an incident spooled while the store was unavailable is reconciled into the registry on the next start', async () => {
   mkdirSync(testsRoot, { recursive: true });
-  const root = mkdtempSync(join(testsRoot, 'spool-'));
+  const root = ownedDir(join(testsRoot, 'spool-'));
   const incidentId = randomUUID();
   mkdirSync(join(root, 'spool', 'incidents'), { recursive: true });
   const spoolFile = join(root, 'spool', 'incidents', `${incidentId}.json`);
@@ -405,7 +406,7 @@ test('a refused arm revokes the grant and stops the run after exactly one arm re
 
 test('a truncated spool file is quarantined and recorded as a capture gap, and startup continues', async () => {
   mkdirSync(testsRoot, { recursive: true });
-  const root = mkdtempSync(join(testsRoot, 'truncated-spool-'));
+  const root = ownedDir(join(testsRoot, 'truncated-spool-'));
   const incidentId = randomUUID();
   mkdirSync(join(root, 'spool', 'incidents'), { recursive: true });
   const spoolFile = join(root, 'spool', 'incidents', `${incidentId}.json`);

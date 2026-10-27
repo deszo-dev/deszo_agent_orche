@@ -6,7 +6,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, randomUUID, sign } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -19,6 +19,7 @@ import { HOST_ENV, hostFromEnvironment } from '../host/runtimeBinding.mjs';
 import { ApplicationLifecycle, createBuildManifest } from '../host/lifecycle.mjs';
 import { missingProductionCapabilities } from '../host/capabilities.mjs';
 import { contextChain, singleAgent, startTestRunner } from './helpers.mjs';
+import { ownedDir } from './test-roots.mjs';
 
 const HOUR = 3_600_000;
 const SNAPSHOT = 'a'.repeat(64);
@@ -32,7 +33,7 @@ const pause = ms => new Promise(done => setTimeout(done, ms));
 const pipeFor = root => (process.platform === 'win32' ? `\\\\.\\pipe\\deszo-adr6-reg-${randomUUID()}` : join(root, 'host.sock'));
 
 // A writable fixture host with an enrolled authenticator, an authenticated controller and one controlling runtime.
-function setup({ scope: scopeOverrides = {}, limits: limitOverrides = {}, durationMs = HOUR, root = mkdtempSync(join(tmpdir(), 'deszo-adr6-reg-')) } = {}) {
+function setup({ scope: scopeOverrides = {}, limits: limitOverrides = {}, durationMs = HOUR, root = ownedDir(join(tmpdir(), 'deszo-adr6-reg-')) } = {}) {
   const time = manualTimeSource();
   const host = new ControlHost({ root, time });
   const authenticator = keys();
@@ -61,7 +62,7 @@ function setup({ scope: scopeOverrides = {}, limits: limitOverrides = {}, durati
 
 // A host-bound runtime in this process, reached over the real IPC protocol, as the runner binds it.
 async function withRuntime(workflow, options, body) {
-  const root = mkdtempSync(join(tmpdir(), 'deszo-adr6-runtime-'));
+  const root = ownedDir(join(tmpdir(), 'deszo-adr6-runtime-'));
   let api = await startTestRunner({ root });
   let cwdIdentity, saved;
   try {
@@ -566,7 +567,7 @@ test('ADR6 bootstrap: a runtime restarted with the pipe and policy but without i
 // ---------- Enablement gates (ADR6 section 7) ----------
 
 test('Enablement: a production host refuses to start while capabilities are unverified', () => {
-  const root = mkdtempSync(join(tmpdir(), 'deszo-adr6-gate-'));
+  const root = ownedDir(join(tmpdir(), 'deszo-adr6-gate-'));
   assert.ok(missingProductionCapabilities().length >= 10, 'No capability is verified by documentation or fixtures.');
   assert.throws(() => new ControlHost({ root, time: manualTimeSource(), assurance: 'production' }), err => err.code === 'autonomy_disabled' && /Production autonomy is disabled/.test(err.message));
   const served = spawnSync(process.execPath, ['--disable-warning=ExperimentalWarning', join(repo, 'runtime/host/main.mjs'), 'serve', '--state', root, '--pipe', pipeFor(root)],
@@ -576,7 +577,7 @@ test('Enablement: a production host refuses to start while capabilities are unve
 });
 
 test('Enablement: a store records its assurance level and refuses to be opened at another level', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'deszo-adr6-store-'));
+  const root = ownedDir(join(tmpdir(), 'deszo-adr6-store-'));
   new ControlHost({ root, time: manualTimeSource() }).close();
   // Re-marking the store as production (as a tampered or copied store would appear) must still stop a fixture open.
   const raw = new DatabaseSync(join(root, 'host.sqlite'));

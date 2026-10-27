@@ -8,6 +8,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { createParser, selectFinal } from '../core/adapters.mjs';
 import { MIGRATION_PATHS, Store } from '../core/store.mjs';
 import { fixtureAdapters, singleAgent, startTestRunner } from './helpers.mjs';
+import { ownedPath } from './test-roots.mjs';
 
 const stream = resolve(import.meta.dirname, 'stream-fixture.mjs');
 const streamAdapters = (scenario, parser = null) => ({
@@ -92,7 +93,7 @@ test('R3: a log-storage failure is contained as capture_failed; a store that can
 });
 
 test('R7: a failing migration rolls back its DDL together with its version row', async () => {
-  const root = join(resolve(import.meta.dirname, '../../.deszo/tests'), `migration-${randomUUID()}`);
+  const root = ownedPath(join(resolve(import.meta.dirname, '../../.deszo/tests'), `migration-${randomUUID()}`));
   mkdirSync(join(root, 'store'), { recursive: true });
   const scripts = MIGRATION_PATHS.map(path => readFileSync(path, 'utf8'));
   new Store(root, { migrations: scripts.slice(0, 1) }).close();

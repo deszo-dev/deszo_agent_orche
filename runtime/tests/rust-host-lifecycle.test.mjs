@@ -3,13 +3,14 @@
 // fixture setup; Rust Host never reads that stream. After the restart this test performs GET-only observation.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import net from 'node:net';
 import { DatabaseSync } from 'node:sqlite';
+import { ownedDir } from './test-roots.mjs';
 
 const repo = resolve(import.meta.dirname, '../..');
 const testsRoot = join(repo, '.deszo/tests');
@@ -181,7 +182,7 @@ async function digestCandidate(path) {
 
 async function prepareFreshInstallation(iteration, { candidateManifestBuildId = 'build-b', corruptCandidateRunner = false,
   duplicateReceiptDelivery = false, pauseAfterShutdownRequestedMs } = {}) {
-  const root = await mkdtemp(join(testsRoot, `rust-host-proof-a-${iteration}-`));
+  const root = ownedDir(join(testsRoot, `rust-host-proof-a-${iteration}-`));
   const install = join(root, 'installation'); const profile = join(root, 'profile'); const staging = join(install, 'staging');
   const fixtureState = join(root, 'fixture-state'); const buildA = join(install, 'versions/build-a'); const candidateB = join(staging, 'build-b');
   await Promise.all([mkdir(buildA, { recursive: true }), mkdir(candidateB, { recursive: true }), mkdir(profile, { recursive: true }), mkdir(staging, { recursive: true }), mkdir(fixtureState, { recursive: true })]);

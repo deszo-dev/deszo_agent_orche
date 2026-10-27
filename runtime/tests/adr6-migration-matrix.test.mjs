@@ -5,16 +5,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
-import { mkdirSync, mkdtempSync, existsSync } from 'node:fs';
+import { mkdirSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { storeCompatibility, verifyCompatibleRollback } from '../host/profileRecovery.mjs';
+import { ownedDir } from './test-roots.mjs';
 
 const CHAIN = ['digest-migration-1', 'digest-migration-2', 'digest-migration-3', 'digest-migration-4', 'digest-migration-5'];
 
 // A profile whose store carries the given migration history. An empty array means a profile with no store file yet.
 function profileWith(history, rows = history.map((sha, index) => [index + 1, sha])) {
-  const root = mkdtempSync(join(tmpdir(), 'deszo-migration-matrix-'));
+  const root = ownedDir(join(tmpdir(), 'deszo-migration-matrix-'));
   const profile = join(root, 'profile');
   mkdirSync(join(profile, 'store'), { recursive: true });
   if (history.length === 0 && rows.length === 0) return profile;
