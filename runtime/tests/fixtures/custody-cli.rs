@@ -213,6 +213,96 @@ fn main() {
             event(r#"{"type":"error","message":"Authentication required; invalid token codex_secret_test_value."}"#);
             std::process::exit(13);
         }
+        "custody-p4-fail" => {
+            eprintln!("P4 deterministic ordinary Agent failure");
+            eprintln!("EXPANSION_ONLY_P4_DETAIL");
+            event(r#"{"type":"error","message":"P4 deterministic ordinary Agent failure."}"#);
+            std::process::exit(14);
+        }
+        "custody-p4-gated-fail" => {
+            let gate = text_directive(&prompt, "gate").expect("the prompt names the worker READY/RELEASE gate");
+            let cwd = env::current_dir().expect("working directory");
+            let ready = cwd.join(format!("READY-{gate}.marker"));
+            let release = cwd.join(format!("RELEASE-{gate}.marker"));
+            fs::write(&ready, format!("{} ready\n", std::process::id())).expect("write worker READY marker");
+            let started = std::time::Instant::now();
+            while !release.exists() {
+                if started.elapsed() > Duration::from_secs(180) {
+                    eprintln!("P4 gated failure fixture exceeded its bounded wait");
+                    std::process::exit(16);
+                }
+                thread::sleep(Duration::from_millis(50));
+            }
+            eprintln!("P4 deterministic ordinary Agent failure");
+            eprintln!("EXPANSION_ONLY_P4_DETAIL");
+            event(r#"{"type":"error","message":"P4 deterministic ordinary Agent failure."}"#);
+            std::process::exit(14);
+        }
+        "custody-p4-wait" => answer(r#"{"schemaVersion":1,"kind":"JudgeDecision","reasonCode":"awaiting_progress","rationale":"The current evidence does not justify another action.","evidenceRefs":[],"action":{"type":"wait"}}"#),
+        "custody-p4-gated-wait" => {
+            let cwd = env::current_dir().expect("working directory");
+            let ready = cwd.join("READY-P4_JUDGE.marker");
+            let release = cwd.join("RELEASE-P4_JUDGE.marker");
+            fs::write(&ready, format!("{} ready\n", std::process::id())).expect("write Judge READY marker");
+            let started = std::time::Instant::now();
+            while !release.exists() {
+                if started.elapsed() > Duration::from_secs(180) {
+                    eprintln!("P4 gated Judge exceeded its bounded wait");
+                    std::process::exit(15);
+                }
+                thread::sleep(Duration::from_millis(50));
+            }
+            answer(r#"{"schemaVersion":1,"kind":"JudgeDecision","reasonCode":"awaiting_progress","rationale":"The current evidence does not justify another action.","evidenceRefs":[],"action":{"type":"wait"}}"#);
+        }
+        "custody-p4-repair-result" => answer("P4_REPAIR_OK"),
+        "custody-p4-verify" => answer("P4_VERIFIED"),
+        "custody-p4-observer" => answer("P4_OBSERVER_RAN"),
+        "custody-p4-question" => {
+            if prompt.contains("\"ownerInput\"") {
+                answer(r#"{"schemaVersion":1,"kind":"JudgeDecision","reasonCode":"awaiting_progress","rationale":"The Owner answer is recorded; the current evidence is now evaluated.","evidenceRefs":[],"action":{"type":"wait"}}"#);
+            } else {
+                answer(r#"{"schemaVersion":1,"kind":"JudgeDecision","reasonCode":"owner_decision_required","rationale":"Owner input is required to resolve this decision.","evidenceRefs":[],"action":{"type":"request_human_input","question":"Which supported option should be used?","answerSpec":{"type":"choice","options":[{"id":"keep","label":"Keep current behavior"},{"id":"change","label":"Use the permitted change"}]}}}"#);
+            }
+        }
+        "custody-p4-repair" => answer(r#"{"schemaVersion":1,"kind":"JudgeDecision","reasonCode":"repair_required","rationale":"The captured failure matches the permitted Repair profile.","evidenceRefs":[],"action":{"type":"request_repair","repairProfileId":"default"}}"#),
+        "custody-p4-adaptive" => {
+            if prompt.contains("\"attentionKind\":\"repair_approval\"") {
+                answer(r#"{"schemaVersion":1,"kind":"JudgeDecision","reasonCode":"repair_acceptable","rationale":"The exact Repair result and required verification are acceptable.","evidenceRefs":[],"action":{"type":"accept_repair"}}"#);
+            } else {
+                answer(r#"{"schemaVersion":1,"kind":"JudgeDecision","reasonCode":"repair_required","rationale":"The captured failure matches the permitted Repair profile.","evidenceRefs":[],"action":{"type":"request_repair","repairProfileId":"default"}}"#);
+            }
+        }
+        "custody-p4-adaptive-question" => {
+            if prompt.contains("\"ownerInput\"") {
+                answer(r#"{"schemaVersion":1,"kind":"JudgeDecision","reasonCode":"awaiting_progress","rationale":"The Owner answer is recorded; the current evidence is now evaluated.","evidenceRefs":[],"action":{"type":"wait"}}"#);
+            } else if prompt.contains("\"attentionKind\":\"repair_approval\"") {
+                answer(r#"{"schemaVersion":1,"kind":"JudgeDecision","reasonCode":"owner_decision_required","rationale":"Owner input is required to resolve this Repair decision.","evidenceRefs":[],"action":{"type":"request_human_input","question":"Choose how to proceed with this Repair result.","answerSpec":{"type":"choice","options":[{"id":"accept","label":"Accept this result"},{"id":"stop","label":"Stop this Repair"}]}}}"#);
+            } else {
+                answer(r#"{"schemaVersion":1,"kind":"JudgeDecision","reasonCode":"repair_required","rationale":"The captured failure matches the permitted Repair profile.","evidenceRefs":[],"action":{"type":"request_repair","repairProfileId":"default"}}"#);
+            }
+        }
+        "custody-p4-adaptive-reject" => {
+            if prompt.contains("\"attentionKind\":\"repair_approval\"") {
+                answer(r#"{"schemaVersion":1,"kind":"JudgeDecision","reasonCode":"repair_rejected","rationale":"The Repair result does not satisfy the captured criteria.","evidenceRefs":[],"action":{"type":"reject_repair","reasonCode":"repair_rejected"}}"#);
+            } else {
+                answer(r#"{"schemaVersion":1,"kind":"JudgeDecision","reasonCode":"repair_required","rationale":"The captured failure matches the permitted Repair profile.","evidenceRefs":[],"action":{"type":"request_repair","repairProfileId":"default"}}"#);
+            }
+        }
+        "custody-p4-evidence" => {
+            if prompt.contains("EXPANSION_ONLY_P4_DETAIL") {
+                fs::write(dir.join("p4-evidence-expansion-received.txt"), "verified\n").expect("record expanded evidence receipt");
+                answer(r#"{"schemaVersion":1,"kind":"JudgeDecision","reasonCode":"awaiting_progress","rationale":"The requested evidence was received and evaluated.","evidenceRefs":[],"action":{"type":"wait"}}"#);
+                return;
+            }
+            let catalog = prompt.split("\"referenceCatalog\":[").nth(1).expect("the evidence prompt includes a reference catalog");
+            let after_id = catalog.split("\"id\":\"").nth(1).expect("the reference catalog has a bounded item");
+            let reference = after_id.split('"').next().expect("the reference id is closed");
+            let decision = format!(r#"{{"schemaVersion":1,"kind":"JudgeDecision","reasonCode":"evidence_insufficient","rationale":"One issued evidence item is needed for this attention.","evidenceRefs":[],"action":{{"type":"request_evidence","evidenceRefs":["{reference}"]}}}}"#);
+            answer(&decision);
+        }
+        "custody-p4-accept" => answer(r#"{"schemaVersion":1,"kind":"JudgeDecision","reasonCode":"repair_acceptable","rationale":"The exact Repair result and required verification are acceptable.","evidenceRefs":[],"action":{"type":"accept_repair"}}"#),
+        "custody-p4-reject" => answer(r#"{"schemaVersion":1,"kind":"JudgeDecision","reasonCode":"repair_rejected","rationale":"The Repair result does not meet the captured acceptance criteria.","evidenceRefs":[],"action":{"type":"reject_repair","reasonCode":"repair_rejected"}}"#),
+        "custody-p4-invalid" => answer(r#"{"schemaVersion":1,"kind":"JudgeDecision","reasonCode":"repair_required","rationale":"Forged authority fields are not accepted.","evidenceRefs":[],"runId":"foreign-run","action":{"type":"request_repair","repairProfileId":"default"}}"#),
         "custody-steady" => {
             let ticks = directive(&prompt, "ticks", 20);
             for tick in 0..ticks {

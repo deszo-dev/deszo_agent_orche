@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, rmdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
-import { deliveryManifestDigest, executeBranchDelivery } from '../core/branchDelivery.mjs';
+import { deliveryManifestDigest, executeBranchDelivery, runBranchDeliveryProcess } from '../core/branchDelivery.mjs';
 import { canonicalHash } from '../core/canonical.mjs';
 import { Store, nowIso } from '../core/store.mjs';
 import { ownedPath } from './test-roots.mjs';
@@ -84,6 +84,218 @@ function refExists(root, ref) {
   return spawnSync('git', ['rev-parse', '--verify', ref], { cwd: root, windowsHide: true }).status === 0;
 }
 
+function temporaryHookDirectories() {
+  return readdirSync(tmpdir()).filter(name => /^deszo-(?:empty-hooks|hooks)-/.test(name)).map(name => join(tmpdir(), name));
+}
+
+function removeFixtureDirectory(path, { maxRetries = 10, retryDelay = 200 } = {}) {
+  if (existsSync(path)) rmSync(path, { recursive: true, force: true, maxRetries, retryDelay });
+}
+
+function capturingProcessRunner(paths, { failClone = false } = {}) {
+  return async (command, args, options = {}) => {
+    for (const argument of args) if (argument.startsWith('core.hooksPath=')) paths.add(argument.slice('core.hooksPath='.length).replace(/\//g, '\\'));
+    const cloneIndex = args.indexOf('clone');
+    if (cloneIndex >= 0 && failClone) {
+      return runBranchDeliveryProcess(command, [...args.slice(0, cloneIndex + 1), '--not-a-git-clone-option'], options);
+    }
+    if (cloneIndex >= 0) {
+      const source = args[args.indexOf('--dissociate') + 1];
+      const destination = args.at(-1);
+      const branch = git(['symbolic-ref', '--short', 'HEAD'], source);
+      git(['init', '-b', branch], destination);
+      mkdirSync(join(destination, '.git', 'objects', 'info'), { recursive: true });
+      writeFileSync(join(destination, '.git', 'objects', 'info', 'alternates'), `${join(source, '.git', 'objects').replace(/\\/g, '/')}\n`);
+      return { status: 0, signal: null, timedOut: false, aborted: false, truncated: false, error: null, stdout: '', stderr: '' };
+    }
+    const fetchIndex = args.indexOf('fetch');
+    if (fetchIndex >= 0) {
+      // The sandbox blocks Git's local upload-pack helper; pack/unpack the same verified object graph locally.
+      const source = args.at(-2); const commit = args.at(-1);
+      const pack = spawnSync('git', ['pack-objects', '--stdout', '--revs'], { cwd: source, input: `${commit}\n`, encoding: null, windowsHide: true, maxBuffer: 64 * 1024 * 1024 });
+      if (pack.status !== 0) return { status: pack.status, signal: pack.signal, timedOut: false, aborted: false, truncated: false, error: pack.error ?? null, stdout: pack.stdout ?? Buffer.alloc(0), stderr: pack.stderr ?? '' };
+      const unpack = spawnSync('git', ['unpack-objects'], { cwd: options.cwd, input: pack.stdout, encoding: 'utf8', windowsHide: true, maxBuffer: 64 * 1024 * 1024 });
+      return { status: unpack.status, signal: unpack.signal, timedOut: false, aborted: false, truncated: false, error: unpack.error ?? null, stdout: unpack.stdout ?? '', stderr: unpack.stderr ?? '' };
+    }
+    return runBranchDeliveryProcess(command, args, options);
+  };
+}
+
+test('RL-A01/A06: successful delivery releases private hook directories and preserves the user hook source', async () => {
+  const { root, baseCommit } = createFixtureRepo();
+  const cloneDir = ownedPath(join(tmpdir(), `deszo-clone-${randomUUID()}`));
+  const hookSource = ownedPath(join(tmpdir(), `deszo-user-hooks-${randomUUID()}`));
+  mkdirSync(hookSource);
+  const sourceFile = join(hookSource, 'keep-this-file.txt');
+  writeFileSync(sourceFile, 'user-owned hook source\n');
+  const hookPaths = new Set();
+  try {
+    const result = await executeBranchDelivery({
+      plan: planFor(root, baseCommit, { hookPolicy: { installHooks: true, hookSource, hooksJournal: 'installed' } }),
+      candidateFiles: CANDIDATE,
+      cloneDir,
+      processRunner: capturingProcessRunner(hookPaths),
+    });
+    assert.equal(result.status, 'READY_FOR_MERGE', result.environmentSmokeReport.diagnostics);
+    assert.equal(hookPaths.size, 2, 'Git should receive the private clone hooks path and the empty host hooks path.');
+    assert.ok([...hookPaths].every(path => !existsSync(path)), `A private hooks directory remained: ${[...hookPaths].filter(existsSync).join(', ')}`);
+    assert.equal(readFileSync(sourceFile, 'utf8'), 'user-owned hook source\n');
+  } finally { removeFixtureDirectory(root); removeFixtureDirectory(cloneDir); removeFixtureDirectory(hookSource); }
+});
+
+test('RL-A02: actual Git failure keeps its diagnostic and releases the exact hooks directory', async () => {
+  const { root, baseCommit } = createFixtureRepo();
+  const cloneDir = ownedPath(join(tmpdir(), `deszo-clone-${randomUUID()}`));
+  const hookPaths = new Set();
+  try {
+    const result = await executeBranchDelivery({
+      plan: planFor(root, baseCommit),
+      candidateFiles: CANDIDATE,
+      cloneDir,
+      processRunner: capturingProcessRunner(hookPaths, { failClone: true }),
+    });
+    assert.equal(result.status, 'delivery_failed');
+    assert.match(result.environmentSmokeReport.diagnostics, /Failed to create isolated delivery clone:/);
+    assert.match(result.environmentSmokeReport.diagnostics, /not-a-git-clone-option/i);
+    assert.equal(hookPaths.size, 1);
+    assert.ok([...hookPaths].every(path => !existsSync(path)), `A hooks directory remained after failure: ${[...hookPaths].filter(existsSync).join(', ')}`);
+  } finally { removeFixtureDirectory(root); removeFixtureDirectory(cloneDir); }
+});
+
+test('RL-A03: an early return after hooks allocation leaves no temporary hooks root', async () => {
+  const { root, baseCommit } = createFixtureRepo();
+  const cloneDir = ownedPath(join(tmpdir(), `deszo-clone-${randomUUID()}`));
+  const before = new Set(temporaryHookDirectories());
+  try {
+    const result = await executeBranchDelivery({
+      plan: planFor(root, baseCommit, { hookPolicy: { installHooks: true, hookSource: join(tmpdir(), `missing-hooks-${randomUUID()}`), hooksJournal: 'installed' } }),
+      candidateFiles: CANDIDATE,
+      cloneDir,
+    });
+    assert.equal(result.status, 'precondition_failed');
+    const leaked = temporaryHookDirectories().filter(path => !before.has(path));
+    assert.deepEqual(leaked, [], `An exact temporary hooks path remained after the early return: ${leaked.join(', ')}`);
+  } finally { removeFixtureDirectory(root); removeFixtureDirectory(cloneDir); }
+});
+
+test('RL-A04: concurrent deliveries receive distinct roots and each releases its own hooks path', async () => {
+  const { root, baseCommit } = createFixtureRepo();
+  const firstClone = ownedPath(join(tmpdir(), `deszo-clone-${randomUUID()}`));
+  const secondClone = ownedPath(join(tmpdir(), `deszo-clone-${randomUUID()}`));
+  const hookPaths = new Set();
+  try {
+    const runner = capturingProcessRunner(hookPaths);
+    const [first, second] = await Promise.all([
+      executeBranchDelivery({ plan: planFor(root, baseCommit, { targetBranchRef: 'refs/heads/feature/concurrent-one' }), candidateFiles: CANDIDATE, cloneDir: firstClone, processRunner: runner }),
+      executeBranchDelivery({ plan: planFor(root, baseCommit, { targetBranchRef: 'refs/heads/feature/concurrent-two' }), candidateFiles: CANDIDATE, cloneDir: secondClone, processRunner: runner }),
+    ]);
+    assert.equal(first.status, 'READY_FOR_MERGE', first.environmentSmokeReport.diagnostics);
+    assert.equal(second.status, 'READY_FOR_MERGE', second.environmentSmokeReport.diagnostics);
+    assert.equal(hookPaths.size, 2, 'Concurrent operations must not share a temporary hooks path.');
+    assert.ok([...hookPaths].every(path => !existsSync(path)), `A concurrent hooks directory remained: ${[...hookPaths].filter(existsSync).join(', ')}`);
+  } finally { removeFixtureDirectory(root); removeFixtureDirectory(firstClone); removeFixtureDirectory(secondClone); }
+});
+
+test('RL-A07: cleanup refuses a real directory substituted at the allocated path', async () => {
+  const { root, baseCommit } = createFixtureRepo();
+  const cloneDir = ownedPath(join(tmpdir(), `deszo-clone-${randomUUID()}`));
+  let hooksPath = null;
+  try {
+    const actualRunner = capturingProcessRunner(new Set());
+    const processRunner = (command, args, options) => {
+      const setting = args.find(argument => argument.startsWith('core.hooksPath='));
+      if (!hooksPath && setting) {
+        hooksPath = setting.slice('core.hooksPath='.length).replace(/\//g, '\\');
+        rmdirSync(hooksPath);
+        mkdirSync(hooksPath);
+        writeFileSync(join(hooksPath, 'replacement-data.txt'), 'preserve replacement\n');
+        return { status: 1, signal: null, timedOut: false, aborted: false, truncated: false, error: null, stdout: '', stderr: 'injected Git failure' };
+      }
+      return actualRunner(command, args, options);
+    };
+    const result = await executeBranchDelivery({ plan: planFor(root, baseCommit), candidateFiles: CANDIDATE, cloneDir, processRunner });
+    assert.equal(result.status, 'delivery_failed');
+    assert.match(result.environmentSmokeReport.diagnostics, /refused: temporary hooks path identity changed after allocation/i);
+    assert.ok(lstatSync(hooksPath).isDirectory());
+    assert.equal(readFileSync(join(hooksPath, 'replacement-data.txt'), 'utf8'), 'preserve replacement\n');
+  } finally {
+    if (hooksPath && existsSync(hooksPath)) rmSync(hooksPath, { recursive: true, force: true });
+    removeFixtureDirectory(root);
+    removeFixtureDirectory(cloneDir);
+  }
+});
+
+test('RL-A05: cancellation waits for an owned child using the temporary Git hooks directory during fetch', async () => {
+  const { root, baseCommit } = createFixtureRepo();
+  const cloneDir = ownedPath(join(tmpdir(), `deszo-clone-${randomUUID()}`));
+  const marker = join(root, 'hook-consumer-started.txt');
+  const vanished = join(root, 'hook-consumer-path-vanished.txt');
+  const controller = new AbortController();
+  const hookPaths = new Set();
+  let childOutcome = null;
+  let operation = null;
+  let childStarted = false;
+  let probeObserved = false;
+  let hooksPath = null;
+  try {
+    const gitRunner = capturingProcessRunner(hookPaths);
+    const processRunner = async (command, args, options = {}) => {
+      if (command === 'git' && args.includes('fetch')) {
+        const setting = args.find(argument => argument.startsWith('core.hooksPath='));
+        const hooksPath = setting?.slice('core.hooksPath='.length).replace(/\//g, '\\');
+        assert.ok(hooksPath, 'The fetch did not receive its operation-owned hooks path.');
+        hookPaths.add(hooksPath);
+        const hookFile = join(hooksPath, 'active-process-probe.txt');
+        writeFileSync(hookFile, 'this operation-owned hooks path is in use\n');
+        const consumer = `const fs=require('node:fs'); const hook=${JSON.stringify(hookFile)}; const marker=${JSON.stringify(marker)}; const vanished=${JSON.stringify(vanished)}; fs.writeFileSync(marker,'started'); setInterval(()=>{try{fs.readFileSync(hook)}catch{fs.writeFileSync(vanished,'missing');process.exit(17)}},20); setTimeout(()=>process.exit(0),750);`;
+        childOutcome = await runBranchDeliveryProcess(process.execPath, ['-e', consumer], options);
+        return childOutcome;
+      }
+      return gitRunner(command, args, options);
+    };
+    operation = executeBranchDelivery({
+      plan: planFor(root, baseCommit),
+      candidateFiles: CANDIDATE,
+      cloneDir,
+      signal: controller.signal,
+      processRunner,
+    });
+    const deadline = Date.now() + 10_000;
+    while (!existsSync(marker) && Date.now() < deadline) await new Promise(resolvePromise => setTimeout(resolvePromise, 50));
+    childStarted = existsSync(marker);
+    hooksPath = [...hookPaths][0] ?? null;
+    probeObserved = Boolean(hooksPath && existsSync(join(hooksPath, 'active-process-probe.txt')));
+    controller.abort();
+    const result = await operation;
+    assert.equal(hookPaths.size, 1, 'RL-A05 must track only its one operation-owned hooks directory.');
+    assert.ok(childStarted, `The hook consumer child never started: ${result.environmentSmokeReport.diagnostics}`);
+    assert.ok(probeObserved, 'The owned child could not observe its hooks directory while running.');
+    assert.ok(childOutcome?.aborted, 'The owned child did not report cancellation.');
+    assert.notEqual(childOutcome?.processActive, true, 'The owned child was still active when the operation returned.');
+    assert.equal(existsSync(vanished), false, 'The temporary hooks path disappeared while its owned child was using it.');
+    assert.equal(result.status, 'stopped');
+    if (childOutcome.terminationError) {
+      assert.match(result.environmentSmokeReport.diagnostics, /Temporary Git hooks directory cleanup deferred/i);
+      assert.match(result.environmentSmokeReport.diagnostics, /taskkill exited with 1:.*user name or password is incorrect/i);
+      assert.ok(existsSync(hooksPath), 'The operation-owned hooks directory was removed after process-tree termination failed.');
+    } else {
+      assert.equal(existsSync(hooksPath), false, 'The operation-owned hooks directory remained after the Git process tree settled.');
+    }
+  } finally {
+    controller.abort();
+    if (operation) await operation.catch(() => {});
+    // This test consumer is a single Node child with no descendants. Only after the runner reports its close
+    // (or successful tree termination) is it safe for the fixture to remove its exact intentionally preserved path.
+    if (childOutcome && childOutcome.processActive !== true) {
+      for (const path of hookPaths) {
+        if (existsSync(path)) rmSync(path, { recursive: true, force: false, maxRetries: 10, retryDelay: 200 });
+      }
+    }
+    removeFixtureDirectory(root);
+    removeFixtureDirectory(cloneDir, { maxRetries: 30, retryDelay: 250 });
+  }
+});
+
 test('A1: delivery yields to the event loop while a verification check is running', async () => {
   const { root, baseCommit } = createFixtureRepo();
   const cloneDir = ownedPath(join(tmpdir(), `deszo-clone-${randomUUID()}`));
@@ -102,27 +314,40 @@ test('A1: delivery yields to the event loop while a verification check is runnin
     assert.ok(callbackAt !== null && callbackAt < returnedAt, 'The runtime callback did not run before delivery returned.');
     assert.equal(refAtCallback, false, 'The target ref was published before the callback ran during smoke.');
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    removeFixtureDirectory(root);
+    removeFixtureDirectory(cloneDir);
   }
 });
 
 test('A1: Stop during smoke terminates the check and prevents the ref from being published', async () => {
   const { root, baseCommit } = createFixtureRepo();
   const cloneDir = ownedPath(join(tmpdir(), `deszo-clone-${randomUUID()}`));
+  const hooksBefore = new Set(temporaryHookDirectories());
   try {
     const hung = { id: 'hung-check', command: process.execPath, args: ['-e', 'setTimeout(() => {}, 60000)'], expectedExitCode: 0 };
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 500);
+    let smokeStarted = false;
+    const gitRunner = capturingProcessRunner(new Set());
+    const processRunner = (command, args, options) => {
+      if (command === process.execPath && args[0] === '-e') {
+        smokeStarted = true;
+        setTimeout(() => controller.abort(), 500);
+      }
+      return gitRunner(command, args, options);
+    };
     const startedAt = Date.now();
-    const result = await executeBranchDelivery({ plan: planFor(root, baseCommit, { verificationChecks: [hung] }), candidateFiles: CANDIDATE, cloneDir, signal: controller.signal });
-    clearTimeout(timer);
+    const result = await executeBranchDelivery({ plan: planFor(root, baseCommit, { verificationChecks: [hung] }), candidateFiles: CANDIDATE, cloneDir, signal: controller.signal, processRunner });
+    assert.ok(smokeStarted, 'Delivery did not reach the verification check before cancellation.');
     assert.ok(Date.now() - startedAt < 20000, 'The stopped verification check was not terminated promptly.');
     assert.equal(result.status, 'stopped');
     assert.equal(result.refUpdated, false);
     assert.equal(result.readyForMerge, false);
     assert.equal(refExists(root, 'refs/heads/feature/live'), false, 'A stopped delivery published the target ref.');
+    const leaked = temporaryHookDirectories().filter(path => !hooksBefore.has(path));
+    assert.deepEqual(leaked, [], `An exact hooks path remained after cancellation settled: ${leaked.join(', ')}`);
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    removeFixtureDirectory(root);
+    removeFixtureDirectory(cloneDir);
   }
 });
 
@@ -139,7 +364,8 @@ test('A6: a target checked out during smoke is refused at publication and the ca
     assert.equal(git(['rev-parse', 'refs/heads/codex/audit'], root), baseCommit);
     assert.equal(git(['status', '--porcelain'], root), '', 'Publication dirtied the caller checkout.');
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    removeFixtureDirectory(root);
+    removeFixtureDirectory(cloneDir);
   }
 });
 

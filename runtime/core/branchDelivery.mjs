@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, copyFileSync, writeFileSync, readFileSync, readdirSync, chmodSync, lstatSync, unlinkSync } from 'node:fs';
-import { join, resolve, isAbsolute, sep } from 'node:path';
+import { existsSync, mkdirSync, mkdtempSync, copyFileSync, writeFileSync, readFileSync, readdirSync, chmodSync, lstatSync, realpathSync, rmSync, unlinkSync } from 'node:fs';
+import { basename, dirname, join, resolve, isAbsolute, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { canonicalHash, compareText, sha256 } from './canonical.mjs';
@@ -12,20 +12,79 @@ const MAX_OUTPUT_BYTES = 16 * 1024 * 1024;
 const KILL_GRACE_MS = 2000;
 const STOPPED_DIAGNOSTICS = 'Delivery was stopped before the verified commit was published; the target ref was not updated.';
 const slash = path => path.replace(/\\/g, '/');
+const samePath = (left, right) => process.platform === 'win32' ? left.toLowerCase() === right.toLowerCase() : left === right;
+
+function createTemporaryHooksDirectory(prefix) {
+  const parent = realpathSync.native(tmpdir());
+  const path = mkdtempSync(join(parent, prefix));
+  const info = lstatSync(path);
+  return { path, prefix, identity: { dev: info.dev, ino: info.ino, birthtimeMs: info.birthtimeMs } };
+}
+
+function releaseTemporaryHooksDirectory({ path, prefix, identity }) {
+  const parent = realpathSync.native(tmpdir());
+  const absolute = resolve(path);
+  const name = basename(absolute);
+  if (!samePath(dirname(absolute), parent) || !name.startsWith(prefix) || !/^[A-Za-z0-9]{6}$/.test(name.slice(prefix.length))) {
+    return { removed: false, reason: 'refused: path is outside the operation-owned temporary hooks location' };
+  }
+  let info;
+  try { info = lstatSync(absolute); }
+  catch (error) { return error.code === 'ENOENT' ? { removed: true, reason: 'already absent' } : { removed: false, reason: `${error.code ?? 'error'}: ${error.message}` }; }
+  if (info.isSymbolicLink() || !info.isDirectory()) return { removed: false, reason: 'refused: temporary hooks path is not a real directory' };
+  if (info.dev !== identity.dev || info.ino !== identity.ino || info.birthtimeMs !== identity.birthtimeMs) {
+    return { removed: false, reason: 'refused: temporary hooks path identity changed after allocation' };
+  }
+  try {
+    if (!samePath(realpathSync.native(absolute), absolute)) return { removed: false, reason: 'refused: temporary hooks path resolves through an alias' };
+    rmSync(absolute, { recursive: true, force: false, maxRetries: 5, retryDelay: 100 });
+    return { removed: true, reason: null };
+  } catch (error) {
+    return { removed: false, reason: `${error.code ?? 'error'}: ${error.message}` };
+  }
+}
 
 // Stops a child and its descendants. On Windows taskkill /T walks the tree; elsewhere the child leads its own group.
 function killTree(child) {
-  if (child.pid === undefined) return;
+  if (child.pid === undefined) return Promise.resolve({ error: null });
   if (process.platform === 'win32') {
-    spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' }).on('error', () => {});
-    return;
+    return new Promise(resolvePromise => {
+      let settled = false;
+      const finish = error => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        if (error) { try { child.kill(); } catch { /* already exited */ } }
+        resolvePromise({ error });
+      };
+      const killer = spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+      const output = { stdout: '', stderr: '' };
+      for (const name of ['stdout', 'stderr']) killer[name].on('data', chunk => {
+        output[name] = (output[name] + chunk.toString('utf8')).slice(-4096);
+      });
+      const timer = setTimeout(() => {
+        try { killer.kill(); } catch { /* already exited */ }
+        finish(new Error(`taskkill did not finish within ${KILL_GRACE_MS} ms`));
+      }, KILL_GRACE_MS);
+      killer.once('error', error => finish(error));
+      killer.once('close', (status, signal) => {
+        const detail = (output.stderr || output.stdout).trim();
+        finish(status === 0 ? null : new Error(`taskkill exited with ${status ?? signal ?? 'unknown status'}${detail ? `: ${detail}` : ''}`));
+      });
+    });
   }
-  try { process.kill(-child.pid, 'SIGKILL'); } catch { try { child.kill('SIGKILL'); } catch { /* already exited */ } }
+  try { process.kill(-child.pid, 'SIGKILL'); return Promise.resolve({ error: null }); }
+  catch (error) {
+    try { child.kill('SIGKILL'); } catch { /* already exited */ }
+    return Promise.resolve({ error });
+  }
 }
 
 // Runs a child process without blocking the event loop (audit A1). Output is captured up to a bound and reported
 // as truncated; a timeout or an abort kills the child tree and resolves with the reason.
-function runProcess(command, args, { cwd, env, timeoutMs = 30000, signal, encoding = 'utf8' } = {}) {
+// The process runner is exported for lifecycle-focused tests that wrap a specific Git transport while retaining this
+// production runner's cancellation, output bounds and process-settlement behavior.
+export function runBranchDeliveryProcess(command, args, { cwd, env, timeoutMs = 30000, signal, encoding = 'utf8', waitForTermination = false } = {}) {
   return new Promise(resolvePromise => {
     const outcome = { status: null, signal: null, timedOut: false, aborted: false, truncated: false, error: null };
     if (signal?.aborted) {
@@ -51,6 +110,8 @@ function runProcess(command, args, { cwd, env, timeoutMs = 30000, signal, encodi
     let settled = false;
     let timer = null;
     let grace = null;
+    let terminationPromise = null;
+    let terminationError = null;
     const settle = extra => {
       if (settled) return;
       settled = true;
@@ -64,19 +125,33 @@ function runProcess(command, args, { cwd, env, timeoutMs = 30000, signal, encodi
       resolvePromise({ ...outcome, ...extra, stdout: text('stdout'), stderr: text('stderr') });
     };
     const terminate = () => {
-      killTree(child);
-      // A descendant that escaped the tree must not hold the caller forever.
-      grace = setTimeout(() => settle({}), KILL_GRACE_MS);
+      terminationPromise = killTree(child).then(result => {
+        terminationError = result.error;
+        return result;
+      }, error => {
+        terminationError = error;
+        return { error };
+      });
+      // Git may still be using its operation-owned hooks path after cancellation. Let its
+      // whole process tree settle before Branch Delivery releases that path. If the bounded
+      // kill request or close wait fails, the caller preserves the path and reports why.
+      grace = setTimeout(() => settle(waitForTermination
+        ? { processActive: child.exitCode === null && child.signalCode === null, terminationError: terminationError ?? new Error(`Git process tree did not settle within ${KILL_GRACE_MS} ms after termination.`) }
+        : {}), KILL_GRACE_MS);
     };
     const onAbort = () => { outcome.aborted = true; terminate(); };
     timer = setTimeout(() => { outcome.timedOut = true; terminate(); }, timeoutMs);
     signal?.addEventListener('abort', onAbort, { once: true });
     child.on('error', error => settle({ error }));
-    child.on('close', (status, childSignal) => settle({ status, signal: childSignal }));
+    child.on('close', (status, childSignal) => {
+      const complete = result => settle({ status, signal: childSignal, ...(result?.error ? { terminationError: result.error } : {}) });
+      if (waitForTermination && terminationPromise) terminationPromise.then(complete, error => complete({ error }));
+      else settle({ status, signal: childSignal });
+    });
   });
 }
 
-const git = (args, cwd, options = {}) => runProcess('git', args, { cwd, ...options });
+const git = (args, cwd, options = {}) => runBranchDeliveryProcess('git', args, { cwd, ...options });
 const hooksOverride = dir => ['-c', `core.hooksPath=${slash(dir)}`];
 
 // The source repository is written by `fetch` (objects) and `update-ref` (the target ref). A `fetch` can end with `git maintenance run --auto`,
@@ -149,7 +224,7 @@ export async function executeBranchDelivery({
   candidateFiles = [], // [{ path, content }]
   cloneDir, // Temporary isolated directory for delivery clone
   signal,
-  processRunner = runProcess,
+  processRunner = runBranchDeliveryProcess,
   onPhase = async () => {},
 }) {
   const planIssues = check('delivery-plan.schema.json', '', plan);
@@ -159,14 +234,18 @@ export async function executeBranchDelivery({
 
   candidateFiles = candidateFiles.map(file => ({ ...file, path: typeof file?.path === 'string' ? slash(file.path) : file?.path }));
   const evidence = [];
+  let hooksCleanupBlockedReason = null;
   const invoke = async (command, args, options = {}) => {
     const result = await processRunner(command, args, options);
     if (result.evidence) evidence.push(result.evidence);
+    if (options.waitForTermination && (result.processActive || result.terminationError)) {
+      hooksCleanupBlockedReason = result.terminationError?.message ?? 'the Git process tree did not settle';
+    }
     if (result.truncated && !result.error) result.error = new Error('Command output exceeded its bounded protocol buffer; captured logs remain available.');
     if (result.error || result.timedOut || result.truncated || result.captureComplete === false) result.status = null;
     return result;
   };
-  const git = (args, cwd, options = {}) => invoke('git', args, { cwd, signal, category: 'git', attemptCost: 0, ...options });
+  const git = (args, cwd, options = {}) => invoke('git', args, { cwd, signal, category: 'git', attemptCost: 0, waitForTermination: true, ...options });
   const resultId = `DELIV-${randomUUID()}`;
   const repoPath = resolve(plan.repositoryPath);
 
@@ -222,11 +301,15 @@ export async function executeBranchDelivery({
     status: hookJournal === 'none' ? 'none' : 'executed',
     journal: `Hooks policy: ${hookJournal}; host ref publication runs with hooks disabled`,
   });
-  const fail = (status, diagnostics, overrides = {}) => failResult(plan, resultId, status, diagnostics, {
-    canonicalManifestDigest,
-    hookExecution: hookReceipt(),
-    ...overrides,
-  });
+  let operationResult = null;
+  const fail = (status, diagnostics, overrides = {}) => {
+    operationResult = failResult(plan, resultId, status, diagnostics, {
+      canonicalManifestDigest,
+      hookExecution: hookReceipt(),
+      ...overrides,
+    });
+    return operationResult;
+  };
   const stopped = () => fail('stopped', STOPPED_DIAGNOSTICS);
 
   // F4 and R5/F3: refuse an active target checkout, a moved target, a mismatched base or a missing base.
@@ -244,16 +327,22 @@ export async function executeBranchDelivery({
   await onPhase('intent', { plan, cloneDir, canonicalManifestDigest });
 
   // F5: Prepare hook policy before clone and checkout to prevent ambient checkout hooks from running
-  const emptyHooksDir = join(tmpdir(), `deszo-empty-hooks-${randomUUID().slice(0, 8)}`);
-  mkdirSync(emptyHooksDir, { recursive: true });
+  const ownedHooksDirectories = [];
+  const emptyHooksPrefix = 'deszo-empty-hooks-';
+  const emptyHooksResource = createTemporaryHooksDirectory(emptyHooksPrefix);
+  const emptyHooksDir = emptyHooksResource.path;
+  ownedHooksDirectories.push(emptyHooksResource);
+  try {
   let effectiveHooksDir = emptyHooksDir;
 
   if (plan.hookPolicy.installHooks) {
     if (!plan.hookPolicy.hookSource || !existsSync(plan.hookPolicy.hookSource)) {
       return fail('precondition_failed', `Configured hookSource directory does not exist: "${plan.hookPolicy.hookSource}".`);
     }
-    const isolatedHooksDir = join(tmpdir(), `deszo-hooks-${randomUUID().slice(0, 8)}`);
-    mkdirSync(isolatedHooksDir, { recursive: true });
+    const isolatedHooksPrefix = 'deszo-hooks-';
+    const isolatedHooksResource = createTemporaryHooksDirectory(isolatedHooksPrefix);
+    const isolatedHooksDir = isolatedHooksResource.path;
+    ownedHooksDirectories.push(isolatedHooksResource);
     const hookEntries = readdirSync(plan.hookPolicy.hookSource, { withFileTypes: true });
     for (const entry of hookEntries) {
       if (entry.isFile()) {
@@ -518,7 +607,30 @@ export async function executeBranchDelivery({
     throw new Error(`Generated invalid DeliveryResult: ${issues.map(i => i.message).join('; ')}`);
   }
 
-  return deliveryResult;
+  operationResult = deliveryResult;
+  return operationResult;
+  } finally {
+    const cleanupFailures = [];
+    if (hooksCleanupBlockedReason) {
+      cleanupFailures.push(`preserved because owned Git process termination was not confirmed (${hooksCleanupBlockedReason})`);
+    } else {
+      for (const directory of ownedHooksDirectories) {
+        let cleanup;
+        try { cleanup = releaseTemporaryHooksDirectory(directory); }
+        catch (error) { cleanup = { removed: false, reason: `${error.code ?? 'error'}: ${error.message}` }; }
+        if (!cleanup.removed) cleanupFailures.push(`${cleanup.reason}: ${directory.path}`);
+      }
+    }
+    if (cleanupFailures.length) {
+      const action = hooksCleanupBlockedReason ? 'deferred' : 'failed';
+      const diagnostic = `Temporary Git hooks directory cleanup ${action}: ${cleanupFailures.join('; ')}`;
+      if (operationResult?.environmentSmokeReport) {
+        operationResult.environmentSmokeReport.diagnostics = `${operationResult.environmentSmokeReport.diagnostics}\n${diagnostic}`;
+      } else {
+        try { process.emitWarning(diagnostic, { code: 'BRANCH_DELIVERY_HOOK_CLEANUP_FAILED' }); } catch { /* preserve the operation's original error */ }
+      }
+    }
+  }
 }
 
 function failResult(plan, resultId, status, diagnostics, overrides = {}) {

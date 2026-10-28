@@ -806,10 +806,29 @@ export function installCustody(Engine) {
 
   // The resumed settlement: the same parser, outputs and transitions an uninterrupted attempt would reach.
   P.resumeCustodyAgent = async function resumeCustodyAgent(state, node, attempt, workspace, record) {
+    let spec = null;
+    if (state.workflow.judgePolicy?.judgeNodeId === node.id) {
+      const attention = this.workflowJudgeCurrentAttention(state.id);
+      if (!attention || attention.judgeAttemptId !== attempt.id) {
+        this.store.transaction(() => {
+          const row = this.requireRun(state.id);
+          const events = [this.workflowJudgeEvent('judge.admission_blocked', { schemaVersion: 1, runId: state.id, judgeAttemptId: attempt.id,
+            reason: 'custody_attention_missing', status: 'held', recordedAt: nowIso() }),
+          ...this.attemptTransition(attempt, 'interrupted', 'Process Custody reattached a Judge Attempt without its matching durable attention record.')];
+          if (['running', 'draining'].includes(row.state)) events.push(this.runEvent(row, 'waiting_for_user',
+            'Process Custody could not bind this Judge process to the exact durable attention; operator close or meaningful evidence progress is required.'));
+          this.store.appendEvents(state.id, events);
+        });
+        await this.custodyCall('custody.stop', { custodyId: this.custodyBindingOf(attempt.id)?.custody_id }).catch(() => {});
+        return;
+      }
+      node = this.workflowJudgeExecutionNode(state, node);
+      spec = this.workflowJudgeSpec(state, node, attempt, attention);
+    }
     const config = node.config;
     const requestedEffort = resolveEffort(config.effort);
     const transport = config.output.format === 'json' && config.output.schema ? transportSchema(config.output.schema) : null;
     const outcome = await this.runProcess(state, attempt, node, null, record);
-    return this.settleAgentProcess(state, node, attempt, { config, requestedEffort, workspace, binding: null, transport, spec: null, record }, outcome);
+    return this.settleAgentProcess(state, node, attempt, { config, requestedEffort, workspace, binding: null, transport, spec, record }, outcome);
   };
 }

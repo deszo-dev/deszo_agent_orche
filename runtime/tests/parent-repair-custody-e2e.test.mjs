@@ -273,7 +273,9 @@ test('P2-E2E-02: the Rust Host finishes Repair while the Engine is absent; repla
     assert.equal(await eventually(() => exited(context.engineA.child), 'Engine A to exit before Repair completes', 30_000, 100), true);
     writeFileSync(join(context.repairWorkspace, 'RELEASE-P2_REPAIR.marker'), 'complete while Engine absent\n');
     await eventually(() => !isAlive(context.repairPid), 'the Host-owned Repair process to finish without an Engine', 90_000, 150);
-    const hostRecord = hostRecords(context.host).find(item => item.custodyId === context.repairCustodyId);
+    const hostRecord = await eventually(() => hostRecords(context.host).find(item => item.custodyId === context.repairCustodyId
+      && item.state === 'exited' && item.drained === true && item.spoolComplete === true),
+      'the Rust Host to persist Repair exit, drain and complete spool evidence', 30_000, 50);
     assert.equal(hostRecord.state, 'exited');
     assert.equal(hostRecord.drained, true);
     assert.equal(hostRecord.spoolComplete, true);

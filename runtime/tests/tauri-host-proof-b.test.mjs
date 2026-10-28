@@ -568,27 +568,22 @@ async function runFreshProof(iteration, artifacts, { custody = false } = {}) {
       assert.ok(hostRecord.stdoutDurable > 0, 'the Host spooled CLI output across the replacement');
       assert.ok(hostRecord.stdoutAcked > 0 && hostRecord.stdoutAcked <= hostRecord.stdoutDurable, 'the Engine acknowledged only durable output');
       const journal = new DatabaseSync(join(prepared.profile, 'store/state.sqlite'), { readOnly: true });
-      let committedStdout;
+      let committedChunks;
       try {
-        committedStdout = journal.prepare("SELECT envelope_json FROM journal_events WHERE attempt_id = ? AND event_type = 'attempt.log_chunk'").all(binding[0].attempt_id)
-          .map(row => JSON.parse(row.envelope_json).payload).filter(payload => payload.stream === 'stdout').reduce((sum, payload) => sum + payload.byteLength, 0);
+        committedChunks = journal.prepare("SELECT envelope_json FROM journal_events WHERE attempt_id = ? AND event_type = 'attempt.log_chunk' ORDER BY sequence")
+          .all(binding[0].attempt_id).map(row => JSON.parse(row.envelope_json).payload).filter(payload => payload.stream === 'stdout');
       } finally { journal.close(); }
+      const committedStdout = committedChunks.reduce((sum, payload) => sum + payload.byteLength, 0);
       assert.ok(committedStdout >= hostRecord.stdoutAcked && committedStdout <= hostRecord.stdoutDurable, 'the Engine journal holds what it acknowledged, and nothing beyond the durable spool');
       // Across both Engines, the committed chunks form one contiguous byte range: no gap and no repeated byte.
-      const journalChunks = new DatabaseSync(join(prepared.profile, 'store/state.sqlite'), { readOnly: true });
-      let chunkSpan;
-      try {
-        const chunks = journalChunks.prepare("SELECT envelope_json FROM journal_events WHERE attempt_id = ? AND event_type = 'attempt.log_chunk' ORDER BY sequence")
-          .all(binding[0].attempt_id).map(row => JSON.parse(row.envelope_json).payload).filter(payload => payload.stream === 'stdout')
-          .sort((a, b) => a.chunkIndex - b.chunkIndex);
-        let expected = 0;
-        chunkSpan = { chunks: chunks.length, contiguous: true, bytes: 0 };
-        for (const chunk of chunks) {
-          if (chunk.byteOffset !== expected) chunkSpan.contiguous = false;
-          expected = chunk.byteOffset + chunk.byteLength;
-        }
-        chunkSpan.bytes = expected;
-      } finally { journalChunks.close(); }
+      const chunks = [...committedChunks].sort((a, b) => a.chunkIndex - b.chunkIndex);
+      let expected = 0;
+      const chunkSpan = { chunks: chunks.length, contiguous: true, bytes: 0 };
+      for (const chunk of chunks) {
+        if (chunk.byteOffset !== expected) chunkSpan.contiguous = false;
+        expected = chunk.byteOffset + chunk.byteLength;
+      }
+      chunkSpan.bytes = expected;
       assert.equal(chunkSpan.contiguous, true, 'the committed output has no gap or repeated byte across the replacement');
       assert.equal(chunkSpan.bytes, committedStdout, 'the contiguous span is exactly the committed output');
       assert.equal(Math.abs(filetimeMs(hostRecord.processCreationTime) - custodyTree.providerAtLaunchMs) <= 2, true, 'the Host creation identity matches the OS process');
@@ -890,7 +885,8 @@ async function runSupervisedWriterProof(scenario) {
     const lastWriteMs = Math.max(...writes.map(item => item.millis));
     assert.ok(lastWriteMs <= Math.min(deaths.get(writerPid), deaths.get(descendantPid)), 'every repository write happened before the tree was observed ended');
     assert.equal(readFileSync(join(prepared.fixtureState, 'writer.pid'), 'utf8').trim(), String(writerPid), 'the writer was not launched again');
-    assert.equal(processCreationMs(writerPid), null, 'the writer is gone (the identity is no longer live)');
+    assert.notEqual(processCreationMs(writerPid), writerIdentity, 'the original writer process instance is gone (its PID may be reused)');
+    assert.notEqual(processCreationMs(descendantPid), descendantIdentity, 'the original descendant process instance is gone (its PID may be reused)');
 
     const after = new DatabaseSync(join(prepared.profile, 'store/state.sqlite'), { readOnly: true });
     let writerAttemptAfter;

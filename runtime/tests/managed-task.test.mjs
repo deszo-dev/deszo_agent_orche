@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -201,6 +201,78 @@ test('root, task and command Stop during actual delivery smoke terminate child t
       else assert.equal((await api.recover(id, { action: 'retry', nodeInstanceId: 'task' })).status, 409, 'Parent retry must not reset the task budget.');
     } finally { await api.close(); }
   });
+});
+
+test('managed delivery preserves hooks when runTaskCommand cannot prove an aborted process tree ended', async t => {
+  if (process.platform !== 'win32') return t.skip('The failure fixture shadows the native Windows taskkill command.');
+  const { api, workspace } = await setup();
+  const originalCwd = process.cwd();
+  let controller = null, runId = null, hooksPath = null, descendantPid = null;
+  try {
+    git(workspace.cwd, ['init', '-b', 'main']); git(workspace.cwd, ['config', 'user.name', 'Fixture']); git(workspace.cwd, ['config', 'user.email', 'fixture@example.com']);
+    git(workspace.cwd, ['config', 'core.autocrlf', 'false']); git(workspace.cwd, ['config', 'commit.gpgSign', 'false']); git(workspace.cwd, ['add', '.']); git(workspace.cwd, ['commit', '-m', 'base']);
+    const baseCommit = git(workspace.cwd, ['rev-parse', 'HEAD']);
+    const started = join(api.root, 'unconfirmed-delivery-child.json'), vanished = `${started}.hooks-vanished`;
+    const engine = api.runner.engine, runCommand = engine.runTaskCommand;
+    let intercepted = false;
+    engine.runTaskCommand = async function (state, execution, attempt, command, args, options = {}) {
+      if (!intercepted && command === 'git' && args.includes('clone')) {
+        intercepted = true;
+        const hooksArgument = args.find(argument => typeof argument === 'string' && argument.startsWith('core.hooksPath='));
+        assert.ok(hooksArgument, 'The real Branch Delivery clone must pass its allocated hooks directory.');
+        hooksPath = hooksArgument.slice('core.hooksPath='.length);
+        const utility = [...this.processes.values()].find(record => record.taskExecutionId === execution.row.id && record.abortController);
+        assert.ok(utility, 'The production delivery utility must own the signal being aborted.');
+        controller = utility.abortController;
+        const consumer = `const fs=require('node:fs');const path=process.argv[1],marker=process.argv[2];fs.writeFileSync(marker,JSON.stringify({pid:process.pid,path}));let seen=false;setInterval(()=>{if(!seen){try{fs.readdirSync(path)}catch(error){seen=true;fs.writeFileSync(marker+'.hooks-vanished',JSON.stringify({code:error.code,pid:process.pid}))}}},20);setTimeout(()=>process.exit(0),30000);`;
+        const parent = `const{spawn}=require('node:child_process');const fs=require('node:fs');const child=spawn(process.execPath,['-e',${JSON.stringify(consumer)},${JSON.stringify(hooksPath)},${JSON.stringify(started)}],{stdio:'ignore',windowsHide:true,detached:true});fs.writeFileSync(${JSON.stringify(`${started}.parent`)},JSON.stringify({parent:process.pid,child:child.pid,path:${JSON.stringify(hooksPath)}}));setTimeout(()=>process.exit(0),5000);`;
+        return runCommand.call(this, state, execution, attempt, process.execPath, ['-e', parent], options);
+      }
+      return runCommand.call(this, state, execution, attempt, command, args, options);
+    };
+
+    const response = await api.run(taskWorkflow({ boundary: 'verified_branch', baseCommit }));
+    assert.equal(response.status, 202, JSON.stringify(response.body));
+    runId = response.body.run.runId;
+    const processes = await waitForFile(`${started}.parent`);
+    descendantPid = processes.child;
+    await waitForFile(started);
+    assert.ok(controller, 'The delivery signal was not captured.');
+    assert.ok(existsSync(hooksPath), 'The temporary hooks directory must exist while the descendant is running.');
+    assert.ok(isAlive(descendantPid), 'The test-owned detached descendant must be alive before cancellation.');
+
+    // The invalid executable makes this exact taskkill request fail. Changing cwd and aborting are synchronous;
+    // the production killTree call starts taskkill before cwd is restored.
+    const failingTaskkillDirectory = join(api.root, 'failing-taskkill');
+    mkdirSync(failingTaskkillDirectory);
+    writeFileSync(join(failingTaskkillDirectory, 'taskkill.exe'), 'not a Windows executable');
+    try { process.chdir(failingTaskkillDirectory); controller.abort(); }
+    finally { process.chdir(originalCwd); }
+
+    const finished = await api.waitFor(runId, undefined, 30000);
+    assert.equal(finished.run.state, 'waiting_for_user', JSON.stringify(finished));
+    const delivery = (await api.call('GET', `/api/v2/runs/${runId}/tasks/task`)).body.delivery;
+    assert.equal(delivery.status, 'stopped');
+    assert.match(delivery.environmentSmokeReport.diagnostics, /Temporary Git hooks directory cleanup deferred/i);
+    assert.match(delivery.environmentSmokeReport.diagnostics, /taskkill/i);
+    assert.ok(existsSync(hooksPath), 'The hooks path must be preserved when taskkill cannot prove tree termination.');
+    assert.ok(isAlive(descendantPid), 'The detached descendant remains alive while the hooks path is preserved.');
+    assert.equal(existsSync(vanished), false, 'The live descendant must never observe premature hooks-path removal.');
+  } finally {
+    process.chdir(originalCwd);
+    if (controller && !controller.signal.aborted) controller.abort();
+    if (runId) await api.waitFor(runId, undefined, 30000).catch(() => {});
+    if (descendantPid && isAlive(descendantPid)) {
+      const taskkill = join(process.env.WINDIR || 'C:\\Windows', 'System32', 'taskkill.exe');
+      const stopped = spawnSync(taskkill, ['/PID', String(descendantPid), '/T', '/F'], { encoding: 'utf8', windowsHide: true });
+      assert.equal(stopped.status, 0, stopped.stderr || stopped.stdout);
+      const deadline = Date.now() + 5000;
+      while (isAlive(descendantPid) && Date.now() < deadline) await new Promise(resolvePromise => setTimeout(resolvePromise, 25));
+      assert.equal(isAlive(descendantPid), false, 'The test-owned descendant must be closed before fixture cleanup.');
+    }
+    if (hooksPath && existsSync(hooksPath)) rmSync(hooksPath, { recursive: true, force: false, maxRetries: 10, retryDelay: 100 });
+    await api.close();
+  }
 });
 
 test('final manual acceptance evidence comes from a fresh policy-selected accepter, never a readiness review', async t => {

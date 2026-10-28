@@ -19,6 +19,7 @@ import { installHostAutonomy } from './hostAutonomy.mjs';
 import { installTaskRuntime } from './taskRuntime.mjs';
 import { installTaskProcesses } from './taskProcesses.mjs';
 import { installJudgeAttention } from './judgeAttention.mjs';
+import { installWorkflowJudge } from './workflowJudge.mjs';
 import { installLinkedRepair } from './linkedRepair.mjs';
 import { afterBarrierWork, crashBeforeIdentityPoint, custodyFaultPoint, installCustody, STOP_FAMILY } from './custody.mjs';
 import { deterministicOutcomeId, makeFailureOutcome, normalizeAttemptErrorCode, sameOutcome, sourceForErrorCode } from './failureOutcomes.mjs';
@@ -50,6 +51,7 @@ const API_V3 = 'runtime-api-v3.schema.json';
 const API_V4 = 'runtime-api-v4.schema.json';
 const CHAT_WORKFLOW = 'context-chat';
 const LEGACY_AUTHORITY_POLICY = 'designated-judge/1';
+const WORKFLOW_JUDGE_POLICY_VERSION = 'workflow-judge/1';
 
 export function canonicalPath(path) {
   const real = realpathSync.native(resolve(path));
@@ -184,6 +186,11 @@ export class Engine {
     // completes any transition whose durable precondition already holds.
     this.reconcileContinuations();
     this.initializeJudgeAttention();
+    this.initializeWorkflowJudge();
+  }
+
+  assertWorkflowJudgeRuntimeAvailable(workflow) {
+    this.workflowJudgeGuard(workflow);
   }
 
   migrateLegacyWorkflowPublications() {
@@ -243,12 +250,14 @@ export class Engine {
     // A process that a restart could not confirm ended blocks every continuation, as it blocks new Runs (createRun).
     const blocked = uncertain.length > 0;
     for (const run of open) {
-      // A run suspended for a linked repair, or waiting at a lifecycle gate, is not interrupted: nothing is executing in it.
-      if (this.isContinuationHeld(run)) continue;
       // P1: a Run continues only on the exact published definition it was captured from. One that does not verify is interrupted below.
       const intact = this.publishedDefinitionIntact(run);
+      let unsupportedJudge = false;
+      if (intact) unsupportedJudge = !this.workflowJudgeRuntimeAvailable(this.store.readJson(run.workflow_snapshot_artifact_id));
+      // Preserve ordinary linked/lifecycle holds. P4 Runs continue only with the supported Process Custody profile.
+      if (intact && this.isContinuationHeld(run) && !unsupportedJudge) continue;
       // A queued Run has dispatched nothing: startRun starts it, as it would have without the restart, when the restart gates pass.
-      if (run.state === 'queued' && intact && this.restartGatesPass(run, blocked)) continue;
+      if (run.state === 'queued' && intact && !unsupportedJudge && this.restartGatesPass(run, blocked)) continue;
       // A Host-owned CLI is reattached only when the Run passes the same restart gates as ordinary continuation. Otherwise its
       // custody process is stopped through the Host, and the Run keeps its existing restart outcome.
       const custodyRows = this.store.all(`SELECT a.id AS attempt_id, a.state, c.custody_id FROM attempts a JOIN attempt_custody c ON c.attempt_id = a.id
@@ -288,7 +297,11 @@ export class Engine {
         for (const binding of this.store.all(`SELECT b.* FROM context_bindings b JOIN run_context_bindings m ON m.binding_id = b.id WHERE m.run_id = ? AND b.state = 'writing'`, run.id))
           events.push(this.bindingTransition(binding, 'needs_review', 'Runtime restarted during a native write; native history may have advanced.')[0]);
         if (!resumable) {
-          const reason = intact ? 'Runtime restarted or lost process supervision.' : 'Recovery refused: the published workflow definition of this Run is missing or inconsistent.';
+          const reason = !intact ? 'Recovery refused: the published workflow definition of this Run is missing or inconsistent.'
+            : unsupportedJudge ? 'Unsupported runtime: workflow-judge/1 execution is unavailable; the Run was interrupted without resumption.'
+              : 'Runtime restarted or lost process supervision.';
+          this.workflowJudgeSupersedeAttentionInTransaction(run.id, reason, events);
+          this.workflowJudgeSupersedeQuestionsInTransaction(run.id, reason, events);
           events.push(this.runEvent(run, 'interrupted', reason));
           if (!intact) {
             const outcome = this.failureOutcomeEvent(null, { runId: run.id,
@@ -335,8 +348,9 @@ export class Engine {
     if (this.isLinkedRun(run.id) || this.store.get(`SELECT 1 FROM control_grants WHERE run_id = ? AND state = 'active'`, run.id)) return false;
     const logicalRepair = this.logicalRepairLinkForRun(run.id);
     if (logicalRepair && !this.logicalRepairLinkIntact(logicalRepair, run)) return false;
-    // Queued Runs take this shortcut before canContinueRun. Keep unsupported execution classes on the pre-P1 restart rule here too.
-    if (allNodesDeep(this.store.readJson(run.workflow_snapshot_artifact_id).nodes).some(node => ['loop', 'map', 'task'].includes(node.type))) return false;
+    // Queued Runs take this shortcut before canContinueRun. P4 is recoverable only when its Process Custody profile is active.
+    const workflow = this.store.readJson(run.workflow_snapshot_artifact_id);
+    if ((workflow.judgePolicy && !this.workflowJudgeRuntimeAvailable(workflow)) || allNodesDeep(workflow.nodes).some(node => ['loop', 'map', 'task'].includes(node.type))) return false;
     const workspace = this.store.get('SELECT w.cwd FROM workspaces w JOIN runs r ON r.workspace_id = w.id WHERE r.id = ?', run.id);
     return !this.unconfirmedOverlapping(workspace?.cwd ?? null);
   }
@@ -552,7 +566,49 @@ export class Engine {
     const structural = structuralIssues(workflow);
     if (structural.length) return { valid: false, issues: structural };
     const issues = semanticIssues(workflow, { maximumAgentTimeoutSeconds: this.maximumAgentTimeoutSeconds }).map(({ path, message }) => ({ path, message }));
+    issues.push(...this.workflowJudgePublicationIssues(workflow));
     return { valid: issues.length === 0, issues };
+  }
+
+  workflowJudgePublicationIssues(workflow) {
+    const policy = workflow.judgePolicy;
+    if (!policy) return [];
+    const issues = [];
+    policy.repairProfiles.forEach((profile, index) => {
+      const at = `/judgePolicy/repairProfiles/${index}`;
+      if (!this.store.get('SELECT id FROM workspaces WHERE id = ?', profile.repairWorkspaceId))
+        issues.push({ path: `${at}/repairWorkspaceId`, message: `Repair workspace "${profile.repairWorkspaceId}" is not registered.` });
+      if (profile.repairWorkflowId === workflow.workflowId) return;
+
+      const publication = this.store.get(`SELECT p.*, a.sha256 AS snapshot_sha256 FROM workflow_publications p
+        JOIN artifacts a ON a.id = p.snapshot_artifact_id
+        WHERE p.workflow_id = ? AND p.version = ?`, profile.repairWorkflowId, profile.repairPublishedVersion);
+      if (!publication || !publication.runnable || publication.snapshot_sha256 !== profile.repairWorkflowSnapshotSha256) {
+        issues.push({ path: `${at}/repairPublishedVersion`, message: 'Repair profile must pin an existing runnable Published Version with the exact workflow snapshot digest.' });
+        return;
+      }
+
+      const repairWorkflow = this.store.readJson(publication.snapshot_artifact_id);
+      const repairNodes = allNodesDeep(repairWorkflow.nodes);
+      const unsupported = repairNodes.find(node => ['loop', 'map', 'task'].includes(node.type));
+      if (unsupported) issues.push({ path: `${at}/repairPublishedVersion`, message: `P4 Repair publication contains unsupported ${unsupported.type} execution.` });
+      const resultNode = repairWorkflow.nodes.find(node => node.id === profile.repairResultNodeInstanceId);
+      if (!resultNode || !['agent', 'text'].includes(resultNode.type))
+        issues.push({ path: `${at}/repairResultNodeInstanceId`, message: 'Repair result node must reference a top-level Agent or Text node in the pinned publication.' });
+      for (const [verificationIndex, nodeId] of profile.verificationNodeInstanceIds.entries()) {
+        const node = repairWorkflow.nodes.find(item => item.id === nodeId);
+        if (!node || !['agent', 'gate'].includes(node.type))
+          issues.push({ path: `${at}/verificationNodeInstanceIds/${verificationIndex}`, message: 'Each verification node must reference a top-level Agent or Gate node in the pinned publication.' });
+      }
+
+      const childPolicy = repairWorkflow.judgePolicy;
+      if (profile.acceptanceMode === 'judge_post_execution'
+        && (publication.authority_policy_version !== WORKFLOW_JUDGE_POLICY_VERSION || childPolicy?.version !== WORKFLOW_JUDGE_POLICY_VERSION))
+        issues.push({ path: `${at}/acceptanceMode`, message: 'judge_post_execution requires a Repair publication explicitly bound to workflow-judge/1.' });
+      if (childPolicy?.repairProfiles?.length)
+        issues.push({ path: `${at}/repairPublishedVersion`, message: 'A P4 Repair publication cannot declare further model-originated Repair profiles.' });
+    });
+    return issues;
   }
 
   savedWorkflow(row) {
@@ -788,11 +844,12 @@ export class Engine {
       const { view, ...executionDefinition } = workflow;
       const latest = this.store.get('SELECT MAX(version) AS version FROM workflow_publications WHERE workflow_id = ?', workflowId).version || 0;
       const version = latest + 1, publishedAt = nowIso(), publicationId = randomUUID();
+      const authorityPolicyVersion = workflow.judgePolicy?.version || LEGACY_AUTHORITY_POLICY;
       this.store.run(`INSERT INTO workflow_publications(
         id,workflow_id,version,snapshot_artifact_id,definition_digest,execution_hash,authority_policy_version,
         provenance,runnable,validation_json,source_draft_revision,created_at
       ) VALUES(?,?,?,?,?,?,?,'owner-publication',1,?,?,?)`, publicationId, workflowId, version, snapshot.id, snapshot.sha256,
-      canonicalHash(executionDefinition), LEGACY_AUTHORITY_POLICY, canonicalize(validation), draftRow.revision, publishedAt);
+      canonicalHash(executionDefinition), authorityPolicyVersion, canonicalize(validation), draftRow.revision, publishedAt);
       this.store.run('UPDATE workflows SET snapshot_artifact_id = ?, revision = ?, updated_at = ? WHERE id = ?', snapshot.id, draftRow.revision, publishedAt, workflowId);
       // Cache identity follows the executable definition: publication, not editing, retires or adds Cache incarnations.
       this.syncCacheNodeIncarnations(workflowId, workflow);
@@ -1186,6 +1243,7 @@ export class Engine {
       const workflow = this.store.readJson(snapshot.id);
       const currentValidation = this.validateWorkflow(workflow);
       if (!currentValidation.valid) throw new ApiError(409, 'published_version_not_runnable', 'The Published Version is no longer suitable for execution under current runtime conditions.', currentValidation.issues);
+      this.assertWorkflowJudgeRuntimeAvailable(workflow);
       const settings = this.currentSettings().settings;
       // ADR-0006: a host permit replaces the confirmation pause only with a genuine admission made by this engine.
       if (body.hostPermitId && !this.isHostAdmission(hostAdmission, body.hostPermitId, 'run.approve')) throw new ApiError(403, 'host_admission_required', 'A run that names a host permit must be admitted by the Local Control Host first.');
@@ -1320,6 +1378,8 @@ export class Engine {
     const deep = allNodesDeep(workflow.nodes);
     for (const id of refreshCaches) if (deep.find(node => node.id === id)?.type !== 'cache') throw new ApiError(422, 'validation_failed', `refreshCaches names "${id}", which is not a Cache node.`);
     for (const id of targets || []) if (!outer.has(id) || outer.get(id).type === 'context') throw new ApiError(422, 'validation_failed', `Target "${id}" is not an executable node of the outer workflow.`);
+    if (workflow.judgePolicy && (targets || []).includes(workflow.judgePolicy.judgeNodeId))
+      throw new ApiError(422, 'validation_failed', 'The designated Judge can only be planned by P4 attention admission.', [{ path: '/targets', message: 'Ordinary Run modes cannot target the designated Judge.' }]);
     const pins = this.pinsFor(workflow.workflowId);
     const frozen = new Set(deep.filter(node => node.type === 'cache' && node.config.mode === 'frozen' && !refreshCaches.includes(node.id)).map(node => node.id));
     for (const id of frozen) {
@@ -1379,6 +1439,12 @@ export class Engine {
   }
 
   captureRun({ workflow, snapshot, workspace, kind, options, requestId, publication = null }) {
+    this.assertWorkflowJudgeRuntimeAvailable(workflow);
+    if (publication) {
+      const expectedAuthorityPolicyVersion = workflow.judgePolicy?.version || LEGACY_AUTHORITY_POLICY;
+      if (publication.authority_policy_version !== expectedAuthorityPolicyVersion)
+        throw new ApiError(409, 'conflict', 'Published authority policy metadata does not match its captured workflow definition.');
+    }
     const active = this.activeRun(workspace.id);
     if (active) throw new ApiError(409, 'conflict', active.state === 'waiting_for_user' ? 'The previous run in this workspace is waiting for recovery; close or stop it first.' : 'Another run is active in this workspace.');
     // A Host-owned process may still be running in an overlapping workspace (H3): no other Run starts there until its owner confirms the end.
@@ -1430,7 +1496,7 @@ export class Engine {
         this.store.run('INSERT INTO run_context_bindings(run_id, context_node_id, mode, binding_id) VALUES (?, ?, ?, ?)', runId, node.id, node.config.mode, bindingId);
       }
       const nodes = new Map(workflow.nodes.map(node => [node.id, node]));
-      const order = topologicalOrder(workflow).filter(id => plan.planned.has(id) || plan.reused.has(id));
+      const order = topologicalOrder(workflow).filter(id => id !== workflow.judgePolicy?.judgeNodeId && (plan.planned.has(id) || plan.reused.has(id)));
       for (const id of order) {
         this.store.run(`INSERT INTO node_instances(run_id, id, node_id, node_type, state) VALUES (?, ?, ?, ?, ?)`, runId, id, id, nodes.get(id).type, plan.reused.has(id) ? 'reused' : 'scheduled');
         events.push({ type: 'node.planned', nodeInstanceId: id, payload: { nodeId: id, nodeType: nodes.get(id).type, scope: null } });
@@ -1718,6 +1784,9 @@ export class Engine {
     // A controller pause must not prevent Root Stop from completing.
     if (this.awaitingArm.has(state.id) || (this.dispatchPaused.has(state.id) && this.runState(state.id) !== 'stopping')) return;
     if (this.judgeAttentionEnabled && this.runState(state.id) !== 'stopping' && this.hasJudgeBarrier(state.id)) return;
+    const workflowJudgeMode = this.workflowJudgeDerivedMode(state);
+    if (workflowJudgeMode === 'judge_only') { this.pumpWorkflowJudgeOnly(state); return; }
+    if (workflowJudgeMode === 'held') { this.finishRunIfDone(state); return; }
     if (this.runState(state.id) === 'running') {
       for (const attempt of this.latestAttempts(state.id)) {
         const ready = this.readiness(state, attempt);
@@ -1751,31 +1820,38 @@ export class Engine {
   finishRunIfDone(state) {
     // Another scheduler pass is pending (for example a Map just changed task states); decide after it.
     if (this.liveIn(state).length || this.pumpAgain) return;
-    const row = this.store.get('SELECT * FROM runs WHERE id = ?', state.id);
-    let to = null, reason = '';
-    if (row.state === 'stopping') { to = 'canceled'; reason = 'Root Stop completed after every child process exited.'; }
-    else if (row.state === 'draining') {
-      to = state.linkedRepairIsolationFailure || state.kind === 'chat' ? 'failed' : 'waiting_for_user';
-      reason = state.linkedRepairIsolationFailure?.message || (state.kind === 'chat' ? 'The chat turn failed.' : 'Running attempts finished after a failure; recovery is needed.');
-    } else if (row.state === 'running') {
-      const latest = this.latestAttempts(state.id);
-      const outer = latest.filter(attempt => !attempt.node_instance_id.includes('/'));
-      if (outer.length && outer.every(attempt => ['succeeded', 'reused', 'skipped'].includes(attempt.state))) { to = 'succeeded'; reason = 'Every planned node succeeded, was reused, or was skipped by a Route.'; }
-      else if (!latest.some(attempt => this.readiness(state, attempt))) {
-        to = state.kind === 'chat' ? 'failed' : 'waiting_for_user';
-        reason = 'No work can proceed; failed, stopped or paused work needs a decision.';
+    const settled = this.store.transaction(() => {
+      let row = this.store.get('SELECT * FROM runs WHERE id = ?', state.id);
+      if (!row || TERMINAL_RUN.has(row.state)) return null;
+      // CP-01: finalization and P4 admission share this Store transaction. The eligibility read cannot race a terminal transition.
+      if (this.workflowJudgeFinalizeInTransaction(state, row)) return { held: true, priorState: row.state };
+      row = this.store.get('SELECT * FROM runs WHERE id = ?', state.id);
+      let to = null, reason = '';
+      if (row.state === 'stopping') { to = 'canceled'; reason = 'Root Stop completed after every child process exited.'; }
+      else if (row.state === 'draining') {
+        to = state.linkedRepairIsolationFailure || state.kind === 'chat' ? 'failed' : 'waiting_for_user';
+        reason = state.linkedRepairIsolationFailure?.message || (state.kind === 'chat' ? 'The chat turn failed.' : 'Running attempts finished after a failure; recovery is needed.');
+      } else if (row.state === 'running') {
+        const latest = this.latestAttempts(state.id);
+        const outer = latest.filter(attempt => !attempt.node_instance_id.includes('/'));
+        if (outer.length && outer.every(attempt => ['succeeded', 'reused', 'skipped'].includes(attempt.state))) { to = 'succeeded'; reason = 'Every planned node succeeded, was reused, or was skipped by a Route.'; }
+        else if (!latest.some(attempt => this.readiness(state, attempt))) {
+          to = state.kind === 'chat' ? 'failed' : 'waiting_for_user';
+          reason = 'No work can proceed; failed, stopped or paused work needs a decision.';
+        }
       }
-    }
-    if (!to) return;
-    // Crash point: every node is accepted and the Run's terminal state is not yet recorded.
-    if (TERMINAL_RUN.has(to)) custodyFaultPoint('before_run_settle');
-    // ADR-0008: a linked repair's outcome is recorded in the same transaction as its terminal state.
-    this.store.transaction(() => {
+      if (!to) return null;
+      // Crash point: every node is accepted and the Run's terminal state is not yet recorded.
+      if (TERMINAL_RUN.has(to)) custodyFaultPoint('before_run_settle');
+      // ADR-0008: a linked repair's outcome is recorded in the same transaction as its terminal state.
       this.store.appendEvents(state.id, [this.runEvent(row, to, reason)]);
       if (TERMINAL_RUN.has(to)) this.recordRepairOutcome(state.id, to);
       else if (to === 'waiting_for_user' && this.logicalRepairWaitingForDecision(state.id)) this.recordRepairOutcome(state.id, 'failed');
+      return { to, priorState: row.state };
     });
-    if (row.state === 'stopping') this.recordTerminationProof(state.id).catch(error => process.stderr.write(`Termination proof for run ${state.id} failed: ${error.message}\n`));
+    if (!settled || settled.held) return;
+    const { to, priorState } = settled;
+    if (priorState === 'stopping') this.recordTerminationProof(state.id).catch(error => process.stderr.write(`Termination proof for run ${state.id} failed: ${error.message}\n`));
     if (TERMINAL_RUN.has(to)) { this.endControl(state.id); this.forget(state); this.releaseHostRun(state.id, to); this.afterRepairRunTerminal(state.id, to); }
   }
 
@@ -2255,6 +2331,12 @@ export class Engine {
 
   // `spec` (Map steps) supplies the directory, Context mapping, prompt and answer hooks.
   tryDispatchAgent(state, scope, node, attempt, spec = null) {
+    if (state.workflow.judgePolicy?.judgeNodeId === node.id) {
+      const attention = this.workflowJudgeCurrentAttention(state.id);
+      if (!attention || attention.judgeAttemptId !== attempt.id || spec && !spec.workflowJudge) return;
+      node = this.workflowJudgeExecutionNode(state, node);
+      spec ||= this.workflowJudgeSpec(state, node, attempt, attention);
+    }
     const workspace = spec?.workspace || this.workspaceOf(state);
     const mapping = spec ? spec.mapping : node.config.contextId ? this.store.get('SELECT * FROM run_context_bindings WHERE run_id = ? AND context_node_id = ?', state.id, this.contextKey(state, scope, node.config.contextId)) : null;
     const keys = [`cwd:${workspace.cwd_identity}`, ...(mapping ? [`binding:${mapping.binding_id}`] : [])].sort();
@@ -2281,7 +2363,7 @@ export class Engine {
     // custodyCwd: from this dispatch until its durable hold is written (after the Host admits it), this record is what tells a managed-task
     // delivery that a Host-owned CLI is about to run here. It is set in the same synchronous step as the checks above.
     const record = { runId: state.id, taskExecutionId: spec?.taskExecutionId, loops: enclosingLoops(scope.prefix).map(item => item.loopInstance), provider: node.config.provider, keys, child: null, stopRequested: false, timedOut: false, launched: false,
-      mapped: Boolean(spec), custodyCwd: custodied ? workspace.cwd : null };
+      mapped: Boolean(spec && !spec.workflowJudge), custodyCwd: custodied ? workspace.cwd : null };
     record.exited = new Promise(done => { record.resolveExit = done; });
     this.processes.set(attempt.id, record);
     // A Custody claim is held by the admission above until its work starts (the barrier is inert outside tests).
@@ -2312,6 +2394,7 @@ export class Engine {
     // P2 can arrive while provider detection is in flight. The process record was registered synchronously before this await,
     // so the coordinator waits for this dispatch and this check prevents the prelaunch attempt from escaping suspension.
     if (this.parentRepairDispatchPaused(state.id)) return;
+    if (spec?.beforeLaunch && !spec.beforeLaunch(attempt)) return;
     let binding = mapping ? this.store.get('SELECT * FROM context_bindings WHERE id = ?', mapping.binding_id) : null;
     if (binding && !['unbound', 'ready'].includes(binding.state)) return this.failAttempt(state, attempt, 'context_unavailable', `Context binding is ${binding.state}; it cannot be used for a new write.`);
     if (!detection.available || !detection.cliPath) {
@@ -2440,6 +2523,12 @@ export class Engine {
       rmSync(join(this.store.workdirs, 'attachments', attempt.id), { recursive: true, force: true });
       return;
     }
+    if (spec?.beforeLaunch && !spec.beforeLaunch(current)) {
+      if (providerPermit) await this.settleHostProviderInvocation(providerPermit, { launched: false, evidence: 'The Judge attention evidence changed before provider launch.' });
+      rmSync(tmp, { recursive: true, force: true });
+      rmSync(join(this.store.workdirs, 'attachments', attempt.id), { recursive: true, force: true });
+      return;
+    }
     let outcome;
     try { outcome = await this.runProcess(state, current, node, invocation, record); }
     catch (error) { await this.settleHostProviderInvocation(providerPermit, { launched: true, evidence: `provider invocation ended with an exception: ${error.message}` }); throw error; }
@@ -2560,11 +2649,17 @@ export class Engine {
       }
       jsonArtifact = this.store.putJson(parsed);
     }
+    if (spec?.workflowJudge) custodyFaultPoint('before_workflow_judge_validation');
     if (spec?.check) {
       let problem;
       try { problem = spec.check(parsed, current); } catch (error) { problem = error.message; }
-      if (problem) return this.failAttempt(state, current, 'output_contract', problem, { evidence: evidence(), ...native });
+      if (problem) {
+        try { spec.reject?.(parsed, current, problem); }
+        catch (error) { process.stderr.write(`Could not record rejected Judge output for ${current.id}: ${error.message}\n`); }
+        return this.failAttempt(state, current, 'output_contract', problem, { evidence: evidence(), ...native });
+      }
     }
+    if (spec?.workflowJudge) custodyFaultPoint('after_workflow_judge_validation');
     if (config.captures) {
       try { captured = this.values.putSet(captureFiles(this.store, workspace.cwd, config.captures, 'output_contract')); }
       catch (error) { return this.failAttempt(state, current, 'output_contract', `Declared output capture failed: ${error.message}`, { evidence: evidence(), ...native }); }
@@ -2597,6 +2692,7 @@ export class Engine {
     // Crash point: the outputs and the attempt's success are durable, and nothing after them has run yet.
     custodyFaultPoint('after_settle');
     custodyFaultPoint(`after_settle:${node.id}`);
+    spec?.afterCommit?.(record, current);
     if (lifecycle.kind === 'intent' && this.lifecycleHost) {
       const request = this.lifecycleHostRequest(state.id);
       if (request) this.emit('lifecycle.operation_requested', request);
@@ -2779,6 +2875,8 @@ export class Engine {
         shouldSignalProcesses = true;
         this.store.transaction(() => {
           const events = [this.runEvent(row, 'stopping', 'Root Stop requested.')];
+          this.workflowJudgeSupersedeAttentionInTransaction(runId, 'Owner Stop superseded pending Judge attention.', events);
+          this.workflowJudgeSupersedeQuestionsInTransaction(runId, 'Owner Stop superseded pending Judge question.', events);
           const loopAttempts = new Set([...this.store.all('SELECT attempt_id FROM loop_executions WHERE run_id = ?', runId).map(item => item.attempt_id), ...this.mapAttemptIds(runId)]);
           for (const attempt of this.latestAttempts(runId).filter(item => UNSTARTED.has(item.state) && !this.processes.get(item.id)?.launching && !loopAttempts.has(item.id)))
             events.push(...this.attemptTransition(attempt, 'canceled', 'Canceled by root Stop before it started.', null,
@@ -2865,6 +2963,10 @@ export class Engine {
     this.validateBody('recoveryRequest', body);
     return this.idempotent(`POST /runs/${runId}/recovery`, body.requestId, body, () => {
       const row = this.requireRun(runId);
+      const capturedWorkflow = this.store.readJson(row.workflow_snapshot_artifact_id);
+      if (body.action !== 'close' && capturedWorkflow.judgePolicy
+        && this.workflowJudgeHasBarrier(runId))
+        throw new ApiError(409, 'judge_attention_pending', 'Native P4 attention or its typed human question must be resolved through the designated Judge before manual recovery. Stop or explicit close remains available.');
       const state = this.runs.get(runId);
       if (row.state !== 'waiting_for_user' || !state) throw new ApiError(409, 'conflict', `Recovery needs a run that is waiting for the user (state is ${row.state}).`);
       const logicalParentLink = this.logicalRepairLinkForRun?.(runId);
@@ -2880,6 +2982,8 @@ export class Engine {
       return this.store.transaction(() => {
         const events = [{ type: 'run.recovery_requested', payload: { action: body.action, target, requestId: body.requestId, options } }];
         if (body.action === 'close') {
+          this.workflowJudgeSupersedeAttentionInTransaction(runId, 'Owner closed the Run.', events);
+          this.workflowJudgeSupersedeQuestionsInTransaction(runId, 'Owner closed the Run.', events);
           const loopAttempts = new Set([...this.store.all('SELECT attempt_id FROM loop_executions WHERE run_id = ?', runId).map(item => item.attempt_id), ...this.mapAttemptIds(runId)]);
           for (const attempt of this.latestAttempts(runId).filter(item => UNSTARTED.has(item.state) && !loopAttempts.has(item.id)))
             events.push(...this.attemptTransition(attempt, 'canceled', 'Closed by the user.', null,
@@ -2911,6 +3015,8 @@ export class Engine {
   }
 
   retry(state, body, events) {
+    // P4 manual recovery barriers are enforced at the public recovery command; P2 continuation remains the only retry authority.
+    this.assertWorkflowJudgeRuntimeAvailable(state.workflow);
     const attempt = this.latestAttempt(state.id, body.nodeInstanceId);
     if (!attempt) throw new ApiError(404, 'not_found', `Node instance "${body.nodeInstanceId}" does not exist in this run.`);
     if (!['failed', 'canceled'].includes(attempt.state)) throw new ApiError(409, 'conflict', `Only failed or canceled attempts can be retried (state is ${attempt.state}).`);
@@ -3014,7 +3120,8 @@ installSupervision(Engine, { ApiError });
 installHostAutonomy(Engine, { ApiError });
 installTaskRuntime(Engine, { ApiError });
 installTaskProcesses(Engine);
-installJudgeAttention(Engine, { ApiError });
 installLinkedRepair(Engine, { ApiError });
+installWorkflowJudge(Engine, { ApiError });
+installJudgeAttention(Engine, { ApiError });
 installCustody(Engine);
 

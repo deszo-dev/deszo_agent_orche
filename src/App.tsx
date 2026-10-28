@@ -19,7 +19,7 @@ import { RunControlPanel, type ControlGrant } from './Supervision';
 import { contextChainTemplate, deliveryTemplate, referenceDeliveryTemplate, reviewLoopTemplate, selectiveDeliveryTemplate, specificationLoopTemplate } from './templates';
 import {
   PROVIDERS, PROVIDER_NAMES, TERMINAL_RUN,
-  type AppSettings, type CachePin, type Capabilities, type ContextBinding, type JournalEvent, type NodeType, type Provider, type Run, type RunSnapshot,
+  type AppSettings, type CachePin, type Capabilities, type ContextBinding, type JournalEvent, type NodeType, type Provider, type Run, type RunSnapshot, type WorkflowJudgeQuestion,
   type PublishedWorkflow, type RunRequest, type SavedWorkflow, type Workflow, type WorkflowNode, type WorkflowSummary, type Workspace,
   type PublishedVersionSummary,
 } from './types';
@@ -822,6 +822,8 @@ function BottomPanel({ panel, setPanel, issues, run, events, client, workspaceId
   const [history, setHistory] = useState<Run[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [showLogs, setShowLogs] = useState(false);
+  const [workflowJudgeEnabled, setWorkflowJudgeEnabled] = useState(Boolean(workflow.judgePolicy));
+  const onWorkflowJudgeState = useCallback((enabled: boolean) => setWorkflowJudgeEnabled(enabled), []);
   const loadHistory = useCallback(async (more = false) => {
     if (!client || !workspaceId) return;
     try {
@@ -849,7 +851,10 @@ function BottomPanel({ panel, setPanel, issues, run, events, client, workspaceId
           <button className="button small ghost" onClick={() => onReplay(run.run.runId)}><History size={12} />Replay</button>
           <button className="button small ghost" onClick={() => onLoadCaptured(run)}>Load captured workflow</button>
         </div>
-        {run.run.state === 'waiting_for_user' && client?.hasFirstParty && <RecoveryPanel run={run} workflow={workflow} onRecovery={onRecovery} />}
+        <WorkflowJudgePanel runId={run.run.runId} runState={run.run.state} client={client} eventsCursor={events.at(-1)?.sequence ?? 0}
+          report={report} onRecovery={onRecovery} onState={onWorkflowJudgeState} />
+        {run.run.state === 'waiting_for_user' && client?.hasFirstParty && !workflowJudgeEnabled && !workflow.judgePolicy
+          && <RecoveryPanel run={run} workflow={workflow} onRecovery={onRecovery} />}
         <table><tbody>{visible.map(event => <tr key={event.sequence} onClick={() => event.nodeInstanceId && onSelectNode(event.nodeInstanceId)}>
           <td className="seq">#{event.sequence}</td><td className="time">{new Date(event.timestamp).toLocaleTimeString()}</td>
           <td className="type">{event.type}</td><td className="node">{event.nodeInstanceId || ''}</td><td className="payload">{describe(event)}</td>
@@ -874,6 +879,61 @@ function BottomPanel({ panel, setPanel, issues, run, events, client, workspaceId
           }}>Accept current state</button>}</td></tr>)}</tbody></table>}
       </div>}
     </div>
+  </section>;
+}
+
+function WorkflowJudgePanel({ runId, runState, client, eventsCursor, report, onRecovery, onState }: {
+  runId: string; runState: RunSnapshot['run']['state']; client: Client | null; eventsCursor: number;
+  report: (error: unknown, prefix?: string) => void; onRecovery: (body: Record<string, unknown>) => void; onState: (enabled: boolean) => void;
+}) {
+  const [data, setData] = useState<{ enabled: boolean; barrier: boolean; items: WorkflowJudgeQuestion[] }>({ enabled: false, barrier: false, items: [] });
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState<string | null>(null);
+  const refresh = useCallback(async () => {
+    if (!client) return;
+    try {
+      const next = await client.get<{ enabled: boolean; barrier: boolean; items: WorkflowJudgeQuestion[] }>(`/runs/${runId}/judge-questions`);
+      setData(next); onState(next.enabled);
+    } catch (error) { report(error, 'Judge questions could not be loaded: '); }
+  }, [client, onState, report, runId]);
+  useEffect(() => { refresh(); }, [refresh, eventsCursor]);
+  if (!data.enabled && data.items.length === 0) return null;
+  const pending = data.items.filter(item => item.status === 'pending');
+  const closeRun = () => {
+    if (window.confirm('Close this Run as failed? This supersedes any pending Judge question and linked continuation.')) onRecovery({ action: 'close' });
+  };
+  const answer = async (question: WorkflowJudgeQuestion) => {
+    if (!client || !client.hasFirstParty) return;
+    const value = values[question.questionId] || '';
+    const typedAnswer = question.answerSpec.type === 'choice'
+      ? { type: 'choice' as const, optionId: value }
+      : { type: 'text' as const, value };
+    setSubmitting(question.questionId);
+    try {
+      await client.post(`/judge-questions/${question.questionId}/answers`, { requestId: crypto.randomUUID(), answer: typedAnswer });
+      await refresh();
+    } catch (error) { report(error, 'Judge answer was not accepted: '); }
+    finally { setSubmitting(null); }
+  };
+  return <section className="judge-questions" aria-label="Workflow Judge questions">
+    <div className="judge-questions-head"><h4>Workflow Judge</h4><span className="muted small">{data.barrier ? 'Run held at a Judge decision boundary' : 'No unresolved Judge barrier'}</span></div>
+    {pending.length === 0 && <p className="muted small">{data.enabled ? 'There is no open typed question. The Judge may be waiting for meaningful evidence progress.' : 'No open questions.'}</p>}
+    {data.items.map(question => <article className="judge-question" key={question.questionId}>
+      <div className="judge-question-title"><strong>{question.status === 'pending' ? 'Owner input requested' : `Question ${question.status}`}</strong>
+        {question.originatingRunId !== runId && <span className="muted small">Linked Repair</span>}</div>
+      <p>{question.question}</p>
+      {question.status === 'pending' && (question.answerSpec.type === 'choice'
+        ? <label className="field"><span>Your answer</span><select value={values[question.questionId] || ''} onChange={event => setValues(current => ({ ...current, [question.questionId]: event.target.value }))}>
+          <option value="">Choose an answer</option>{question.answerSpec.options.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
+        </select></label>
+        : <label className="field"><span>Your answer</span><textarea maxLength={question.answerSpec.maxLength} value={values[question.questionId] || ''}
+          onChange={event => setValues(current => ({ ...current, [question.questionId]: event.target.value }))} /></label>)}
+      {question.status === 'pending' && <button className="button small secondary" disabled={!client?.hasFirstParty || submitting === question.questionId
+        || (question.answerSpec.type === 'choice' && !values[question.questionId])} onClick={() => answer(question)}>
+        {submitting === question.questionId ? 'Submitting…' : 'Submit answer'}
+      </button>}
+    </article>)}
+    {data.enabled && runState === 'waiting_for_user' && client?.hasFirstParty && <button className="button small ghost" onClick={closeRun}>Close Run</button>}
   </section>;
 }
 

@@ -4,9 +4,26 @@ import { SUPERVISOR_ENV } from './supervisor-client.mjs';
 
 // Owned process trees are terminated explicitly; the Rust Job Object is the crash backstop.
 export async function killTree(pid) {
-  if (!pid) return;
-  if (process.platform === 'win32') await capture('taskkill.exe', ['/PID', String(pid), '/T', '/F'], { timeout: 15_000, env: process.env });
-  else { try { process.kill(-pid, 'SIGKILL'); } catch { try { process.kill(pid, 'SIGKILL'); } catch { /* Already gone. */ } } }
+  if (!pid) return { confirmed: true, error: null };
+  if (process.platform === 'win32') {
+    let result;
+    try { result = await capture('taskkill.exe', ['/PID', String(pid), '/T', '/F'], { timeout: 15_000, env: process.env }); }
+    catch (error) { return { confirmed: false, error }; }
+    if (result.code === 0) return { confirmed: true, error: null };
+    const detail = (result.stderr || result.stdout).trim();
+    return { confirmed: false, error: new Error(`taskkill exited with ${result.code ?? 'unknown status'}${detail ? `: ${detail}` : ''}`) };
+  }
+  try {
+    process.kill(-pid, 'SIGKILL');
+    return { confirmed: true, error: null };
+  } catch (treeError) {
+    try {
+      process.kill(pid, 'SIGKILL');
+      return { confirmed: false, error: treeError };
+    } catch (processError) {
+      return { confirmed: false, error: processError ?? treeError };
+    }
+  }
 }
 
 export function isAlive(pid) {

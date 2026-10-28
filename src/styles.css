@@ -107,6 +107,10 @@ table{width:100%;border-collapse:collapse;font-size:11.5px}td{padding:5px 8px;bo
 .run-pill.waiting_for_user{color:#f0d79a;border-color:#6b5a2e;background:#33291a}
 .recovery{border:1px solid #5c5134;background:#221f17;border-radius:7px;padding:10px 12px;margin:4px 0 10px;display:flex;flex-direction:column;gap:8px;font-size:12px;color:#ead9a8}
 .recovery-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.recovery-row select{width:auto}.recovery-row code{color:#c9cde0}
+.judge-questions{border:1px solid #49455f;background:#1d1c25;border-radius:7px;padding:10px 12px;margin:4px 0 10px;color:#dfdbee}
+.judge-questions-head,.judge-question-title{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.judge-questions-head h4{margin:0;font-size:12px}.judge-questions>p{margin:8px 0}.judge-question{border-top:1px solid #343141;margin-top:8px;padding-top:8px}
+.judge-question p{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.5}.judge-question .field{max-width:560px}
 input.tiny{width:70px}.row.tight{gap:6px;align-items:center}.button.wide{width:100%;justify-content:center;margin:4px 0 8px}.check{margin:8px 0}
 .record-field{border:1px solid #2b2d39;border-radius:6px;padding:6px;margin:4px 0;display:flex;flex-direction:column;gap:6px}
 select.narrow{width:110px;flex-shrink:0}.capacity-grid.two{grid-template-columns:1fr 1fr}

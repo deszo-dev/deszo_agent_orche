@@ -2228,7 +2228,16 @@
             "judge.turn_settled",
             "judge.attention_expired",
             "judge.invocation_unknown",
-            "judge.queued_behind_active_turn"
+            "judge.queued_behind_active_turn",
+            "judge.attention_opened",
+            "judge.attention_superseded",
+            "judge.waited",
+            "judge.admission_blocked",
+            "question.created",
+            "question.answered",
+            "question.superseded",
+            "repair.approval_recorded",
+            "repair.approval_rejected"
           ]
         },
         "payload": {

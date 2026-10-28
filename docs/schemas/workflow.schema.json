@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://deszo.local/documentation/workflow.schema.json",
-  "title": "Workflow definition (core-v1 with optional loops-v1, cache-v1, pipeline-v1)",
+  "title": "Workflow definition (core-v1 with optional loops-v1, cache-v1, pipeline-v1 and workflow-judge/1)",
   "type": "object",
   "properties": {
     "schemaVersion": {
@@ -30,6 +30,9 @@
       "minItems": 1,
       "maxItems": 7,
       "uniqueItems": true
+    },
+    "judgePolicy": {
+      "$ref": "#/$defs/workflowJudgePolicy"
     },
     "settings": {
       "type": "object",
@@ -391,6 +394,147 @@
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]{0,63}$"
     },
+    "workflowJudgePolicy": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "workflow-judge/1"
+        },
+        "judgeNodeId": {
+          "$ref": "#/$defs/id"
+        },
+        "maxJudgeAttemptsPerRun": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "maxEvidenceExpansionsPerAttention": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "repairProfiles": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 8,
+          "items": {
+            "$ref": "#/$defs/workflowJudgeRepairProfile"
+          }
+        }
+      },
+      "required": [
+        "version",
+        "judgeNodeId",
+        "maxJudgeAttemptsPerRun",
+        "maxEvidenceExpansionsPerAttention",
+        "repairProfiles"
+      ],
+      "additionalProperties": false
+    },
+    "workflowJudgeRepairProfile": {
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "$ref": "#/$defs/id"
+        },
+        "repairWorkflowId": {
+          "$ref": "#/$defs/id"
+        },
+        "repairPublishedVersion": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "repairWorkflowSnapshotSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "repairWorkspaceId": {
+          "$ref": "#/$defs/id"
+        },
+        "failedNodeInstanceId": {
+          "$ref": "#/$defs/id"
+        },
+        "repairResultNodeInstanceId": {
+          "$ref": "#/$defs/id"
+        },
+        "verificationNodeInstanceIds": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        },
+        "acceptanceMode": {
+          "enum": [
+            "expected_digest",
+            "judge_post_execution"
+          ]
+        },
+        "expectedRepairResultSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "failedNodeRetry": {
+          "enum": [
+            "explicit_safe",
+            "never"
+          ]
+        }
+      },
+      "required": [
+        "profileId",
+        "repairWorkflowId",
+        "repairPublishedVersion",
+        "repairWorkflowSnapshotSha256",
+        "repairWorkspaceId",
+        "failedNodeInstanceId",
+        "repairResultNodeInstanceId",
+        "verificationNodeInstanceIds",
+        "acceptanceMode",
+        "failedNodeRetry"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "acceptanceMode": {
+                "const": "expected_digest"
+              }
+            },
+            "required": [
+              "acceptanceMode"
+            ]
+          },
+          "then": {
+            "required": [
+              "expectedRepairResultSha256"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "acceptanceMode": {
+                "const": "judge_post_execution"
+              }
+            },
+            "required": [
+              "acceptanceMode"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "expectedRepairResultSha256"
+              ]
+            }
+          }
+        }
+      ]
+    },
     "artifactRef": {
       "type": "object",
       "properties": {
@@ -571,7 +715,7 @@
             },
             "role": {
               "enum": ["judge"],
-              "description": "Designated Judge (ADR-0009). Only this agent may propose a lifecycle action; at most one agent per workflow may declare it."
+              "description": "Identity marker for a workflow Judge. This marker alone grants no P4 authority; the explicit published judgePolicy is required."
             },
             "captures": {
               "type": "array",

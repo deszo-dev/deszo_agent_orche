@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { StreamRecorder } from './streams.mjs';
-import { killTree } from './processes.mjs';
+import { isAlive, killTree } from './processes.mjs';
 import { shimFailureOf } from './supervisor-client.mjs';
 import { nowIso } from './store.mjs';
 import { assertValid } from './schemas.mjs';
@@ -14,7 +14,7 @@ const BUFFER_LIMIT = 16 * 1024 * 1024;
 // No supervisor credential or inherited Node preload is passed to a utility child.
 export function installTaskProcesses(Engine) {
   Engine.prototype.runTaskCommand = async function runTaskCommand(state, execution, parent, command, args, options = {}) {
-    const { cwd, signal, encoding = 'utf8', timeoutMs = 30000, category = 'git', attemptCost = 0, expectedExitCode = 0 } = options;
+    const { cwd, signal, encoding = 'utf8', timeoutMs = 30000, category = 'git', attemptCost = 0, expectedExitCode = 0, waitForTermination = false } = options;
     if (this.closing || this.runState(state.id) !== 'running' || signal?.aborted) return { status: null, aborted: true, stdout: '', stderr: '' };
     const seq = ++execution.data.commandSeq;
     this.saveManagedTask(execution);
@@ -44,15 +44,26 @@ export function installTaskProcesses(Engine) {
       // Keep the command in the ordinary invocation event for audit/provenance consumers.
       this.store.appendEvents(state.id, [{ type: 'attempt.invocation_committed', nodeInstanceId: instance, attemptId: attempt.id, payload: { manifest: commandRef } }]);
       const result = await new Promise(resolve => {
-        let settled = false, timer;
+        let settled = false, finishing = false, timer, terminationPromise = null;
         const chunks = { stdout: [], stderr: [] }, sizes = { stdout: 0, stderr: 0 };
         let truncated = false;
         const onFault = error => this.captureFault(record, error);
         const streams = Object.fromEntries(['stdout', 'stderr'].map(stream => [stream, new StreamRecorder({ store: this.store, runId: state.id, attempt, stream,
           mediaType: 'application/octet-stream', onFault, extended: true })]));
-        const onAbort = () => { record.stopRequested = true; if (record.child?.pid) void killTree(record.child.pid); };
+        const terminateTree = () => {
+          if (!terminationPromise && record.child?.pid) {
+            try {
+              terminationPromise = Promise.resolve(killTree(record.child.pid)).then(
+                result => result ?? { confirmed: false, error: new Error('Process-tree termination returned no result.') },
+                error => ({ confirmed: false, error }),
+              );
+            } catch (error) { terminationPromise = Promise.resolve({ confirmed: false, error }); }
+          }
+          return terminationPromise;
+        };
+        const onAbort = () => { record.stopRequested = true; if (record.child?.pid) void terminateTree(); };
         let startedAt = null;
-        const finish = ({ status = null, childSignal = null, error = null, complete = false }) => {
+        const finalize = ({ status = null, childSignal = null, error = null, complete = false }, termination = null) => {
           if (settled) return; settled = true; clearTimeout(timer); signal?.removeEventListener('abort', onAbort);
           const aborted = record.stopRequested || signal?.aborted || this.runState(state.id) === 'stopping';
           const outcome = record.captureError ? 'capture_failed' : aborted ? 'canceled' : record.timedOut ? 'timed_out' : error ? 'spawn_failed' : status === expectedExitCode ? 'passed' : 'failed';
@@ -90,8 +101,20 @@ export function installTaskProcesses(Engine) {
             });
           } catch (captureError) { this.storageUnavailable(captureError); error = captureError; }
           const bytes = name => encoding === 'buffer' ? Buffer.concat(chunks[name]) : Buffer.concat(chunks[name]).toString('utf8');
+          const terminationError = termination && !termination.confirmed
+            ? termination.error ?? new Error('Process-tree termination could not be confirmed.') : null;
           resolve({ status, signal: childSignal, error: error || record.captureError || null, timedOut: record.timedOut, aborted, truncated,
-            stdout: bytes('stdout'), stderr: bytes('stderr'), evidence: evidenceRef, captureComplete: closed ? Object.values(closed).every(item => item.integrity === 'complete') : false });
+            stdout: bytes('stdout'), stderr: bytes('stderr'), evidence: evidenceRef, captureComplete: closed ? Object.values(closed).every(item => item.integrity === 'complete') : false,
+            ...(waitForTermination && termination ? { processActive: Boolean(record.child?.pid && isAlive(record.child.pid)), ...(terminationError ? { terminationError } : {}) } : {}) });
+        };
+        const finish = result => {
+          if (settled || finishing) return;
+          if (waitForTermination && terminationPromise) {
+            finishing = true;
+            terminationPromise.then(termination => finalize(result, termination), error => finalize(result, { confirmed: false, error }));
+            return;
+          }
+          finalize(result);
         };
         try {
           record.child = this.launchContained(state.id, { command, args, cwd, env: environment, stdin: '' });
@@ -110,7 +133,7 @@ export function installTaskProcesses(Engine) {
               this.store.run('UPDATE attempts SET process_id=?,process_start_identity=?,supervisor_generation=?,started_at=? WHERE id=?', child.pid, startIdentity, this.supervisorGeneration, startedAt, attempt.id);
               this.store.appendEvents(state.id, this.attemptTransition(attempt, 'running', 'Run-owned utility process launched.', { pid: child.pid, startIdentity, supervisorGeneration: this.supervisorGeneration }));
             }
-            timer = setTimeout(() => { record.timedOut = true; void killTree(child.pid); }, effectiveTimeout);
+            timer = setTimeout(() => { record.timedOut = true; void terminateTree(); }, effectiveTimeout);
             if (signal?.aborted || record.stopRequested || this.runState(state.id) !== 'running') onAbort();
           } catch (error) { onFault(error); }
         });

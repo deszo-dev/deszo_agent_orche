@@ -61,7 +61,9 @@ test('P2-M19: existing linked-repair rows survive the additive coordination migr
     assert.equal(link.repair_run_id, repairRunId);
     assert.equal(link.candidate_digest, candidateDigest);
     assert.equal(link.checkpoint_artifact_id, checkpointArtifact.artifactId);
-    assert.equal(migratedStore.get('SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 1').version, 20);
+    assert.equal(link.acceptance_mode, 'expected_digest', 'legacy linked Repair rows do not acquire adaptive Judge approval authority');
+    assert.equal(link.decision_status, 'pending');
+    assert.equal(migratedStore.get('SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 1').version, MIGRATION_PATHS.length);
     assert.equal(migratedStore.get("SELECT name FROM sqlite_master WHERE type='table' AND name='failure_outcomes'").name, 'failure_outcomes');
     assert.deepEqual(migratedStore.all('PRAGMA foreign_key_check'), []);
   } finally {

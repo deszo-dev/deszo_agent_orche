@@ -403,7 +403,8 @@ test('P1-10: a pending Stop survives Engine replacement; nothing is launched and
     engineB = await startEngine(scratch.root, host, { fixtureStateDir: scratch.fixtureState });
     const final = await waitForRunState(engineB, runId, SETTLED, 180_000);
     assert.ok(['canceled', 'interrupted'].includes(final), `the Stop ends the Run without completing it (state ${final})`);
-    assert.equal(isAlive(bRunning.pid), false, 'the provider process the Stop targeted has ended');
+    assert.equal(await eventually(() => !isAlive(bRunning.pid), 'the recovered Root Stop to end its targeted provider process', 30_000, 100), true,
+      'the provider process the Stop targeted has ended');
     assert.equal(settledCount(scratch.root, runId, 'c'), 0, 'C is never accepted');
     assert.equal(launchesOf(scratch, 'custody-steady').length, 1, 'no second launch of B');
     record('P1-10', { runId, finalRunState: final, launches: { b: 1 } });

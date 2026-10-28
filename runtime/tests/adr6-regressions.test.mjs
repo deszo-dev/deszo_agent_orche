@@ -6,7 +6,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, randomUUID, sign } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -570,6 +570,7 @@ test('Enablement: a production host refuses to start while capabilities are unve
   const root = ownedDir(join(tmpdir(), 'deszo-adr6-gate-'));
   assert.ok(missingProductionCapabilities().length >= 10, 'No capability is verified by documentation or fixtures.');
   assert.throws(() => new ControlHost({ root, time: manualTimeSource(), assurance: 'production' }), err => err.code === 'autonomy_disabled' && /Production autonomy is disabled/.test(err.message));
+  assert.equal(existsSync(join(root, 'host.sqlite')), false, 'A failure before SQLite acquisition created a database.');
   const served = spawnSync(process.execPath, ['--disable-warning=ExperimentalWarning', join(repo, 'runtime/host/main.mjs'), 'serve', '--state', root, '--pipe', pipeFor(root)],
     { encoding: 'utf8', windowsHide: true, timeout: 20000 });
   assert.equal(served.status, 1, served.stdout);
@@ -583,8 +584,13 @@ test('Enablement: a store records its assurance level and refuses to be opened a
   const raw = new DatabaseSync(join(root, 'host.sqlite'));
   raw.prepare(`UPDATE host_meta SET value = 'production' WHERE key = 'assurance'`).run();
   raw.close();
-  assert.throws(() => new ControlHost({ root, time: manualTimeSource(), assurance: 'fixture' }), err => err.code === 'assurance_mismatch');
+  let initializationError;
+  try { new ControlHost({ root, time: manualTimeSource(), assurance: 'fixture' }); } catch (error) { initializationError = error; }
+  assert.equal(initializationError?.code, 'assurance_mismatch');
+  assert.match(initializationError?.message ?? '', /cannot be opened as fixture/);
   assert.throws(() => new ControlHost({ root, time: manualTimeSource(), assurance: 'production' }), err => err.code === 'autonomy_disabled');
+  rmSync(root, { recursive: true });
+  assert.equal(existsSync(root), false, 'The database connection remained open after failed construction.');
   const ctx = setup();
   const pipeName = pipeFor(ctx.root);
   const server = await startHostServer({ host: ctx.host, pipeName });
@@ -596,4 +602,13 @@ test('Enablement: a store records its assurance level and refuses to be opened a
     binding.client.close();
     await assert.rejects(hostFromEnvironment({ ...env, DESZO_ALLOW_FIXTURE_HOST: '1' }, { packaged: true }), /refuses a fixture Local Control Host/);
   } finally { await new Promise(done => server.close(done)); ctx.host.close(); }
+});
+
+test('ControlHost normal shutdown releases its SQLite file and remains idempotent', () => {
+  const root = ownedDir(join(tmpdir(), 'deszo-adr6-close-'));
+  const host = new ControlHost({ root, time: manualTimeSource() });
+  host.close();
+  assert.doesNotThrow(() => host.close());
+  rmSync(root, { recursive: true });
+  assert.equal(existsSync(root), false);
 });

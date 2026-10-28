@@ -62,12 +62,23 @@ export interface MapConfig {
 export interface GatePolicy { slots: { id: string; role: string; view: 'full' | 'public'; scopeRefs?: string[] }[] }
 export type NodeType = WorkflowNode['type'];
 
+export interface WorkflowJudgeRepairProfile {
+  profileId: string; repairWorkflowId: string; repairPublishedVersion: number; repairWorkflowSnapshotSha256: string;
+  repairWorkspaceId: string; failedNodeInstanceId: string; repairResultNodeInstanceId: string; verificationNodeInstanceIds: string[];
+  acceptanceMode: 'expected_digest' | 'judge_post_execution'; expectedRepairResultSha256?: string; failedNodeRetry: 'explicit_safe' | 'never';
+}
+export interface WorkflowJudgePolicy {
+  version: 'workflow-judge/1'; judgeNodeId: string; maxJudgeAttemptsPerRun: number; maxEvidenceExpansionsPerAttention: number;
+  repairProfiles: WorkflowJudgeRepairProfile[];
+}
+
 export interface WorkflowEdge { id: string; source: { nodeId: string; port: string }; target: { nodeId: string; port: string } }
 export type Capability = 'core-v1' | 'loops-v1' | 'cache-v1' | 'pipeline-v1' | 'delivery-v1' | 'revisions-v1' | 'task-planning-v1';
 export interface Workflow {
   schemaVersion: 1; workflowId: string; capabilities: Capability[];
   settings: { nativeConfiguration: 'restricted' | 'inherit' };
   nodes: WorkflowNode[]; edges: WorkflowEdge[]; after: { before: string; after: string }[];
+  judgePolicy?: WorkflowJudgePolicy;
   view?: Record<string, { x: number; y: number; label?: string }>;
 }
 
@@ -90,6 +101,14 @@ export interface RunSnapshot {
   contexts: { contextNodeId: string; mode: 'new' | 'continue'; bindingId: string }[];
   loops: LoopExecution[];
   maps?: MapExecution[];
+}
+export type WorkflowJudgeAnswerSpec =
+  | { type: 'choice'; options: { id: string; label: string }[] }
+  | { type: 'text'; maxLength: number };
+export interface WorkflowJudgeQuestion {
+  questionId: string; rootRunId: string; originatingRunId: string; linkId: string | null; incidentId: string | null;
+  status: 'pending' | 'answered' | 'canceled' | 'superseded'; question: string; answerSpec: WorkflowJudgeAnswerSpec;
+  answer: { type: 'choice'; optionId: string } | { type: 'text'; value: string } | null; createdAt: string; updatedAt: string;
 }
 export interface MapExecution { mapInstanceId: string; mapExecutionId: string; state: string; generation: number; failedVerificationCycles: number; maxFailedVerificationCycles: number; pauseReason: string | null; accepted: number; total: number }
 export interface MapNavigator {

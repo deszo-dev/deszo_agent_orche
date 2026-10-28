@@ -64,6 +64,16 @@ export class HostError extends Error {
   constructor(status, code, message) { super(message); this.status = status; this.code = code; }
 }
 
+function preserveCleanupFailure(primaryError, cleanupError) {
+  const diagnostic = cleanupError instanceof Error ? cleanupError : new Error(String(cleanupError));
+  try {
+    const existing = Array.isArray(primaryError?.cleanupErrors) ? primaryError.cleanupErrors : [];
+    Object.defineProperty(primaryError, 'cleanupErrors', { value: [...existing, diagnostic], configurable: true, enumerable: false });
+  } catch {
+    try { process.emitWarning(`ControlHost initialization cleanup failed: ${diagnostic.message}`, { code: 'CONTROL_HOST_INIT_CLEANUP_FAILED' }); } catch { /* preserve the primary initialization error */ }
+  }
+}
+
 const nowIsoFrom = time => new Date(time.wallNow()).toISOString();
 
 function contract(definition, value, label = definition) {
@@ -138,23 +148,29 @@ export class ControlHost {
     this.revocationFailure = null;
     this.dispatchBlocked = null;
     this.userSurfaceSha256 = null;
-    if (readOnly) {
-      if (!existsSync(join(root, 'host.sqlite'))) throw new HostError(404, 'not_found', 'No host store exists at this state directory.');
-      this.db = new DatabaseSync(join(root, 'host.sqlite'), { readOnly: true });
-      this.refreshBlock();
-      return;
+    this.db = null;
+    try {
+      if (readOnly) {
+        if (!existsSync(join(root, 'host.sqlite'))) throw new HostError(404, 'not_found', 'No host store exists at this state directory.');
+        this.db = new DatabaseSync(join(root, 'host.sqlite'), { readOnly: true });
+        this.refreshBlock();
+        return;
+      }
+      mkdirSync(root, { recursive: true });
+      this.db = new DatabaseSync(join(root, 'host.sqlite'));
+      this.db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA foreign_keys = ON;');
+      this.migrate();
+      // A store records the assurance it was created with; fixture state can never be opened as production state.
+      const marked = this.get(`SELECT value FROM host_meta WHERE key = 'assurance'`);
+      const storeAssurance = assurance === 'bootstrap' ? 'production' : assurance;
+      if (!marked) this.run(`INSERT INTO host_meta(key, value) VALUES ('assurance', ?)`, storeAssurance);
+      else if (marked.value !== storeAssurance) throw new HostError(409, 'assurance_mismatch', `This store was created for ${marked.value} assurance and cannot be opened as ${assurance}.`);
+      if (recover) this.recover();
+      else this.refreshBlock();
+    } catch (error) {
+      try { this.close(); } catch (cleanupError) { preserveCleanupFailure(error, cleanupError); }
+      throw error;
     }
-    mkdirSync(root, { recursive: true });
-    this.db = new DatabaseSync(join(root, 'host.sqlite'));
-    this.db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA foreign_keys = ON;');
-    this.migrate();
-    // A store records the assurance it was created with; fixture state can never be opened as production state.
-    const marked = this.get(`SELECT value FROM host_meta WHERE key = 'assurance'`);
-    const storeAssurance = assurance === 'bootstrap' ? 'production' : assurance;
-    if (!marked) this.run(`INSERT INTO host_meta(key, value) VALUES ('assurance', ?)`, storeAssurance);
-    else if (marked.value !== storeAssurance) throw new HostError(409, 'assurance_mismatch', `This store was created for ${marked.value} assurance and cannot be opened as ${assurance}.`);
-    if (recover) this.recover();
-    else this.refreshBlock();
   }
 
   requireWritable() {
@@ -210,7 +226,17 @@ export class ControlHost {
     this.ownerPath = null;
   }
 
-  close() { this.releaseOwnership(); this.db.close(); }
+  close() {
+    const failures = [];
+    try { this.releaseOwnership(); } catch (error) { failures.push(error); }
+    if (this.db) {
+      try { this.db.close(); this.db = null; } catch (error) { failures.push(error); }
+    }
+    if (failures.length) {
+      for (const error of failures.slice(1)) preserveCleanupFailure(failures[0], error);
+      throw failures[0];
+    }
+  }
 
   // One serialized transaction: BEGIN IMMEDIATE takes the write lock, so concurrent hosts and requests linearize.
   transaction(fn) {

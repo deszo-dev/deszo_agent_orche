@@ -121,6 +121,49 @@ export function semanticIssues(workflow, { maximumAgentTimeoutSeconds = M1_MAXIM
   visitGraph(workflow.nodes, workflow.edges, '/nodes', '/edges', 0);
   const loops = loopsOf(workflow.nodes).map(entry => entry.loop);
 
+  // A role marker is inert on legacy workflows. Only the versioned publication policy
+  // enables the stricter identity and isolation contract used by P4.
+  const judgePolicy = workflow.judgePolicy;
+  if (judgePolicy) {
+    const markedJudges = [...all.values()].filter(node => node.type === 'agent' && node.config.role === 'judge');
+    const judgeNodeIndex = workflow.nodes.findIndex(node => node.id === judgePolicy.judgeNodeId);
+    const judgeNode = judgeNodeIndex >= 0 ? workflow.nodes[judgeNodeIndex] : null;
+    if (markedJudges.length !== 1) add('judge.identity.count', '/nodes', 'A workflow-judge/1 policy requires exactly one Agent with config.role "judge".');
+    if (!judgeNode) add('judge.node.reference', '/judgePolicy/judgeNodeId', `Judge node "${judgePolicy.judgeNodeId}" must identify a top-level node.`);
+    else {
+      if (judgeNode.type !== 'agent') add('judge.node.type', `/nodes/${judgeNodeIndex}/type`, 'The designated Judge node must be an Agent.');
+      else {
+        if (judgeNode.config.role !== 'judge') add('judge.node.role', `/nodes/${judgeNodeIndex}/config/role`, 'The designated Agent must declare config.role "judge".');
+        if (judgeNode.config.contextId) add('judge.context.unsupported', `/nodes/${judgeNodeIndex}/config/contextId`, 'workflow-judge/1 does not support a Context-backed Judge.');
+        if (judgeNode.config.output.format !== 'json') add('judge.output.format', `/nodes/${judgeNodeIndex}/config/output/format`, 'The designated Judge must declare JSON output for the typed decision contract.');
+      }
+      if (markedJudges.length === 1 && markedJudges[0].id !== judgeNode.id)
+        add('judge.identity.binding', '/judgePolicy/judgeNodeId', 'judgeNodeId must bind the only Agent with config.role "judge".');
+      if (workflow.edges.some(edge => edge.source.nodeId === judgeNode.id || edge.target.nodeId === judgeNode.id))
+        add('judge.isolation.edge', '/edges', 'The designated Judge must have no incoming or outgoing data edges.');
+      if (workflow.after.some(item => item.before === judgeNode.id || item.after === judgeNode.id))
+        add('judge.isolation.after', '/after', 'The designated Judge must have no incoming or outgoing After dependencies.');
+    }
+
+    const unsupported = [...all.values()].find(node => ['loop', 'map', 'task'].includes(node.type));
+    if (unsupported) add('judge.execution.unsupported', '/nodes', `workflow-judge/1 cannot enroll workflows containing ${unsupported.type} execution.`);
+
+    const profileIds = new Set();
+    judgePolicy.repairProfiles.forEach((profile, index) => {
+      const at = `/judgePolicy/repairProfiles/${index}`;
+      if (profileIds.has(profile.profileId)) add('judge.repair_profile.unique', `${at}/profileId`, `Repair profile ID "${profile.profileId}" is duplicated.`);
+      profileIds.add(profile.profileId);
+      if (profile.repairWorkflowId === workflow.workflowId)
+        add('judge.repair_profile.self', `${at}/repairWorkflowId`, 'A Repair profile must target a separate published workflow.');
+      const failedNodeIndex = workflow.nodes.findIndex(node => node.id === profile.failedNodeInstanceId);
+      const failedNode = failedNodeIndex >= 0 ? workflow.nodes[failedNodeIndex] : null;
+      if (!failedNode || failedNode.type !== 'agent')
+        add('judge.repair_profile.failed_node', `${at}/failedNodeInstanceId`, 'failedNodeInstanceId must reference a top-level Agent in the Parent workflow.');
+      if (profile.verificationNodeInstanceIds.includes(profile.repairResultNodeInstanceId))
+        add('judge.repair_profile.verification', `${at}/verificationNodeInstanceIds`, 'The Repair result node cannot also be listed as a separate verification node.');
+    });
+  }
+
   const outerContexts = new Map(workflow.nodes.filter(node => node.type === 'context').map(node => [node.id, node]));
   const contextKey = context => context.config.mode === 'continue' ? `binding:${context.config.bindingId}` : `node:${context.id}`;
   // Contexts that a loop's body (at any depth) uses from outside that loop, per loop.
@@ -243,6 +286,9 @@ export function semanticIssues(workflow, { maximumAgentTimeoutSeconds = M1_MAXIM
       for (const port of Object.keys(inputs)) {
         const count = incoming.get(`${id}\u0000${port}`) || 0;
         if (count === 1) continue;
+        // P4.2 supplies the isolated Judge prompt as an Engine-created evidence package.
+        // P4.1 only validates that this node is explicitly designated; it never schedules it.
+        if (id === workflow.judgePolicy?.judgeNodeId && port === 'prompt') continue;
         if (id === RETURN) add('loop.return', edgeBase, `${RETURN}.${port} needs exactly one connection (has ${count}).`);
         else add('input.required', `${base}/${local.get(id).index}`, `Input ${id}.${port} needs exactly one connection (has ${count}).`);
       }
@@ -304,7 +350,7 @@ export function semanticIssues(workflow, { maximumAgentTimeoutSeconds = M1_MAXIM
     for (const [id, { node, index }] of local) {
       if (node.type === 'context') {
         if (![...all.values()].some(other => contextIdsOf(other).includes(id))) add('context.unused', `${base}/${index}`, `Context "${id}" is not referenced by any Agent.`);
-      } else if (node.type !== 'result-viewer' && !cycle && !sinks.some(sink => reaches(id, sink))) {
+      } else if (node.type !== 'result-viewer' && id !== workflow.judgePolicy?.judgeNodeId && !cycle && !sinks.some(sink => reaches(id, sink))) {
         add('node.sink', `${base}/${index}`, boundary ? `"${id}" does not lead to ${RETURN}.` : `"${id}" does not lead to a Result Viewer.`);
       }
     }

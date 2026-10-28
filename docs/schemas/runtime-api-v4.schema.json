@@ -23,6 +23,36 @@
       "properties": { "requestId": { "type": "string", "format": "uuid" } },
       "required": ["requestId"],
       "additionalProperties": false
+    },
+    "judgeQuestionAnswer": {
+      "type": "object",
+      "properties": {
+        "requestId": { "type": "string", "format": "uuid" },
+        "answer": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "type": { "const": "choice" },
+                "optionId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" }
+              },
+              "required": ["type", "optionId"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": { "const": "text" },
+                "value": { "type": "string", "maxLength": 2048 }
+              },
+              "required": ["type", "value"],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": ["requestId", "answer"],
+      "additionalProperties": false
     }
   }
 }
