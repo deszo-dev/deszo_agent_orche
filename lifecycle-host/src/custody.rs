@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     fs::{self, File, OpenOptions},
     io::{BufRead, BufReader, Read, Seek, SeekFrom, Write},
     net::{Ipv4Addr, TcpListener, TcpStream},
@@ -66,6 +66,421 @@ fn text<'a>(payload: &'a Value, key: &str) -> Result<&'a str, Refusal> {
 
 fn number(payload: &Value, key: &str) -> Result<u64, Refusal> {
     payload.get(key).and_then(Value::as_u64).ok_or_else(|| Refusal { code: "invalid_request", message: format!("{key} must be a nonnegative integer") })
+}
+
+fn string_list(payload: &Value, key: &str, max_items: usize, max_len: usize) -> Result<Vec<String>, Refusal> {
+    let Some(values) = payload.get(key).and_then(Value::as_array) else {
+        return refuse("invalid_request", format!("{key} must be an array of strings"));
+    };
+    if values.len() > max_items { return refuse("invalid_request", format!("{key} exceeds its bounded item count")); }
+    let mut result = Vec::with_capacity(values.len());
+    for value in values {
+        let Some(value) = value.as_str() else { return refuse("invalid_request", format!("{key} contains a non-string item")); };
+        if value.is_empty() || value.len() > max_len || !valid_selector(value) {
+            return refuse("invalid_request", format!("{key} contains an unsupported path selector"));
+        }
+        if result.iter().any(|previous| previous == value) { return refuse("invalid_request", format!("{key} contains a duplicate selector")); }
+        result.push(value.to_string());
+    }
+    Ok(result)
+}
+
+fn valid_selector(value: &str) -> bool {
+    if value.starts_with('/') || value.starts_with('\\') || value.contains('\\') || value.contains(':')
+        || !value.is_ascii() || value.bytes().any(|byte| byte < 0x20 || byte == 0x7f) { return false; }
+    let raw = value.strip_suffix("/**").unwrap_or(value);
+    !raw.split('/').any(|component| component.is_empty() || component == "." || component == ".."
+        || component.ends_with('.') || component.ends_with(' '))
+}
+
+fn component_glob(pattern: &[u8], value: &[u8]) -> bool {
+    let mut pending = vec![(0usize, 0usize)];
+    let mut seen = HashSet::new();
+    while let Some((mut p, mut v)) = pending.pop() {
+        loop {
+            if !seen.insert((p, v)) { break; }
+            if p == pattern.len() { if v == value.len() { return true; } break; }
+            if pattern[p] == b'*' {
+                while p < pattern.len() && pattern[p] == b'*' { p += 1; }
+                for next in v..=value.len() { pending.push((p, next)); }
+                break;
+            }
+            if v == value.len() || pattern[p] != value[v] { break; }
+            p += 1; v += 1;
+        }
+    }
+    false
+}
+
+fn glob_components(pattern: &[&str], value: &[&str]) -> bool {
+    let mut pending = vec![(0usize, 0usize)];
+    let mut seen = HashSet::new();
+    while let Some((p, v)) = pending.pop() {
+        if !seen.insert((p, v)) { continue; }
+        if p == pattern.len() { if v == value.len() { return true; } continue; }
+        if pattern[p] == "**" {
+            pending.push((p + 1, v));
+            if v < value.len() { pending.push((p, v + 1)); }
+            continue;
+        }
+        if v < value.len() && component_glob(pattern[p].as_bytes(), value[v].as_bytes()) { pending.push((p + 1, v + 1)); }
+    }
+    false
+}
+
+fn selector_matches(path: &str, selectors: &[String]) -> bool {
+    let value: Vec<_> = path.split('/').collect();
+    selectors.iter().any(|selector| {
+        let pattern: Vec<_> = selector.split('/').collect();
+        glob_components(&pattern, &value)
+    })
+}
+
+fn may_contain_included(path: &str, include: &[String]) -> bool {
+    include.iter().any(|selector| {
+        if selector == "**" || selector.starts_with("**/") || selector_matches(path, std::slice::from_ref(selector)) { return true; }
+        let literal_prefix = selector.split('*').next().unwrap_or("");
+        literal_prefix.starts_with(&format!("{path}/")) || path.starts_with(literal_prefix.trim_end_matches('/'))
+    })
+}
+
+fn excluded_subtree(path: &str, exclude: &[String]) -> bool {
+    exclude.iter().any(|selector| {
+        selector_matches(path, std::slice::from_ref(selector))
+            && (!selector.contains('*') || selector.ends_with("/**"))
+    })
+}
+
+#[derive(Clone)]
+struct NativeSourceScan {
+    canonical_root: String,
+    root_identity: Value,
+    path_digest: String,
+    snapshot_digest: String,
+    content_digest: String,
+    file_count: usize,
+    total_bytes: u64,
+}
+
+struct NativeToolIdentity {
+    canonical_path: String,
+    identity: Value,
+    byte_size: u64,
+    link_count: u64,
+}
+
+fn refusal(code: &'static str, message: impl Into<String>) -> Refusal { Refusal { code, message: message.into() } }
+
+fn scan_native_tool_identity(path: &Path) -> Result<NativeToolIdentity, Refusal> {
+    ensure_local_source_path(path)?;
+    let canonical = fs::canonicalize(path).map_err(|error| refusal("workspace_unavailable", format!("Cannot resolve pinned tool path: {error}")))?;
+    if !canonical.is_absolute() || normalize_native_path(&canonical) != normalize_native_path(path) {
+        return refuse("unsupported_alias", "Pinned tool path uses an unsupported filesystem alias.");
+    }
+    let parent = path.parent().ok_or_else(|| refusal("invalid_request", "Pinned tool path has no parent directory."))?;
+    for ancestor in parent.ancestors().collect::<Vec<_>>().into_iter().rev() {
+        let metadata = fs::symlink_metadata(ancestor).map_err(|error| refusal("workspace_unavailable", format!("Cannot inspect pinned tool ancestor: {error}")))?;
+        let (_, reparse, _) = native_identity(ancestor, &metadata)?;
+        if !metadata.is_dir() || reparse { return refuse("topology_unsupported", "Pinned tool ancestor is not a real directory."); }
+    }
+    let metadata = fs::symlink_metadata(path).map_err(|error| refusal("workspace_unavailable", format!("Cannot inspect pinned tool: {error}")))?;
+    let (identity, reparse, links) = native_identity(path, &metadata)?;
+    if !metadata.is_file() || reparse || links == 0 { return refuse("topology_unsupported", "Pinned tool is not a regular non-reparse file with a measurable link count."); }
+    Ok(NativeToolIdentity { canonical_path: node_path(&canonical).to_string_lossy().to_string(),
+        identity: json!({ "volumeId": identity.0, "fileId": identity.1 }), byte_size: metadata.len(), link_count: links })
+}
+
+fn scan_native_directory_identity(root: &Path) -> Result<NativeSourceScan, Refusal> {
+    ensure_local_source_path(root)?;
+    let canonical = fs::canonicalize(root).map_err(|error| refusal("workspace_unavailable", format!("Cannot resolve native source root: {error}")))?;
+    if !canonical.is_absolute() || normalize_native_path(&canonical) != normalize_native_path(root) {
+        return refuse("unsupported_alias", "Native source root uses an unsupported path alias.");
+    }
+    let mut records = Vec::new();
+    let mut root_identity = None;
+    for ancestor in root.ancestors().collect::<Vec<_>>().into_iter().rev() {
+        let metadata = fs::symlink_metadata(ancestor).map_err(|error| refusal("workspace_unavailable", format!("Cannot inspect source ancestor: {error}")))?;
+        let (identity, reparse, _) = native_identity(ancestor, &metadata)?;
+        if !metadata.is_dir() || reparse { return refuse("topology_unsupported", "Native source root or ancestor is not a real directory."); }
+        if normalize_native_path(ancestor) == normalize_native_path(root) { root_identity = Some(identity.clone()); }
+        records.push(format!("ancestor\0{}\0{}\0{}", normalize_relative_native_path(ancestor), identity.0, identity.1));
+    }
+    let root_identity = root_identity.ok_or_else(|| refusal("native_identity_unavailable", "Windows root identity was not observed."))?;
+    Ok(NativeSourceScan { canonical_root: node_path(&canonical).to_string_lossy().to_string(), root_identity: json!({
+        "volumeId": root_identity.0, "fileId": root_identity.1 }),
+        path_digest: hex::encode(Sha256::digest([])), snapshot_digest: hex::encode(Sha256::digest(records.join("\0").as_bytes())),
+        content_digest: hex::encode(Sha256::digest([])),
+        file_count: 0, total_bytes: 0 })
+}
+
+fn scan_native_source_tree(root: &Path, include: &[String], exclude: &[String], max_files: u64, max_bytes: u64) -> Result<NativeSourceScan, Refusal> {
+    ensure_local_source_path(root)?;
+    let canonical = fs::canonicalize(root).map_err(|error| refusal("workspace_unavailable", format!("Cannot resolve native source root: {error}")))?;
+    if !canonical.is_absolute() || normalize_native_path(&canonical) != normalize_native_path(root) {
+        return refuse("unsupported_alias", "Native source root uses an unsupported path alias.");
+    }
+    let mut ancestors = Vec::new();
+    for ancestor in root.ancestors().collect::<Vec<_>>().into_iter().rev() {
+        let metadata = fs::symlink_metadata(ancestor).map_err(|error| refusal("workspace_unavailable", format!("Cannot inspect source ancestor: {error}")))?;
+        let (identity, reparse, _) = native_identity(ancestor, &metadata)?;
+        if !metadata.is_dir() || reparse { return refuse("topology_unsupported", "Native source root or ancestor is not a real directory."); }
+        ancestors.push((normalize_relative_native_path(ancestor), identity));
+    }
+    let root_metadata = fs::symlink_metadata(root).map_err(|error| refusal("workspace_unavailable", error.to_string()))?;
+    let (root_identity_value, _, _) = native_identity(root, &root_metadata)?;
+    let mut scan = NativeScanBuilder { include, exclude, max_files, max_bytes, paths: Vec::new(), records: Vec::new(), content_records: Vec::new(),
+        seen_ids: HashMap::new(), total_bytes: 0, visited: 0 };
+    scan.records.extend(ancestors.into_iter().map(|(path, identity)| format!("ancestor\0{path}\0{}\0{}\0", identity.0, identity.1)));
+    scan.visit(root, "", &root_metadata)?;
+    scan.paths.sort();
+    scan.paths.dedup();
+    let mut path_bytes = Vec::new();
+    for path in &scan.paths { path_bytes.extend_from_slice(path.as_bytes()); path_bytes.push(0); }
+    let path_digest = hex::encode(Sha256::digest(&path_bytes));
+    scan.records.sort();
+    let snapshot_bytes = scan.records.join("\0");
+    scan.content_records.sort_by(|left, right| left.0.cmp(&right.0));
+    let content_bytes = scan.content_records.iter().map(|(_, record)| record.as_str()).collect::<String>();
+    Ok(NativeSourceScan { canonical_root: node_path(&canonical).to_string_lossy().to_string(), root_identity: json!({
+        "volumeId": root_identity_value.0, "fileId": root_identity_value.1 }), path_digest, snapshot_digest: hex::encode(Sha256::digest(snapshot_bytes.as_bytes())),
+        content_digest: hex::encode(Sha256::digest(content_bytes.as_bytes())),
+        file_count: scan.paths.len(), total_bytes: scan.total_bytes })
+}
+
+struct NativeScanBuilder<'a> {
+    include: &'a [String],
+    exclude: &'a [String],
+    max_files: u64,
+    max_bytes: u64,
+    paths: Vec<String>,
+    records: Vec<String>,
+    content_records: Vec<(String, String)>,
+    seen_ids: HashMap<String, String>,
+    total_bytes: u64,
+    visited: u64,
+}
+
+impl NativeScanBuilder<'_> {
+    fn visit(&mut self, directory: &Path, relative: &str, directory_metadata: &std::fs::Metadata) -> Result<(), Refusal> {
+        self.visited += 1;
+        if self.visited > 100_000 { return refuse("source_budget_exceeded", "Native source scan exceeded its total filesystem-entry bound."); }
+        let (directory_id, reparse, _) = native_identity(directory, directory_metadata)?;
+        if reparse || !directory_metadata.is_dir() { return refuse("topology_unsupported", "A source directory is a reparse point or non-directory."); }
+        self.remember_identity(directory, relative, &directory_id, "directory")?;
+        let mut children = fs::read_dir(directory).map_err(|error| refusal("workspace_unavailable", format!("Cannot enumerate native source directory: {error}")))?
+            .map(|entry| entry.map_err(|error| refusal("workspace_unavailable", error.to_string())))
+            .collect::<Result<Vec<_>, _>>()?;
+        children.sort_by_key(|entry| entry.file_name());
+        for child in children {
+            let name = child.file_name().to_string_lossy().to_string();
+            if name.is_empty() || !name.is_ascii() { return refuse("path_unsupported", "Native source contains a non-ASCII path alias."); }
+            let path = if relative.is_empty() { name } else { format!("{relative}/{name}") };
+            let child_path = child.path();
+            if excluded_subtree(&path, self.exclude) { continue; }
+            if self.paths.len() as u64 >= self.max_files && may_contain_included(&path, self.include) {
+                return refuse("source_budget_exceeded", "Native source scan exceeded its file-count bound.");
+            }
+            if !may_contain_included(&path, self.include) { continue; }
+            let metadata = fs::symlink_metadata(&child_path).map_err(|error| refusal("workspace_unavailable", error.to_string()))?;
+            let (identity, reparse, links) = native_identity(&child_path, &metadata)?;
+            if metadata.is_dir() {
+                if reparse { return refuse("topology_unsupported", format!("Source directory {path} is a reparse point.")); }
+                self.visit(&child_path, &path, &metadata)?;
+            } else if selector_matches(&path, self.include) && !selector_matches(&path, self.exclude) {
+                if !metadata.is_file() || reparse || links != 1 { return refuse("topology_unsupported", format!("Source file {path} is not a single-link regular file.")); }
+                validate_portable_source_path(&path)?;
+                let size = metadata.len();
+                self.total_bytes = self.total_bytes.checked_add(size).ok_or_else(|| refusal("source_budget_exceeded", "Native source byte count overflowed."))?;
+                if self.total_bytes > self.max_bytes { return refuse("source_budget_exceeded", "Native source scan exceeded its byte bound."); }
+                self.remember_identity(&child_path, &path, &identity, "file")?;
+                let content_sha256 = hash_native_source_file(&child_path, &identity, size)?;
+                self.content_records.push((path.clone(), format!("{path}\0{size}\0{content_sha256}\n")));
+                self.paths.push(path.clone());
+                let modified = metadata.modified().ok().and_then(|value| value.duration_since(std::time::UNIX_EPOCH).ok()).map(|value| value.as_nanos().to_string()).unwrap_or_default();
+                self.records.push(format!("file\0{path}\0{}\0{}\0{size}\0{links}\0{modified}", identity.0, identity.1));
+            } else if !metadata.is_file() && !metadata.is_dir() {
+                return refuse("topology_unsupported", format!("Source entry {path} has an unsupported filesystem type."));
+            }
+        }
+        let after = fs::symlink_metadata(directory).map_err(|error| refusal("workspace_unavailable", error.to_string()))?;
+        let (after_identity, after_reparse, _) = native_identity(directory, &after)?;
+        if after_reparse || after_identity != directory_id || !after.is_dir() { return refuse("source_drift", "A source directory changed identity during native enumeration."); }
+        Ok(())
+    }
+
+    fn remember_identity(&mut self, path: &Path, relative: &str, identity: &(String, String), kind: &str) -> Result<(), Refusal> {
+        let key = format!("{}:{}", identity.0, identity.1);
+        if let Some(prior) = self.seen_ids.insert(key, relative.to_string()) {
+            return refuse("unsupported_alias", format!("Native paths {prior} and {relative} refer to the same filesystem object."));
+        }
+        let canonical = fs::canonicalize(path).map_err(|error| refusal("workspace_unavailable", error.to_string()))?;
+        if normalize_native_path(&canonical) != normalize_native_path(path) { return refuse("unsupported_alias", "A source path resolves through an unsupported filesystem alias."); }
+        if kind == "directory" { self.records.push(format!("directory\0{relative}\0{}\0{}", identity.0, identity.1)); }
+        Ok(())
+    }
+}
+
+/// Hash the bytes from an identity-bound, no-follow source handle. On Windows the handle denies
+/// concurrent write/delete opens for its lifetime, so the digest cannot be switched underneath
+/// the Custody Host while it reads the selected source file.
+fn hash_native_source_file(path: &Path, expected_identity: &(String, String), expected_size: u64) -> Result<String, Refusal> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::{ffi::OsStrExt, io::{AsRawHandle, FromRawHandle}};
+        use windows_sys::Win32::{
+            Foundation::{GENERIC_READ, INVALID_HANDLE_VALUE},
+            Storage::FileSystem::{CreateFileW, GetFileInformationByHandle, BY_HANDLE_FILE_INFORMATION,
+                FILE_ATTRIBUTE_REPARSE_POINT, FILE_FLAG_OPEN_REPARSE_POINT, FILE_READ_ATTRIBUTES,
+                FILE_SHARE_READ, OPEN_EXISTING},
+        };
+        let wide: Vec<u16> = path.as_os_str().encode_wide().chain(Some(0)).collect();
+        let handle = unsafe { CreateFileW(wide.as_ptr(), GENERIC_READ | FILE_READ_ATTRIBUTES, FILE_SHARE_READ,
+            std::ptr::null(), OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, std::ptr::null_mut()) };
+        if handle == INVALID_HANDLE_VALUE { return refuse("native_identity_unavailable", "Windows could not open a source file for identity-bound hashing."); }
+        let mut file = unsafe { File::from_raw_handle(handle as _) };
+        let inspect = |handle, output: &mut BY_HANDLE_FILE_INFORMATION| unsafe { GetFileInformationByHandle(handle, output) != 0 };
+        let mut before = BY_HANDLE_FILE_INFORMATION::default();
+        if !inspect(file.as_raw_handle() as _, &mut before) { return refuse("native_identity_unavailable", "Windows could not inspect the opened source-file handle."); }
+        let before_file_id = ((before.nFileIndexHigh as u64) << 32) | before.nFileIndexLow as u64;
+        let before_id = format!("{before_file_id:016x}");
+        let before_volume = format!("{:08x}", before.dwVolumeSerialNumber);
+        let before_size = ((before.nFileSizeHigh as u64) << 32) | before.nFileSizeLow as u64;
+        if before.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT != 0 || before.nNumberOfLinks != 1
+            || before_volume != expected_identity.0 || before_id != expected_identity.1 || before_size != expected_size {
+            return refuse("source_drift", "The opened source file identity differs from the scanned regular file.");
+        }
+        let mut hasher = Sha256::new();
+        let mut buffer = [0u8; 64 * 1024];
+        let mut read_bytes = 0u64;
+        loop {
+            let count = file.read(&mut buffer).map_err(|error| refusal("workspace_unavailable", format!("Cannot hash native source bytes: {error}")))?;
+            if count == 0 { break; }
+            read_bytes = read_bytes.checked_add(count as u64).ok_or_else(|| refusal("source_budget_exceeded", "Native source byte count overflowed while hashing."))?;
+            if read_bytes > expected_size { return refuse("source_drift", "A source file grew while the Host was hashing it."); }
+            hasher.update(&buffer[..count]);
+        }
+        let mut after = BY_HANDLE_FILE_INFORMATION::default();
+        if !inspect(file.as_raw_handle() as _, &mut after) { return refuse("native_identity_unavailable", "Windows could not re-inspect the opened source-file handle."); }
+        let after_file_id = ((after.nFileIndexHigh as u64) << 32) | after.nFileIndexLow as u64;
+        let after_id = format!("{after_file_id:016x}");
+        let after_size = ((after.nFileSizeHigh as u64) << 32) | after.nFileSizeLow as u64;
+        if after.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT != 0 || after.nNumberOfLinks != 1
+            || after_id != before_id || after.dwVolumeSerialNumber != before.dwVolumeSerialNumber
+            || after_size != before_size || read_bytes != expected_size {
+            return refuse("source_drift", "The identity-bound source file changed while the Host was hashing it.");
+        }
+        return Ok(hex::encode(hasher.finalize()));
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        use std::os::unix::fs::MetadataExt;
+        let mut options = OpenOptions::new();
+        options.read(true).custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC);
+        let mut file = options.open(path).map_err(|error| refusal("workspace_unavailable", format!("Cannot open native source file without following links: {error}")))?;
+        let before = file.metadata().map_err(|error| refusal("workspace_unavailable", error.to_string()))?;
+        let before_id = (before.dev().to_string(), before.ino().to_string());
+        if !before.is_file() || before.nlink() != 1 || &before_id != expected_identity || before.len() != expected_size {
+            return refuse("source_drift", "The opened source file identity differs from the scanned regular file.");
+        }
+        let mut hasher = Sha256::new();
+        let mut buffer = [0u8; 64 * 1024];
+        let mut read_bytes = 0u64;
+        loop {
+            let count = file.read(&mut buffer).map_err(|error| refusal("workspace_unavailable", format!("Cannot hash native source bytes: {error}")))?;
+            if count == 0 { break; }
+            read_bytes = read_bytes.checked_add(count as u64).ok_or_else(|| refusal("source_budget_exceeded", "Native source byte count overflowed while hashing."))?;
+            if read_bytes > expected_size { return refuse("source_drift", "A source file grew while the Host was hashing it."); }
+            hasher.update(&buffer[..count]);
+        }
+        let after = file.metadata().map_err(|error| refusal("workspace_unavailable", error.to_string()))?;
+        let after_identity = (after.dev().to_string(), after.ino().to_string());
+        if !after.is_file() || after.nlink() != 1 || after_identity != before_id || after.len() != before.len()
+            || after.mtime() != before.mtime() || after.mtime_nsec() != before.mtime_nsec() || read_bytes != expected_size {
+            return refuse("source_drift", "The opened source file changed while the Host was hashing it.");
+        }
+        return Ok(hex::encode(hasher.finalize()));
+    }
+    #[allow(unreachable_code)]
+    { let _ = (path, expected_identity, expected_size); refuse("native_identity_unavailable", "This platform cannot hash a source file through a native identity-bound handle.") }
+}
+
+fn validate_portable_source_path(path: &str) -> Result<(), Refusal> {
+    if path.is_empty() || path.len() > 1024 || !path.is_ascii() || path.starts_with('/') || path.contains('\\') || path.contains(':')
+        || path.bytes().any(|byte| byte < 0x20 || byte == 0x7f) {
+        return refuse("path_unsupported", format!("Source path {path} is outside the portable P5 path language."));
+    }
+    for component in path.split('/') {
+        let base = component.split('.').next().unwrap_or("");
+        if component.is_empty() || component == "." || component == ".." || component.ends_with('.') || component.ends_with(' ')
+            || component.eq_ignore_ascii_case(".git") || component.eq_ignore_ascii_case(".p5")
+            || ["con", "prn", "aux", "nul", "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9"].contains(&base.to_ascii_lowercase().as_str()) {
+            return refuse("path_unsupported", format!("Source path {path} contains an unsupported Windows alias."));
+        }
+    }
+    Ok(())
+}
+
+fn normalize_native_path(path: &Path) -> String {
+    let mut value = node_path(path).to_string_lossy().replace('/', "\\");
+    while value.len() > 3 && value.ends_with('\\') { value.pop(); }
+    value.to_lowercase()
+}
+
+fn normalize_relative_native_path(path: &Path) -> String { path.to_string_lossy().replace('\\', "/").to_lowercase() }
+
+fn ensure_local_source_path(root: &Path) -> Result<(), Refusal> {
+    if !root.is_absolute() { return refuse("invalid_request", "Native source root must be absolute."); }
+    #[cfg(windows)]
+    {
+        use std::os::windows::ffi::OsStrExt;
+        use windows_sys::Win32::{Storage::FileSystem::GetDriveTypeW, System::WindowsProgramming::DRIVE_FIXED};
+        let text = root.to_string_lossy().replace('/', "\\");
+        let drive_path = text.strip_prefix(r"\\?\").unwrap_or(&text);
+        if drive_path.starts_with(r"\\") || drive_path.len() < 3 || drive_path.as_bytes()[1] != b':' || drive_path.as_bytes()[2] != b'\\' {
+            return refuse("unsupported_filesystem", "P5 supports only local fixed-drive Windows source roots.");
+        }
+        let drive = format!("{}\\", &drive_path[..2]);
+        let wide: Vec<u16> = std::ffi::OsStr::new(&drive).encode_wide().chain(Some(0)).collect();
+        if unsafe { GetDriveTypeW(wide.as_ptr()) } != DRIVE_FIXED {
+            return refuse("unsupported_filesystem", "P5 refuses network, removable or unknown Windows source volumes.");
+        }
+    }
+    Ok(())
+}
+
+fn native_identity(path: &Path, metadata: &std::fs::Metadata) -> Result<((String, String), bool, u64), Refusal> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::ffi::OsStrExt;
+        use windows_sys::Win32::{
+            Foundation::{CloseHandle, INVALID_HANDLE_VALUE},
+            Storage::FileSystem::{CreateFileW, GetFileInformationByHandle, BY_HANDLE_FILE_INFORMATION,
+                FILE_ATTRIBUTE_REPARSE_POINT, FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT,
+                FILE_READ_ATTRIBUTES, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING},
+        };
+        let wide: Vec<u16> = path.as_os_str().encode_wide().chain(Some(0)).collect();
+        let handle = unsafe { CreateFileW(wide.as_ptr(), FILE_READ_ATTRIBUTES,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, std::ptr::null(), OPEN_EXISTING,
+            FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, std::ptr::null_mut()) };
+        if handle == INVALID_HANDLE_VALUE {
+            return refuse("native_identity_unavailable", "Windows could not open a source path for native identity.");
+        }
+        let mut info = BY_HANDLE_FILE_INFORMATION::default();
+        let ok = unsafe { GetFileInformationByHandle(handle, &mut info) } != 0;
+        unsafe { CloseHandle(handle); }
+        if !ok { return refuse("native_identity_unavailable", "Windows could not read native source identity."); }
+        let file = ((info.nFileIndexHigh as u64) << 32) | info.nFileIndexLow as u64;
+        let reparse = info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT != 0 || metadata.file_type().is_symlink();
+        return Ok(((format!("{:08x}", info.dwVolumeSerialNumber), format!("{file:016x}")), reparse, info.nNumberOfLinks as u64));
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        return Ok(((metadata.dev().to_string(), metadata.ino().to_string()), metadata.file_type().is_symlink(), metadata.nlink()));
+    }
+    #[allow(unreachable_code)]
+    { let _ = (path, metadata); refuse("native_identity_unavailable", "This platform does not expose the required native filesystem identity." ) }
 }
 
 /// One executable the Host may launch, identified by its canonical path and SHA-256 digest.
@@ -256,8 +671,70 @@ impl CustodyRegistry {
             "custody.stop" => self.stop(payload, false),
             "custody.emergency_stop" => self.stop(payload, true),
             "custody.cancel" => self.cancel(payload),
+            "custody.source_identity" => self.source_identity(payload),
+            "custody.tool_identity" => self.tool_identity(payload),
             _ => refuse("unsupported", "The Host does not implement that custody command."),
         }
+    }
+
+    fn source_identity(&self, payload: &Value) -> Result<Value, Refusal> {
+        self.check_generation(payload)?;
+        let epoch = {
+            let inner = self.guard()?;
+            Self::check_epoch(&inner, payload)?;
+            inner.epoch
+        };
+        let root = PathBuf::from(text(payload, "root")?);
+        let include = string_list(payload, "include", 64, 1024)?;
+        let exclude = string_list(payload, "exclude", 64, 1024)?;
+        let max_files = number(payload, "maxFiles")?;
+        let max_bytes = number(payload, "maxBytes")?;
+        if !root.is_absolute() || (include.is_empty() != (max_files == 0 && max_bytes == 0)) || max_files > 20_000 || max_bytes > 536_870_912 {
+            return refuse("invalid_request", "The native source identity request has an unsupported root, path policy or budget.");
+        }
+        let expected_path_digest = payload.get("expectedPathsDigest").and_then(Value::as_str);
+        if expected_path_digest.is_some_and(|digest| digest.len() != 64 || !digest.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())) {
+            return refuse("invalid_request", "expectedPathsDigest must be a lowercase SHA-256 digest or null.");
+        }
+        let first = if include.is_empty() { scan_native_directory_identity(&root)? }
+            else { scan_native_source_tree(&root, &include, &exclude, max_files, max_bytes)? };
+        if expected_path_digest.is_some_and(|expected| expected != first.path_digest) {
+            return refuse("source_inventory_mismatch", "The native Windows source path set differs from the Engine's committed source inventory.");
+        }
+        let second = if include.is_empty() { scan_native_directory_identity(&root)? }
+            else { scan_native_source_tree(&root, &include, &exclude, max_files, max_bytes)? };
+        if first.snapshot_digest != second.snapshot_digest || first.path_digest != second.path_digest {
+            return refuse("source_drift", "Native source identity changed during the bounded topology scan.");
+        }
+        self.check_generation(payload)?;
+        {
+            let inner = self.guard()?;
+            Self::check_epoch(&inner, payload)?;
+        }
+        Ok(json!({ "canonicalRoot": first.canonical_root, "rootIdentity": first.root_identity,
+            "pathDigest": first.path_digest, "snapshotDigest": first.snapshot_digest,
+            "contentDigest": first.content_digest,
+            "fileCount": first.file_count, "totalBytes": first.total_bytes,
+            "hostPid": self.host_pid, "generation": self.current_generation(), "epoch": epoch }))
+    }
+
+    fn tool_identity(&self, payload: &Value) -> Result<Value, Refusal> {
+        self.check_generation(payload)?;
+        let epoch = {
+            let inner = self.guard()?;
+            Self::check_epoch(&inner, payload)?;
+            inner.epoch
+        };
+        let path = PathBuf::from(text(payload, "path")?);
+        let identity = scan_native_tool_identity(&path)?;
+        self.check_generation(payload)?;
+        {
+            let inner = self.guard()?;
+            Self::check_epoch(&inner, payload)?;
+        }
+        Ok(json!({ "canonicalPath": identity.canonical_path, "identity": identity.identity,
+            "byteSize": identity.byte_size, "linkCount": identity.link_count,
+            "hostPid": self.host_pid, "generation": self.current_generation(), "epoch": epoch }))
     }
 
     /// Graceful Host shutdown: every running invocation is stopped and recorded before the Host exits.

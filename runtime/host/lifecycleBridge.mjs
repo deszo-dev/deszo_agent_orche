@@ -31,7 +31,8 @@ function hostCall(port, capability) {
       socket.destroy();
       error ? reject(error) : resolve(value);
     };
-    const timeoutMs = command === 'custody.reserve' || command === 'custody.launch' ? CUSTODY_FILE_VERIFY_TIMEOUT_MS : 5_000;
+    const timeoutMs = command === 'engine.source_release' || command === 'engine.source_inventory' || command === 'custody.reserve' || command === 'custody.launch' || command === 'custody.source_identity' || command === 'custody.tool_identity'
+      ? CUSTODY_FILE_VERIFY_TIMEOUT_MS : 5_000;
     socket.setTimeout(timeoutMs, () => finish(new Error('Lifecycle Host IPC timed out.')));
     socket.once('error', error => finish(new Error(`Lifecycle Host IPC failed: ${error.message}`)));
     socket.once('connect', () => socket.write(`${JSON.stringify({ capability, command, payload })}\n`));
@@ -75,6 +76,18 @@ export function lifecycleBridgeFromEnvironment(env = process.env) {
     },
     activateCandidate(request) { return call('lifecycle.activate_candidate', request); },
     acknowledgeReceipt(receiptId) { return call('lifecycle.receipt_ack', { receiptId }); },
+    // The Host re-hashes the active managed package and returns its trusted build source fields. The Engine
+    // compares this exact identity with the installation-owned P5 enrollment; it never labels local HEAD as
+    // the source of the running application.
+    runningSourceRelease({ pid = process.pid } = {}) {
+      if (!Number.isSafeInteger(pid) || pid < 1) throw new Error('Source release request PID is malformed.');
+      return call('engine.source_release', { generation: context.generation, pid });
+    },
+    runningSourceInventory({ pid = process.pid, paths } = {}) {
+      if (!Number.isSafeInteger(pid) || pid < 1) throw new Error('Source inventory request PID is malformed.');
+      if (!Array.isArray(paths) || paths.length < 1 || paths.length > 32) throw new Error('Source inventory request batch is malformed.');
+      return call('engine.source_inventory', { generation: context.generation, pid, paths });
+    },
     // Process Custody commands (custody.*). The same lifecycle capability authenticates them; the Host fences them by epoch.
     custody(command, payload) { return call(command, payload); },
   });

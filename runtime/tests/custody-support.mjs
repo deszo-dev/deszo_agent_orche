@@ -68,7 +68,8 @@ export async function custodyRequest(host, command, payload = {}) {
     const [address, port] = host.address.split(':');
     const socket = net.createConnection({ host: address, port: Number(port) });
     let data = '';
-    const timeoutMs = command === 'custody.reserve' || command === 'custody.launch' ? 120_000 : 10_000;
+    const timeoutMs = command === 'custody.reserve' || command === 'custody.launch' ? 120_000
+      : command === 'custody.source_identity' || command === 'custody.tool_identity' ? 60_000 : 10_000;
     socket.setTimeout(timeoutMs, () => { socket.destroy(); reject(new Error(`custody ${command} timed out`)); });
     socket.once('error', reject);
     // A Host that crashes mid-request closes the connection without a reply; the caller learns that at once.

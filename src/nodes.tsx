@@ -34,7 +34,7 @@ function summary(data: FlowNode['data']): string {
     case 'loop': return `${node.config.valueType} · ≤${node.config.limits.maxIterations} iterations · ${node.config.body.nodes.length} body nodes`;
     case 'cache': return `${node.config.mode === 'frozen' ? 'Frozen — uses the pinned value' : 'Live — passes the value through'} · ${node.config.valueType}`;
     case 'route': return `${node.config.selector || '(root)'} → ${node.config.cases.map(item => item.id).join(' | ')}`;
-    case 'gate': return `${node.config.mode} · ${node.config.policy.slots.map(slot => slot.id).join(', ')}`;
+    case 'gate': return node.config.mode === 'self-repair-verify' ? 'Installed P5 plan · no model supplied inputs' : `${node.config.mode} · ${node.config.policy.slots.map(slot => slot.id).join(', ')}`;
     case 'map': return `${node.config.roles.length} roles · ≤${node.config.limits.maxFailedVerificationCycles} failed verifications`;
     default: return 'Displays the final value';
   }

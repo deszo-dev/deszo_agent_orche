@@ -1,0 +1,729 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deszo.local/documentation/protected-self-repair.schema.json",
+  "title": "Protected Self-Repair P5 records",
+  "$defs": {
+    "ref": {
+      "type": "object",
+      "properties": {
+        "artifactId": { "type": "string", "format": "uuid" },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      },
+      "required": ["artifactId", "sha256"],
+      "additionalProperties": false
+    },
+    "publication": {
+      "type": "object",
+      "properties": {
+        "workflowId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+        "publishedVersionId": { "type": "string", "format": "uuid" },
+        "version": { "type": "integer", "minimum": 1 },
+        "snapshotSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      },
+      "required": ["workflowId", "publishedVersionId", "version", "snapshotSha256"],
+      "additionalProperties": false
+    },
+    "scope": {
+      "type": "object",
+      "properties": {
+        "add": { "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 1024 } },
+        "modify": { "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 1024 } },
+        "delete": { "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 1024 } },
+        "executable": { "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 1024 } },
+        "denied": { "type": "array", "maxItems": 1024, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 1024 } },
+        "sensitiveCategories": { "type": "array", "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" } }
+      },
+      "required": ["add", "modify", "delete", "executable", "denied", "sensitiveCategories"],
+      "additionalProperties": false
+    },
+    "budgets": {
+      "type": "object",
+      "properties": {
+        "maxSourceFiles": { "type": "integer", "minimum": 1, "maximum": 20000 }, "maxSourceBytes": { "type": "integer", "minimum": 1, "maximum": 536870912 },
+        "developerTimeoutSeconds": { "type": "integer", "minimum": 1, "maximum": 600 }, "verificationTimeoutSeconds": { "type": "integer", "minimum": 1, "maximum": 3600 },
+        "maxCheckOutputBytes": { "type": "integer", "minimum": 1024, "maximum": 16777216 }, "verificationRetries": { "const": 0 },
+        "maxJudgeAttempts": { "type": "integer", "minimum": 1, "maximum": 8 }, "maxEvidenceExpansions": { "const": 1 }
+      },
+      "required": ["maxSourceFiles", "maxSourceBytes", "developerTimeoutSeconds", "verificationTimeoutSeconds", "maxCheckOutputBytes", "verificationRetries", "maxJudgeAttempts", "maxEvidenceExpansions"],
+      "additionalProperties": false
+    },
+    "baselineManifest": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "ProtectedSelfRepairBaselineManifest" },
+        "enrollmentId": { "type": "string", "format": "uuid" }, "repositoryIdentity": { "$ref": "#/$defs/repositoryIdentity" },
+        "repositoryRoot": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "gitObjectFormat": { "enum": ["sha1", "sha256"] }, "baseCommit": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "baseTree": { "type": "string", "minLength": 1, "maxLength": 128 }, "pathPolicyDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "pathPolicy": { "$ref": "#/$defs/sourcePathPolicy" },
+        "effectiveSourceDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "baselineId": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "sourceManifest": { "$ref": "#/$defs/ref" }, "runningSourceRelease": { "$ref": "#/$defs/ref" },
+        "excludedPaths": { "type": "array", "maxItems": 20000, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 1024 } },
+        "capturedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["schemaVersion", "kind", "enrollmentId", "repositoryIdentity", "repositoryRoot", "gitObjectFormat", "baseCommit", "baseTree", "pathPolicyDigest", "pathPolicy", "effectiveSourceDigest", "baselineId", "sourceManifest", "runningSourceRelease", "excludedPaths", "capturedAt"],
+      "additionalProperties": false
+    },
+    "sourcePathPolicy": {
+      "type": "object",
+      "properties": {
+        "include": { "type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 1024 } },
+        "exclude": { "type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 1024 } },
+        "secretPaths": { "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 1024 } }
+      },
+      "required": ["include", "exclude", "secretPaths"],
+      "additionalProperties": false
+    },
+    "profile": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "ProtectedSelfRepairProfile" }, "enrollmentId": { "type": "string", "format": "uuid" },
+        "repositoryIdentity": { "$ref": "#/$defs/repositoryIdentity" }, "baselineId": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "baseline": { "$ref": "#/$defs/ref" }, "runningSourceRelease": { "$ref": "#/$defs/ref" }, "repairPublication": { "$ref": "#/$defs/publication" },
+        "developerNodeId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" }, "verificationNodeId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" }, "repairJudgeNodeId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+        "workspace": { "type": "object", "properties": { "workspaceId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" }, "allocationId": { "type": "string", "format": "uuid" }, "canonicalRoot": { "type": "string", "minLength": 1, "maxLength": 4096 }, "singleUse": { "const": true }, "cleanCommitted": { "const": true } }, "required": ["workspaceId", "allocationId", "canonicalRoot", "singleUse", "cleanCommitted"], "additionalProperties": false },
+        "scope": { "$ref": "#/$defs/scope" }, "verificationPolicy": { "$ref": "#/$defs/ref" }, "requiredCheckIds": { "type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" } },
+        "eligibleIncidents": { "type": "array", "minItems": 1, "maxItems": 64, "items": { "type": "object", "properties": { "category": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" }, "canonicalCode": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" } }, "required": ["category", "canonicalCode"], "additionalProperties": false } },
+        "failedNodeRetry": { "enum": ["explicit_safe", "never"] }, "acceptanceMode": { "const": "judge_post_execution" }, "budgets": { "$ref": "#/$defs/budgets" }
+      },
+      "required": ["schemaVersion", "kind", "enrollmentId", "repositoryIdentity", "baselineId", "baseline", "runningSourceRelease", "repairPublication", "developerNodeId", "verificationNodeId", "repairJudgeNodeId", "workspace", "scope", "verificationPolicy", "requiredCheckIds", "eligibleIncidents", "failedNodeRetry", "acceptanceMode", "budgets"],
+      "additionalProperties": false
+    },
+    "enrollment": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "ProtectedSelfRepairEnrollment" }, "enrollmentId": { "type": "string", "format": "uuid" },
+        "repositoryIdentity": { "$ref": "#/$defs/repositoryIdentity" }, "gitObjectFormat": { "enum": ["sha1", "sha256"] }, "baseCommit": { "type": "string", "minLength": 1, "maxLength": 128 }, "baseTree": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "pathPolicyDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "effectiveSourceDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "baselineId": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "baselineManifest": { "$ref": "#/$defs/ref" },
+        "runningSourceRelease": { "$ref": "#/$defs/ref" }, "parentPublication": { "$ref": "#/$defs/publication" }, "profile": { "$ref": "#/$defs/ref" }, "repairPublication": { "$ref": "#/$defs/publication" },
+        "workspace": { "type": "object", "properties": { "workspaceId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" }, "canonicalRoot": { "type": "string", "minLength": 1, "maxLength": 4096 }, "allocationId": { "type": "string", "format": "uuid" }, "nativeIdentity": { "$ref": "#/$defs/nativeIdentity" } }, "required": ["workspaceId", "canonicalRoot", "allocationId", "nativeIdentity"], "additionalProperties": false },
+        "verificationPolicy": { "$ref": "#/$defs/ref" }, "harnessClosureDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "toolIdentities": { "type": "array", "minItems": 1, "maxItems": 64, "items": { "type": "object", "properties": { "name": { "type": "string", "minLength": 1, "maxLength": 128 }, "path": { "type": "string", "minLength": 1, "maxLength": 1024 }, "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" } }, "required": ["name", "path", "sha256"], "additionalProperties": false } },
+        "scope": { "$ref": "#/$defs/scope" }, "budgets": { "$ref": "#/$defs/budgets" }, "minimumReaderCapability": { "const": "protected-self-repair-v1" }
+      },
+      "required": ["schemaVersion", "kind", "enrollmentId", "repositoryIdentity", "gitObjectFormat", "baseCommit", "baseTree", "pathPolicyDigest", "effectiveSourceDigest", "baselineId", "baselineManifest", "runningSourceRelease", "parentPublication", "profile", "repairPublication", "workspace", "verificationPolicy", "harnessClosureDigest", "toolIdentities", "scope", "budgets", "minimumReaderCapability"],
+      "additionalProperties": false
+    },
+    "sourceBinding": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "ProtectedSelfRepairSourceBinding" }, "enrollmentId": { "type": "string", "format": "uuid" },
+        "parentRunId": { "type": "string", "format": "uuid" }, "parentPublication": { "$ref": "#/$defs/publication" }, "parentSnapshot": { "$ref": "#/$defs/ref" },
+        "baselineId": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "baselineManifest": { "$ref": "#/$defs/ref" }, "profile": { "$ref": "#/$defs/ref" },
+        "runningSourceRelease": { "$ref": "#/$defs/ref" }, "runtimeInstanceId": { "type": "string", "format": "uuid" }, "lifecycleGeneration": { "type": "string", "format": "uuid" }, "boundAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["schemaVersion", "kind", "enrollmentId", "parentRunId", "parentPublication", "parentSnapshot", "baselineId", "baselineManifest", "profile", "runningSourceRelease", "runtimeInstanceId", "lifecycleGeneration", "boundAt"],
+      "additionalProperties": false
+    },
+    "preparationIntent": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "ProtectedSelfRepairPreparationIntent" },
+        "enrollment": { "$ref": "#/$defs/ref" }, "baselineManifest": { "$ref": "#/$defs/ref" },
+        "sourceManifest": { "$ref": "#/$defs/ref" }, "sourceBinding": { "$ref": "#/$defs/ref" }, "verificationInputs": { "$ref": "#/$defs/ref" },
+        "parentRunId": { "type": "string", "format": "uuid" }, "repairRunId": { "type": "string", "format": "uuid" },
+        "linkId": { "type": "string", "format": "uuid" },
+        "workspace": { "type": "object", "properties": {
+          "workspaceId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+          "allocationId": { "type": "string", "format": "uuid" }, "canonicalRoot": { "type": "string", "minLength": 1, "maxLength": 4096 },
+          "nativeIdentity": { "$ref": "#/$defs/nativeIdentity" }
+        }, "required": ["workspaceId", "allocationId", "canonicalRoot", "nativeIdentity"], "additionalProperties": false },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["schemaVersion", "kind", "enrollment", "baselineManifest", "sourceManifest", "sourceBinding", "verificationInputs", "parentRunId", "repairRunId", "linkId", "workspace", "createdAt"],
+      "additionalProperties": false
+    },
+    "workspacePreparation": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "ProtectedSelfRepairWorkspacePreparation" },
+        "intent": { "$ref": "#/$defs/ref" }, "workspaceRoot": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "sourceRoot": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "workspaceIdentity": { "$ref": "#/$defs/nativeIdentity" }, "sourceIdentity": { "$ref": "#/$defs/nativeIdentity" },
+        "baselineId": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "sourceDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "snapshotDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "pathDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "contentDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "fileCount": { "type": "integer", "minimum": 1, "maximum": 20000 },
+        "totalBytes": { "type": "integer", "minimum": 0, "maximum": 536870912 }, "hostPid": { "type": "integer", "minimum": 1 },
+        "generation": { "type": "string", "minLength": 1, "maxLength": 128 }, "epoch": { "type": "integer", "minimum": 0 },
+        "preparedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["schemaVersion", "kind", "intent", "workspaceRoot", "sourceRoot", "workspaceIdentity", "sourceIdentity", "baselineId", "sourceDigest", "snapshotDigest", "pathDigest", "contentDigest", "fileCount", "totalBytes", "hostPid", "generation", "epoch", "preparedAt"],
+      "additionalProperties": false
+    },
+    "verificationPolicy": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "ProtectedSelfRepairVerificationPolicy" }, "planVersion": { "const": 1 },
+        "requiredStages": { "type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" } },
+        "requiredCheckIds": { "type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" } },
+        "optionalCheckIds": { "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" } },
+        "harnessClosureDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "incidentInputSelectors": { "type": "array", "minItems": 1, "maxItems": 1, "items": { "type": "object", "properties": {
+          "selector": { "const": "p3-outcome-artifacts" }, "source": { "const": "p3-outcome-artifacts" },
+          "maxItems": { "type": "integer", "minimum": 1, "maximum": 64 },
+          "maxBytesPerArtifact": { "type": "integer", "minimum": 1, "maximum": 65536 },
+          "maxTotalBytes": { "type": "integer", "minimum": 1, "maximum": 262144 }
+        }, "required": ["selector", "source", "maxItems", "maxBytesPerArtifact", "maxTotalBytes"], "additionalProperties": false } },
+        "checks": { "type": "array", "minItems": 1, "maxItems": 256, "items": { "type": "object", "properties": {
+          "checkId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" }, "stageId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" }, "required": { "type": "boolean" },
+          "commandDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "executable": { "type": "string", "minLength": 1, "maxLength": 1024 }, "executableSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "argv": { "type": "array", "maxItems": 256, "items": { "type": "string", "maxLength": 4096 } },
+          "cwd": { "enum": ["candidate-source", "candidate-execution-tree", "verify-scratch", "installed-control"] }, "inputRefs": { "type": "array", "maxItems": 64, "items": { "$ref": "#/$defs/ref" } },
+          "environment": { "type": "object", "maxProperties": 64, "propertyNames": { "pattern": "^[A-Z_][A-Z0-9_]{0,63}$" }, "additionalProperties": { "type": "string", "maxLength": 4096 } },
+          "subjectEntryPoints": { "type": "array", "minItems": 1, "maxItems": 64, "items": { "type": "string", "minLength": 1, "maxLength": 1024 } }, "expectedAssertions": { "type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 256 } },
+          "expectedExitCodes": { "type": "array", "minItems": 1, "maxItems": 8, "uniqueItems": true, "items": { "type": "integer", "minimum": 0, "maximum": 255 } }, "timeoutSeconds": { "type": "integer", "minimum": 1, "maximum": 3600 }, "maxOutputBytes": { "type": "integer", "minimum": 1024, "maximum": 16777216 },
+          "subjectBinding": { "enum": ["candidate-entrypoint", "protected-overlay"] }, "overlayPaths": { "type": "array", "maxItems": 512, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 1024 } }
+        }, "required": ["checkId", "stageId", "required", "commandDigest", "executable", "executableSha256", "argv", "cwd", "inputRefs", "environment", "subjectEntryPoints", "expectedAssertions", "expectedExitCodes", "timeoutSeconds", "maxOutputBytes", "subjectBinding", "overlayPaths"], "additionalProperties": false } },
+        "verificationRetries": { "const": 0 }, "aggregateTimeoutSeconds": { "type": "integer", "minimum": 1, "maximum": 7200 }
+      },
+      "required": ["schemaVersion", "kind", "planVersion", "requiredStages", "requiredCheckIds", "optionalCheckIds", "harnessClosureDigest", "incidentInputSelectors", "checks", "verificationRetries", "aggregateTimeoutSeconds"],
+      "additionalProperties": false
+    },
+    "verificationInputs": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "ProtectedSelfRepairVerificationInputs" }, "incidentId": { "type": "string", "format": "uuid" },
+        "outcomeId": { "type": "string", "format": "uuid" }, "outcomeRevision": { "type": "integer", "minimum": 1 }, "verificationPolicy": { "$ref": "#/$defs/ref" },
+        "inputs": { "type": "array", "minItems": 1, "maxItems": 64, "items": { "type": "object", "properties": { "selector": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" }, "artifact": { "$ref": "#/$defs/ref" }, "sourceOutcomeId": { "type": "string", "format": "uuid" }, "sourceRevision": { "type": "integer", "minimum": 1 } }, "required": ["selector", "artifact", "sourceOutcomeId", "sourceRevision"], "additionalProperties": false } },
+        "capturedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["schemaVersion", "kind", "incidentId", "outcomeId", "outcomeRevision", "verificationPolicy", "inputs", "capturedAt"],
+      "additionalProperties": false
+    },
+    "subjectResolution": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "ProtectedSelfRepairSubjectResolution" },
+        "candidateId": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "candidateSourceDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "baselineId": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "checkId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+        "verificationPolicy": { "$ref": "#/$defs/ref" }, "verificationInputs": { "$ref": "#/$defs/ref" },
+        "inputDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "driverIdentity": { "type": "string", "minLength": 1, "maxLength": 1024 }, "driverSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "entryPoints": { "type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 1024 } },
+        "resolvedFiles": { "type": "array", "minItems": 1, "maxItems": 20000, "items": { "type": "object", "properties": {
+          "path": { "type": "string", "minLength": 1, "maxLength": 1024 }, "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "byteSize": { "type": "integer", "minimum": 0 }, "executable": { "type": "boolean" }
+        }, "required": ["path", "sha256", "byteSize", "executable"], "additionalProperties": false } },
+        "sourceClosureDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "assertionBindings": { "type": "array", "minItems": 1, "maxItems": 256, "items": { "type": "object", "properties": {
+          "assertion": { "type": "string", "minLength": 1, "maxLength": 256 }, "sourcePath": { "type": "string", "minLength": 1, "maxLength": 1024 }
+        }, "required": ["assertion", "sourcePath"], "additionalProperties": false } }
+      },
+      "required": ["schemaVersion", "kind", "candidateId", "candidateSourceDigest", "baselineId", "checkId", "verificationPolicy", "verificationInputs", "inputDigest", "driverIdentity", "driverSha256", "entryPoints", "resolvedFiles", "sourceClosureDigest", "assertionBindings"],
+      "additionalProperties": false
+    },
+    "materializedCheckInputs": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "ProtectedSelfRepairMaterializedCheckInputs" },
+        "candidateId": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "candidateSourceDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "baselineId": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "checkId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+        "inputDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "root": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "inputs": { "type": "array", "minItems": 1, "maxItems": 128, "items": { "type": "object", "properties": {
+          "source": { "enum": ["policy", "incident"] }, "selector": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+          "sourceOutcomeId": { "type": "string", "format": "uuid" }, "sourceRevision": { "type": "integer", "minimum": 1 },
+          "artifact": { "$ref": "#/$defs/ref" }, "relativePath": { "type": "string", "pattern": "^inputs/[a-z][a-z0-9-]{0,63}/input-[0-9]{4}\\.bin$" },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "byteSize": { "type": "integer", "minimum": 0, "maximum": 67108864 }
+        }, "required": ["source", "artifact", "relativePath", "sha256", "byteSize"], "additionalProperties": false } }
+      },
+      "required": ["schemaVersion", "kind", "candidateId", "candidateSourceDigest", "baselineId", "checkId", "inputDigest", "root", "inputs"],
+      "additionalProperties": false
+    },
+    "executionTreeCaptureEvidence": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "ProtectedSelfRepairExecutionTreeCaptureEvidence" },
+        "rootPath": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "rootIdentity": { "$ref": "#/$defs/nativeIdentity" }, "hostPid": { "type": "integer", "minimum": 1 },
+        "generation": { "type": "string", "minLength": 1, "maxLength": 128 }, "epoch": { "type": "integer", "minimum": 0 },
+        "snapshotDigestBefore": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "snapshotDigestAfter": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "pathDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "contentDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "fileCount": { "type": "integer", "minimum": 1, "maximum": 20000 }, "totalBytes": { "type": "integer", "minimum": 0, "maximum": 536870912 }
+      },
+      "required": ["schemaVersion", "kind", "rootPath", "rootIdentity", "hostPid", "generation", "epoch", "snapshotDigestBefore", "snapshotDigestAfter", "pathDigest", "contentDigest", "fileCount", "totalBytes"],
+      "additionalProperties": false
+    },
+    "overlayEntry": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "maxLength": 1024, "pattern": "^[\\x20-\\x7e]+$" },
+        "candidateBefore": { "anyOf": [{ "$ref": "#/$defs/fileEntry" }, { "type": "null" }] },
+        "protectedReplacement": { "$ref": "#/$defs/fileEntry" }, "protectedArtifact": { "$ref": "#/$defs/ref" }
+      },
+      "required": ["path", "candidateBefore", "protectedReplacement", "protectedArtifact"],
+      "additionalProperties": false
+    },
+    "overlayManifest": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "ProtectedSelfRepairOverlayManifest" },
+        "candidateId": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "candidateSourceDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "baselineId": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "checkId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+        "candidateManifest": { "$ref": "#/$defs/ref" }, "baselineManifest": { "$ref": "#/$defs/ref" },
+        "entries": { "type": "array", "minItems": 1, "maxItems": 512, "items": { "$ref": "#/$defs/overlayEntry" } },
+        "executionInventory": { "type": "array", "minItems": 1, "maxItems": 20000, "items": { "$ref": "#/$defs/fileEntry" } },
+        "executionTreeCapture": { "$ref": "#/$defs/ref" },
+        "overlayManifestDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "materializationDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      },
+      "required": ["schemaVersion", "kind", "candidateId", "candidateSourceDigest", "baselineId", "checkId", "candidateManifest", "baselineManifest", "entries", "executionInventory", "executionTreeCapture", "overlayManifestDigest", "materializationDigest"],
+      "additionalProperties": false
+    },
+    "testInputManifest": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "ProtectedSelfRepairTestInputManifest" },
+        "candidateId": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "candidateSourceDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "baselineId": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "verificationPolicy": { "$ref": "#/$defs/ref" },
+        "verificationInputs": { "$ref": "#/$defs/ref" }, "harnessClosureDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "checks": { "type": "array", "minItems": 1, "maxItems": 256, "items": { "type": "object", "properties": {
+          "checkId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" }, "inputDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "subjectResolution": { "$ref": "#/$defs/ref" }, "executionTreeDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "materializedInputs": { "$ref": "#/$defs/ref" }, "materializedInputPath": { "type": "string", "pattern": "^inputs/[a-z][a-z0-9-]{0,63}/manifest\\.json$" },
+          "materializedInputDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "overlayManifest": { "anyOf": [{ "$ref": "#/$defs/ref" }, { "type": "null" }] }
+        }, "required": ["checkId", "inputDigest", "subjectResolution", "executionTreeDigest", "materializedInputs", "materializedInputPath", "materializedInputDigest", "overlayManifest"], "additionalProperties": false } }
+      },
+      "required": ["schemaVersion", "kind", "candidateId", "candidateSourceDigest", "baselineId", "verificationPolicy", "verificationInputs", "harnessClosureDigest", "checks"],
+      "additionalProperties": false
+    },
+    "commandManifest": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "ProtectedSelfRepairCommandManifest" },
+        "candidateId": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "candidateSourceDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "verificationPolicy": { "$ref": "#/$defs/ref" }, "gateAttemptId": { "type": "string", "format": "uuid" },
+        "roots": { "type": "object", "properties": {
+          "candidateSource": { "type": "string", "minLength": 1, "maxLength": 4096 }, "executionRoot": { "type": "string", "minLength": 1, "maxLength": 4096 },
+          "verifyScratch": { "type": "string", "minLength": 1, "maxLength": 4096 }, "installedControl": { "type": "string", "minLength": 1, "maxLength": 4096 }
+        }, "required": ["candidateSource", "executionRoot", "verifyScratch", "installedControl"], "additionalProperties": false },
+        "checks": { "type": "array", "minItems": 1, "maxItems": 256, "items": { "type": "object", "properties": {
+          "checkId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" }, "commandDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "executable": { "type": "string", "minLength": 1, "maxLength": 4096 }, "executableSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "argv": { "type": "array", "maxItems": 256, "items": { "type": "string", "maxLength": 4096 } }, "cwdKind": { "enum": ["candidate-source", "candidate-execution-tree", "verify-scratch", "installed-control"] },
+          "cwd": { "type": "string", "minLength": 1, "maxLength": 4096 }, "environment": { "type": "object", "maxProperties": 65, "propertyNames": { "pattern": "^[A-Z_][A-Z0-9_]{0,63}$" }, "additionalProperties": { "type": "string", "maxLength": 4096 } },
+          "environmentDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "inputDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "inputManifest": { "$ref": "#/$defs/ref" }, "inputManifestPath": { "type": "string", "minLength": 1, "maxLength": 4096 },
+          "inputManifestDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        }, "required": ["checkId", "commandDigest", "executable", "executableSha256", "argv", "cwdKind", "cwd", "environment", "environmentDigest", "inputDigest", "inputManifest", "inputManifestPath", "inputManifestDigest"], "additionalProperties": false } }
+      },
+      "required": ["schemaVersion", "kind", "candidateId", "candidateSourceDigest", "verificationPolicy", "gateAttemptId", "roots", "checks"],
+      "additionalProperties": false
+    },
+    "checkObservationEvidence": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "ProtectedSelfRepairCheckObservation" },
+        "candidateId": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "candidateSourceDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "baselineId": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "checkId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+        "commandDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "inputDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "subjectResolution": { "$ref": "#/$defs/ref" }, "executionTreeDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "startedAt": { "type": "string", "format": "date-time" }, "endedAt": { "type": "string", "format": "date-time" },
+        "status": { "enum": ["passed", "failed", "incomplete", "uncertain"] }, "exitCode": { "type": "integer" },
+        "expectedAssertions": { "type": "array", "minItems": 1, "maxItems": 256, "items": { "type": "string", "minLength": 1, "maxLength": 256 } },
+        "completedAssertions": { "type": "array", "maxItems": 256, "items": { "type": "string", "minLength": 1, "maxLength": 256 } },
+        "stdout": { "$ref": "#/$defs/ref" }, "stderr": { "$ref": "#/$defs/ref" }, "captureStatus": { "const": "complete" }
+      },
+      "required": ["schemaVersion", "kind", "candidateId", "candidateSourceDigest", "baselineId", "checkId", "commandDigest", "inputDigest", "subjectResolution", "executionTreeDigest", "startedAt", "endedAt", "status", "exitCode", "expectedAssertions", "completedAssertions", "stdout", "stderr", "captureStatus"],
+      "additionalProperties": false
+    },
+    "nativeIdentity": {
+      "type": "object",
+      "properties": {
+        "volumeId": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "fileId": { "type": "string", "minLength": 1, "maxLength": 256 }
+      },
+      "required": ["volumeId", "fileId"],
+      "additionalProperties": false
+    },
+    "sourceCaptureEvidence": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "ProtectedSelfRepairSourceCaptureEvidence" },
+        "sourceRoot": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "rootIdentity": { "$ref": "#/$defs/nativeIdentity" }, "hostPid": { "type": "integer", "minimum": 1 },
+        "generation": { "type": "string", "minLength": 1, "maxLength": 128 }, "epoch": { "type": "integer", "minimum": 0 },
+        "snapshotDigestBefore": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "snapshotDigestAfter": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "pathDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "contentDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "fileCount": { "type": "integer", "minimum": 1, "maximum": 20000 }, "totalBytes": { "type": "integer", "minimum": 0, "maximum": 536870912 }
+      },
+      "required": ["schemaVersion", "kind", "sourceRoot", "rootIdentity", "hostPid", "generation", "epoch", "snapshotDigestBefore", "snapshotDigestAfter", "pathDigest", "contentDigest", "fileCount", "totalBytes"],
+      "additionalProperties": false
+    },
+    "repositoryIdentity": {
+      "type": "object",
+      "properties": {
+        "enrollmentId": { "type": "string", "format": "uuid" },
+        "canonicalCommonDirectory": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "nativeDirectoryIdentity": { "$ref": "#/$defs/nativeIdentity" }
+      },
+      "required": ["enrollmentId", "canonicalCommonDirectory", "nativeDirectoryIdentity"],
+      "additionalProperties": false
+    },
+    "runningSourceRelease": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "kind": { "const": "ProtectedSelfRepairRunningSourceRelease" },
+        "installationId": { "type": "string", "pattern": "^[a-f0-9]{32}$" },
+        "buildId": { "type": "string", "pattern": "^[a-zA-Z0-9_-]{1,100}$" },
+        "bootstrap": { "enum": ["runtime", "tauri"] },
+        "packageSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "sourceCommit": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" },
+        "sourceDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "inputsDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      },
+      "required": ["schemaVersion", "kind", "installationId", "buildId", "bootstrap", "packageSha256", "sourceCommit", "sourceDigest", "inputsDigest"],
+      "additionalProperties": false
+    },
+    "runningSourceInventory": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "ProtectedSelfRepairRunningSourceInventory" },
+        "installationId": { "type": "string", "pattern": "^[a-f0-9]{32}$" },
+        "buildId": { "type": "string", "pattern": "^[a-zA-Z0-9_-]{1,100}$" },
+        "packageSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "sourceCommit": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" },
+        "sourceDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "generation": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "entries": { "type": "array", "minItems": 1, "maxItems": 32, "items": { "oneOf": [
+          { "type": "object", "properties": { "path": { "type": "string", "minLength": 1, "maxLength": 4096 }, "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" } }, "required": ["path", "sha256"], "additionalProperties": false },
+          { "type": "object", "properties": { "path": { "type": "string", "minLength": 1, "maxLength": 4096 }, "absent": { "const": true } }, "required": ["path", "absent"], "additionalProperties": false },
+          { "type": "object", "properties": { "path": { "type": "string", "minLength": 1, "maxLength": 4096 }, "missing": { "const": true } }, "required": ["path", "missing"], "additionalProperties": false }
+        ] } }
+      },
+      "required": ["schemaVersion", "kind", "installationId", "buildId", "packageSha256", "sourceCommit", "sourceDigest", "generation", "entries"],
+      "additionalProperties": false
+    },
+    "fileEntry": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "maxLength": 1024, "pattern": "^[\\x20-\\x7e]+$" },
+        "type": { "const": "regular" },
+        "byteSize": { "type": "integer", "minimum": 0, "maximum": 536870912 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "executable": { "type": "boolean" }
+      },
+      "required": ["path", "type", "byteSize", "sha256", "executable"],
+      "additionalProperties": false
+    },
+    "sourceObjectEntry": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "maxLength": 1024, "pattern": "^[\\x20-\\x7e]+$" },
+        "type": { "const": "regular" }, "byteSize": { "type": "integer", "minimum": 0, "maximum": 536870912 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "executable": { "type": "boolean" },
+        "artifact": { "$ref": "#/$defs/ref" }
+      },
+      "required": ["path", "type", "byteSize", "sha256", "executable", "artifact"],
+      "additionalProperties": false
+    },
+    "sourceManifest": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "kind": { "const": "ProtectedSelfRepairSourceManifest" },
+        "sourceDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "entries": { "type": "array", "maxItems": 20000, "items": { "$ref": "#/$defs/sourceObjectEntry" } }
+      },
+      "required": ["schemaVersion", "kind", "sourceDigest", "entries"],
+      "additionalProperties": false
+    },
+    "change": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "maxLength": 1024, "pattern": "^[\\x20-\\x7e]+$" },
+        "operation": { "enum": ["add", "modify", "delete"] },
+        "before": { "anyOf": [{ "$ref": "#/$defs/fileEntry" }, { "type": "null" }] },
+        "after": { "anyOf": [{ "$ref": "#/$defs/fileEntry" }, { "type": "null" }] },
+        "beforeArtifact": { "anyOf": [{ "$ref": "#/$defs/ref" }, { "type": "null" }] },
+        "afterArtifact": { "anyOf": [{ "$ref": "#/$defs/ref" }, { "type": "null" }] }
+      },
+      "required": ["path", "operation", "before", "after"],
+      "additionalProperties": false,
+      "allOf": [
+        { "if": { "properties": { "operation": { "const": "add" } }, "required": ["operation"] }, "then": { "properties": { "before": { "type": "null" }, "after": { "$ref": "#/$defs/fileEntry" } } } },
+        { "if": { "properties": { "operation": { "const": "modify" } }, "required": ["operation"] }, "then": { "properties": { "before": { "$ref": "#/$defs/fileEntry" }, "after": { "$ref": "#/$defs/fileEntry" } } } },
+        { "if": { "properties": { "operation": { "const": "delete" } }, "required": ["operation"] }, "then": { "properties": { "before": { "$ref": "#/$defs/fileEntry" }, "after": { "type": "null" } } } }
+      ]
+    },
+    "changeManifest": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "ProtectedSelfRepairChangeManifest" },
+        "candidateId": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "baselineId": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "baseSourceDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "candidateSourceDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "profileDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "verificationPolicyDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "verificationInputsDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "workspaceAllocationId": { "type": "string", "format": "uuid" },
+        "parentRunId": { "type": "string", "format": "uuid" }, "repairRunId": { "type": "string", "format": "uuid" },
+        "linkId": { "type": "string", "format": "uuid" }, "incidentId": { "type": "string", "format": "uuid" },
+        "changes": { "type": "array", "minItems": 1, "maxItems": 20000, "items": { "$ref": "#/$defs/change" } }
+      },
+      "required": ["schemaVersion", "kind", "candidateId", "baselineId", "baseSourceDigest", "candidateSourceDigest", "profileDigest", "verificationPolicyDigest", "verificationInputsDigest", "workspaceAllocationId", "parentRunId", "repairRunId", "linkId", "incidentId", "changes"],
+      "additionalProperties": false
+    },
+    "candidate": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "ProtectedSelfRepairCandidate" },
+        "candidateId": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "enrollment": { "$ref": "#/$defs/ref" },
+        "baselineRef": { "$ref": "#/$defs/ref" }, "baselineId": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "baseCommit": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "baseSourceDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "candidateSourceDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "sourceManifest": { "$ref": "#/$defs/ref" }, "changeManifest": { "$ref": "#/$defs/ref" },
+        "sourceCaptureEvidence": { "$ref": "#/$defs/ref" },
+        "repositoryIdentity": { "$ref": "#/$defs/repositoryIdentity" }, "sourceBinding": { "$ref": "#/$defs/ref" },
+        "workspace": { "type": "object", "properties": { "workspaceId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" }, "allocationId": { "type": "string", "format": "uuid" }, "canonicalRoot": { "type": "string", "minLength": 1, "maxLength": 4096 }, "sourceRoot": { "type": "string", "minLength": 1, "maxLength": 4096 }, "nativeIdentity": { "$ref": "#/$defs/nativeIdentity" } }, "required": ["workspaceId", "allocationId", "canonicalRoot", "sourceRoot", "nativeIdentity"], "additionalProperties": false },
+        "parentRunId": { "type": "string", "format": "uuid" }, "repairRunId": { "type": "string", "format": "uuid" }, "linkId": { "type": "string", "format": "uuid" }, "incidentId": { "type": "string", "format": "uuid" },
+        "outcomeId": { "type": "string", "format": "uuid" }, "outcomeRevision": { "type": "integer", "minimum": 1 },
+        "parentPublication": { "$ref": "#/$defs/publication" }, "repairPublication": { "$ref": "#/$defs/publication" },
+        "developerNodeId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" }, "developerAttemptId": { "type": "string", "format": "uuid" },
+        "selfRepairProfile": { "$ref": "#/$defs/ref" }, "verificationPolicy": { "$ref": "#/$defs/ref" }, "verificationInputs": { "$ref": "#/$defs/ref" }, "developerTerminalEvidence": { "$ref": "#/$defs/ref" },
+        "scopeVerdict": { "type": "object", "properties": { "status": { "const": "within_scope" }, "changeCount": { "type": "integer", "minimum": 1, "maximum": 20000 } }, "required": ["status", "changeCount"], "additionalProperties": false },
+        "capturedAt": { "type": "string", "format": "date-time" }, "journalCursor": { "type": "integer", "minimum": 1 }
+      },
+      "required": ["schemaVersion", "kind", "candidateId", "enrollment", "baselineRef", "baselineId", "baseCommit", "baseSourceDigest", "candidateSourceDigest", "sourceManifest", "changeManifest", "sourceCaptureEvidence", "repositoryIdentity", "sourceBinding", "workspace", "parentRunId", "repairRunId", "linkId", "incidentId", "outcomeId", "outcomeRevision", "parentPublication", "repairPublication", "developerNodeId", "developerAttemptId", "selfRepairProfile", "verificationPolicy", "verificationInputs", "developerTerminalEvidence", "scopeVerdict", "capturedAt", "journalCursor"],
+      "additionalProperties": false
+    },
+    "reviewDossierChunk": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "ProtectedSelfRepairReviewDossierChunk" },
+        "candidateId": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "candidateManifest": { "$ref": "#/$defs/ref" },
+        "candidateSourceDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "changeManifest": { "$ref": "#/$defs/ref" },
+        "receiptId": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "receipt": { "$ref": "#/$defs/ref" },
+        "chunkIndex": { "type": "integer", "minimum": 0, "maximum": 3 },
+        "fileChanges": { "type": "array", "minItems": 1, "maxItems": 20000, "items": {
+          "type": "object", "properties": {
+            "path": { "type": "string", "minLength": 1, "maxLength": 1024, "pattern": "^[\\x20-\\x7e]+$" },
+            "operation": { "enum": ["add", "modify", "delete"] },
+            "before": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/reviewFileText" }] },
+            "after": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/reviewFileText" }] }
+          },
+          "required": ["path", "operation", "before", "after"], "additionalProperties": false
+        } }
+      },
+      "required": ["schemaVersion", "kind", "candidateId", "candidateManifest", "candidateSourceDigest", "changeManifest", "receiptId", "receipt", "chunkIndex", "fileChanges"],
+      "additionalProperties": false
+    },
+    "reviewFileText": {
+      "type": "object",
+      "properties": {
+        "artifact": { "$ref": "#/$defs/ref" }, "byteSize": { "type": "integer", "minimum": 0, "maximum": 65536 },
+        "executable": { "type": "boolean" }, "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "text": { "type": "string", "maxLength": 65536 }
+      },
+      "required": ["artifact", "byteSize", "executable", "sha256", "text"], "additionalProperties": false
+    },
+    "reviewDeliveryCarry": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "ProtectedSelfRepairReviewDeliveryCarry" },
+        "runId": { "type": "string", "format": "uuid" }, "questionId": { "type": "string", "format": "uuid" },
+        "candidateId": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "receiptId": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "requiredReviewSetDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "sourceAttentionKey": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "attentionKey": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "sourceDeliveryEventSequence": { "type": "integer", "minimum": 1 }, "sourceJudgeAttemptId": { "type": "string", "format": "uuid" },
+        "sourceExpansionArtifact": { "$ref": "#/$defs/ref" }, "carriedExpansionArtifact": { "$ref": "#/$defs/ref" },
+        "evidenceArtifact": { "$ref": "#/$defs/ref" }, "judgeAttemptId": { "type": "string", "format": "uuid" },
+        "carriedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["schemaVersion", "kind", "runId", "questionId", "candidateId", "receiptId", "requiredReviewSetDigest", "sourceAttentionKey", "attentionKey", "sourceDeliveryEventSequence", "sourceJudgeAttemptId", "sourceExpansionArtifact", "carriedExpansionArtifact", "evidenceArtifact", "judgeAttemptId", "carriedAt"],
+      "additionalProperties": false
+    },
+    "candidateInvalidation": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "ProtectedSelfRepairEligibilityInvalidation" },
+        "invalidationId": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "reason": { "enum": ["root_stop", "source_drift", "receipt_revoked", "host_uncertain", "scope_invalid", "authorization_changed"] },
+        "stoppedRunId": { "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }] },
+        "stoppedRunState": { "anyOf": [{ "enum": ["queued", "running", "draining", "waiting_for_user", "stopping", "succeeded", "failed", "canceled", "interrupted"] }, { "type": "null" }] },
+        "parentRunId": { "type": "string", "format": "uuid" }, "repairRunId": { "type": "string", "format": "uuid" },
+        "linkId": { "type": "string", "format": "uuid" }, "incidentId": { "type": "string", "format": "uuid" },
+        "p2Authorization": { "anyOf": [{ "$ref": "#/$defs/ref" }, { "type": "null" }] },
+        "candidateManifest": { "anyOf": [{ "$ref": "#/$defs/ref" }, { "type": "null" }] },
+        "candidateId": { "anyOf": [{ "type": "string", "pattern": "^[a-f0-9]{64}$" }, { "type": "null" }] },
+        "verificationReceipt": { "anyOf": [{ "$ref": "#/$defs/ref" }, { "type": "null" }] },
+        "receiptId": { "anyOf": [{ "type": "string", "pattern": "^[a-f0-9]{64}$" }, { "type": "null" }] },
+        "handoff": { "anyOf": [{ "$ref": "#/$defs/ref" }, { "type": "null" }] },
+        "handoffId": { "anyOf": [{ "type": "string", "pattern": "^[a-f0-9]{64}$" }, { "type": "null" }] },
+        "priorLinkState": { "enum": ["open", "repair_failed", "repair_completed", "repair_accepted", "resumed", "parent_stopped", "blocked"] },
+        "priorDecisionStatus": { "enum": ["pending", "accepted", "rejected"] },
+        "eligibility": { "const": false }, "revision": { "type": "integer", "minimum": 1 },
+        "recordedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["schemaVersion", "kind", "invalidationId", "reason", "stoppedRunId", "stoppedRunState", "parentRunId", "repairRunId", "linkId", "incidentId", "p2Authorization", "candidateManifest", "candidateId", "verificationReceipt", "receiptId", "handoff", "handoffId", "priorLinkState", "priorDecisionStatus", "eligibility", "revision", "recordedAt"],
+      "allOf": [{ "if": { "properties": { "reason": { "const": "root_stop" } }, "required": ["reason"] },
+        "then": { "properties": { "stoppedRunId": { "type": "string", "format": "uuid" },
+          "stoppedRunState": { "enum": ["queued", "running", "draining", "waiting_for_user", "stopping", "succeeded", "failed", "canceled", "interrupted"] } } } }],
+      "additionalProperties": false
+    },
+    "checkObservation": {
+      "type": "object",
+      "properties": {
+        "checkId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" }, "stageId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+        "required": { "type": "boolean" }, "commandDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "toolIdentities": { "type": "array", "maxItems": 64, "items": { "type": "string", "minLength": 1, "maxLength": 1024 } },
+        "inputDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "subjectResolution": { "$ref": "#/$defs/ref" },
+        "executionTreeDigest": { "anyOf": [{ "type": "string", "pattern": "^[a-f0-9]{64}$" }, { "type": "null" }] }, "overlayManifest": { "anyOf": [{ "$ref": "#/$defs/ref" }, { "type": "null" }] },
+        "startedAt": { "type": "string", "format": "date-time" }, "endedAt": { "type": "string", "format": "date-time" }, "status": { "enum": ["passed", "failed", "incomplete", "uncertain"] }, "exitCode": { "type": "integer" },
+        "expectedAssertions": { "type": "array", "minItems": 1, "maxItems": 256, "items": { "type": "string", "minLength": 1, "maxLength": 256 } }, "completedAssertions": { "type": "array", "maxItems": 256, "items": { "type": "string", "minLength": 1, "maxLength": 256 } },
+        "stdout": { "$ref": "#/$defs/ref" }, "stderr": { "$ref": "#/$defs/ref" }, "observations": { "$ref": "#/$defs/ref" }
+      },
+      "required": ["checkId", "stageId", "required", "commandDigest", "toolIdentities", "inputDigest", "subjectResolution", "executionTreeDigest", "overlayManifest", "startedAt", "endedAt", "status", "exitCode", "expectedAssertions", "completedAssertions", "stdout", "stderr", "observations"],
+      "additionalProperties": false
+    },
+    "verificationStarted": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "ProtectedSelfRepairVerificationStarted" },
+        "runId": { "type": "string", "format": "uuid" }, "repairRunId": { "type": "string", "format": "uuid" },
+        "parentRunId": { "type": "string", "format": "uuid" }, "linkId": { "type": "string", "format": "uuid" },
+        "incidentId": { "type": "string", "format": "uuid" }, "gateNodeId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+        "gateAttemptId": { "type": "string", "format": "uuid" }, "candidateId": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "candidateSourceDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "candidateManifest": { "$ref": "#/$defs/ref" },
+        "verificationPolicy": { "$ref": "#/$defs/ref" }, "verificationInputs": { "$ref": "#/$defs/ref" },
+        "verifierPlan": { "$ref": "#/$defs/ref" }, "commandManifest": { "$ref": "#/$defs/ref" },
+        "testInputManifest": { "$ref": "#/$defs/ref" }, "invocation": { "$ref": "#/$defs/ref" },
+        "candidateSourceRoot": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "candidateSourceBefore": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "freshSourceRoot": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "executionRoot": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "verifyScratch": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "environmentDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "harnessClosureDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "lifecycleGeneration": { "type": "string", "format": "uuid" },
+        "engineEpoch": { "type": "integer", "minimum": 0 }, "startedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["schemaVersion", "kind", "runId", "repairRunId", "parentRunId", "linkId", "incidentId", "gateNodeId", "gateAttemptId", "candidateId", "candidateSourceDigest", "candidateManifest", "verificationPolicy", "verificationInputs", "verifierPlan", "commandManifest", "testInputManifest", "invocation", "candidateSourceRoot", "candidateSourceBefore", "freshSourceRoot", "executionRoot", "verifyScratch", "environmentDigest", "harnessClosureDigest", "lifecycleGeneration", "engineEpoch", "startedAt"],
+      "additionalProperties": false
+    },
+    "verificationOutcome": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "ProtectedSelfRepairVerificationOutcome" },
+        "status": { "enum": ["passed", "failed", "incomplete"] },
+        "candidateManifest": { "$ref": "#/$defs/ref" }, "candidateId": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "candidateSourceDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "baselineId": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "repairRunId": { "type": "string", "format": "uuid" }, "linkId": { "type": "string", "format": "uuid" },
+        "incidentId": { "type": "string", "format": "uuid" }, "gateAttemptId": { "type": "string", "format": "uuid" },
+        "verificationPolicy": { "$ref": "#/$defs/ref" }, "verificationInputs": { "$ref": "#/$defs/ref" },
+        "verifierResult": { "anyOf": [{ "$ref": "#/$defs/ref" }, { "type": "null" }] },
+        "terminalEvidence": { "anyOf": [{ "$ref": "#/$defs/ref" }, { "type": "null" }] },
+        "streamEvidence": { "anyOf": [{ "$ref": "#/$defs/ref" }, { "type": "null" }] },
+        "captureStatus": { "enum": ["complete", "incomplete"] },
+        "reason": { "anyOf": [{ "type": "string", "maxLength": 8192 }, { "type": "null" }] },
+        "checks": { "type": "array", "maxItems": 256, "items": { "$ref": "#/$defs/checkObservation" } },
+        "recordedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["schemaVersion", "kind", "status", "candidateManifest", "candidateId", "candidateSourceDigest", "baselineId", "repairRunId", "linkId", "incidentId", "gateAttemptId", "verificationPolicy", "verificationInputs", "verifierResult", "terminalEvidence", "streamEvidence", "captureStatus", "reason", "checks", "recordedAt"],
+      "additionalProperties": false
+    },
+    "verificationReceipt": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "ProtectedSelfRepairVerificationReceipt" }, "receiptId": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "status": { "enum": ["passed", "failed", "incomplete", "uncertain"] }, "candidateId": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "candidateSourceDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "baselineId": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "candidateManifest": { "$ref": "#/$defs/ref" }, "changeManifest": { "$ref": "#/$defs/ref" }, "selfRepairProfile": { "$ref": "#/$defs/ref" }, "verificationPolicy": { "$ref": "#/$defs/ref" }, "verificationInputs": { "$ref": "#/$defs/ref" },
+        "repairRunId": { "type": "string", "format": "uuid" }, "linkId": { "type": "string", "format": "uuid" }, "incidentId": { "type": "string", "format": "uuid" }, "verificationNodeId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" }, "gateAttemptId": { "type": "string", "format": "uuid" },
+        "execution": { "$ref": "#/$defs/execution" },
+        "checks": { "type": "array", "maxItems": 256, "items": { "$ref": "#/$defs/checkObservation" } }, "requiredCheckSetDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "completedCheckSetDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "sourceBeforeDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "sourceAfterDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "liveCandidateDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "harnessAfterDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "terminalEvidence": { "$ref": "#/$defs/ref" }, "captureStatus": { "enum": ["complete", "incomplete", "uncertain"] }, "startedAt": { "type": "string", "format": "date-time" }, "completedAt": { "type": "string", "format": "date-time" }, "observationJournalCursor": { "type": "integer", "minimum": 1 }, "issuedJournalCursor": { "type": "integer", "minimum": 1 }
+      },
+      "required": ["schemaVersion", "kind", "receiptId", "status", "candidateId", "candidateSourceDigest", "baselineId", "candidateManifest", "changeManifest", "selfRepairProfile", "verificationPolicy", "verificationInputs", "repairRunId", "linkId", "incidentId", "verificationNodeId", "gateAttemptId", "execution", "checks", "requiredCheckSetDigest", "completedCheckSetDigest", "sourceBeforeDigest", "sourceAfterDigest", "liveCandidateDigest", "harnessAfterDigest", "terminalEvidence", "captureStatus", "startedAt", "completedAt", "observationJournalCursor", "issuedJournalCursor"],
+      "additionalProperties": false
+    },
+    "execution": {
+      "type": "object",
+      "properties": {
+        "custodyId": { "type": "string", "format": "uuid" }, "hostIdentity": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "lifecycleGeneration": { "type": "string", "format": "uuid" }, "engineEpoch": { "type": "integer", "minimum": 1 },
+        "invocationDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "commandManifest": { "$ref": "#/$defs/ref" },
+        "executableIdentity": { "type": "string", "minLength": 1, "maxLength": 1024 }, "harnessClosureDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "testInputManifest": { "$ref": "#/$defs/ref" }, "environmentDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      },
+      "required": ["custodyId", "hostIdentity", "lifecycleGeneration", "engineEpoch", "invocationDigest", "commandManifest", "executableIdentity", "harnessClosureDigest", "testInputManifest", "environmentDigest"],
+      "additionalProperties": false
+    },
+    "acceptance": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "ProtectedSelfRepairAcceptance" },
+        "acceptanceId": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "candidateManifest": { "$ref": "#/$defs/ref" }, "candidateId": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "candidateSourceDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "verificationReceipt": { "$ref": "#/$defs/ref" }, "receiptId": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "gateAttemptId": { "type": "string", "format": "uuid" }, "parentRunId": { "type": "string", "format": "uuid" },
+        "repairRunId": { "type": "string", "format": "uuid" }, "linkId": { "type": "string", "format": "uuid" },
+        "incidentId": { "type": "string", "format": "uuid" }, "decisionId": { "type": "string", "format": "uuid" },
+        "judgeAttemptId": { "type": "string", "format": "uuid" }, "attentionKey": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "p2Authorization": { "$ref": "#/$defs/ref" },
+        "sourceIntegrityRevision": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "retentionRevision": { "type": "integer", "minimum": 0 },
+        "requiredReviewSetDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "reviewDelivery": { "type": "object", "properties": {
+          "attentionKey": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "evidenceArtifact": { "$ref": "#/$defs/ref" }, "expansionArtifact": { "$ref": "#/$defs/ref" },
+          "sourceAttentionKey": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "sourceDeliveryEventSequence": { "type": "integer", "minimum": 1 },
+          "sourceJudgeAttemptId": { "type": "string", "format": "uuid" },
+          "sourceExpansionArtifact": { "$ref": "#/$defs/ref" }
+        }, "required": ["attentionKey", "evidenceArtifact", "expansionArtifact", "sourceAttentionKey", "sourceDeliveryEventSequence", "sourceJudgeAttemptId", "sourceExpansionArtifact"], "additionalProperties": false },
+        "acceptedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["schemaVersion", "kind", "acceptanceId", "candidateManifest", "candidateId", "candidateSourceDigest", "verificationReceipt", "receiptId", "gateAttemptId", "parentRunId", "repairRunId", "linkId", "incidentId", "decisionId", "judgeAttemptId", "attentionKey", "p2Authorization", "sourceIntegrityRevision", "retentionRevision", "requiredReviewSetDigest", "reviewDelivery", "acceptedAt"],
+      "additionalProperties": false
+    },
+    "p2Outcome": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "ProtectedSelfRepairP2Outcome" },
+        "outcomeId": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "parentRunId": { "type": "string", "format": "uuid" }, "repairRunId": { "type": "string", "format": "uuid" },
+        "linkId": { "type": "string", "format": "uuid" }, "incidentId": { "type": "string", "format": "uuid" },
+        "decisionId": { "type": "string", "format": "uuid" }, "candidateId": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "receiptId": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "p2Approval": { "$ref": "#/$defs/ref" }, "p5Acceptance": { "$ref": "#/$defs/ref" },
+        "resultAttemptId": { "type": "string", "format": "uuid" }, "resultSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "failedNodeRetry": { "enum": ["explicit_safe", "never"] }, "continuationState": { "const": "repair_accepted" },
+        "recordedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["schemaVersion", "kind", "outcomeId", "parentRunId", "repairRunId", "linkId", "incidentId", "decisionId", "candidateId", "receiptId", "p2Approval", "p5Acceptance", "resultAttemptId", "resultSha256", "failedNodeRetry", "continuationState", "recordedAt"],
+      "additionalProperties": false
+    },
+    "retentionRecord": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "ProtectedSelfRepairRetention" },
+        "retentionId": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "parentRunId": { "type": "string", "format": "uuid" }, "repairRunId": { "type": "string", "format": "uuid" },
+        "linkId": { "type": "string", "format": "uuid" }, "incidentId": { "type": "string", "format": "uuid" },
+        "candidateManifest": { "$ref": "#/$defs/ref" }, "candidateId": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "verificationReceipt": { "$ref": "#/$defs/ref" }, "receiptId": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "workspaceId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+        "allocationId": { "type": "string", "format": "uuid" }, "workspaceIdentity": { "$ref": "#/$defs/nativeIdentity" },
+        "status": { "const": "retained" }, "revision": { "type": "integer", "minimum": 1 },
+        "retainedAt": { "type": "string", "format": "date-time" }, "cleanupDeferred": { "const": true }
+      },
+      "required": ["schemaVersion", "kind", "retentionId", "parentRunId", "repairRunId", "linkId", "incidentId", "candidateManifest", "candidateId", "verificationReceipt", "receiptId", "workspaceId", "allocationId", "workspaceIdentity", "status", "revision", "retainedAt", "cleanupDeferred"],
+      "additionalProperties": false
+    },
+    "handoff": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "ProtectedSelfRepairHandoff" }, "handoffId": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "candidateId": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "candidateSourceDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "candidate": { "$ref": "#/$defs/ref" }, "baselineId": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "repositoryIdentity": { "$ref": "#/$defs/repositoryIdentity" }, "sourceBinding": { "$ref": "#/$defs/ref" }, "enrollment": { "$ref": "#/$defs/ref" }, "sourceManifest": { "$ref": "#/$defs/ref" }, "changeManifest": { "$ref": "#/$defs/ref" }, "verificationPolicy": { "$ref": "#/$defs/ref" }, "verificationInputs": { "$ref": "#/$defs/ref" }, "verificationReceipt": { "$ref": "#/$defs/ref" }, "parentRunId": { "type": "string", "format": "uuid" }, "repairRunId": { "type": "string", "format": "uuid" }, "linkId": { "type": "string", "format": "uuid" }, "incidentId": { "type": "string", "format": "uuid" }, "judgeAttemptId": { "type": "string", "format": "uuid" }, "decisionId": { "type": "string", "format": "uuid" }, "p2Authorization": { "$ref": "#/$defs/ref" }, "p2Approval": { "$ref": "#/$defs/ref" }, "p2Outcome": { "$ref": "#/$defs/ref" }, "retentionRecord": { "$ref": "#/$defs/ref" }, "continuationState": { "type": "string", "minLength": 1, "maxLength": 64 }, "hostProvenance": { "$ref": "#/$defs/execution" }, "retention": { "type": "object", "properties": { "status": { "const": "retained" }, "revision": { "type": "integer", "minimum": 1 }, "retainedAt": { "type": "string", "format": "date-time" }, "cleanupDeferred": { "const": true } }, "required": ["status", "revision", "retainedAt", "cleanupDeferred"], "additionalProperties": false }, "currentEligibility": { "type": "object", "properties": { "eligible": { "type": "boolean" }, "revision": { "type": "integer", "minimum": 1 }, "checkedAt": { "type": "string", "format": "date-time" } }, "required": ["eligible", "revision", "checkedAt"], "additionalProperties": false }, "authority": { "type": "object", "properties": { "sourceCandidateAccepted": { "const": true }, "sourceApplied": { "const": false }, "branchPublished": { "const": false }, "productionBuilt": { "const": false }, "binaryInstalled": { "const": false }, "activated": { "const": false } }, "required": ["sourceCandidateAccepted", "sourceApplied", "branchPublished", "productionBuilt", "binaryInstalled", "activated"], "additionalProperties": false }
+      },
+      "required": ["schemaVersion", "kind", "handoffId", "candidateId", "candidateSourceDigest", "candidate", "baselineId", "repositoryIdentity", "sourceBinding", "enrollment", "sourceManifest", "changeManifest", "verificationPolicy", "verificationInputs", "verificationReceipt", "parentRunId", "repairRunId", "linkId", "incidentId", "judgeAttemptId", "decisionId", "p2Authorization", "p2Approval", "p2Outcome", "retentionRecord", "continuationState", "hostProvenance", "retention", "currentEligibility", "authority"],
+      "additionalProperties": false
+    }
+  }
+}

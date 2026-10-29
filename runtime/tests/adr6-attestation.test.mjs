@@ -51,8 +51,15 @@ test('ADR6 attestation: a routine build stages only with the attestation of its 
     assert.equal(attestation.closureAfterDigest, attestation.closureDigest, 'The closure did not change while the build ran.');
     const baseline = await builds.stage({ buildId: 'baseline', sourceDir: outputs, sourceRoot: c.root, sourceCommit: c.head, protocolVersion: 1, storeSchemaVersion: 11, launchEntry: 'deszo.exe', operatorBaseline: true, sourceBuildAttestation: attestation });
     assert.equal(baseline.verification.sourceBuildAttestation.attestationDigest, attestation.attestationDigest);
+    assert.equal(baseline.manifest.sourceInventory.path, '.deszo-source-inventory.json');
+    assert.ok(baseline.manifest.artifacts.some(item => item.path === baseline.manifest.sourceInventory.path
+      && item.sha256 === baseline.manifest.sourceInventory.sha256), 'the Host manifest names the attested source inventory artifact');
     const routine = await builds.stage({ buildId: 'routine', sourceDir: outputs, sourceRoot: c.root, sourceCommit: c.head, protocolVersion: 1, storeSchemaVersion: 11, launchEntry: 'deszo.exe', sourceBuildAttestation: attestation });
     assert.equal(routine.verification.sourceBuildAttestation.executor, 'fixture-child-process');
+    const inventoryPath = join(outputs, '.deszo-source-inventory.json');
+    writeFileSync(inventoryPath, Buffer.concat([readFileSync(inventoryPath), Buffer.from(' ')]));
+    await assert.rejects(builds.stage({ buildId: 'tampered-inventory', sourceDir: outputs, sourceRoot: c.root, sourceCommit: c.head,
+      protocolVersion: 1, storeSchemaVersion: 11, launchEntry: 'deszo.exe', sourceBuildAttestation: attestation }), /not an attested output/);
   } finally { h.close(); }
 });
 

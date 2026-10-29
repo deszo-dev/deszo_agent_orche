@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, GitBranch, Lock, Play, Plus, RefreshCw, Repeat, Square, Trash2, Unlock, X } from 'lucide-react';
-import { DECISION_SCHEMA, MODEL_SUGGESTIONS, NODE_LABELS, syncSlots, validId } from './model';
+import { DECISION_SCHEMA, DEFAULT_POLICY, MODEL_SUGGESTIONS, NODE_LABELS, syncSlots, validId } from './model';
 import { PROVIDERS, PROVIDER_NAMES, VALUE_TYPES, type CachePin, type ContextBinding, type GatePolicy, type MapHistory, type MapNavigator, type ManagedTaskNavigator, type MapRole, type FieldSource, type JournalEvent, type Provider, type TextSource, type ValueType, type WorkflowNode } from './types';
 import type { Client } from './transport';
 import { STATE_LABELS } from './nodes';
@@ -29,6 +29,7 @@ export function Inspector(props: Props) {
   };
   const update = (config: object) => onChange({ ...node, config: { ...node.config, ...config } } as WorkflowNode);
   const replaceConfig = (config: object) => onChange({ ...node, config } as WorkflowNode);
+  const gatePolicy = node.type === 'gate' && 'policy' in node.config ? node.config.policy : structuredClone(DEFAULT_POLICY);
 
   return <div className="inspector-body">
     <div className="inspector-title">
@@ -230,7 +231,7 @@ export function Inspector(props: Props) {
     {node.type === 'cache' && <>
       <TypeSelect label="Value type" value={node.config.valueType} readOnly={readOnly} onChange={valueType => update({ valueType })} />
       <label className="field"><span>Mode</span>
-        <select value={node.config.mode} disabled={readOnly} onChange={event => update({ mode: event.target.value })}>
+        <select value={node.config.mode} disabled={readOnly} onChange={event => update({ mode: event.target.value as 'live' | 'frozen' })}>
           <option value="live">Live — pass the producer's value through</option>
           <option value="frozen">Frozen — use the pinned value; the producer is not run for it</option>
         </select>
@@ -270,16 +271,27 @@ export function Inspector(props: Props) {
 
     {node.type === 'gate' && <>
       <label className="field"><span>Mode</span>
-        <select value={node.config.mode} disabled={readOnly} onChange={event => update({ mode: event.target.value })}>
+        <select value={node.config.mode} disabled={readOnly} onChange={event => {
+          const mode = event.target.value;
+          if (mode === 'self-repair-verify') replaceConfig({ mode, verificationPolicy: 'verificationPolicy' in node.config ? node.config.verificationPolicy : { artifactId: '', sha256: '' } });
+          else if ('policy' in node.config) replaceConfig({ ...node.config, mode: mode as 'prepare' | 'evaluate' | 'verify' });
+          else replaceConfig({ mode: mode as 'prepare' | 'evaluate' | 'verify', policy: gatePolicy });
+        }}>
           <option value="prepare">Prepare — validate the bundle, build role views and a review plan</option>
           <option value="evaluate">Evaluate — check every review, update issues, issue a certificate</option>
           <option value="verify">Verify — accept only an engine-issued certificate for this subject</option>
+          <option value="self-repair-verify">Self-Repair Verification — installed enrollment only</option>
         </select>
       </label>
+      {node.config.mode === 'self-repair-verify' ? <>
+        <JsonField label="Enrolled verification-policy reference" hint="ArtifactRef only; the Engine requires an exact match with installation enrollment" value={node.config.verificationPolicy} readOnly={readOnly} keyId={`${node.id}-p5-policy`} objectOnly
+          onChange={verificationPolicy => update({ verificationPolicy })} />
+        <small className="muted">The Engine supplies candidate and incident inputs from the exact P2 Repair authorization. A caller-supplied policy body or direct command is not accepted.</small>
+      </> : <>
       {node.config.mode === 'prepare' && <label className="field"><span>Subject</span>
         <select value={node.config.subject || 'specification'} disabled={readOnly} onChange={event => replaceConfig(event.target.value === 'delivery'
-          ? { mode: 'prepare', policy: node.config.policy, subject: 'delivery', specificationPolicy: structuredClone(node.config.policy) }
-          : { mode: 'prepare', policy: node.config.policy })}>
+          ? { mode: 'prepare', policy: gatePolicy, subject: 'delivery', specificationPolicy: structuredClone(gatePolicy) }
+          : { mode: 'prepare', policy: gatePolicy })}>
           <option value="specification">Specification bundle (SPEC + index + map)</option>
           <option value="delivery">Delivery: approved spec + completed Map + candidate + passing checks</option>
         </select></label>}
@@ -294,8 +306,9 @@ export function Inspector(props: Props) {
       {node.config.mode === 'prepare' && node.config.subject !== 'delivery' && <label className="check"><input type="checkbox" checked={Boolean(node.config.carry)} disabled={readOnly}
         onChange={event => update({ carry: event.target.checked || undefined })} />Carry unchanged approvals (adds a <code>prior</code> input and a <code>&lt;slot&gt;-need</code> output per slot)</label>}
       {node.config.mode === 'prepare' && node.config.carry && <small className="muted">Route each slot on <code>/needsReview</code>: live → the reviewer's prompt, carried → JSON Select <code>/carry</code>; join both with a selected Merge into evaluate.</small>}
-      <PolicyEditor policy={node.config.policy} readOnly={readOnly} onChange={policy => update({ policy })} />
+      <PolicyEditor policy={gatePolicy} readOnly={readOnly} onChange={policy => update({ policy })} />
       <small className="muted">Use the same policy in prepare, evaluate and verify; a certificate from another policy never opens the gate. Review slots must come from the <code>json</code> output of an Agent.</small>
+      </>}
     </>}
 
     {node.type === 'map' && <>

@@ -30,6 +30,7 @@ export function nodePorts(node) {
     case 'cache': return { inputs: { value: config.valueType }, outputs: { value: config.valueType } };
     case 'route': return { inputs: { selector: 'JsonValue', value: config.valueType }, outputs: Object.fromEntries(config.cases.map(item => [item.id, config.valueType])) };
     case 'gate': {
+      if (config.mode === 'self-repair-verify') return { inputs: {}, outputs: { report: 'JsonValue' } };
       const slots = config.policy.slots.map(slot => slot.id);
       if (config.mode === 'prepare' && config.subject === 'delivery') return {
         inputs: { documentation: 'ArtifactSet', approval: 'JsonValue', summary: 'JsonValue', candidate: 'ArtifactSet', issues: 'JsonValue', ...(config.technicalPolicy ? { technical: 'JsonValue' } : {}) },
@@ -87,6 +88,8 @@ export function semanticIssues(workflow, { maximumAgentTimeoutSeconds = M1_MAXIM
   const all = new Map();
   const edgeIds = new Set();
   const caps = new Set(workflow.capabilities);
+  if (workflow.judgePolicy?.repairProfiles?.some(profile => profile.selfRepair) && !caps.has('protected-self-repair-v1'))
+    add('capability.protected_self_repair', '/capabilities', 'A Parent publication with a Self-Repair profile must declare protected-self-repair-v1.');
   // Walk every graph (outer and nested bodies) once for global identity and capability rules.
   const visitGraph = (nodes, edges, base, edgeBase, depth) => {
     nodes.forEach((node, index) => {
@@ -96,6 +99,10 @@ export function semanticIssues(workflow, { maximumAgentTimeoutSeconds = M1_MAXIM
       if (node.type === 'cache' && !caps.has('cache-v1')) add('capability.cache', `${at}/type`, `"${node.id}" needs the cache-v1 capability.`);
       if ((['gate', 'route'].includes(node.type) || (node.type === 'merge' && node.config.mode === 'selected') || (node.type === 'loop' && depth > 0)) && !caps.has('pipeline-v1'))
         add('capability.pipeline', `${at}/type`, `"${node.id}" needs the pipeline-v1 capability.`);
+      if (node.type === 'gate' && node.config.mode === 'self-repair-verify') {
+        if (!caps.has('protected-self-repair-v1')) add('capability.protected_self_repair', `${at}/config/mode`, 'A Self-Repair Verification Gate needs the protected-self-repair-v1 capability.');
+        if (depth > 0) add('p5.execution_profile', `${at}/config/mode`, 'A Self-Repair Verification Gate must be a top-level node in the enrolled sequential Repair workflow.');
+      }
       if (node.type === 'map' && !caps.has('delivery-v1')) add('capability.delivery', `${at}/type`, `"${node.id}" needs the delivery-v1 capability.`);
       if (node.type === 'task' && !caps.has('task-planning-v1')) add('capability.task', `${at}/type`, `"${node.id}" needs the task-planning-v1 capability.`);
       if (node.type === 'task') {
@@ -253,8 +260,10 @@ export function semanticIssues(workflow, { maximumAgentTimeoutSeconds = M1_MAXIM
         if (new Set(ids).size !== ids.length) add('gate.slot', `${at}/config/approvalPolicy/slots`, 'Approval policy slot IDs must be unique.');
       }
       if (node.type === 'gate') {
-        const ids = node.config.policy.slots.map(slot => slot.id);
-        if (new Set(ids).size !== ids.length || ids.some(id => GATE_RESERVED.includes(id) || (node.config.carry && id.length > 59))) add('gate.slot', `${at}/config/policy/slots`, `Slot IDs must be unique, at most 59 characters with carry, and cannot be ${GATE_RESERVED.join(', ')}.`);
+        if (node.config.mode !== 'self-repair-verify') {
+          const ids = node.config.policy.slots.map(slot => slot.id);
+          if (new Set(ids).size !== ids.length || ids.some(id => GATE_RESERVED.includes(id) || (node.config.carry && id.length > 59))) add('gate.slot', `${at}/config/policy/slots`, `Slot IDs must be unique, at most 59 characters with carry, and cannot be ${GATE_RESERVED.join(', ')}.`);
+        }
       }
       if (node.type === 'route') {
         const ids = node.config.cases.map(item => item.id);

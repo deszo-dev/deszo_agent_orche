@@ -12,6 +12,7 @@ import { randomUUID } from 'node:crypto';
 import { canonicalHash, parseStrictJson } from './canonical.mjs';
 import { custodyFaultPoint } from './custody.mjs';
 import { allNodesDeep } from './planning.mjs';
+import { createP5Handoff, validateP5Contract, verifyP5Receipt } from './protectedSelfRepair.mjs';
 import { resolveWorkspaceRoot, workspaceRootsOverlap } from './workspaceIsolation.mjs';
 
 const SHA256 = /^[0-9a-f]{64}$/;
@@ -60,6 +61,14 @@ export function installLinkedRepair(Engine, { ApiError }) {
   P.parentRepairAuthorization = function (link) {
     if (!link?.authorization_artifact_id) return null;
     try { return this.store.readJson(link.authorization_artifact_id); } catch { return null; }
+  };
+  P.protectedSelfRepairWorkspaceReserved = function (workspaceId) {
+    if (!workspaceId) return false;
+    for (const link of this.store.all("SELECT * FROM run_links WHERE repair_workspace_id = ? AND continuation_contract = 'logical_policy'", workspaceId)) {
+      const authorization = this.parentRepairAuthorization(link);
+      if (authorization?.profile?.selfRepair) return true;
+    }
+    return false;
   };
   P.logicalRepairWaitingForDecision = function (repairRunId) {
     const link = this.store.get("SELECT * FROM run_links WHERE repair_run_id = ? AND continuation_contract = 'logical_policy' AND state = 'open'", repairRunId);
@@ -286,6 +295,21 @@ export function installLinkedRepair(Engine, { ApiError }) {
       this.refuseLinkedRepairContinuation(link, { code: 'coordination_invalid', message: 'The persisted Parent/Repair contract or pinned published definition failed validation.' });
       return false;
     }
+    const authorization = this.parentRepairAuthorization(link);
+    try {
+      const repair = this.store.get('SELECT * FROM runs WHERE id = ?', repairRunId);
+      const workflow = repair && this.store.readJson(repair.workflow_snapshot_artifact_id);
+      const p5Workflow = workflow?.capabilities?.includes('protected-self-repair-v1') === true;
+      const p5Authorization = Boolean(authorization?.profile?.selfRepair);
+      if (p5Workflow || p5Authorization) {
+        if (!p5Workflow || !p5Authorization || this.protectedSelfRepairAdmissionEnabled !== true || !this.protectedSelfRepairEnrollment
+        || !this.protectedSelfRepairEnrollmentFile || !this.protectedSelfRepairEnrollmentArtifact
+        || !this.lifecycleClient || !this.custodyHost || this.custodyUnavailable
+          || !Number.isSafeInteger(this.custodyEpoch)) return false;
+        const projection = this.protectedSelfRepairRunProjection?.(repairRunId);
+        if (!projection || projection.issues.length || projection.stage !== 'prepared') return false;
+      }
+    } catch { return false; }
     return true;
   };
 
@@ -354,6 +378,80 @@ export function installLinkedRepair(Engine, { ApiError }) {
     return true;
   };
 
+  P.recordProtectedSelfRepairHandoffInTransaction = function recordProtectedSelfRepairHandoffInTransaction(link, { approval, p5Acceptance,
+    resultAttempt, resultSha256, recordedAt }) {
+    const repairEvents = this.store.readEvents(link.repair_run_id);
+    if (repairEvents.some(item => item.type === 'self_repair.candidate_invalidated')
+      || repairEvents.some(item => item.type === 'self_repair.handoff_recorded')
+      || repairEvents.some(item => item.type === 'self_repair.retention_changed'))
+      throw Object.assign(new Error('P5 eligibility is invalidated or already has a retention/handoff record.'), { code: 'p5_handoff_ineligible' });
+    const authorization = this.parentRepairAuthorization(link);
+    const authRow = this.store.artifactRow(link.authorization_artifact_id);
+    if (!authorization?.profile?.selfRepair || !authRow?.sha256 || !p5Acceptance)
+      throw Object.assign(new Error('P5 handoff requires the exact Parent authorization and P5 acceptance artifact.'), { code: 'p5_handoff_ineligible' });
+    this.store.verifyRef(approval.protectedSelfRepairAcceptance);
+    validateP5Contract('acceptance', p5Acceptance);
+    const candidateRef = p5Acceptance.candidateManifest;
+    const receiptRef = p5Acceptance.verificationReceipt;
+    const candidate = this.store.readJson(this.store.verifyRef(candidateRef).artifactId);
+    const receipt = this.store.readJson(this.store.verifyRef(receiptRef).artifactId);
+    validateP5Contract('verificationReceipt', receipt);
+    verifyP5Receipt(receipt, { store: this.store, candidateRef, gateAttemptId: p5Acceptance.gateAttemptId,
+      terminalEvidenceRef: receipt.terminalEvidence });
+    const p2ApprovalRef = { artifactId: link.repair_approval_artifact_id,
+      sha256: this.store.artifactRow(link.repair_approval_artifact_id)?.sha256 };
+    if (!p2ApprovalRef.sha256 || p5Acceptance.parentRunId !== link.parent_run_id || p5Acceptance.repairRunId !== link.repair_run_id
+      || p5Acceptance.linkId !== link.id || p5Acceptance.incidentId !== link.incident_id
+      || p5Acceptance.decisionId !== approval.decisionId || candidate.candidateId !== p5Acceptance.candidateId
+      || receipt.receiptId !== p5Acceptance.receiptId || receipt.status !== 'passed'
+      || resultAttempt?.id !== approval.resultAttemptId || approval.resultSha256 !== resultSha256)
+      throw Object.assign(new Error('The accepted P5 candidate, receipt, P2 result and link do not share one exact lineage.'), { code: 'p5_handoff_ineligible' });
+
+    const p2OutcomeFields = { schemaVersion: 1, kind: 'ProtectedSelfRepairP2Outcome', parentRunId: link.parent_run_id,
+      repairRunId: link.repair_run_id, linkId: link.id, incidentId: link.incident_id, decisionId: approval.decisionId,
+      candidateId: candidate.candidateId, receiptId: receipt.receiptId, p2Approval: p2ApprovalRef,
+      p5Acceptance: approval.protectedSelfRepairAcceptance, resultAttemptId: resultAttempt.id, resultSha256,
+      failedNodeRetry: link.failed_node_retry, continuationState: 'repair_accepted', recordedAt };
+    const p2Outcome = { ...p2OutcomeFields, outcomeId: canonicalHash({ kind: p2OutcomeFields.kind, version: 1, ...p2OutcomeFields }) };
+    validateP5Contract('p2Outcome', p2Outcome);
+    const p2OutcomeArtifact = this.store.putJson(p2Outcome);
+    this.store.verifyRef(p2OutcomeArtifact);
+
+    const retentionFields = { schemaVersion: 1, kind: 'ProtectedSelfRepairRetention', parentRunId: link.parent_run_id,
+      repairRunId: link.repair_run_id, linkId: link.id, incidentId: link.incident_id,
+      candidateManifest: candidateRef, candidateId: candidate.candidateId,
+      verificationReceipt: receiptRef, receiptId: receipt.receiptId,
+      workspaceId: candidate.workspace.workspaceId, allocationId: candidate.workspace.allocationId,
+      workspaceIdentity: candidate.workspace.nativeIdentity, status: 'retained', revision: 1,
+      retainedAt: recordedAt, cleanupDeferred: true };
+    const retention = { ...retentionFields, retentionId: canonicalHash({ kind: retentionFields.kind, version: 1, ...retentionFields }) };
+    validateP5Contract('retentionRecord', retention);
+    const retentionArtifact = this.store.putJson(retention);
+    const retentionRef = { artifactId: retentionArtifact.artifactId, sha256: retentionArtifact.sha256 };
+    this.store.verifyRef(retentionRef);
+
+    const handoff = createP5Handoff({
+      candidate: { ...candidate, candidateArtifact: candidateRef },
+      receipt: { ...receipt, artifact: receiptRef },
+      approval: { ...approval, authorization: { artifactId: link.authorization_artifact_id, sha256: authRow.sha256 },
+        artifact: p2ApprovalRef, outcome: { artifactId: p2OutcomeArtifact.artifactId, sha256: p2OutcomeArtifact.sha256 } },
+      continuation: { state: 'repair_accepted' },
+      retention: { ...retention, artifact: retentionRef },
+      sourceBinding: candidate.sourceBinding, enrollment: candidate.enrollment,
+      currentEligibility: { eligible: true, revision: 1, checkedAt: recordedAt },
+    });
+    const handoffArtifact = this.store.putJson(handoff);
+    const handoffRef = { artifactId: handoffArtifact.artifactId, sha256: handoffArtifact.sha256 };
+    this.store.verifyRef(handoffRef);
+    this.store.appendEvents(link.repair_run_id, [
+      event('self_repair.retention_changed', { record: retentionRef }),
+      event('self_repair.cleanup_deferred', { record: retentionRef }),
+      event('self_repair.handoff_recorded', { record: handoffRef }),
+    ]);
+    return { p2Outcome: { artifactId: p2OutcomeArtifact.artifactId, sha256: p2OutcomeArtifact.sha256 },
+      retention: retentionRef, handoff: handoffRef };
+  };
+
   P.recordLogicalRepairOutcome = function (link, to) {
     if (link.state !== 'open' || link.continuation_contract !== 'logical_policy') return null;
     const at = now();
@@ -362,15 +460,48 @@ export function installLinkedRepair(Engine, { ApiError }) {
         this.blockLogicalRepair(link, 'coordination_invalid', 'Repair outcome acceptance failed the persisted identity, publication or workspace checks.');
         return null;
       }
-      let actualDigest = null;
+      let actualDigest = null, resultAttempt = null;
       try {
-        const attempt = this.latestAttempt(link.repair_run_id, link.repair_result_node_instance_id);
-        const outputs = attempt?.state === 'succeeded' && attempt.outputs_artifact_id ? this.store.readJson(attempt.outputs_artifact_id).values : null;
+        resultAttempt = this.latestAttempt(link.repair_run_id, link.repair_result_node_instance_id);
+        const outputs = resultAttempt?.state === 'succeeded' && resultAttempt.outputs_artifact_id ? this.store.readJson(resultAttempt.outputs_artifact_id).values : null;
         if (outputs?.text?.artifact) actualDigest = this.store.verifyRef(outputs.text.artifact).sha256;
       } catch { actualDigest = null; }
       if (link.acceptance_mode === 'judge_post_execution') {
         let approval = null;
         try { approval = link.repair_approval_artifact_id ? this.store.readJson(link.repair_approval_artifact_id) : null; } catch { approval = null; }
+        const isP5 = Boolean(this.parentRepairAuthorization(link)?.profile?.selfRepair);
+        let p5Acceptance = null;
+        if (isP5) {
+          try {
+            const p5Ref = approval?.protectedSelfRepairAcceptance;
+            if (!p5Ref) return null;
+            this.store.verifyRef(p5Ref);
+            p5Acceptance = this.store.readJson(p5Ref.artifactId);
+            validateP5Contract('acceptance', p5Acceptance);
+            const repairEvents = this.store.readEvents(link.repair_run_id);
+            if (repairEvents.some(item => item.type === 'self_repair.candidate_invalidated')) return null;
+            const candidateEvents = repairEvents.filter(item => item.type === 'self_repair.candidate_captured');
+            const receiptEvents = repairEvents.filter(item => item.type === 'self_repair.verification_recorded'
+              && item.payload?.record?.artifactId === p5Acceptance.verificationReceipt.artifactId
+              && item.payload?.record?.sha256 === p5Acceptance.verificationReceipt.sha256);
+            if (candidateEvents.length !== 1 || candidateEvents[0].payload?.record?.artifactId !== p5Acceptance.candidateManifest.artifactId
+              || candidateEvents[0].payload?.record?.sha256 !== p5Acceptance.candidateManifest.sha256 || receiptEvents.length !== 1) return null;
+            const candidate = this.store.readJson(this.store.verifyRef(p5Acceptance.candidateManifest).artifactId);
+            const receipt = this.store.readJson(this.store.verifyRef(p5Acceptance.verificationReceipt).artifactId);
+            validateP5Contract('verificationReceipt', receipt);
+            verifyP5Receipt(receipt, { store: this.store, candidateRef: p5Acceptance.candidateManifest,
+              gateAttemptId: p5Acceptance.gateAttemptId, terminalEvidenceRef: receipt.terminalEvidence });
+            const authRow = this.store.artifactRow(link.authorization_artifact_id);
+            if (p5Acceptance.candidateId !== candidate.candidateId || p5Acceptance.candidateSourceDigest !== candidate.candidateSourceDigest
+              || p5Acceptance.receiptId !== receipt.receiptId || receipt.status !== 'passed'
+              || receipt.candidateId !== candidate.candidateId || receipt.candidateSourceDigest !== candidate.candidateSourceDigest
+              || p5Acceptance.parentRunId !== link.parent_run_id || p5Acceptance.repairRunId !== link.repair_run_id
+              || p5Acceptance.linkId !== link.id || p5Acceptance.incidentId !== link.incident_id
+              || p5Acceptance.decisionId !== approval.decisionId || p5Acceptance.judgeAttemptId !== approval.judgeAttemptId
+              || p5Acceptance.p2Authorization.artifactId !== link.authorization_artifact_id
+              || p5Acceptance.p2Authorization.sha256 !== authRow?.sha256) return null;
+          } catch { return null; }
+        }
         if (link.decision_status !== 'accepted' || !approval || approval.decision !== 'accept_repair'
           || approval.linkId !== link.id || approval.incidentId !== link.incident_id || approval.repairRunId !== link.repair_run_id
           || approval.resultSha256 !== actualDigest || link.repair_result_sha256 !== actualDigest
@@ -380,8 +511,11 @@ export function installLinkedRepair(Engine, { ApiError }) {
           AND acceptance_mode = 'judge_post_execution' AND decision_status = 'accepted' AND repair_result_sha256 = ?`,
           at, link.id, actualDigest).changes;
         if (!changed) return null;
+        const p5Artifacts = isP5 ? this.recordProtectedSelfRepairHandoffInTransaction(link,
+          { approval, p5Acceptance, resultAttempt, resultSha256: actualDigest, recordedAt: at }) : null;
         const payload = { linkId: link.id, incidentId: link.incident_id, parentRunId: link.parent_run_id, repairRunId: link.repair_run_id,
-          resultNodeInstanceId: link.repair_result_node_instance_id, resultSha256: actualDigest, approvalArtifactId: link.repair_approval_artifact_id };
+          resultNodeInstanceId: link.repair_result_node_instance_id, resultSha256: actualDigest, approvalArtifactId: link.repair_approval_artifact_id,
+          ...(p5Artifacts ? { p5AcceptanceArtifact: approval.protectedSelfRepairAcceptance, p5HandoffArtifact: p5Artifacts.handoff } : {}) };
         this.store.appendEvents(link.repair_run_id, [event('continuation.repair_completed', payload), event('continuation.repair_result_accepted', payload)]);
         this.store.appendEvents(link.parent_run_id, [event('continuation.repair_result_accepted', payload)]);
         return this.store.get('SELECT * FROM run_links WHERE id = ?', link.id);
@@ -519,6 +653,71 @@ export function installLinkedRepair(Engine, { ApiError }) {
     return true;
   };
 
+  P.invalidateProtectedSelfRepairCandidateInTransaction = function invalidateProtectedSelfRepairCandidateInTransaction(link, reason,
+    { stoppedRunId = null, stoppedRunState = null } = {}) {
+    const current = link?.id && this.store.get('SELECT * FROM run_links WHERE id = ?', link.id);
+    if (!current || current.continuation_contract !== 'logical_policy') return false;
+    const authorization = this.parentRepairAuthorization(current);
+    const journalSignal = Boolean(this.store.get(`SELECT 1 FROM journal_events WHERE
+      (run_id = ? OR run_id = ?) AND event_type GLOB 'self_repair.*' LIMIT 1`, current.parent_run_id, current.repair_run_id));
+    if (!authorization?.profile?.selfRepair && !journalSignal) return false;
+    // An existing invalidation event is sufficient for every reason and keeps Stop idempotent.
+    if (this.store.get("SELECT 1 FROM journal_events WHERE run_id = ? AND event_type = 'self_repair.candidate_invalidated' LIMIT 1", current.repair_run_id)) return false;
+    let repairEvents = [];
+    try { repairEvents = this.store.readEvents(current.repair_run_id); } catch { /* The revocation still fails closed. */ }
+    const recordFor = (type, matchesLink) => {
+      const rows = repairEvents.filter(item => item.type === type);
+      if (rows.length !== 1) return { ref: null, value: null };
+      const artifactRef = rows[0].payload?.record;
+      if (!artifactRef || typeof artifactRef.artifactId !== 'string' || !/^[a-f0-9]{64}$/.test(artifactRef.sha256 || ''))
+        return { ref: null, value: null };
+      // Preserve the journal reference even when its object is missing or cannot be matched.
+      let value = null;
+      try {
+        this.store.verifyRef(artifactRef);
+        const artifact = this.store.readJson(artifactRef.artifactId);
+        if (matchesLink(artifact)) value = artifact;
+      } catch { /* The immutable journal ref remains historical evidence only. */ }
+      return { ref: artifactRef, value };
+    };
+    const matches = (value, kind, { allowMissingParent = false } = {}) => value?.kind === kind && value.linkId === current.id
+      && (value.parentRunId === current.parent_run_id || (allowMissingParent && value.parentRunId === undefined))
+      && value.repairRunId === current.repair_run_id && value.incidentId === current.incident_id;
+    const candidate = recordFor('self_repair.candidate_captured', value => matches(value, 'ProtectedSelfRepairCandidate'));
+    const receipt = recordFor('self_repair.verification_recorded', value => matches(value, 'ProtectedSelfRepairVerificationReceipt', { allowMissingParent: true }));
+    const handoff = recordFor('self_repair.handoff_recorded', value => matches(value, 'ProtectedSelfRepairHandoff'));
+    let p2Authorization = null;
+    try {
+      const row = this.store.artifactRow(current.authorization_artifact_id);
+      if (row?.sha256) p2Authorization = { artifactId: current.authorization_artifact_id, sha256: row.sha256 };
+    } catch { /* A missing authorization cannot grant eligibility. */ }
+    const fields = { reason, stoppedRunId, stoppedRunState, parentRunId: current.parent_run_id,
+      repairRunId: current.repair_run_id, linkId: current.id, incidentId: current.incident_id, p2Authorization,
+      candidateManifest: candidate.ref, candidateId: candidate.value?.candidateId ?? null,
+      verificationReceipt: receipt.ref, receiptId: receipt.value?.receiptId ?? null,
+      handoff: handoff.ref, handoffId: handoff.value?.handoffId ?? null,
+      priorLinkState: current.state, priorDecisionStatus: current.decision_status };
+    const record = { schemaVersion: 1, kind: 'ProtectedSelfRepairEligibilityInvalidation',
+      invalidationId: canonicalHash({ kind: 'ProtectedSelfRepairEligibilityInvalidation', version: 1, ...fields }),
+      ...fields, eligibility: false, revision: 1, recordedAt: now() };
+    try { validateP5Contract('candidateInvalidation', record); }
+    catch { return false; }
+    const artifact = this.store.putJson(record);
+    this.store.verifyRef(artifact);
+    this.store.appendEvents(current.repair_run_id, [{ type: 'self_repair.candidate_invalidated', payload: { record: artifact },
+      nodeInstanceId: null, attemptId: null }]);
+    return true;
+  };
+
+  // Root Stop revokes pending P5 acceptance and unconsumed handoff even after terminal Parent state.
+  P.invalidateProtectedSelfRepairForStopInTransaction = function invalidateProtectedSelfRepairForStopInTransaction(stoppedRunId, stoppedRunState) {
+    const links = this.store.all(`SELECT * FROM run_links WHERE continuation_contract = 'logical_policy'
+      AND (parent_run_id = ? OR repair_run_id = ?) ORDER BY created_at, id`, stoppedRunId, stoppedRunId);
+    let invalidated = 0;
+    for (const link of links) if (this.invalidateProtectedSelfRepairCandidateInTransaction(link, 'root_stop', { stoppedRunId, stoppedRunState })) invalidated++;
+    return invalidated;
+  };
+
   P.afterLogicalParentClose = function (parentRunId) {
     const link = this.store.get(`SELECT * FROM run_links WHERE parent_run_id = ? AND continuation_contract = 'logical_policy'
       AND state IN ('open','repair_failed','repair_completed','repair_accepted') ORDER BY created_at DESC LIMIT 1`, parentRunId);
@@ -645,7 +844,7 @@ export function installLinkedRepair(Engine, { ApiError }) {
 
   // Private P4 authority path. The caller owns the outer Judge Attempt settlement transaction;
   // this method writes only Store state and never starts work or runs an after-commit callback.
-  P.startWorkflowJudgeRepairInTransaction = function startWorkflowJudgeRepairInTransaction(parentRunId, context, profileId, attention, decisionId) {
+  P.startWorkflowJudgeRepairInTransaction = function startWorkflowJudgeRepairInTransaction(parentRunId, context, profileId, attention, decisionId, decision, p5Admission = null) {
     const failJudge = (code, message) => { throw new ApiError(409, code, message); };
     if (context?.kind !== 'failure') failJudge('judge_repair_context', 'Only a Parent failure Judge may request a captured Repair profile.');
     const parent = this.requireRun(parentRunId);
@@ -662,6 +861,10 @@ export function installLinkedRepair(Engine, { ApiError }) {
       failJudge('unsupported_execution_class', 'P4 Repair supports only the captured sequential execution profile.');
     const profile = policy.repairProfiles.find(item => item.profileId === profileId);
     if (!profile) failJudge('repair_profile_unauthorized', 'The requested Repair profile is not pinned in the captured Parent policy.');
+    if (profile.selfRepair) {
+      try { this.assertProtectedSelfRepairRepairAdmission(p5Admission, { parentRunId, profile, attention, decision, context }); }
+      catch (error) { failJudge(error.code || 'p5_enrollment_unavailable', error.message); }
+    } else if (p5Admission) failJudge('p5_admission_invalid', 'A P5 Repair admission cannot authorize an ordinary P2 Repair profile.');
     if (context.incidentId !== attention.incidentId
       || !context.outcomes?.some(item => item.outcome.nodeInstanceId === profile.failedNodeInstanceId))
       failJudge('repair_incident_mismatch', 'The captured Repair profile does not target the exact failed node bound to this Judge attention.');
@@ -672,7 +875,10 @@ export function installLinkedRepair(Engine, { ApiError }) {
     const existingIncident = this.logicalRepairLinkForIncident(incidentId);
     if (existingIncident) {
       const prior = this.parentRepairAuthorization(existingIncident);
-      if (prior?.decisionId === decisionId && prior?.profileId === profile.profileId) return { link: existingIncident, replayed: true };
+      if (prior?.decisionId === decisionId && prior?.profileId === profile.profileId) {
+        const intent = this.store.readEvents(existingIncident.repair_run_id).find(item => item.type === 'self_repair.preparation_intent');
+        return { link: existingIncident, replayed: true, ...(intent?.payload?.record ? { preparationIntentRef: intent.payload.record } : {}) };
+      }
       failJudge('repair_incident_already_used', 'This P4 incident already has a durable Repair link and cannot create another.');
     }
     if (this.store.get("SELECT id FROM run_links WHERE parent_run_id = ? AND state IN ('open','repair_completed','repair_accepted')", parentRunId))
@@ -683,6 +889,9 @@ export function installLinkedRepair(Engine, { ApiError }) {
     if (!target || target.state !== 'failed' || !targetOutcome || !['task_failure','provider_failure','orchestrator_failure'].includes(targetOutcome.category)
       || ['unknown','unresolved'].includes(targetOutcome.executionCertainty))
       failJudge('parent_checkpoint_unsafe', 'The named Parent node is not a settled, P3-verified failure safe to checkpoint for this Repair request.');
+    if (profile.selfRepair && (!p5Admission || p5Admission.outcomeId !== targetOutcome.outcomeId
+      || p5Admission.outcomeRevision !== targetOutcome.revision))
+      failJudge('p5_incident_outcome_mismatch', 'The P5 input capture and P2 checkpoint do not name the same exact failed P3 outcome revision.');
     const repairWorkspace = this.requireWorkspace(profile.repairWorkspaceId);
     const parentWorkspace = this.requireWorkspace(parent.workspace_id);
     const isolationIssue = this.linkedRepairWorkspaceIssue(parentWorkspace, repairWorkspace);
@@ -710,7 +919,7 @@ export function installLinkedRepair(Engine, { ApiError }) {
       failJudge('validation_failed', 'The captured Repair acceptance mode is unsupported.');
 
     const captured = this.captureRun({ workflow: repairWorkflow, snapshot: repairSnapshot, workspace: repairWorkspace, kind: 'workflow', publication,
-      options: { mode: 'workflow', targets: [], refreshCaches: [] }, requestId: decisionId });
+      options: { mode: 'workflow', targets: [], refreshCaches: [] }, requestId: decisionId, p5Admission });
     const repairRunId = captured.body.run.runId;
     const at = now();
     const activeParentWork = this.parentRepairWorkInFlight(parentRunId);
@@ -724,7 +933,9 @@ export function installLinkedRepair(Engine, { ApiError }) {
       failedNodeInstanceId: profile.failedNodeInstanceId, repairResultNodeInstanceId: profile.repairResultNodeInstanceId,
       expectedRepairResultSha256: profile.expectedRepairResultSha256 ?? null, failedNodeRetry: profile.failedNodeRetry,
       verificationNodeInstanceIds: profile.verificationNodeInstanceIds || [], logicalAcceptance: profile.acceptanceMode === 'expected_digest'
-        ? 'exact_text_artifact_sha256' : 'designated_repair_judge' });
+        ? 'exact_text_artifact_sha256' : 'designated_repair_judge',
+      ...(p5Admission ? { selfRepairProfile: profile.selfRepair, p5Enrollment: p5Admission.enrollmentRef, p5SourceBinding: p5Admission.sourceBindingRef,
+        verificationInputs: p5Admission.verificationInputsRef, outcomeId: p5Admission.outcomeId, outcomeRevision: p5Admission.outcomeRevision } : {}) });
     const checkpoint = this.store.putJson({ schemaVersion: 1, kind: 'LinkedRepairCheckpoint', contract: 'logical_policy', incidentId,
       parentRunId, parentPublishedVersionId: parent.published_version_id,
       parentSnapshotSha256: this.store.artifactRow(parent.workflow_snapshot_artifact_id).sha256,
@@ -752,16 +963,34 @@ export function installLinkedRepair(Engine, { ApiError }) {
       event('continuation.parent_suspension_requested', { linkId: link.id, incidentId, repairRunId, activeParentWork, checkpoint: checkpoint.artifactId })]);
     this.store.appendEvents(repairRunId, [event('continuation.linked_repair_started', { linkId: link.id, incidentId, parentRunId,
       contract: 'logical_policy', authorizedBy: 'workflow-judge-policy' })]);
+    let preparationIntentRef = null;
+    if (p5Admission) {
+      const baseline = this.store.readJson(p5Admission.enrollment.baselineManifest.artifactId);
+      const intent = { schemaVersion: 1, kind: 'ProtectedSelfRepairPreparationIntent', enrollment: p5Admission.enrollmentRef,
+        baselineManifest: p5Admission.enrollment.baselineManifest, sourceManifest: baseline.sourceManifest, sourceBinding: p5Admission.sourceBindingRef,
+        verificationInputs: p5Admission.verificationInputsRef, parentRunId, repairRunId, linkId: link.id,
+        workspace: p5Admission.enrollment.workspace, createdAt: at };
+      validateP5Contract('preparationIntent', intent);
+      const artifact = this.store.putJson(intent);
+      this.store.verifyRef(artifact);
+      preparationIntentRef = { artifactId: artifact.artifactId, sha256: artifact.sha256 };
+      this.store.appendEvents(repairRunId, [{ type: 'self_repair.preparation_intent', payload: { record: preparationIntentRef }, nodeInstanceId: null, attemptId: null }]);
+    }
     const receiptPayload = { linkId: link.id, parentRunId, repairRunId, incidentId, decisionId };
     const receiptArtifact = this.store.putJson(receiptPayload);
     this.store.run('INSERT INTO command_receipts(request_id, command, payload_sha256, response_artifact_id, created_at) VALUES (?, ?, ?, ?, ?)',
       decisionId, 'workflow-judge-repair', canonicalHash({ profileId, attentionKey: attention.attentionKey }), receiptArtifact.artifactId, at);
-    return { link: this.store.get('SELECT * FROM run_links WHERE id = ?', link.id), replayed: false };
+    return { link: this.store.get('SELECT * FROM run_links WHERE id = ?', link.id), replayed: false, ...(preparationIntentRef ? { preparationIntentRef } : {}) };
   };
 
-  P.applyWorkflowJudgeRepairApprovalInTransaction = function applyWorkflowJudgeRepairApprovalInTransaction(state, attempt, attention, context, decisionId, decision) {
+  P.applyWorkflowJudgeRepairApprovalInTransaction = function applyWorkflowJudgeRepairApprovalInTransaction(state, attempt, attention, context, decisionId, decision,
+    p5AcceptanceAdmission = null, p5ReviewEvidence = null) {
     const link = context?.link;
     const action = decision.action.type;
+    const authorization = this.parentRepairAuthorization(link);
+    if (authorization?.profile?.selfRepair && action === 'accept_repair' && !p5AcceptanceAdmission)
+      throw new ApiError(409, 'p5_acceptance_unavailable',
+        'Protected Self-Repair approval requires the current Engine-issued candidate, receipt, source-integrity and Judge-delivery admission.');
     if (!link || context.kind !== 'repair_approval' || link.repair_run_id !== state.id || link.state !== 'open'
       || link.acceptance_mode !== 'judge_post_execution' || !this.logicalRepairLinkIntact(link)
       || attempt.run_id !== link.repair_run_id || attempt.node_instance_id !== state.workflow.judgePolicy?.judgeNodeId)
@@ -786,19 +1015,43 @@ export function installLinkedRepair(Engine, { ApiError }) {
       verification.push({ nodeId, attemptId: verified.id, outputs: { artifactId: verified.outputs_artifact_id,
         sha256: this.store.artifactRow(verified.outputs_artifact_id).sha256 } });
     }
+    let p5AcceptanceRef = null;
+    if (authorization?.profile?.selfRepair && action === 'accept_repair') {
+      const admission = this.assertProtectedSelfRepairAcceptanceAdmission(p5AcceptanceAdmission,
+        { state, attempt, attention, context, decision, evidence: p5ReviewEvidence });
+      const p5Review = context.p5Review;
+      if (!p5Review || p5Review.candidate.candidateId !== admission.candidateId
+        || p5Review.receipt.receiptId !== admission.receiptId)
+        throw new ApiError(409, 'p5_acceptance_stale', 'The verified P5 candidate or receipt changed before atomic approval.');
+      const acceptanceFields = { schemaVersion: 1, kind: 'ProtectedSelfRepairAcceptance',
+        candidateManifest: admission.candidateRef, candidateId: admission.candidateId,
+        candidateSourceDigest: admission.candidateSourceDigest, verificationReceipt: admission.receiptRef,
+        receiptId: admission.receiptId, gateAttemptId: admission.gateAttemptId,
+        parentRunId: link.parent_run_id, repairRunId: state.id, linkId: link.id, incidentId: link.incident_id,
+        decisionId, judgeAttemptId: attempt.id, attentionKey: attention.attentionKey,
+        p2Authorization: admission.p2Authorization, sourceIntegrityRevision: admission.sourceIntegrityRevision,
+        retentionRevision: admission.retentionRevision, requiredReviewSetDigest: admission.requiredReviewSetDigest,
+        reviewDelivery: admission.reviewDelivery, acceptedAt: now() };
+      const acceptance = { ...acceptanceFields, acceptanceId: canonicalHash({ kind: acceptanceFields.kind, version: 1, ...acceptanceFields }) };
+      validateP5Contract('acceptance', acceptance);
+      const acceptanceArtifact = this.store.putJson(acceptance);
+      this.store.verifyRef(acceptanceArtifact);
+      p5AcceptanceRef = { artifactId: acceptanceArtifact.artifactId, sha256: acceptanceArtifact.sha256 };
+    }
     const approval = { schemaVersion: 1, kind: 'AdaptiveRepairJudgeDecision', decisionId, decision: action,
       reasonCode: decision.reasonCode, rootParentRunId: link.parent_run_id, parentPublishedVersionId: parent.published_version_id,
       repairRunId: state.id, repairPublishedVersionId: this.requireRun(state.id).published_version_id,
       linkId: link.id, incidentId: link.incident_id, attentionKey: attention.attentionKey, judgeAttemptId: attempt.id,
       resultNodeInstanceId: profile.repairResultNodeInstanceId, resultAttemptId: resultAttempt.id, resultSha256,
-      verification, failedNodeRetry: link.failed_node_retry, recordedAt: now() };
+      verification, failedNodeRetry: link.failed_node_retry, ...(p5AcceptanceRef ? { protectedSelfRepairAcceptance: p5AcceptanceRef } : {}), recordedAt: now() };
     if (action === 'accept_repair') {
       const artifact = this.store.putJson(approval);
       const updated = this.store.run(`UPDATE run_links SET decision_status='accepted', repair_result_sha256=?, repair_approval_artifact_id=?, updated_at=?
         WHERE id=? AND state='open' AND acceptance_mode='judge_post_execution' AND decision_status='pending' AND parent_suspension_state IN ('suspension_requested','suspended_for_repair')`,
         resultSha256, artifact.artifactId, now(), link.id);
       if (!updated.changes) throw new ApiError(409, 'repair_approval_stale', 'The P2 link changed before approval could be recorded.');
-      return { type: 'adaptive_repair_approval', linkId: link.id, artifact: artifact.artifactId, resultSha256 };
+      return { type: 'adaptive_repair_approval', linkId: link.id, artifact: artifact.artifactId, resultSha256,
+        ...(p5AcceptanceRef ? { protectedSelfRepairAcceptance: p5AcceptanceRef } : {}) };
     }
     this.store.run(`UPDATE run_links SET state='repair_failed', repair_outcome='failed', decision_status='rejected',
       parent_suspension_state='suspended_for_repair', repair_result_sha256=?, updated_at=? WHERE id=? AND state='open' AND decision_status='pending'`,

@@ -2,8 +2,12 @@
 // native bounded-command reporter, whose observations are captured by the protected service; the fixture executor below
 // runs plain child processes and is accepted only by fixture hosts. Both record the same attestation shape.
 import { spawnSync } from 'node:child_process';
+import { existsSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { canonicalHash, canonicalize } from '../core/canonical.mjs';
 import { ALLOWED_BUILD_COMMANDS, commandAllowed, commandRecord, createBuildAttestation, outputFiles } from './buildAttestation.mjs';
 import { securityClosure } from './installedBuilds.mjs';
+import { SOURCE_INVENTORY_PATH } from './sourceProvenance.mjs';
 import { HostError } from './authority.mjs';
 
 const refuse = message => { throw new HostError(403, 'build_attestation_refused', message); };
@@ -38,6 +42,12 @@ export async function runAttestedBuild({ sourceRoot, gitTool, readGit = null, co
   }
   const after = await securityClosure(sourceRoot, gitTool, readGit);
   if (after.digest !== before.digest) refuse('The source closure changed during the build; the attestation is refused.');
+  const sourceInventory = { schemaVersion: 1, kind: 'DeszoBuildSourceInventory', sourceCommit: before.source.sourceCommit,
+    sourceDigest: before.source.sourceDigest, files: before.source.files };
+  if (canonicalHash(sourceInventory.files) !== sourceInventory.sourceDigest) refuse('The captured source inventory digest is inconsistent.');
+  const sourceInventoryPath = join(outputsDir, SOURCE_INVENTORY_PATH);
+  if (existsSync(sourceInventoryPath)) refuse('The build output already contains the reserved source-inventory path.');
+  writeFileSync(sourceInventoryPath, canonicalize(sourceInventory), { flag: 'wx' });
   const outputs = outputFiles(outputsDir);
   return createBuildAttestation({ closure: before, closureAfterDigest: after.digest, commands: records, outputs, toolIdentities, executor: executor.name, createdAt: createdAt ?? new Date().toISOString() });
 }

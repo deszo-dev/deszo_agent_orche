@@ -2,10 +2,10 @@
 // decision. A routine build must preserve the installed authority/dependency closure captured by the operator.
 import { copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, constants } from 'node:fs';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
-import { canonicalHash, canonicalize, sha256 } from '../core/canonical.mjs';
+import { canonicalHash, canonicalize, parseStrictJson, sha256 } from '../core/canonical.mjs';
 import { createBuildManifest, verifyBuildDirectory } from './lifecycle.mjs';
 import { HostError } from './authority.mjs';
-import { authorityImportClosure, sourceInventory } from './sourceProvenance.mjs';
+import { authorityImportClosure, sourceInventory, SOURCE_INVENTORY_PATH } from './sourceProvenance.mjs';
 import { ALLOWED_BUILD_COMMANDS, verifyBuildAttestation } from './buildAttestation.mjs';
 
 const fail = message => { throw new HostError(403, 'build_promotion_refused', message); };
@@ -45,16 +45,39 @@ export class InstalledBuilds {
     if(sourceCommit!==closure.source.sourceCommit)fail('The claimed source commit differs from the independently observed Git HEAD.');
     const baselineKey=`build-tcb-baseline:${closure.source.projectId}`,baseline=this.host.get('SELECT value FROM host_meta WHERE key=?',baselineKey);
     if(diagnosticOnly&&!operatorBaseline)fail('Only the installation operator may stage a verification-only build.');
+    const existing = this.host.get('SELECT * FROM installed_builds WHERE build_id=?', buildId);
+    if (existing && (JSON.parse(existing.verification_json).diagnosticOnly === true) !== diagnosticOnly)
+      fail('A diagnostic build cannot be promoted by reusing its identity.');
     if(!diagnosticOnly&&!operatorBaseline&&(!baseline||JSON.parse(baseline.value).tcbDigest!==closure.digest))fail('The actual authority/dependency closure differs from the protected operator baseline.');
     if(expectedTcbDigest&&expectedTcbDigest!==closure.digest)fail('The expected closure does not match the actual source/dependencies.');
     if(!diagnosticOnly&&baseline&&JSON.parse(baseline.value).tcbDigest!==closure.digest)fail('Replacing the trusted baseline requires a separate verified trust update; a caller flag cannot widen it.');
+    if(!diagnosticOnly&&!sourceBuildAttestation)fail('A routine compilation attestation is required.');
     const observedInputs=canonicalHash({sourceCommit,sourceDigest:closure.source.sourceDigest,authorityClosureDigest:closure.digest,dependencyDigest:closure.dependencyDigest,gitTool:closure.source.gitTool});
     if(inputsDigest&&inputsDigest!==observedInputs)fail('The supplied input digest differs from the independently captured inputs.');
-    const manifest = createBuildManifest({ buildDir: sourceDir, buildId, sourceCommit, inputsDigest:observedInputs, protocolVersion, storeSchemaVersion, launchEntry, dirtySourceDigest: closure.source.sourceDigest, createdAt: new Date(this.host.time.wallNow()).toISOString() });
-    const existing = this.host.get('SELECT * FROM installed_builds WHERE build_id=?', buildId);
+    let sourceInventoryRef = null;
+    if (!diagnosticOnly) {
+      const sourceInventoryPath = join(sourceDir, SOURCE_INVENTORY_PATH);
+      let inventoryBytes, inventory;
+      try {
+        const info = lstatSync(sourceInventoryPath);
+        if (!info.isFile() || info.isSymbolicLink() || resolve(realpathSync(sourceInventoryPath)).toLowerCase() !== resolve(sourceInventoryPath).toLowerCase()
+          || info.size <= 0 || info.size > 32 * 1024 * 1024) fail('The packaged source inventory must be a bounded plain file.');
+        inventoryBytes = readFileSync(sourceInventoryPath);
+        if (inventoryBytes.length !== info.size || inventoryBytes.length > 32 * 1024 * 1024) fail('The packaged source inventory changed while it was read.');
+        inventory = parseStrictJson(inventoryBytes.toString('utf8'));
+      } catch (error) { if (error instanceof HostError) throw error; fail('A valid source-to-build inventory artifact is required for a routine build.'); }
+      if (inventory?.schemaVersion !== 1 || inventory.kind !== 'DeszoBuildSourceInventory'
+        || inventory.sourceCommit !== closure.source.sourceCommit || inventory.sourceDigest !== closure.source.sourceDigest
+        || canonicalHash(inventory.files) !== closure.source.sourceDigest
+        || canonicalHash(inventory.files) !== canonicalHash(closure.source.files))
+        fail('The packaged source inventory differs from the independently captured build source.');
+      sourceInventoryRef = { path: SOURCE_INVENTORY_PATH, sha256: sha256(inventoryBytes) };
+    }
+    const manifest = createBuildManifest({ buildDir: sourceDir, buildId, sourceCommit, inputsDigest:observedInputs, protocolVersion, storeSchemaVersion,
+      launchEntry, dirtySourceDigest: closure.source.sourceDigest, createdAt: new Date(this.host.time.wallNow()).toISOString(),
+      ...(sourceInventoryRef ? { sourceInventory: sourceInventoryRef } : {}) });
     if (existing) {
       const old = JSON.parse(existing.manifest_json); const { createdAt: a, ...oldSemantic } = old, { createdAt: b, ...newSemantic } = manifest;
-      if((JSON.parse(existing.verification_json).diagnosticOnly===true)!==diagnosticOnly)fail('A diagnostic build cannot be promoted by reusing its identity.');
       if (canonicalHash(oldSemantic) !== canonicalHash(newSemantic)) fail('A staged build identity cannot be replaced.');
       if (!verifyBuildDirectory(old, existing.build_dir).verified) fail('The installed build no longer matches its receipt.'); return this.get(buildId);
     }

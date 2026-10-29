@@ -257,6 +257,11 @@
         "sourceCommit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
         "dirtySourceDigest": { "anyOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
         "inputsDigest": { "$ref": "#/$defs/sha256" },
+        "sourceInventory": {
+          "type": "object",
+          "properties": { "path": { "const": ".deszo-source-inventory.json" }, "sha256": { "$ref": "#/$defs/sha256" } },
+          "required": ["path", "sha256"], "additionalProperties": false
+        },
         "protocolVersion": { "type": "integer", "minimum": 1 },
         "storeSchemaVersion": { "type": "integer", "minimum": 1 },
         "launchEntry": { "type": "string", "minLength": 1 },

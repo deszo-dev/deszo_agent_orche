@@ -123,6 +123,10 @@ class CustodyChild extends EventEmitter {
     this.closed = false;
     this.commit = null;
     this.custodyState = null;
+    this.terminalStatus = null;
+    this.invocationDigest = null;
+    this.executableSha256 = null;
+    this.processTreeEnded = false;
     // The Host's word on the spool. Only a confirmed complete spool may close this attempt's stream as complete.
     this.spoolComplete = false;
     this.faultReported = false;
@@ -159,6 +163,8 @@ class CustodyChild extends EventEmitter {
       throw refusal('custody_admission_lost', 'This invocation was admitted earlier and its launch permit is gone; it was not launched again.');
     }
     this.custodyId = reserved.custodyId;
+    this.invocationDigest = reserved.invocationDigest;
+    this.executableSha256 = reserved.executableSha256;
     // Parent repair may be requested while Host admission is in flight. Withdraw the unlaunched admission before
     // writing a Custody binding or asking the Host to launch it; the coordinator will resume this attempt after Repair.
     if (this.engine.parentRepairDispatchPaused?.(this.runId)) {
@@ -324,6 +330,8 @@ class CustodyChild extends EventEmitter {
     const status = await this.statusUntilAnswered();
     // This Engine does not own the attempt any more (fenced or unauthorized): it settles nothing and the owning Engine decides.
     if (status === null) return;
+    this.invocationDigest = status.invocationDigest;
+    this.executableSha256 = status.executableSha256;
     // The Host answers for the invocation, so a condition an earlier Engine recorded no longer stands.
     this.engine.custodyClearUnresolved(this.custodyId, status);
     // A record that never reached a running CLI is not a process to observe; it was never launched and is never launched again.
@@ -414,6 +422,8 @@ class CustodyChild extends EventEmitter {
     }
     if (status === null) return;
     this.custodyState = status.state;
+    this.terminalStatus = structuredClone(status);
+    this.processTreeEnded = status.processTreeEnded === true;
     this.spoolComplete = status.spoolComplete === true;
     let code = null, outcomeSignal = null;
     if (HOST_ENDED.has(status.state)) outcomeSignal = status.state;
@@ -476,6 +486,7 @@ export function installCustody(Engine) {
     try {
       const attached = await this.custodyHost.custody('custody.attach', { generation: this.custodyHost.context.generation });
       this.custodyEpoch = attached.epoch;
+      this.custodyHostPid = attached.hostPid;
       this.custodyUnavailable = null;
     } catch (error) {
       this.custodyUnavailable = `Process Custody is unavailable: ${error.message}`;
@@ -736,13 +747,16 @@ export function installCustody(Engine) {
     return { stdout: bytes('stdout'), stderr: bytes('stderr'), normalized: bytes('normalized') };
   };
 
-  // Whether an attempt may run under Process Custody. Only plain top-level agent attempts qualify; anything else keeps the
-  // existing launch path, so Custody never owns a process whose recovery it cannot reconstruct.
-  // `mapped` attempts are Map-step steps, which have their own dispatch and settlement and are never Host-owned in this PoC.
+  // Custody accepts plain top-level Agent Attempts and the exact Engine-registered P5 verification Gate. Other node types
+  // keep their existing launch path so Custody never owns a process whose recovery it cannot reconstruct. `mapped` attempts
+  // are Map-step steps, which have their own dispatch and settlement and are never Host-owned in this PoC.
   P.custodyScopeAllows = function custodyScopeAllows(node, record) {
     // An explicit Custody requirement stays fail-closed even if its Host bootstrap is missing.
-    return Boolean(this.custodyHost || this.processCustodyRequired) && !this.hostAuthority && !record.mapped && !record.taskExecutionId
-      && record.loops.length === 0 && !node.config.contextId;
+    const plainTopLevel = Boolean(record) && !record.mapped && !record.taskExecutionId && record.loops?.length === 0;
+    const agent = node?.type === 'agent' && plainTopLevel && !node.config.contextId;
+    const p5Gate = node?.type === 'gate' && node.config?.mode === 'self-repair-verify' && plainTopLevel
+      && record.p5ProtectedGate === true && this.protectedSelfRepairGateRecords?.has(record) === true;
+    return Boolean(this.custodyHost || this.processCustodyRequired) && !this.hostAuthority && (agent || p5Gate);
   };
 
   P.custodyEligible = function custodyEligible(node, record) {
@@ -790,6 +804,26 @@ export function installCustody(Engine) {
       }
       const workspace = this.workspaceOf(state);
       const keys = [`cwd:${workspace.cwd_identity}`];
+      if (node.type === 'gate' && node.config?.mode === 'self-repair-verify') {
+        const record = { runId, loops: [], provider: 'p5-verifier', keys, child: null,
+          stopRequested: runRow.state === 'stopping', timedOut: false, launched: false, custodyResume: true, p5ProtectedGate: true };
+        if (!this.protectedSelfRepairGateCanResume?.(state, node, attempt, record)) {
+          const binding = this.custodyBindingOf(attemptId);
+          if (binding) this.custodyCall('custody.stop', { custodyId: binding.custody_id }).catch(() => {});
+          this.store.transaction(() => this.store.appendEvents(runId, this.attemptTransition(attempt, 'interrupted',
+            'The Engine cannot resume this Process Custody Gate without its exact durable P5 verification plan.')));
+          continue;
+        }
+        this.protectedSelfRepairGateRecords.add(record);
+        record.exited = new Promise(done => { record.resolveExit = done; });
+        for (const key of keys) { this.locks.add(key); this.store.run('INSERT INTO resource_locks(resource_key, run_id, attempt_id, acquired_at) VALUES (?, ?, ?, ?)', key, runId, attemptId, nowIso()); }
+        this.processes.set(attemptId, record);
+        this.resumeProtectedSelfRepairGate(state, node, attempt, workspace, record).catch(error => {
+          try { this.failAttempt(state, this.store.get('SELECT * FROM attempts WHERE id = ?', attemptId), 'process', error.message); }
+          catch (journalError) { this.storageUnavailable(journalError); }
+        }).finally(() => this.releaseAgent(state, attempt, record));
+        continue;
+      }
       // A run that was stopping when its Engine ended still wants its CLI stopped: the Stop is issued again once the child attaches.
       const record = { runId, loops: [], provider: node.config.provider, keys, child: null, stopRequested: runRow.state === 'stopping', timedOut: false, launched: false,
         custodyResume: true };

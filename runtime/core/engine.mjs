@@ -10,6 +10,10 @@ import { INPUT, M1_MAXIMUM_TIMEOUT, PROVIDERS, RETURN, capabilityIssues, context
 import { ADAPTER_VERSION, defaultAdapters, outputContractText, parseJsonAnswer } from './adapters.mjs';
 import { isAlive, killTree, launch, processStartTime } from './processes.mjs';
 import { UtilityError, captureFiles, jsonValue, ref, resolvePointer, runUtility, textValue, values as valueHelpers } from './utilities.mjs';
+import { loadP5EnrollmentWithHostIdentity, P5_ENROLLMENT_RELATIVE_PATH, P5_EVENT_TYPES, validateP5Contract, verifyP5EnrollmentFileCurrent,
+  verifyP5GitBaselineCurrent, prepareP5WorkspaceFromIntent, captureP5VerificationInputs, verifyP5VerificationInputsCurrent,
+  sealP5Candidate, verifyP5RunningSourceInventory, verifyP5Receipt, inventoryP5SourceWithHost } from './protectedSelfRepair.mjs';
+import { installProtectedSelfRepairGate } from './p5Gate.mjs';
 import { transportSchema } from './transport.mjs';
 import { allNodesDeep, bodyPrefix, enclosingLoops, fingerprints, parseInstance, requiredSet, returnSources } from './planning.mjs';
 import * as gate from './gate.mjs';
@@ -93,11 +97,23 @@ export function routeCase(cases, selected) {
 }
 
 export class Engine {
-  constructor({ root, adapters = defaultAdapters, processContainment = 'standalone-best-effort', supervisorGeneration = randomUUID(), runtimeInstanceId = randomUUID(), nodeExecutable = process.execPath, bridgeScript = resolve(import.meta.dirname, '../../mcp/bridge.mjs'), externalRunConfirmationOverride = null, maximumAgentTimeoutSeconds = M1_MAXIMUM_TIMEOUT, detectionTtlMs = 30_000, loopMinuteMs = 60_000, supervisor = null, hostAuthority = null, hostRuntimeGeneration = null, hostPolicyId = null,hostVerificationOnly=false, judgeAttentionEnabled=false, lifecycleHost = null, custodyHost = null, processCustodyRequired = false } = {}) {
+  constructor({ root, adapters = defaultAdapters, processContainment = 'standalone-best-effort', supervisorGeneration = randomUUID(), runtimeInstanceId = randomUUID(), nodeExecutable = process.execPath, bridgeScript = resolve(import.meta.dirname, '../../mcp/bridge.mjs'), externalRunConfirmationOverride = null, maximumAgentTimeoutSeconds = M1_MAXIMUM_TIMEOUT, detectionTtlMs = 30_000, loopMinuteMs = 60_000, supervisor = null, hostAuthority = null, hostRuntimeGeneration = null, hostPolicyId = null,hostVerificationOnly=false, judgeAttentionEnabled=false, lifecycleHost = null, lifecycleClient = null, custodyHost = null, processCustodyRequired = false } = {}) {
     // Process Custody (PoC) owns CLIs through the Lifecycle Host. A Local Control Host binding has its own run permits, so the
     // two are not combined in this PoC.
     if ((custodyHost || processCustodyRequired) && hostAuthority) throw new Error('Process Custody is not available with a Local Control Host binding in this PoC.');
     this.judgeAttentionEnabled = judgeAttentionEnabled === true;
+    // P5 enrollment may be loaded during managed startup, but admission stays disabled until every
+    // lifecycle stage and its Host recovery proofs, atomic acceptance and handoff are verified.
+    this.protectedSelfRepairEnrollment = null;
+    this.protectedSelfRepairEnrollmentFile = null;
+    this.protectedSelfRepairEnrollmentArtifact = null;
+    this.protectedSelfRepairUnavailableReason = null;
+    this.protectedSelfRepairAdmissionEnabled = false;
+    this.protectedSelfRepairRunAdmissions = new WeakSet();
+    this.protectedSelfRepairRepairAdmissions = new WeakSet();
+    this.protectedSelfRepairAcceptanceAdmissions = new WeakSet();
+    this.protectedSelfRepairGateRecords = new WeakSet();
+    this.custodyHostPid = null;
     this.store = new Store(root);
     // ADR-0006: outer authority from a Local Control Host, when this runtime is registered with one.
     this.hostAuthority = hostAuthority;
@@ -105,6 +121,7 @@ export class Engine {
     this.hostVerificationOnly=hostVerificationOnly;
     this.hostPolicyId = hostPolicyId;
     this.lifecycleHost = lifecycleHost;
+    this.lifecycleClient = lifecycleClient;
     // Process Custody state: the Host bridge, this Engine's epoch, why custody is unusable (if it is), and the runs to resume.
     this.custodyHost = custodyHost; this.processCustodyRequired = processCustodyRequired === true;
     this.custodyEpoch = null;
@@ -153,7 +170,9 @@ export class Engine {
   off(...args) { return this.store.off(...args); }
   emit(...args) { return this.store.emit(...args); }
 
-  async initialize() {
+  async initialize({ beforeRecovery } = {}) {
+    if (beforeRecovery !== undefined && typeof beforeRecovery !== 'function')
+      throw new TypeError('Engine initialize beforeRecovery must be a function.');
     this.reconcileIncidentSpool();
     if (!this.store.get('SELECT * FROM application_settings WHERE singleton = 1')) {
       const artifact = this.store.putJson(DEFAULT_SETTINGS);
@@ -176,7 +195,12 @@ export class Engine {
     });
     this.expireRunRequests();
     if (this.custodyHost) await this.custodyAttach();
+    // Managed startup uses this boundary to load Host-verified P5 enrollment before recovery can
+    // reconcile or resume a protected run. The callback is optional for legacy and test Engines.
+    if (beforeRecovery) await beforeRecovery();
     await this.recover();
+    await this.reconcileProtectedSelfRepairPreparations();
+    this.reconcileProtectedSelfRepairProjections();
     this.resumeCustodyAttempts();
     if (this.custodyHost) this.startCustodyHoldReconciler();
     else if (this.store.get(`SELECT COUNT(*) AS n FROM custody_workspace_holds WHERE state = 'held'`).n) {
@@ -187,6 +211,845 @@ export class Engine {
     this.reconcileContinuations();
     this.initializeJudgeAttention();
     this.initializeWorkflowJudge();
+  }
+
+  // P5 enrollment is loaded before recovery only after Custody attachment. The Host re-hashes its
+  // active package and binds the request to this managed Engine PID; local Git state and the build
+  // label are not source provenance.
+  async initializeProtectedSelfRepairEnrollment() {
+    this.protectedSelfRepairEnrollment = null;
+    this.protectedSelfRepairEnrollmentFile = null;
+    this.protectedSelfRepairEnrollmentArtifact = null;
+    this.protectedSelfRepairUnavailableReason = null;
+    const profileRoot = this.lifecycleHost?.profileRoot;
+    if (!profileRoot || !existsSync(join(profileRoot, P5_ENROLLMENT_RELATIVE_PATH))) return false;
+    if (!this.lifecycleClient || !this.custodyHost || this.custodyUnavailable || !this.custodyEpoch) {
+      this.protectedSelfRepairUnavailableReason = 'P5 enrollment requires the managed Lifecycle Host and an attached Process Custody Host.';
+      return false;
+    }
+    try {
+      const runningSourceRelease = await this.lifecycleClient.runningSourceRelease({ pid: process.pid });
+      const readers = this.protectedSelfRepairHostReaders();
+      const loaded = await loadP5EnrollmentWithHostIdentity({ profileRoot, store: this.store,
+        installationId: this.lifecycleHost.installationId, runningSourceRelease, ...readers });
+      if (!loaded) return false;
+      await verifyP5RunningSourceInventory({ store: this.store, enrollment: loaded.enrollment,
+        currentRunningSourceRelease: runningSourceRelease, generation: this.lifecycleHost.generation,
+        readBatch: paths => this.lifecycleClient.runningSourceInventory({ pid: process.pid, paths }) });
+      this.protectedSelfRepairEnrollment = loaded.enrollment;
+      this.protectedSelfRepairEnrollmentFile = loaded;
+      this.protectedSelfRepairEnrollmentArtifact = ref(this.store.putJson(loaded.enrollment));
+      return true;
+    } catch (error) {
+      this.protectedSelfRepairUnavailableReason = `${error.code || 'p5_enrollment_unavailable'}: ${error.message}`;
+      process.stderr.write(`Protected Self-Repair enrollment was refused: ${this.protectedSelfRepairUnavailableReason}\n`);
+      return false;
+    }
+  }
+
+  protectedSelfRepairHostReaders() {
+    const generation = this.lifecycleHost?.generation || this.custodyHost?.context?.generation;
+    if (!this.custodyHost || typeof this.custodyHost.custody !== 'function' || !generation || !Number.isSafeInteger(this.custodyEpoch))
+      throw new ApiError(409, 'p5_host_unavailable', 'P5 requires the current generation and epoch fenced Rust Process Custody Host.');
+    return {
+      nativeSourceReader: request => this.custodyHost.custody('custody.source_identity', { generation, epoch: this.custodyEpoch, ...request }),
+      nativeToolIdentityReader: request => this.custodyHost.custody('custody.tool_identity', { generation, epoch: this.custodyEpoch, ...request }),
+      expectedHostPid: this.custodyHostPid, expectedGeneration: generation, expectedEpoch: this.custodyEpoch,
+    };
+  }
+
+  async verifyProtectedSelfRepairEnrollmentFileCurrent() {
+    const file = this.protectedSelfRepairEnrollmentFile;
+    if (!file) throw new ApiError(409, 'p5_enrollment_unavailable', 'No installation-owned P5 enrollment file is loaded.');
+    return verifyP5EnrollmentFileCurrent({ ...file, ...this.protectedSelfRepairHostReaders() });
+  }
+
+  async prepareProtectedSelfRepairParentRunAdmission({ publication, workflow }) {
+    const enrollment = this.protectedSelfRepairEnrollment;
+    const enrollmentFile = this.protectedSelfRepairEnrollmentFile;
+    if (!enrollment || !enrollmentFile || !this.protectedSelfRepairEnrollmentArtifact)
+      throw new ApiError(409, 'p5_enrollment_unavailable', this.protectedSelfRepairUnavailableReason || 'No valid installation-owned P5 enrollment is loaded.');
+    if (!this.lifecycleClient || !this.lifecycleHost?.generation || !this.custodyHost || this.custodyUnavailable || !this.custodyEpoch)
+      throw new ApiError(409, 'p5_host_unavailable', 'P5 Parent admission requires the managed Lifecycle Host and attached Process Custody Host.');
+    if (!publication || publication.workflow_id !== enrollment.parentPublication.workflowId
+      || publication.id !== enrollment.parentPublication.publishedVersionId || publication.version !== enrollment.parentPublication.version
+      || publication.snapshot_sha256 !== enrollment.parentPublication.snapshotSha256
+      || workflow.workflowId !== enrollment.parentPublication.workflowId)
+      throw new ApiError(409, 'p5_publication_mismatch', 'This P5 Run does not use the exact enrolled Parent publication.');
+    const profileMatches = (workflow.judgePolicy?.repairProfiles || []).filter(item => item.selfRepair
+      && canonicalHash(item.selfRepair) === canonicalHash(enrollment.profile));
+    if (profileMatches.length !== 1)
+      throw new ApiError(409, 'p5_profile_mismatch', 'The enrolled Parent publication must contain exactly one Repair profile bound to the enrolled P5 profile artifact.');
+    const repairPublication = this.store.get(`SELECT p.*, a.sha256 AS snapshot_sha256 FROM workflow_publications p
+      JOIN artifacts a ON a.id = p.snapshot_artifact_id WHERE p.id = ? AND p.workflow_id = ? AND p.runnable = 1`,
+      enrollment.repairPublication.publishedVersionId, enrollment.repairPublication.workflowId);
+    if (!repairPublication || repairPublication.version !== enrollment.repairPublication.version
+      || repairPublication.snapshot_sha256 !== enrollment.repairPublication.snapshotSha256)
+      throw new ApiError(409, 'p5_publication_mismatch', 'The enrolled Repair publication is missing or its immutable snapshot changed.');
+    try {
+      const external = await this.verifyProtectedSelfRepairEnrollmentFileCurrent();
+      if (canonicalHash(external) !== canonicalHash(enrollment))
+        throw Object.assign(new Error('The installed P5 enrollment changed.'), { code: 'p5_enrollment_changed' });
+      const currentRunningSourceRelease = await this.lifecycleClient.runningSourceRelease({ pid: process.pid });
+      const readers = this.protectedSelfRepairHostReaders();
+      const currentBaseline = await verifyP5GitBaselineCurrent({ store: this.store, enrollment, currentRunningSourceRelease, ...readers });
+      const admission = Object.freeze({ kind: 'p5-parent-run-admission', enrollment, enrollmentRef: this.protectedSelfRepairEnrollmentArtifact,
+        baseline: currentBaseline, publication: enrollment.parentPublication, profile: enrollment.profile,
+        runningSourceRelease: enrollment.runningSourceRelease, lifecycleGeneration: this.lifecycleHost.generation });
+      this.protectedSelfRepairRunAdmissions.add(admission);
+      return admission;
+    } catch (error) {
+      throw new ApiError(409, error.code || 'p5_admission_unavailable', `Protected Self-Repair admission was refused: ${error.message}`);
+    }
+  }
+
+  protectedSelfRepairJournalRecordRef(runId, type) {
+    const events = this.store.readEvents(runId).filter(item => item.type === type);
+    if (events.length !== 1 || !events[0].payload?.record) return null;
+    const recordRef = events[0].payload.record;
+    this.store.verifyRef(recordRef);
+    return recordRef;
+  }
+
+  async prepareProtectedSelfRepairRepairAdmission({ state, attempt, attention, context, decision }) {
+    if (decision?.action?.type !== 'request_repair') return null;
+    const parent = this.requireRun(state.id);
+    const parentWorkflow = this.store.readJson(parent.workflow_snapshot_artifact_id);
+    const profile = parentWorkflow.judgePolicy?.repairProfiles?.find(item => item.profileId === decision.action.repairProfileId);
+    if (!profile?.selfRepair) return null;
+    if (this.protectedSelfRepairAdmissionEnabled !== true)
+      throw new ApiError(409, 'p5_admission_unavailable', 'P5 Repair remains fail-closed until candidate capture, trusted verification, atomic acceptance and recovery are all enabled. No Repair was opened.');
+    const enrollment = this.protectedSelfRepairEnrollment;
+    const enrollmentFile = this.protectedSelfRepairEnrollmentFile;
+    const enrollmentRef = this.protectedSelfRepairEnrollmentArtifact;
+    if (!enrollment || !enrollmentFile || !enrollmentRef || !this.lifecycleClient || !this.lifecycleHost?.generation
+      || !this.custodyHost || this.custodyUnavailable || !Number.isSafeInteger(this.custodyEpoch))
+      throw new ApiError(409, 'p5_enrollment_unavailable', this.protectedSelfRepairUnavailableReason || 'The installed P5 enrollment and current Lifecycle/Custody Host proof are unavailable.');
+    if (context?.kind !== 'failure' || context.incidentId !== attention?.incidentId || attention?.runId !== parent.id
+      || attention?.judgeAttemptId !== attempt?.id || !parentWorkflow.capabilities?.includes('protected-self-repair-v1')
+      || parent.published_version_id !== enrollment.parentPublication.publishedVersionId
+      || parentWorkflow.workflowId !== enrollment.parentPublication.workflowId
+      || profile.selfRepair.artifactId !== enrollment.profile.artifactId || profile.selfRepair.sha256 !== enrollment.profile.sha256
+      || profile.repairWorkflowId !== enrollment.repairPublication.workflowId
+      || profile.repairPublishedVersion !== enrollment.repairPublication.version
+      || profile.repairWorkflowSnapshotSha256 !== enrollment.repairPublication.snapshotSha256
+      || profile.repairWorkspaceId !== enrollment.workspace.workspaceId
+      || profile.acceptanceMode !== 'judge_post_execution')
+      throw new ApiError(409, 'p5_repair_profile_mismatch', 'The exact P4 request, enrolled Parent, P5 profile and Repair publication do not agree.');
+    const targetOutcomes = (context.outcomes || []).filter(item => item.outcome?.nodeInstanceId === profile.failedNodeInstanceId);
+    if (targetOutcomes.length !== 1)
+      throw new ApiError(409, 'p5_incident_outcome_mismatch', 'P5 requires exactly one current P3 outcome for its enrolled failed node.');
+    const enrolledProfile = this.store.readJson(enrollment.profile.artifactId);
+    const capturedInputs = captureP5VerificationInputs({ store: this.store, enrollment, profile: enrolledProfile,
+      parentRunId: parent.id, incidentId: attention.incidentId, outcome: targetOutcomes[0].outcome });
+    this.store.verifyRef(profile.selfRepair);
+    const sourceBindingRef = this.protectedSelfRepairJournalRecordRef(parent.id, 'self_repair.source_bound');
+    if (!sourceBindingRef) throw new ApiError(409, 'p5_source_binding_missing', 'The Parent Run has no unique, durable P5 source binding.');
+    const sourceBinding = this.store.readJson(sourceBindingRef.artifactId);
+    validateP5Contract('sourceBinding', sourceBinding);
+    const parentSnapshot = this.store.artifactRow(parent.workflow_snapshot_artifact_id);
+    if (sourceBinding.parentRunId !== parent.id || sourceBinding.parentSnapshot.artifactId !== parentSnapshot.id
+      || sourceBinding.parentSnapshot.sha256 !== parentSnapshot.sha256 || sourceBinding.enrollmentId !== enrollment.enrollmentId
+      || sourceBinding.baselineId !== enrollment.baselineId || sourceBinding.parentPublication.publishedVersionId !== parent.published_version_id
+      || sourceBinding.profile.artifactId !== enrollment.profile.artifactId || sourceBinding.profile.sha256 !== enrollment.profile.sha256)
+      throw new ApiError(409, 'p5_source_binding_mismatch', 'The durable Parent source binding does not match this P4/P2 request.');
+    try {
+      const installed = await this.verifyProtectedSelfRepairEnrollmentFileCurrent();
+      if (canonicalHash(installed) !== canonicalHash(enrollment))
+        throw Object.assign(new Error('The installed P5 enrollment changed.'), { code: 'p5_enrollment_changed' });
+      const currentRunningSourceRelease = await this.lifecycleClient.runningSourceRelease({ pid: process.pid });
+      const readers = this.protectedSelfRepairHostReaders();
+      const currentBaseline = await verifyP5GitBaselineCurrent({ store: this.store, enrollment, currentRunningSourceRelease, ...readers });
+      const admission = Object.freeze({ kind: 'p5-repair-run-admission', parentRunId: parent.id, parentPublicationId: parent.published_version_id,
+        parentSnapshot: { artifactId: parentSnapshot.id, sha256: parentSnapshot.sha256 }, decisionDigest: canonicalHash(decision),
+        judgeAttemptId: attempt.id, attentionKey: attention.attentionKey, incidentId: attention.incidentId, profileId: profile.profileId,
+        profileDigest: canonicalHash(profile), enrollment, enrollmentRef, sourceBindingRef, baseline: currentBaseline,
+        verificationInputsRef: capturedInputs.artifact, outcomeId: targetOutcomes[0].outcome.outcomeId,
+        outcomeRevision: targetOutcomes[0].outcome.revision, outcomeDigest: canonicalHash(targetOutcomes[0].outcome),
+        lifecycleGeneration: this.lifecycleHost.generation });
+      this.protectedSelfRepairRepairAdmissions.add(admission);
+      return admission;
+    } catch (error) {
+      throw new ApiError(409, error.code || 'p5_admission_unavailable', 'Protected Self-Repair P2 admission was refused: ' + error.message);
+    }
+  }
+
+  assertProtectedSelfRepairRepairAdmission(admission, { parentRunId, profile, attention, decision, context }) {
+    const parent = this.store.get('SELECT * FROM runs WHERE id = ?', parentRunId);
+    const parentSnapshot = parent && this.store.artifactRow(parent.workflow_snapshot_artifact_id);
+    const targetOutcomes = (context?.outcomes || []).filter(item => item.outcome?.nodeInstanceId === profile?.failedNodeInstanceId);
+    if (!admission || !this.protectedSelfRepairRepairAdmissions.has(admission) || admission.kind !== 'p5-repair-run-admission'
+      || admission.parentRunId !== parentRunId || admission.profileId !== profile?.profileId
+      || admission.profileDigest !== canonicalHash(profile) || admission.attentionKey !== attention?.attentionKey
+      || admission.incidentId !== attention?.incidentId || admission.decisionDigest !== canonicalHash(decision)
+      || admission.judgeAttemptId !== attention?.judgeAttemptId || !parent || admission.parentPublicationId !== parent.published_version_id
+      || !parentSnapshot || admission.parentSnapshot.artifactId !== parentSnapshot.id || admission.parentSnapshot.sha256 !== parentSnapshot.sha256
+      || !admission.verificationInputsRef || targetOutcomes.length !== 1 || admission.outcomeId !== targetOutcomes[0].outcome.outcomeId
+      || admission.outcomeRevision !== targetOutcomes[0].outcome.revision || admission.outcomeDigest !== canonicalHash(targetOutcomes[0].outcome)
+      || admission.enrollment?.enrollmentId !== this.protectedSelfRepairEnrollment?.enrollmentId)
+      throw new ApiError(409, 'p5_admission_invalid', 'P5 P2 requires the exact Engine-issued enrollment, Parent, Judge Attempt and Repair decision admission.');
+    this.store.verifyRef(admission.verificationInputsRef);
+    const inputs = this.store.readJson(admission.verificationInputsRef.artifactId);
+    validateP5Contract('verificationInputs', inputs);
+    if (inputs.incidentId !== attention.incidentId || inputs.outcomeId !== admission.outcomeId
+      || inputs.outcomeRevision !== admission.outcomeRevision
+      || canonicalHash(inputs.verificationPolicy) !== canonicalHash(admission.enrollment.verificationPolicy))
+      throw new ApiError(409, 'p5_verification_inputs_stale', 'P5 pre-captured incident inputs no longer match the current Judge attention and P3 outcome.');
+    const outcomeRow = this.store.get('SELECT outcome_json FROM failure_outcomes WHERE outcome_id = ? AND run_id = ?', admission.outcomeId, parentRunId);
+    if (!outcomeRow) throw new ApiError(409, 'p5_verification_inputs_stale', 'The exact P3 outcome row disappeared before the P2 transaction.');
+    const outcome = parseStrictJson(outcomeRow.outcome_json);
+    if (canonicalHash(outcome) !== admission.outcomeDigest || canonicalHash(outcome) !== canonicalHash(targetOutcomes[0].outcome))
+      throw new ApiError(409, 'p5_verification_inputs_stale', 'The persisted P3 outcome changed before the P2 transaction.');
+    const enrolledProfile = this.store.readJson(admission.enrollment.profile.artifactId);
+    try { verifyP5VerificationInputsCurrent({ store: this.store, enrollment: admission.enrollment, profile: enrolledProfile, parentRunId, inputs }); }
+    catch (error) { throw new ApiError(409, error.code || 'p5_verification_inputs_stale', error.message); }
+    return admission;
+  }
+
+  async prepareProtectedSelfRepairAcceptanceAdmission({ state, attempt, attention, context, decision, evidence }) {
+    if (decision?.action?.type !== 'accept_repair' || !context?.p5Review) return null;
+    const fail = (code, message) => { throw new ApiError(409, code, message); };
+    const link = context.link;
+    const p5Review = context.p5Review;
+    if (this.protectedSelfRepairAdmissionEnabled !== true)
+      fail('p5_acceptance_unavailable', 'P5 acceptance remains fail-closed until the complete lifecycle and recovery proofs are enabled.');
+    const projection = this.protectedSelfRepairRunProjection?.(state.id);
+    if (!projection || projection.issues.length || projection.stage !== 'judge_pending')
+      fail('p5_projection_unavailable', 'P5 acceptance requires an intact journal projection with the exact verified candidate pending its designated Repair Judge.');
+    if (!link || link.repair_run_id !== state.id || link.state !== 'open' || link.decision_status !== 'pending'
+      || link.acceptance_mode !== 'judge_post_execution' || !this.logicalRepairLinkIntact(link)
+      || attention?.runId !== state.id || attention?.judgeAttemptId !== attempt?.id
+      || context.kind !== 'repair_approval')
+      fail('p5_acceptance_stale', 'P5 acceptance requires the exact open P2 link and its designated Repair Judge Attempt.');
+    const parent = this.store.get('SELECT * FROM runs WHERE id = ?', link.parent_run_id);
+    if (!parent || ['stopping', 'succeeded', 'failed', 'canceled', 'interrupted'].includes(parent.state)
+      || !['suspension_requested', 'suspended_for_repair'].includes(link.parent_suspension_state))
+      fail('p5_acceptance_stale', 'Parent Stop or a changed P2 suspension blocks P5 acceptance.');
+    if (!this.lifecycleClient || !this.lifecycleHost?.generation || !this.custodyHost || this.custodyUnavailable
+      || !Number.isSafeInteger(this.custodyEpoch) || !this.protectedSelfRepairEnrollmentFile
+      || !this.protectedSelfRepairEnrollmentArtifact || !this.protectedSelfRepairEnrollment)
+      fail('p5_host_unavailable', this.protectedSelfRepairUnavailableReason || 'P5 acceptance requires the current enrolled Lifecycle and Custody Hosts.');
+    if (this.store.readEvents(state.id).some(item => item.type === 'self_repair.candidate_invalidated'))
+      fail('p5_candidate_invalidated', 'A durable P5 invalidation already revokes this candidate.');
+    if (!this.workflowJudgeP5ReviewDelivered(state, attention, evidence, p5Review))
+      fail('p5_review_delivery_missing', 'The exact complete P5 review dossier was not delivered to the current Judge Attempt.');
+    const deliveryLineage = this.workflowJudgeP5ReviewDeliveryLineage(state, attention, evidence, p5Review);
+    if (!deliveryLineage) fail('p5_review_delivery_missing', 'P5 review delivery has no verifiable Judge event lineage.');
+
+    const enrollment = this.protectedSelfRepairEnrollment;
+    const invalidateCandidate = reason => this.store.transaction(() =>
+      this.invalidateProtectedSelfRepairCandidateInTransaction?.(link, reason));
+    try {
+      const installed = await this.verifyProtectedSelfRepairEnrollmentFileCurrent();
+      if (canonicalHash(installed) !== canonicalHash(enrollment))
+        throw Object.assign(new Error('The installed P5 enrollment changed.'), { code: 'p5_enrollment_changed' });
+      const currentRunningSourceRelease = await this.lifecycleClient.runningSourceRelease({ pid: process.pid });
+      const readers = this.protectedSelfRepairHostReaders();
+      await verifyP5GitBaselineCurrent({ store: this.store, enrollment, currentRunningSourceRelease, ...readers });
+      await verifyP5RunningSourceInventory({ store: this.store, enrollment, currentRunningSourceRelease,
+        generation: this.lifecycleHost.generation,
+        readBatch: paths => this.lifecycleClient.runningSourceInventory({ pid: process.pid, paths }) });
+
+      const candidate = p5Review.candidate;
+      const receipt = p5Review.receipt;
+      this.store.verifyRef(p5Review.candidateRef);
+      this.store.verifyRef(p5Review.receiptRef);
+      verifyP5Receipt(receipt, { store: this.store, candidateRef: p5Review.candidateRef,
+        gateAttemptId: receipt.gateAttemptId, terminalEvidenceRef: receipt.terminalEvidence });
+      let workspaceMatches = false;
+      try {
+        workspaceMatches = candidate.repairRunId === state.id && candidate.parentRunId === link.parent_run_id
+          && candidate.linkId === link.id && candidate.incidentId === link.incident_id
+          && candidate.enrollment?.artifactId === this.protectedSelfRepairEnrollmentArtifact.artifactId
+          && candidate.enrollment?.sha256 === this.protectedSelfRepairEnrollmentArtifact.sha256
+          && candidate.workspace.workspaceId === enrollment.workspace.workspaceId
+          && candidate.workspace.allocationId === enrollment.workspace.allocationId
+          && canonicalPath(candidate.workspace.canonicalRoot) === canonicalPath(enrollment.workspace.canonicalRoot)
+          && canonicalPath(candidate.workspace.sourceRoot) === canonicalPath(resolve(candidate.workspace.canonicalRoot, 'source'));
+      } catch { workspaceMatches = false; }
+      if (!workspaceMatches) {
+        invalidateCandidate('authorization_changed');
+        fail('p5_candidate_binding_mismatch', 'P5 candidate identities no longer match the enrolled workspace, P2 link and current Repair.');
+      }
+
+      const sourceManifest = this.store.readJson(candidate.sourceManifest.artifactId);
+      const expectedEntries = sourceManifest.entries.map(({ artifact: _artifact, ...entry }) => entry);
+      const executableModes = new Map(expectedEntries.map(entry => [entry.path, entry.executable]));
+      let currentCandidate;
+      try {
+        currentCandidate = await inventoryP5SourceWithHost(candidate.workspace.sourceRoot, {
+          nativeSourceReader: readers.nativeSourceReader,
+          maxFiles: enrollment.budgets.maxSourceFiles,
+          maxBytes: enrollment.budgets.maxSourceBytes,
+          include: ['**'], exclude: [], executableFor: path => executableModes.get(path) ?? false });
+      } catch (error) {
+        const reason = ['p5_host_unavailable', 'p5_native_identity_unavailable', 'p5_native_identity_mismatch'].includes(error.code)
+          ? 'host_uncertain' : 'source_drift';
+        invalidateCandidate(reason);
+        fail('p5_candidate_source_unavailable', `The current candidate source could not be proven and its eligibility was revoked: ${error.message}`);
+      }
+      const captureEvidence = this.store.readJson(candidate.sourceCaptureEvidence.artifactId);
+      if (currentCandidate.sourceDigest !== candidate.candidateSourceDigest
+        || canonicalHash(currentCandidate.entries) !== canonicalHash(expectedEntries)
+        || canonicalHash(currentCandidate.nativeEvidence.rootIdentity) !== canonicalHash(captureEvidence.rootIdentity)) {
+        invalidateCandidate('source_drift');
+        fail('p5_candidate_source_drift', 'The live candidate source no longer matches the sealed candidate and was durably invalidated.');
+      }
+      const authRow = this.store.artifactRow(link.authorization_artifact_id);
+      if (!authRow?.sha256) fail('p5_authorization_missing', 'The exact P2 authorization artifact is unavailable.');
+      const admission = Object.freeze({ kind: 'p5-repair-acceptance-admission', repairRunId: state.id,
+        parentRunId: link.parent_run_id, linkId: link.id, incidentId: link.incident_id,
+        judgeAttemptId: attempt.id, attentionKey: attention.attentionKey, decisionDigest: canonicalHash(decision),
+        candidateRef: p5Review.candidateRef, candidateId: candidate.candidateId,
+        candidateSourceDigest: candidate.candidateSourceDigest, receiptRef: p5Review.receiptRef,
+        receiptId: receipt.receiptId, gateAttemptId: receipt.gateAttemptId,
+        p2Authorization: { artifactId: link.authorization_artifact_id, sha256: authRow.sha256 },
+        sourceIntegrityRevision: p5Review.sourceIntegrityRevision, retentionRevision: p5Review.retentionRevision,
+        requiredReviewSetDigest: p5Review.dossier.requiredReviewSetDigest,
+        reviewDelivery: { attentionKey: attention.attentionKey, evidenceArtifact: attention.evidenceArtifact,
+          expansionArtifact: evidence.expandedEvidence.artifact, ...deliveryLineage },
+        lifecycleGeneration: this.lifecycleHost.generation, engineEpoch: this.custodyEpoch });
+      this.protectedSelfRepairAcceptanceAdmissions.add(admission);
+      return admission;
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      throw new ApiError(409, error.code || 'p5_acceptance_unavailable', 'P5 Repair acceptance was refused: ' + error.message);
+    }
+  }
+
+  assertProtectedSelfRepairAcceptanceAdmission(admission, { state, attempt, attention, context, decision, evidence }) {
+    const link = context?.link;
+    const p5Review = context?.p5Review;
+    const deliveryLineage = p5Review && this.workflowJudgeP5ReviewDeliveryLineage(state, attention, evidence, p5Review);
+    const expectedDelivery = deliveryLineage ? { attentionKey: attention.attentionKey, evidenceArtifact: attention.evidenceArtifact,
+      expansionArtifact: evidence?.expandedEvidence?.artifact, ...deliveryLineage } : null;
+    const authRow = link && this.store.artifactRow(link.authorization_artifact_id);
+    if (!admission || !this.protectedSelfRepairAcceptanceAdmissions.has(admission)
+      || admission.kind !== 'p5-repair-acceptance-admission' || decision?.action?.type !== 'accept_repair'
+      || admission.repairRunId !== state.id || admission.parentRunId !== link?.parent_run_id
+      || admission.linkId !== link?.id || admission.incidentId !== link?.incident_id
+      || admission.judgeAttemptId !== attempt?.id || admission.attentionKey !== attention?.attentionKey
+      || admission.decisionDigest !== canonicalHash(decision) || !p5Review
+      || canonicalHash(admission.candidateRef) !== canonicalHash(p5Review.candidateRef)
+      || admission.candidateId !== p5Review.candidate.candidateId
+      || admission.candidateSourceDigest !== p5Review.candidate.candidateSourceDigest
+      || canonicalHash(admission.receiptRef) !== canonicalHash(p5Review.receiptRef)
+      || admission.receiptId !== p5Review.receipt.receiptId || admission.gateAttemptId !== p5Review.receipt.gateAttemptId
+      || admission.sourceIntegrityRevision !== p5Review.sourceIntegrityRevision
+      || admission.retentionRevision !== p5Review.retentionRevision
+      || admission.requiredReviewSetDigest !== p5Review.dossier.requiredReviewSetDigest
+      || canonicalHash(admission.reviewDelivery) !== canonicalHash(expectedDelivery)
+      || !authRow?.sha256 || admission.p2Authorization.artifactId !== link.authorization_artifact_id
+      || admission.p2Authorization.sha256 !== authRow.sha256
+      || admission.lifecycleGeneration !== this.lifecycleHost?.generation
+      || admission.engineEpoch !== this.custodyEpoch
+      || !this.workflowJudgeP5ReviewDelivered(state, attention, evidence, p5Review)
+      || link.state !== 'open' || link.decision_status !== 'pending'
+      || this.store.readEvents(state.id).some(item => item.type === 'self_repair.candidate_invalidated'))
+      throw new ApiError(409, 'p5_acceptance_admission_invalid', 'P5 acceptance lost its exact Engine-issued candidate, receipt, review delivery or P2 binding before commit.');
+    return admission;
+  }
+
+  async captureProtectedSelfRepairDeveloperCandidate({ state, node, attempt, workspace, binding, record, outcome, current }) {
+    const link = this.logicalRepairLinkForRun(state.id);
+    const authorization = link && this.parentRepairAuthorization(link);
+    if (!authorization?.profile?.selfRepair) return null;
+    const fail = (code, message) => { throw new ApiError(409, code, message); };
+    if (link.state !== 'open' || link.repair_run_id !== state.id || !this.logicalRepairLinkIntact(link, this.store.get('SELECT * FROM runs WHERE id = ?', state.id)))
+      fail('p5_candidate_authorization_invalid', 'P5 candidate capture requires the exact intact, open P2 Repair link.');
+    if (this.protectedSelfRepairAdmissionEnabled !== true)
+      fail('p5_admission_unavailable', 'P5 candidate capture is unavailable while the complete protected lifecycle remains fail-closed.');
+    if (!this.protectedSelfRepairEnrollment || !this.protectedSelfRepairEnrollmentArtifact || !this.protectedSelfRepairEnrollmentFile
+      || canonicalHash(authorization.p5Enrollment) !== canonicalHash(this.protectedSelfRepairEnrollmentArtifact))
+      fail('p5_enrollment_unavailable', 'P5 candidate capture requires the exact currently loaded installation enrollment.');
+    for (const ref of [authorization.selfRepairProfile, authorization.p5Enrollment, authorization.p5SourceBinding, authorization.verificationInputs])
+      this.store.verifyRef(ref);
+    const profile = this.store.readJson(authorization.selfRepairProfile.artifactId);
+    const enrollment = this.protectedSelfRepairEnrollment;
+    validateP5Contract('profile', profile);
+    validateP5Contract('enrollment', enrollment);
+    if (profile.kind !== 'ProtectedSelfRepairProfile' || node.id !== profile.developerNodeId) return null;
+    if (node.type !== 'agent' || binding || record.mapped || record.taskExecutionId || record.loops.length !== 0
+      || node.config.contextId || !state.workflow.capabilities?.includes('protected-self-repair-v1'))
+      fail('p5_developer_execution_unsupported', 'The enrolled P5 Developer must be one top-level, context-free Agent Attempt.');
+    const p2Profile = authorization.profile;
+    if (p2Profile.selfRepair.artifactId !== enrollment.profile.artifactId || p2Profile.selfRepair.sha256 !== enrollment.profile.sha256
+      || authorization.repairRunId !== state.id || authorization.parentRunId !== link.parent_run_id
+      || authorization.incidentId !== link.incident_id || authorization.repairWorkspaceId !== enrollment.workspace.workspaceId
+      || !authorization.outcomeId || !Number.isSafeInteger(authorization.outcomeRevision))
+      fail('p5_candidate_authorization_invalid', 'The P2 Repair authorization differs from the enrolled P5 profile, source, incident or workspace.');
+    const priorCandidates = this.store.readEvents(state.id).filter(item => item.type === 'self_repair.candidate_captured');
+    if (priorCandidates.length) fail('p5_candidate_already_captured', 'P5 permits only one sealed candidate for this P2 Repair link.');
+    const events = this.store.readEvents(state.id);
+    const intents = events.filter(item => item.type === 'self_repair.preparation_intent');
+    const preparations = events.filter(item => item.type === 'self_repair.workspace_prepared');
+    if (intents.length !== 1 || preparations.length !== 1 || !intents[0].payload?.record || !preparations[0].payload?.record)
+      fail('p5_workspace_not_prepared', 'P5 candidate capture requires one durable preparation intent and one matching Host-verified prepared record.');
+    const intentRef = intents[0].payload.record, preparedRef = preparations[0].payload.record;
+    this.store.verifyRef(intentRef); this.store.verifyRef(preparedRef);
+    const intent = this.store.readJson(intentRef.artifactId);
+    const prepared = this.store.readJson(preparedRef.artifactId);
+    if (intent.parentRunId !== link.parent_run_id || intent.repairRunId !== state.id || intent.linkId !== link.id
+      || canonicalHash(intent.workspace) !== canonicalHash(enrollment.workspace)
+      || canonicalHash(intent.enrollment) !== canonicalHash(authorization.p5Enrollment)
+      || canonicalHash(intent.sourceBinding) !== canonicalHash(authorization.p5SourceBinding)
+      || canonicalHash(intent.verificationInputs) !== canonicalHash(authorization.verificationInputs)
+      || prepared.kind !== 'ProtectedSelfRepairWorkspacePreparation'
+      || prepared.intent.artifactId !== intentRef.artifactId || prepared.intent.sha256 !== intentRef.sha256
+      || prepared.workspaceRoot !== enrollment.workspace.canonicalRoot
+      || prepared.sourceRoot !== resolve(enrollment.workspace.canonicalRoot, 'source')
+      || canonicalHash(prepared.workspaceIdentity) !== canonicalHash(enrollment.workspace.nativeIdentity)
+      || prepared.baselineId !== enrollment.baselineId || prepared.sourceDigest !== enrollment.effectiveSourceDigest)
+      fail('p5_workspace_preparation_mismatch', 'The prepared workspace is not bound to this exact enrolled P2 authorization.');
+    const verificationInputs = this.store.readJson(authorization.verificationInputs.artifactId);
+    try { verifyP5VerificationInputsCurrent({ store: this.store, enrollment, profile,
+      parentRunId: link.parent_run_id, inputs: verificationInputs }); }
+    catch (error) { fail(error.code || 'p5_verification_input_stale', error.message); }
+    const sourceBindingRef = this.protectedSelfRepairJournalRecordRef(link.parent_run_id, 'self_repair.source_bound');
+    if (!sourceBindingRef || canonicalHash(sourceBindingRef) !== canonicalHash(authorization.p5SourceBinding))
+      fail('p5_source_binding_missing', 'P5 candidate capture requires the exact Parent source-binding event.');
+    const sourceBinding = this.store.readJson(sourceBindingRef.artifactId);
+    const installed = await this.verifyProtectedSelfRepairEnrollmentFileCurrent();
+    if (canonicalHash(installed) !== canonicalHash(enrollment))
+      fail('p5_enrollment_changed', 'The installed P5 enrollment changed before Developer candidate capture.');
+      const currentRunningSourceRelease = await this.lifecycleClient.runningSourceRelease({ pid: process.pid });
+    const readers = this.protectedSelfRepairHostReaders();
+    const currentBaseline = await verifyP5GitBaselineCurrent({ store: this.store, enrollment, currentRunningSourceRelease, ...readers });
+
+    const custody = this.custodyBindingOf(attempt.id);
+    const child = record.child;
+    const status = child?.terminalStatus;
+    const processCreationIdentity = `custody:${status?.processCreationTime}`;
+    if (!custody || custody.custody_id !== status?.custodyId || !child?.custody || status?.attemptId !== attempt.id
+      || status?.runId !== state.id || status?.terminal !== true || status?.processTreeEnded !== true
+      || status?.spoolComplete !== true || status?.tailGapPossible === true || status?.state !== 'exited'
+      || status?.exitCode !== outcome.code || status?.processId !== current.process_id
+      || current.process_start_identity !== processCreationIdentity || status?.invocationDigest !== child.invocationDigest
+      || status?.executableSha256 !== child.executableSha256
+      || status?.stdoutAcked !== status?.stdoutDurable || status?.stderrAcked !== status?.stderrDurable)
+      fail('p5_developer_terminal_unproven', 'P5 requires the exact Host terminal record, process creation identity, ended tree and complete acknowledged spool.');
+    if (!Number.isSafeInteger(this.custodyEpoch) || !this.lifecycleHost?.generation)
+      fail('p5_host_unavailable', 'The P5 Developer terminal record is not attached to the current Lifecycle Host generation and Custody epoch.');
+    const terminalEvidence = { schemaVersion: 1, kind: 'ProtectedSelfRepairDeveloperTerminalEvidence', runId: state.id,
+      attemptId: attempt.id, custodyId: custody.custody_id, lifecycleGeneration: this.lifecycleHost.generation, engineEpoch: this.custodyEpoch,
+      processId: status.processId, processCreationTime: status.processCreationTime, invocationDigest: status.invocationDigest,
+      executable: status.executable, executableSha256: status.executableSha256, state: status.state, terminal: status.terminal,
+      processTreeEnded: status.processTreeEnded, spoolComplete: status.spoolComplete, tailGapPossible: status.tailGapPossible,
+      stdoutDurable: status.stdoutDurable, stdoutAcked: status.stdoutAcked, stderrDurable: status.stderrDurable,
+      stderrAcked: status.stderrAcked, exitCode: status.exitCode, terminationReason: status.terminationReason ?? null, observedAt: nowIso() };
+    const terminalRef = ref(this.store.putJson(terminalEvidence));
+    this.store.verifyRef(terminalRef);
+    const baselineRecord = this.store.readJson(enrollment.baselineManifest.artifactId);
+    const baselineSource = this.store.readJson(baselineRecord.sourceManifest.artifactId);
+    const baseline = { ...currentBaseline, baselineId: enrollment.baselineId, baselineManifest: enrollment.baselineManifest,
+      sourceManifest: baselineRecord.sourceManifest, sourceDigest: enrollment.effectiveSourceDigest,
+      entries: baselineSource.entries.map(({ artifact: _artifact, ...entry }) => entry),
+      contentRefs: new Map(baselineSource.entries.map(entry => [entry.path, entry.artifact])) };
+    const candidateAuthorization = { incidentId: link.incident_id, parentRunId: link.parent_run_id, repairRunId: state.id,
+      linkId: link.id, outcomeId: authorization.outcomeId, outcomeRevision: authorization.outcomeRevision,
+      developerAttemptId: attempt.id, developerNodeId: profile.developerNodeId,
+      parentPublication: sourceBinding.parentPublication, repairPublication: enrollment.repairPublication,
+      workspace: enrollment.workspace, enrollment: authorization.p5Enrollment, selfRepairProfile: authorization.selfRepairProfile,
+      verificationPolicy: enrollment.verificationPolicy, verificationInputs: authorization.verificationInputs, sourceBinding: authorization.p5SourceBinding,
+      developerTerminal: { artifact: terminalRef, attemptId: attempt.id, processTreeEnded: true, spoolComplete: true,
+        status: status.state, exitCode: status.exitCode }, scope: profile.scope, capturedAt: nowIso(), journalCursor: this.requireRun(state.id).last_sequence + 3 };
+    const sourceRoot = resolve(workspace.cwd, 'source');
+    const sealed = await sealP5Candidate({ store: this.store, sourceRoot, baseline, authorization: candidateAuthorization,
+      budgets: enrollment.budgets, nativeSourceReader: readers.nativeSourceReader });
+    return { candidate: sealed.candidate, candidateArtifact: sealed.candidateArtifact };
+  }
+
+  async materializeProtectedSelfRepairPreparation(intentRef, { recovery = false } = {}) {
+    const enrollmentFile = this.protectedSelfRepairEnrollmentFile;
+    const enrollment = this.protectedSelfRepairEnrollment;
+    if (!enrollmentFile || !enrollment || !this.lifecycleClient)
+      throw new ApiError(409, 'p5_enrollment_unavailable', 'P5 workspace materialization requires the current installed enrollment and Lifecycle Host.');
+    const installed = await this.verifyProtectedSelfRepairEnrollmentFileCurrent();
+    if (canonicalHash(installed) !== canonicalHash(enrollment))
+      throw new ApiError(409, 'p5_enrollment_changed', 'The installed P5 enrollment changed before workspace materialization.');
+      const currentRunningSourceRelease = await this.lifecycleClient.runningSourceRelease({ pid: process.pid });
+    const readers = this.protectedSelfRepairHostReaders();
+    await verifyP5GitBaselineCurrent({ store: this.store, enrollment, currentRunningSourceRelease, ...readers });
+    const result = await prepareP5WorkspaceFromIntent({ store: this.store, intentRef, nativeSourceReader: readers.nativeSourceReader, recovery });
+    const intent = this.store.readJson(intentRef.artifactId);
+    const prior = this.store.readEvents(intent.repairRunId).filter(item => item.type === 'self_repair.workspace_prepared');
+    if (prior.length) {
+      if (prior.length !== 1 || !prior[0].payload?.record)
+        throw new ApiError(409, 'p5_preparation_conflict', 'The durable P5 workspace-prepared record conflicts with the exact preparation intent.');
+      const priorRef = prior[0].payload.record;
+      this.store.verifyRef(priorRef);
+      const priorEvidence = this.store.readJson(priorRef.artifactId);
+      const stableFields = ['intent', 'workspaceRoot', 'sourceRoot', 'workspaceIdentity', 'sourceIdentity', 'baselineId', 'sourceDigest',
+        'snapshotDigest', 'pathDigest', 'contentDigest', 'fileCount', 'totalBytes'];
+      if (priorEvidence.kind !== 'ProtectedSelfRepairWorkspacePreparation'
+        || stableFields.some(field => canonicalHash(priorEvidence[field]) !== canonicalHash(result.evidence[field])))
+        throw new ApiError(409, 'p5_preparation_conflict', 'The durable P5 workspace-prepared record no longer matches its enrolled source and native workspace identity.');
+      return { ...result, evidence: priorEvidence, evidenceArtifact: priorRef };
+    }
+    this.store.transaction(() => {
+      const link = this.store.get('SELECT * FROM run_links WHERE id = ? AND parent_run_id = ? AND repair_run_id = ?', intent.linkId, intent.parentRunId, intent.repairRunId);
+      const parent = this.store.get('SELECT * FROM runs WHERE id = ?', intent.parentRunId);
+      const repair = this.store.get('SELECT * FROM runs WHERE id = ?', intent.repairRunId);
+      const admittedAttempt = this.store.get(`SELECT 1 FROM attempts WHERE run_id = ? AND (state NOT IN ('scheduled','waiting') OR invocation_artifact_id IS NOT NULL) LIMIT 1`, intent.repairRunId);
+      if (!link || link.state !== 'open' || !parent || !repair || repair.state !== 'queued' || admittedAttempt)
+        throw new ApiError(409, 'p5_preparation_stale', 'P5 workspace preparation lost its queued, not-yet-dispatched P2 Repair precondition.');
+      this.store.appendEvents(intent.repairRunId, [{ type: 'self_repair.workspace_prepared', payload: { record: result.evidenceArtifact }, nodeInstanceId: null, attemptId: null }]);
+    });
+    return result;
+  }
+
+  async reconcileProtectedSelfRepairPreparations() {
+    const report = { recovered: [], alreadyPrepared: [], deferred: [], blocked: [] };
+    const links = this.store.all(`SELECT l.* FROM run_links l JOIN runs r ON r.id = l.repair_run_id
+      WHERE l.continuation_contract = 'logical_policy' AND l.state = 'open' ORDER BY l.created_at, l.id`);
+    for (const link of links) {
+      let repair, workflow;
+      try {
+        repair = this.requireRun(link.repair_run_id);
+        workflow = this.store.readJson(repair.workflow_snapshot_artifact_id);
+      } catch { continue; }
+      if (!workflow?.capabilities?.includes('protected-self-repair-v1')) continue;
+
+      // An older or unproven reader must preserve the suspended association, never dispatch it.
+      // A later compatible startup can retry from the durable intent and exact Store artifacts.
+      if (this.protectedSelfRepairAdmissionEnabled !== true || !this.protectedSelfRepairEnrollment
+        || !this.protectedSelfRepairEnrollmentFile || !this.protectedSelfRepairEnrollmentArtifact
+        || !this.lifecycleClient || !this.custodyHost || this.custodyUnavailable
+        || !Number.isSafeInteger(this.custodyEpoch)) {
+        report.deferred.push(link.id);
+        continue;
+      }
+
+      const events = this.store.readEvents(repair.id);
+      const intents = events.filter(item => item.type === 'self_repair.preparation_intent');
+      const prepared = events.filter(item => item.type === 'self_repair.workspace_prepared');
+      const failClosed = (code, message) => {
+        const current = this.store.get('SELECT * FROM run_links WHERE id = ?', link.id);
+        if (current?.state === 'open') this.blockLogicalRepair(current, code, message);
+        report.blocked.push(link.id);
+      };
+      if (intents.length !== 1 || prepared.length > 1) {
+        failClosed('p5_preparation_history_invalid', 'P5 startup recovery found a missing or duplicate durable preparation record; the linked Repair remains blocked.');
+        continue;
+      }
+      const intentRef = intents[0].payload?.record;
+      if (!intentRef) {
+        failClosed('p5_preparation_intent_invalid', 'P5 startup recovery found a preparation event without its immutable intent reference.');
+        continue;
+      }
+
+      try {
+        this.store.verifyRef(intentRef);
+        const intent = this.store.readJson(intentRef.artifactId);
+        validateP5Contract('preparationIntent', intent);
+        if (intent.parentRunId !== link.parent_run_id || intent.repairRunId !== link.repair_run_id
+          || intent.linkId !== link.id || intent.enrollment.artifactId !== this.protectedSelfRepairEnrollmentArtifact.artifactId
+          || intent.enrollment.sha256 !== this.protectedSelfRepairEnrollmentArtifact.sha256
+          || intent.workspace.workspaceId !== this.protectedSelfRepairEnrollment.workspace.workspaceId)
+          throw new ApiError(409, 'p5_preparation_intent_mismatch', 'The durable preparation intent does not match the current P2 link and installed enrollment.');
+
+        if (prepared.length === 1) {
+          const preparedRef = prepared[0].payload?.record;
+          if (!preparedRef) throw new ApiError(409, 'p5_preparation_record_invalid', 'The workspace-prepared event has no immutable artifact reference.');
+          this.store.verifyRef(preparedRef);
+          const preparation = this.store.readJson(preparedRef.artifactId);
+          validateP5Contract('workspacePreparation', preparation);
+          if (preparation.intent.artifactId !== intentRef.artifactId || preparation.intent.sha256 !== intentRef.sha256)
+            throw new ApiError(409, 'p5_preparation_record_mismatch', 'The prepared workspace is not bound to the exact durable intent.');
+          report.alreadyPrepared.push(link.id);
+          continue;
+        }
+
+        const parent = this.store.get('SELECT * FROM runs WHERE id = ?', link.parent_run_id);
+        const currentLink = this.store.get('SELECT * FROM run_links WHERE id = ?', link.id);
+        const authorization = currentLink && this.parentRepairAuthorization(currentLink);
+        const admittedAttempt = this.store.get(`SELECT 1 FROM attempts WHERE run_id = ?
+          AND (state NOT IN ('scheduled','waiting') OR invocation_artifact_id IS NOT NULL
+            OR id IN (SELECT attempt_id FROM attempt_custody)) LIMIT 1`, repair.id);
+        if (!currentLink || currentLink.state !== 'open' || !this.logicalRepairLinkIntact(currentLink)
+          || !authorization?.profile?.selfRepair || !parent
+          || !['running', 'waiting_for_user'].includes(parent.state)
+          || !['suspension_requested', 'suspended_for_repair'].includes(currentLink.parent_suspension_state)
+          || repair.state !== 'queued' || admittedAttempt)
+          throw new ApiError(409, 'p5_preparation_stale', 'The P2 link, Parent suspension or queued Repair changed before P5 startup could recover preparation.');
+
+        await this.materializeProtectedSelfRepairPreparation(intentRef, { recovery: true });
+        const after = this.store.readEvents(repair.id).filter(item => item.type === 'self_repair.workspace_prepared');
+        if (after.length !== 1 || !after[0].payload?.record)
+          throw new ApiError(409, 'p5_preparation_recovery_incomplete', 'P5 startup materialization did not commit exactly one workspace-prepared record.');
+        this.store.verifyRef(after[0].payload.record);
+        const recovered = this.store.readJson(after[0].payload.record.artifactId);
+        validateP5Contract('workspacePreparation', recovered);
+        if (recovered.intent.artifactId !== intentRef.artifactId || recovered.intent.sha256 !== intentRef.sha256)
+          throw new ApiError(409, 'p5_preparation_recovery_mismatch', 'Recovered workspace preparation does not bind to the exact durable P2 intent.');
+        report.recovered.push(link.id);
+      } catch (error) {
+        failClosed(error.code || 'p5_preparation_recovery_failed', `P5 startup preparation recovery failed closed: ${error.message}`);
+        process.stderr.write(`P5 workspace preparation recovery failed for linked Repair ${repair.id}: ${error.message}\n`);
+      }
+    }
+    return report;
+  }
+
+  protectedSelfRepairRunProjection(repairRunId) {
+    const link = this.logicalRepairLinkForRun(repairRunId);
+    const authorization = link && this.parentRepairAuthorization(link);
+    if (!link) return null;
+    const parent = this.store.get('SELECT * FROM runs WHERE id = ?', link.parent_run_id);
+    const repair = this.store.get('SELECT * FROM runs WHERE id = ?', link.repair_run_id);
+    let repairWorkflow = null;
+    try { if (repair) repairWorkflow = this.store.readJson(repair.workflow_snapshot_artifact_id); } catch { /* reported below */ }
+    const issues = [];
+    const addIssue = code => { if (!issues.includes(code)) issues.push(code); };
+    const eventsFor = (runId, type) => this.store.readEvents(runId).filter(item => item.type === type);
+    const exactRef = (left, right) => Boolean(left && right && left.artifactId === right.artifactId && left.sha256 === right.sha256);
+    const records = (runId, type, maximum, contract = null) => {
+      const events = eventsFor(runId, type);
+      if (events.length > maximum) addIssue(`${type}_duplicate`);
+      const values = [];
+      for (const event of events) {
+        const ref = event.payload?.record;
+        if (!ref || event.attemptId !== null) { addIssue(`${type}_invalid_event`); continue; }
+        try {
+          this.store.verifyRef(ref);
+          const value = this.store.readJson(ref.artifactId);
+          if (contract) validateP5Contract(contract, value);
+          values.push({ event, ref, value });
+        } catch { addIssue(`${type}_artifact_invalid`); }
+      }
+      return values;
+    };
+
+    if (!parent || !repair || link.repair_run_id !== repairRunId || link.continuation_contract !== 'logical_policy')
+      addIssue('link_or_run_missing');
+    const p5Workflow = repairWorkflow?.capabilities?.includes('protected-self-repair-v1') === true;
+    if (!authorization?.profile?.selfRepair && !p5Workflow) return null;
+    if (!authorization?.profile?.selfRepair) {
+      return { schemaVersion: 1, kind: 'ProtectedSelfRepairRunProjection', parentRunId: link.parent_run_id,
+        repairRunId, linkId: link.id, stage: 'held_uncertain', eligible: false,
+        revision: repair?.last_sequence ?? 0, issues: ['p5_authorization_missing'], candidateId: null, receiptId: null, handoffId: null };
+    }
+
+    let enrollment = null, profile = null;
+    try {
+      if (authorization.p5Enrollment) {
+        this.store.verifyRef(authorization.p5Enrollment);
+        enrollment = this.store.readJson(authorization.p5Enrollment.artifactId);
+        validateP5Contract('enrollment', enrollment);
+      }
+      if (authorization.selfRepairProfile) {
+        this.store.verifyRef(authorization.selfRepairProfile);
+        profile = this.store.readJson(authorization.selfRepairProfile.artifactId);
+        validateP5Contract('profile', profile);
+      }
+    } catch { addIssue('enrollment_or_profile_invalid'); }
+
+    const sourceBindings = records(link.parent_run_id, 'self_repair.source_bound', 1, 'sourceBinding');
+    const sourceBinding = sourceBindings[0];
+    if (sourceBindings.length !== 1 || !sourceBinding || !exactRef(sourceBinding.ref, authorization.p5SourceBinding)
+      || sourceBinding.value.parentRunId !== link.parent_run_id
+      || sourceBinding.value.enrollmentId !== enrollment?.enrollmentId
+      || sourceBinding.value.baselineId !== enrollment?.baselineId
+      || !exactRef(sourceBinding.value.profile, authorization.selfRepairProfile)) addIssue('source_binding_mismatch');
+
+    const intents = records(repairRunId, 'self_repair.preparation_intent', 1, 'preparationIntent');
+    const intent = intents[0];
+    if (intents.length !== 1 || !intent || intent.value.parentRunId !== link.parent_run_id
+      || intent.value.repairRunId !== repairRunId || intent.value.linkId !== link.id
+      || !exactRef(intent.value.enrollment, authorization.p5Enrollment)
+      || !exactRef(intent.value.sourceBinding, authorization.p5SourceBinding)
+      || !exactRef(intent.value.verificationInputs, authorization.verificationInputs)
+      || canonicalHash(intent.value.workspace) !== canonicalHash(enrollment?.workspace ?? null)) addIssue('preparation_intent_mismatch');
+
+    const preparations = records(repairRunId, 'self_repair.workspace_prepared', 1, 'workspacePreparation');
+    const preparation = preparations[0];
+    if (preparation && (!intent || !exactRef(preparation.value.intent, intent.ref)
+      || preparation.value.workspaceRoot !== enrollment?.workspace.canonicalRoot
+      || preparation.value.sourceRoot !== (enrollment?.workspace?.canonicalRoot ? resolve(enrollment.workspace.canonicalRoot, 'source') : null)
+      || canonicalHash(preparation.value.workspaceIdentity ?? null) !== canonicalHash(enrollment?.workspace?.nativeIdentity ?? null)
+      || preparation.value.baselineId !== enrollment?.baselineId
+      || preparation.value.sourceDigest !== enrollment?.effectiveSourceDigest)) addIssue('workspace_preparation_mismatch');
+
+    const candidates = records(repairRunId, 'self_repair.candidate_captured', 1, 'candidate');
+    const candidate = candidates[0];
+    if (candidate && (!preparation || candidate.value.parentRunId !== link.parent_run_id
+      || candidate.value.repairRunId !== repairRunId || candidate.value.linkId !== link.id
+      || candidate.value.incidentId !== link.incident_id
+      || !exactRef(candidate.value.enrollment, authorization.p5Enrollment)
+      || !exactRef(candidate.value.sourceBinding, authorization.p5SourceBinding)
+      || !exactRef(candidate.value.verificationInputs, authorization.verificationInputs)
+      || !exactRef(candidate.value.selfRepairProfile, authorization.selfRepairProfile)
+      || candidate.value.baselineId !== enrollment?.baselineId)) addIssue('candidate_lineage_mismatch');
+
+    const starts = records(repairRunId, 'self_repair.verification_started', 1, 'verificationStarted');
+    const start = starts[0];
+    if (start && (!candidate || start.value.runId !== repairRunId || start.value.repairRunId !== repairRunId
+      || start.value.parentRunId !== link.parent_run_id || start.value.linkId !== link.id || start.value.incidentId !== link.incident_id
+      || start.value.gateNodeId !== profile?.verificationNodeId || start.value.candidateId !== candidate.value.candidateId
+      || start.value.candidateSourceDigest !== candidate.value.candidateSourceDigest
+      || !exactRef(start.value.candidateManifest, candidate.ref) || !start.value.gateAttemptId)) addIssue('verification_start_mismatch');
+
+    const verificationEvents = eventsFor(repairRunId, 'self_repair.verification_recorded');
+    if (verificationEvents.length > 1) addIssue('verification_recorded_duplicate');
+    let verification = null;
+    for (const event of verificationEvents) {
+      const ref = event.payload?.record;
+      try {
+        if (!ref || event.attemptId !== null) throw new Error('missing record');
+        this.store.verifyRef(ref);
+        const value = this.store.readJson(ref.artifactId);
+        if (value?.kind === 'ProtectedSelfRepairVerificationReceipt') {
+          validateP5Contract('verificationReceipt', value);
+          if (!start || value.gateAttemptId !== start.value.gateAttemptId
+            || !exactRef(value.candidateManifest, candidate?.ref) || value.issuedJournalCursor !== event.sequence
+            || value.status !== 'passed') addIssue('verification_receipt_mismatch');
+          else verifyP5Receipt(value, { store: this.store, candidateRef: candidate.ref,
+            gateAttemptId: start.value.gateAttemptId, terminalEvidenceRef: value.terminalEvidence });
+        } else if (value?.kind === 'ProtectedSelfRepairVerificationOutcome') {
+          validateP5Contract('verificationOutcome', value);
+          const outcomeRefs = [value.candidateManifest, value.verificationPolicy, value.verificationInputs,
+            value.verifierResult, value.terminalEvidence, value.streamEvidence,
+            ...value.checks.flatMap(item => [item.subjectResolution, item.overlayManifest, item.stdout, item.stderr, item.observations])];
+          for (const nestedRef of outcomeRefs) if (nestedRef) this.store.verifyRef(nestedRef);
+          if (!start || value.gateAttemptId !== start.value.gateAttemptId
+            || value.repairRunId !== repairRunId || value.linkId !== link.id || value.incidentId !== link.incident_id
+            || value.candidateId !== candidate?.value.candidateId
+            || value.candidateSourceDigest !== candidate?.value.candidateSourceDigest
+            || value.baselineId !== candidate?.value.baselineId
+            || !exactRef(value.candidateManifest, candidate?.ref)
+            || !exactRef(value.verificationPolicy, start.value.verificationPolicy)
+            || !exactRef(value.verificationPolicy, candidate?.value.verificationPolicy)
+            || !exactRef(value.verificationInputs, start.value.verificationInputs)
+            || !exactRef(value.verificationInputs, candidate?.value.verificationInputs)
+            || !['failed', 'incomplete'].includes(value.status)) addIssue('verification_outcome_mismatch');
+        } else addIssue('verification_record_kind_invalid');
+        verification = { event, ref, value };
+      } catch { addIssue('verification_record_invalid'); }
+    }
+
+    const invalidations = records(repairRunId, 'self_repair.candidate_invalidated', 1, 'candidateInvalidation');
+    const invalidation = invalidations[0];
+    if (invalidation && (invalidation.value.repairRunId !== repairRunId || invalidation.value.linkId !== link.id
+      || invalidation.value.parentRunId !== link.parent_run_id || invalidation.value.incidentId !== link.incident_id))
+      addIssue('candidate_invalidation_mismatch');
+
+    const carries = records(repairRunId, 'self_repair.review_delivery_carried', 64, 'reviewDeliveryCarry');
+    if (carries.some(item => item.value.runId !== repairRunId
+      || item.value.candidateId !== candidate?.value.candidateId
+      || item.value.receiptId !== verification?.value.receiptId))
+      addIssue('review_delivery_carry_mismatch');
+
+    const retentionEvents = records(repairRunId, 'self_repair.retention_changed', 1, 'retentionRecord');
+    const cleanupDeferrals = records(repairRunId, 'self_repair.cleanup_deferred', 1, 'retentionRecord');
+    const handoffs = records(repairRunId, 'self_repair.handoff_recorded', 1, 'handoff');
+    const retention = retentionEvents[0], cleanupDeferral = cleanupDeferrals[0], handoff = handoffs[0];
+    if (retention && (!candidate || retention.value.repairRunId !== repairRunId || retention.value.linkId !== link.id
+      || !exactRef(retention.value.candidateManifest, candidate.ref))) addIssue('retention_mismatch');
+    if (retention && (!cleanupDeferral || !exactRef(cleanupDeferral.ref, retention.ref))) addIssue('cleanup_deferred_missing_or_mismatched');
+    if (!retention && cleanupDeferral) addIssue('cleanup_deferred_without_retention');
+    if (handoff && (!candidate || !retention || !exactRef(handoff.value.retentionRecord, retention.ref)
+      || handoff.value.repairRunId !== repairRunId || handoff.value.linkId !== link.id
+      || !exactRef(handoff.value.candidate, candidate.ref)
+      || handoff.value.candidateId !== candidate.value.candidateId
+      || handoff.value.candidateSourceDigest !== candidate.value.candidateSourceDigest
+      || !exactRef(handoff.value.verificationReceipt, verification?.ref)
+      || !exactRef(handoff.value.sourceBinding, authorization.p5SourceBinding)
+      || !exactRef(handoff.value.enrollment, authorization.p5Enrollment)
+      || handoff.value.currentEligibility?.eligible !== true)) addIssue('handoff_mismatch');
+
+    const approval = link.repair_approval_artifact_id ? (() => {
+      try { return this.store.readJson(link.repair_approval_artifact_id); } catch { return null; }
+    })() : null;
+    if (handoff) {
+      try {
+        const approvalRow = link.repair_approval_artifact_id && this.store.artifactRow(link.repair_approval_artifact_id);
+        const outcomeRef = handoff.value.p2Outcome;
+        this.store.verifyRef(outcomeRef);
+        const outcome = this.store.readJson(outcomeRef.artifactId);
+        validateP5Contract('p2Outcome', outcome);
+        if (!approvalRow || !exactRef(handoff.value.p2Approval,
+          { artifactId: link.repair_approval_artifact_id, sha256: approvalRow.sha256 })
+          || outcome.parentRunId !== link.parent_run_id || outcome.repairRunId !== repairRunId
+          || outcome.linkId !== link.id || outcome.incidentId !== link.incident_id
+          || outcome.candidateId !== candidate?.value.candidateId
+          || outcome.receiptId !== verification?.value.receiptId
+          || !exactRef(outcome.p2Approval, handoff.value.p2Approval)) addIssue('p2_handoff_lineage_mismatch');
+      } catch { addIssue('p2_handoff_outcome_invalid'); }
+    }
+    let acceptance = null;
+    if (approval?.protectedSelfRepairAcceptance) {
+      try {
+        this.store.verifyRef(approval.protectedSelfRepairAcceptance);
+        acceptance = this.store.readJson(approval.protectedSelfRepairAcceptance.artifactId);
+        validateP5Contract('acceptance', acceptance);
+        if (!candidate || !verification || verification.value.kind !== 'ProtectedSelfRepairVerificationReceipt'
+          || !exactRef(acceptance.candidateManifest, candidate.ref)
+          || !exactRef(acceptance.verificationReceipt, verification.ref)
+          || acceptance.linkId !== link.id || acceptance.parentRunId !== link.parent_run_id
+          || acceptance.repairRunId !== repairRunId || acceptance.incidentId !== link.incident_id)
+          addIssue('acceptance_mismatch');
+      } catch { addIssue('acceptance_invalid'); }
+    }
+    if (handoff && (!acceptance || approval?.decision !== 'accept_repair')) addIssue('handoff_without_acceptance');
+    if (['repair_accepted', 'resumed'].includes(link.state) && !handoff) addIssue('accepted_handoff_missing');
+
+    const unknownEvents = [...this.store.readEvents(link.parent_run_id), ...this.store.readEvents(repairRunId)]
+      .filter(item => item.type.startsWith('self_repair.') && !P5_EVENT_TYPES.includes(item.type));
+    if (unknownEvents.length) addIssue('unknown_p5_event');
+
+    let stage = 'held_uncertain';
+    if (invalidation && !issues.length) stage = 'invalidated';
+    else if (!issues.length && (link.state === 'parent_stopped' || link.parent_suspension_state === 'stopped')) stage = 'stopped';
+    else if (!issues.length && (link.state === 'repair_failed' || link.decision_status === 'rejected')) stage = 'rejected';
+    else if (!issues.length && handoff) stage = 'retained_for_p6';
+    else if (!issues.length && acceptance) stage = 'accepted';
+    else if (!issues.length && verification?.value.kind === 'ProtectedSelfRepairVerificationReceipt') stage = 'judge_pending';
+    else if (!issues.length && verification) stage = ['failed', 'incomplete'].includes(verification.value.status) ? 'incomplete' : 'held_uncertain';
+    else if (!issues.length && start) stage = 'verifying';
+    else if (!issues.length && candidate) stage = 'captured';
+    else if (!issues.length && preparation) {
+      const developer = profile?.developerNodeId && this.latestAttempt(repairRunId, profile.developerNodeId);
+      stage = developer && ['running', 'waiting'].includes(developer.state) ? 'developing' : 'prepared';
+    } else if (!issues.length && intent) stage = 'preparing';
+    if (!issues.length && link.state === 'blocked' && !invalidation) stage = 'held_uncertain';
+
+    if (issues.length && ['open', 'repair_completed', 'repair_accepted'].includes(link.state)) stage = 'held_uncertain';
+    const terminalStages = new Set(['held_uncertain', 'incomplete', 'invalidated', 'rejected', 'stopped']);
+    return { schemaVersion: 1, kind: 'ProtectedSelfRepairRunProjection', parentRunId: link.parent_run_id,
+      repairRunId, linkId: link.id, stage, eligible: issues.length === 0 && !terminalStages.has(stage),
+      revision: repair?.last_sequence ?? 0, issues: issues.sort(), candidateId: candidate?.value.candidateId ?? null,
+      receiptId: verification?.value.receiptId ?? null, handoffId: handoff?.value.handoffId ?? null };
+  }
+
+  reconcileProtectedSelfRepairProjections() {
+    const report = { projected: [], blocked: [], held: [] };
+    const links = this.store.all(`SELECT * FROM run_links WHERE continuation_contract = 'logical_policy'
+      ORDER BY created_at, id`);
+    for (const link of links) {
+      const repair = this.store.get('SELECT workflow_snapshot_artifact_id FROM runs WHERE id = ?', link.repair_run_id);
+      let p5Workflow = false;
+      try { p5Workflow = this.store.readJson(repair.workflow_snapshot_artifact_id)?.capabilities?.includes('protected-self-repair-v1') === true; }
+      catch { /* The projection reports an unreadable P5 snapshot as held when authorization marks it P5. */ }
+      if (!this.parentRepairAuthorization(link)?.profile?.selfRepair && !p5Workflow) continue;
+      let projection;
+      try { projection = this.protectedSelfRepairRunProjection(link.repair_run_id); }
+      catch (error) {
+        projection = { stage: 'held_uncertain', eligible: false, issues: [error.code || 'projection_failed'] };
+      }
+      report.projected.push({ linkId: link.id, stage: projection?.stage ?? 'held_uncertain' });
+      if (!projection || projection.issues.length) {
+        if (['open', 'repair_completed', 'repair_accepted'].includes(link.state)
+          && this.blockLogicalRepair(link, 'p5_projection_invalid',
+            `P5 startup projection refused an inconsistent journal: ${(projection?.issues || ['projection_unavailable']).join(', ')}.`))
+          report.blocked.push(link.id);
+        else report.held.push(link.id);
+      } else if (projection.stage === 'invalidated' && ['open', 'repair_completed'].includes(link.state)) {
+        if (this.blockLogicalRepair(link, 'p5_candidate_invalidated', 'P5 candidate eligibility was revoked before startup continuation.')) report.blocked.push(link.id);
+      } else if (projection.stage === 'held_uncertain') {
+        report.held.push(link.id);
+      }
+    }
+    return report;
   }
 
   assertWorkflowJudgeRuntimeAvailable(workflow) {
@@ -350,6 +1213,7 @@ export class Engine {
     if (logicalRepair && !this.logicalRepairLinkIntact(logicalRepair, run)) return false;
     // Queued Runs take this shortcut before canContinueRun. P4 is recoverable only when its Process Custody profile is active.
     const workflow = this.store.readJson(run.workflow_snapshot_artifact_id);
+    if (workflow.capabilities?.includes('protected-self-repair-v1') && this.protectedSelfRepairAdmissionEnabled !== true) return false;
     if ((workflow.judgePolicy && !this.workflowJudgeRuntimeAvailable(workflow)) || allNodesDeep(workflow.nodes).some(node => ['loop', 'map', 'task'].includes(node.type))) return false;
     const workspace = this.store.get('SELECT w.cwd FROM workspaces w JOIN runs r ON r.workspace_id = w.id WHERE r.id = ?', run.id);
     return !this.unconfirmedOverlapping(workspace?.cwd ?? null);
@@ -1217,7 +2081,26 @@ export class Engine {
   }
 
   // ---------- Run creation ----------
-  createRun(body, { role = 'first-party', clientLabel = null, controllerToken = null, hostAdmission = null } = {}) {
+  async createRunAsync(body, options = {}) {
+    if (typeof body?.publishedVersionId !== 'string' || typeof body?.workflowId !== 'string') return this.createRun(body, options);
+    const publication = this.store.get(`SELECT p.*, a.sha256 AS snapshot_sha256 FROM workflow_publications p
+      JOIN artifacts a ON a.id = p.snapshot_artifact_id WHERE p.id = ? AND p.workflow_id = ?`, body.publishedVersionId, body.workflowId);
+    if (!publication) return this.createRun(body, options);
+    const workflow = this.store.readJson(publication.snapshot_artifact_id);
+    if (!workflow.capabilities?.includes('protected-self-repair-v1')) return this.createRun(body, options);
+    if (this.protectedSelfRepairAdmissionEnabled !== true)
+      throw new ApiError(409, 'p5_admission_unavailable', 'P5 Run admission remains disabled until candidate capture, trusted verification, atomic P2/P4 acceptance and recovery are implemented and verified. No Run was captured.');
+    const command = options.role === 'external' ? 'POST /runs/external' : 'POST /runs/direct';
+    if (typeof body.requestId === 'string') {
+      const replay = this.replayCommittedReceipt(command, body.requestId, body);
+      if (replay.found) return replay.response;
+    }
+    const p5Admission = await this.prepareProtectedSelfRepairParentRunAdmission({ publication, workflow });
+    try { return this.createRun(body, { ...options, p5Admission }); }
+    finally { this.protectedSelfRepairRunAdmissions.delete(p5Admission); }
+  }
+
+  createRun(body, { role = 'first-party', clientLabel = null, controllerToken = null, hostAdmission = null, p5Admission = null } = {}) {
     // Replay exact commands committed before the Published-Version request shape existed.
     if (!hostAdmission && typeof body?.requestId === 'string') {
       const priorDirect = this.replayCommittedReceipt('POST /runs/direct', body.requestId, body, { ignoreDifferentCommand: true });
@@ -1241,6 +2124,9 @@ export class Engine {
       const workspace = this.requireWorkspace(body.workspaceId);
       const snapshot = this.store.artifactRow(publication.snapshot_artifact_id);
       const workflow = this.store.readJson(snapshot.id);
+      if (workflow.capabilities?.includes('protected-self-repair-v1')
+        && (!p5Admission || !this.protectedSelfRepairRunAdmissions.has(p5Admission) || p5Admission.kind !== 'p5-parent-run-admission'))
+        throw new ApiError(409, 'p5_admission_unavailable', 'P5 publications require the asynchronous enrolled Parent admission path.');
       const currentValidation = this.validateWorkflow(workflow);
       if (!currentValidation.valid) throw new ApiError(409, 'published_version_not_runnable', 'The Published Version is no longer suitable for execution under current runtime conditions.', currentValidation.issues);
       this.assertWorkflowJudgeRuntimeAvailable(workflow);
@@ -1261,7 +2147,7 @@ export class Engine {
       }
       if (!hostAdmitted) this.refuseUnpermittedRun('A run');
       const result = this.captureRun({ workflow, snapshot, workspace, kind: 'workflow', publication,
-        options: { mode: body.mode || 'workflow', targets: body.targets, refreshCaches: body.refreshCaches || [] }, requestId: body.requestId });
+        options: { mode: body.mode || 'workflow', targets: body.targets, refreshCaches: body.refreshCaches || [] }, requestId: body.requestId, p5Admission });
       // The observer is armed here, inside the creating transaction and before the queued start.
       if (body.controlGrantId) this.bindControlGrant(body.controlGrantId, { runId: result.body.run.runId, workflowId: body.workflowId, workspaceId: body.workspaceId,
         snapshotSha256: body.workflowSnapshotSha256, controllerToken });
@@ -1438,7 +2324,23 @@ export class Engine {
     return null;
   }
 
-  captureRun({ workflow, snapshot, workspace, kind, options, requestId, publication = null }) {
+  captureRun({ workflow, snapshot, workspace, kind, options, requestId, publication = null, p5Admission = null }) {
+    const protectedSelfRepair = workflow.capabilities.includes('protected-self-repair-v1');
+    if (protectedSelfRepair && !this.protectedSelfRepairEnrollment)
+      throw new ApiError(409, 'p5_enrollment_unavailable', 'This runtime cannot start a P5 publication without a loaded installation-owned enrollment and protected admission path.');
+    const parentAdmission = p5Admission?.kind === 'p5-parent-run-admission'
+      && this.protectedSelfRepairRunAdmissions.has(p5Admission)
+      && p5Admission.publication.publishedVersionId === publication?.id
+      && p5Admission.enrollment.enrollmentId === this.protectedSelfRepairEnrollment?.enrollmentId;
+    const repairAdmission = p5Admission?.kind === 'p5-repair-run-admission'
+      && this.protectedSelfRepairRepairAdmissions.has(p5Admission)
+      && p5Admission.enrollment.enrollmentId === this.protectedSelfRepairEnrollment?.enrollmentId
+      && publication?.id === p5Admission.enrollment.repairPublication.publishedVersionId
+      && p5Admission.parentRunId && p5Admission.attentionKey && p5Admission.judgeAttemptId;
+    if (protectedSelfRepair && !parentAdmission && !repairAdmission)
+      throw new ApiError(409, 'p5_admission_unavailable', 'P5 Run admission requires the exact enrolled Parent or Engine-issued P2 Repair admission.');
+    if (!protectedSelfRepair && p5Admission)
+      throw new ApiError(409, 'p5_admission_invalid', 'A P5 admission cannot authorize a non-P5 Run.');
     this.assertWorkflowJudgeRuntimeAvailable(workflow);
     if (publication) {
       const expectedAuthorityPolicyVersion = workflow.judgePolicy?.version || LEGACY_AUTHORITY_POLICY;
@@ -1447,6 +2349,8 @@ export class Engine {
     }
     const active = this.activeRun(workspace.id);
     if (active) throw new ApiError(409, 'conflict', active.state === 'waiting_for_user' ? 'The previous run in this workspace is waiting for recovery; close or stop it first.' : 'Another run is active in this workspace.');
+    if (this.protectedSelfRepairWorkspaceReserved?.(workspace.id))
+      throw new ApiError(409, 'p5_workspace_reserved', 'An enrolled P5 workspace slot is single-use and remains reserved after its linked Repair is admitted.');
     // A Host-owned process may still be running in an overlapping workspace (H3): no other Run starts there until its owner confirms the end.
     if (this.custodyHoldOverlapping(workspace.cwd)) throw new ApiError(409, 'conflict', 'A Host-owned process may still be running in this workspace; another run cannot use it until its owner confirms that it has ended.');
     // A process that a restart could not confirm ended keeps the same workspace unavailable until that process ends.
@@ -1491,6 +2395,18 @@ export class Engine {
         { type: 'run.state_changed', payload: { from: null, to: 'queued', reason: 'Run captured.' } },
         { type: 'run.planned', payload: { plan: ref(planArtifact), mode: plan.mode, targets: plan.targets } },
       ];
+      if (parentAdmission) {
+        const sourceBinding = { schemaVersion: 1, kind: 'ProtectedSelfRepairSourceBinding',
+          enrollmentId: p5Admission.enrollment.enrollmentId, parentRunId: runId, parentPublication: p5Admission.publication,
+          parentSnapshot: { artifactId: snapshot.id, sha256: snapshot.sha256 }, baselineId: p5Admission.enrollment.baselineId,
+          baselineManifest: p5Admission.enrollment.baselineManifest, profile: p5Admission.profile,
+          runningSourceRelease: p5Admission.runningSourceRelease, runtimeInstanceId: this.runtimeInstanceId,
+          lifecycleGeneration: p5Admission.lifecycleGeneration, boundAt: createdAt };
+        validateP5Contract('sourceBinding', sourceBinding);
+        const sourceBindingArtifact = this.store.putJson(sourceBinding);
+        this.store.verifyRef(sourceBindingArtifact);
+        events.push({ type: 'self_repair.source_bound', payload: { record: ref(sourceBindingArtifact) } });
+      }
       for (const { node } of contexts.filter(item => item.node.config.lifetime !== 'iteration')) {
         const bindingId = node.config.mode === 'continue' ? continued.get(node.id).id : this.createBinding(runId, workspace, node.config.provider, node.id, createdAt);
         this.store.run('INSERT INTO run_context_bindings(run_id, context_node_id, mode, binding_id) VALUES (?, ?, ?, ?)', runId, node.id, node.config.mode, bindingId);
@@ -1799,6 +2715,7 @@ export class Engine {
         else if (ready.node.type === 'agent') this.tryDispatchAgent(state, ready.scope, ready.node, attempt);
         else if (ready.node.type === 'loop') { this.startLoop(state, ready.scope, ready.node, attempt); this.pumpAgain = true; }
         else if (ready.node.type === 'map') { this.startMap(state, ready.scope, ready.node, attempt); this.pumpAgain = true; }
+        else if (ready.node.type === 'gate' && ready.node.config.mode === 'self-repair-verify') this.dispatchProtectedSelfRepairGate(state, ready.scope, ready.node, attempt);
         else { this.runStatic(state, ready.scope, ready.node, attempt, ready.chosen); this.pumpAgain = true; }
         if (this.runState(state.id) !== 'running') break;
       }
@@ -2051,6 +2968,8 @@ export class Engine {
 
   runGate(state, scope, node, attempt, values, events) {
     const config = node.config;
+    if (config.mode === 'self-repair-verify')
+      throw new UtilityError('p5_verification_unavailable', 'Protected Self-Repair verification is fail-closed: this Engine has no installed enrollment, trusted verifier, or Host-backed Gate recovery binding.');
     if (config.mode === 'prepare') {
       const evaluator = scope.graph.edges.filter(item => item.source.nodeId === node.id && item.source.port === 'plan').map(item => scope.nodes.get(item.target.nodeId))
         .find(item => item?.type === 'gate' && item.config.mode === 'evaluate');
@@ -2667,6 +3586,25 @@ export class Engine {
     // ADR-0008: a linked repair's Judge proposal is validated before anything commits; a refused proposal fails the attempt.
     const lifecycle = this.lifecycleProposalFor(state, node, parser.finalText);
     if (lifecycle.kind === 'refuse') return this.failAttempt(state, current, lifecycle.code, lifecycle.message, { evidence: evidence(), ...native });
+    let p5CandidateCapture = null;
+    try { p5CandidateCapture = await this.captureProtectedSelfRepairDeveloperCandidate({ state, node, attempt: current, workspace,
+      binding, record, outcome, current }); }
+    catch (error) {
+      const terminal = record.child?.terminalStatus;
+      return this.failAttempt(state, current, error.code || 'capture_failed', `P5 candidate capture failed closed: ${error.message}`,
+        { source: 'engine', executionCertainty: 'completed', sideEffectCertainty: 'unknown',
+          observedState: { hostState: terminal?.state || 'exited', processTreeEnded: terminal?.processTreeEnded === true,
+            spoolComplete: terminal?.spoolComplete === true, ...(Number.isInteger(outcome.code) ? { exitCode: outcome.code } : {}) } });
+    }
+    let commitAdmission = null;
+    if (spec?.prepareCommit) {
+      try { commitAdmission = await spec.prepareCommit(parsed, current); }
+      catch (error) {
+        return this.failAttempt(state, current, error.code || 'p5_admission_unavailable',
+          'The Judge decision was not committed because its Engine-side admission check failed: ' + error.message,
+          { evidence: evidence(), source: 'engine', executionCertainty: 'completed', observedState: { hostState: 'settled' } });
+      }
+    }
     this.store.transaction(() => {
       const textArtifact = this.store.putText(parser.finalText);
       const outputValues = { text: textValue(textArtifact), ...(jsonArtifact ? { json: jsonValue(jsonArtifact) } : {}), ...(captured ? { files: captured } : {}) };
@@ -2679,20 +3617,23 @@ export class Engine {
         if (first) events.push({ type: 'context.bound', payload: { bindingId: binding.id, provider: config.provider, nativeSessionRef: ref(sessionArtifact), cwdIdentity: workspace.cwd_identity } });
         events.push(event); binding = updated;
       }
-      spec?.commit?.(parsed, events, current, { provider: config.provider, requestedModel: config.model, observedModel: parser.model });
+      spec?.commit?.(parsed, events, current, { provider: config.provider, requestedModel: config.model, observedModel: parser.model,
+        p5RepairAdmission: commitAdmission });
       if (this.store.get('SELECT outcome_id FROM failure_outcomes WHERE attempt_id = ?', current.id)) {
         const reconciled = this.failureOutcomeEvent(current, { source: 'host', code: 'custody_unresolved', causeKnowledge: 'direct_fact', attemptState: 'succeeded',
           executionCertainty: 'completed', observedState: { hostState: 'exited', processTreeEnded: true, exitCode: outcome.code, spoolComplete: true } });
         if (reconciled) events.push(reconciled);
       }
       events.push(...this.attemptTransition(current, 'succeeded', 'Outputs committed after a successful terminal event and process exit.'));
+      if (p5CandidateCapture) events.push({ type: 'self_repair.candidate_captured', payload: { record: p5CandidateCapture.candidateArtifact },
+        nodeInstanceId: null, attemptId: null });
       if (lifecycle.kind === 'intent') events.push(...this.openLifecycleIntent(state, current, current.node_instance_id, lifecycle.proposal));
       this.store.appendEvents(state.id, events);
     });
     // Crash point: the outputs and the attempt's success are durable, and nothing after them has run yet.
     custodyFaultPoint('after_settle');
     custodyFaultPoint(`after_settle:${node.id}`);
-    spec?.afterCommit?.(record, current);
+    await spec?.afterCommit?.(record, current);
     if (lifecycle.kind === 'intent' && this.lifecycleHost) {
       const request = this.lifecycleHostRequest(state.id);
       if (request) this.emit('lifecycle.operation_requested', request);
@@ -2707,7 +3648,7 @@ export class Engine {
 
   runProcess(state, attempt, node, invocation, record) {
     return new Promise(resolvePromise => {
-      const parser = this.adapters.createParser(node.config.provider, { output: node.config.output });
+      const parser = record.parser || this.adapters.createParser(node.config.provider, { output: node.config.output });
       // Capture failures (for example a full disk) happen in stream callbacks and timers, outside
       // the awaited invocation: contain them, stop the owned process and report them distinctly.
       const fault = error => this.captureFault(record, error);
@@ -2728,11 +3669,12 @@ export class Engine {
       const custodyDeadlineMs = (node.config.timeoutSeconds + 5) * 1000;
       let child;
       try {
-        if (record.custodyResume) child = this.attachCustody(state.id, attempt, { provider: node.config.provider, deadlineMs: custodyDeadlineMs });
+        const custodyProvider = record.provider || node.config.provider;
+        if (record.custodyResume) child = this.attachCustody(state.id, attempt, { provider: custodyProvider, deadlineMs: custodyDeadlineMs });
         else if (this.custodyScopeAllows(node, record)) {
           // A Custody-scoped attempt never falls back to an ordinary launch: when the Host is unavailable it fails here, closed.
           if (this.custodyUnavailable) throw Object.assign(new Error(this.custodyUnavailable), { code: 'custody_unavailable' });
-          child = this.launchCustody(state.id, attempt, invocation, { provider: node.config.provider, deadlineMs: custodyDeadlineMs });
+          child = this.launchCustody(state.id, attempt, invocation, { provider: custodyProvider, deadlineMs: custodyDeadlineMs });
         }
         else child = this.launchContained(state.id, invocation);
       }
@@ -2870,10 +3812,14 @@ export class Engine {
     let shouldSignalProcesses = false;
     return this.idempotent(`POST /runs/${runId}/stop`, body.requestId, body, () => {
       const row = this.requireRun(runId);
-      if (TERMINAL_RUN.has(row.state)) return { status: 200, body: { runId, state: row.state, requestId: body.requestId } };
+      if (TERMINAL_RUN.has(row.state)) {
+        this.store.transaction(() => this.invalidateProtectedSelfRepairForStopInTransaction?.(runId, row.state));
+        return { status: 200, body: { runId, state: row.state, requestId: body.requestId } };
+      }
       if (row.state !== 'stopping') {
         shouldSignalProcesses = true;
         this.store.transaction(() => {
+          this.invalidateProtectedSelfRepairForStopInTransaction?.(runId, row.state);
           const events = [this.runEvent(row, 'stopping', 'Root Stop requested.')];
           this.workflowJudgeSupersedeAttentionInTransaction(runId, 'Owner Stop superseded pending Judge attention.', events);
           this.workflowJudgeSupersedeQuestionsInTransaction(runId, 'Owner Stop superseded pending Judge question.', events);
@@ -2886,6 +3832,8 @@ export class Engine {
           this.cancelManagedTasks(runId, events, 'Managed task canceled by root Stop.');
           this.store.appendEvents(runId, events);
         });
+      } else {
+        this.store.transaction(() => this.invalidateProtectedSelfRepairForStopInTransaction?.(runId, row.state));
       }
       return { status: 202, body: { runId, state: 'stopping', requestId: body.requestId } };
     }, () => {
@@ -3124,4 +4072,5 @@ installLinkedRepair(Engine, { ApiError });
 installWorkflowJudge(Engine, { ApiError });
 installJudgeAttention(Engine, { ApiError });
 installCustody(Engine);
+installProtectedSelfRepairGate(Engine);
 

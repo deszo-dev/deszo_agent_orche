@@ -4,13 +4,14 @@ import { mkdir } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline';
-import { readFileSync, writeFileSync, renameSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
 import { ApiError, Engine } from './core/engine.mjs';
 import { ContractError } from './core/schemas.mjs';
 import { CorruptionError } from './core/store.mjs';
 import { supervisorFromEnvironment } from './core/supervisor-client.mjs';
 import { hostFromEnvironment } from './host/runtimeBinding.mjs';
 import { custodyBridgeFromEnvironment, lifecycleBridgeFromEnvironment } from './host/lifecycleBridge.mjs';
+import { P5_ENROLLMENT_RELATIVE_PATH } from './core/protectedSelfRepair.mjs';
 import { autonomyGateway } from './host/uiGateway.mjs';
 import { acquireRuntimeLock } from './lock.mjs';
 
@@ -117,19 +118,28 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
   let lifecycleHost = null;
   try {
     lifecycleHost = lifecycleBridgeFromEnvironment(process.env);
+    // An installation-owned P5 enrollment is the explicit opt-in for the managed Lifecycle
+    // Host's Custody service. Legacy installs without that file keep their existing launch path.
+    // The file only triggers attachment; Engine still validates its type, contents and provenance.
+    const p5EnrollmentInstalled = Boolean(lifecycleHost?.context?.profileRoot
+      && existsSync(join(lifecycleHost.context.profileRoot, P5_ENROLLMENT_RELATIVE_PATH)));
+    const processCustodyOptIn = process.env.DESZO_PROCESS_CUSTODY === '1' || p5EnrollmentInstalled;
     // ADR-0006: a runtime launched or covered by a Local Control Host binds to it before serving requests.
     hostBinding = await hostFromEnvironment(process.env, { packaged: PACKAGED_RUNTIME });
     if (PACKAGED_RUNTIME && devTestConfirmationOff) throw new Error('The packaged runtime does not support the fixture confirmation policy.');
     engine = new Engine({ root, adapters, runtimeInstanceId, nodeExecutable, bridgeScript: bridgeFile, supervisor: supervisorFromEnvironment(), hostAuthority: hostBinding?.adapter ?? null, hostRuntimeGeneration: hostBinding?.runtimeGeneration ?? null, hostPolicyId: hostBinding?.policyId ?? null,hostVerificationOnly:hostBinding?.verificationOnly===true,judgeAttentionEnabled,
       externalRunConfirmationOverride: devTestConfirmationOff ? false : null,
       lifecycleHost: lifecycleHost?.context ?? null,
+      lifecycleClient: lifecycleHost,
       // Process Custody is an explicit experimental opt-in; without it every CLI keeps the existing launch path.
       // A test-only seam: a scripted Host answers in place of the bridge, so the Engine's own Custody path runs with no real process.
-      custodyHost: scriptedCustodyHost ?? (process.env.DESZO_PROCESS_CUSTODY === '1' ? (lifecycleHost ?? custodyBridgeFromEnvironment(process.env)) : null),
+      custodyHost: scriptedCustodyHost ?? (processCustodyOptIn ? (lifecycleHost ?? custodyBridgeFromEnvironment(process.env)) : null),
       // Preserve the explicit requirement so a missing Host bootstrap cannot fall through to a Node-launched provider.
-      processCustodyRequired: scriptedCustodyHost != null || process.env.DESZO_PROCESS_CUSTODY === '1',
+      processCustodyRequired: scriptedCustodyHost != null || processCustodyOptIn,
       processContainment: supervised ? 'tauri-job' : 'standalone-best-effort', ...(maximumAgentTimeoutSeconds ? { maximumAgentTimeoutSeconds } : {}), ...(loopMinuteMs ? { loopMinuteMs } : {}) });
-    await engine.initialize();
+    await engine.initialize({
+      beforeRecovery: lifecycleHost ? () => engine.initializeProtectedSelfRepairEnrollment() : undefined,
+    });
     engine.closePendingRunRequestsAtOwnerCutover();
     if (lifecycleHost) {
       const identity = engine.runtimeIdentity();
@@ -318,7 +328,7 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
     ['POST', 'public', /^\/api\/v2\/runs$/, async ({ req }) => {
       const body = parse(await bodyText(req));
       const options = { role: req.authRole, clientLabel: req.headers['x-deszo-client-label'], controllerToken: controllerTokenOf(req) };
-      const result = body?.hostPermitId ? await engine.createRunUnderHostPermit(body, options) : engine.createRun(body, options);
+      const result = body?.hostPermitId ? await engine.createRunUnderHostPermit(body, options) : await engine.createRunAsync(body, options);
       return [result.status, result.body];
     }, { hostVariant: true }],
     ['GET', 'public', /^\/api\/v2\/run-requests$/, ({ url }) => {

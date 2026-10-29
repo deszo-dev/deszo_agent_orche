@@ -89,7 +89,7 @@ export function installHostAutonomy(Engine, { ApiError }) {
       // Host policy bindings pin definition bytes by their immutable snapshot hash. The caller still
       // selects the exact Published Version; createRun verifies that version's digest and snapshot
       // against both the request and the admitted Host scope before it captures the Run.
-      result = this.createRun(body, { ...options, hostAdmission: admission });
+      result = await this.createRunAsync(body, { ...options, hostAdmission: admission });
     }
     catch (error) {
       await this.settleHostPermit(admission.permitId, 'not_executed', `engine refused the run: ${error.code || 'error'}: ${error.message}`);

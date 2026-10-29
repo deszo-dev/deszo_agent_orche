@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://deszo.local/documentation/journal-event-v2.schema.json",
-  "title": "Durable run event (journal v2, additive through M6)",
+  "title": "Durable run event (journal v2, additive through M6 and P5)",
   "type": "object",
   "properties": {
     "schemaVersion": {
@@ -2238,6 +2238,47 @@
             "question.superseded",
             "repair.approval_recorded",
             "repair.approval_rejected"
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "record": {
+              "$ref": "#/$defs/ref"
+            }
+          },
+          "required": [
+            "record"
+          ],
+          "additionalProperties": false
+        },
+        "nodeInstanceId": {
+          "type": "null"
+        },
+        "attemptId": {
+          "type": "null"
+        }
+      },
+      "required": [
+        "type",
+        "payload"
+      ]
+    },
+    {
+      "properties": {
+        "type": {
+          "enum": [
+            "self_repair.source_bound",
+            "self_repair.preparation_intent",
+            "self_repair.workspace_prepared",
+            "self_repair.candidate_captured",
+            "self_repair.verification_started",
+            "self_repair.verification_recorded",
+            "self_repair.candidate_invalidated",
+            "self_repair.review_delivery_carried",
+            "self_repair.handoff_recorded",
+            "self_repair.retention_changed",
+            "self_repair.cleanup_deferred"
           ]
         },
         "payload": {

@@ -36,10 +36,14 @@ function filesUnder(root) {
 
 const fileDigest = path => createHash('sha256').update(readFileSync(path)).digest('hex');
 
-export function createBuildManifest({ buildDir, buildId, sourceCommit, dirtySourceDigest = null, inputsDigest, protocolVersion, storeSchemaVersion, launchEntry, createdAt }) {
+export function createBuildManifest({ buildDir, buildId, sourceCommit, dirtySourceDigest = null, inputsDigest, protocolVersion, storeSchemaVersion, launchEntry, createdAt, sourceInventory = null }) {
   const root = resolve(buildDir);
   const artifacts = filesUnder(root).map(path => ({ path: relative(root, path).split(sep).join('/'), sha256: fileDigest(path), bytes: statSync(path).size }));
-  const manifest = { schemaVersion: 1, kind: 'BuildManifest', buildId, sourceCommit, dirtySourceDigest, inputsDigest, protocolVersion, storeSchemaVersion, launchEntry, artifacts, createdAt };
+  if (sourceInventory && (!artifacts.some(item => item.path === sourceInventory.path && item.sha256 === sourceInventory.sha256)
+    || sourceInventory.path !== '.deszo-source-inventory.json'))
+    throw new HostError(400, 'invalid_request', 'The source inventory reference must match the reserved, packaged artifact.');
+  const manifest = { schemaVersion: 1, kind: 'BuildManifest', buildId, sourceCommit, dirtySourceDigest, inputsDigest, protocolVersion, storeSchemaVersion, launchEntry,
+    artifacts, createdAt, ...(sourceInventory ? { sourceInventory } : {}) };
   const issues = check('autonomy-policy.schema.json', 'buildManifest', manifest);
   if (issues.length) throw new HostError(400, 'invalid_request', `Build manifest violates its contract: ${issues.map(i => i.message).join('; ')}`);
   if (!artifacts.some(a => a.path === launchEntry)) throw new HostError(400, 'invalid_request', 'The launch entry is not one of the manifest artifacts.');

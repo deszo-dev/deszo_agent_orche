@@ -33,6 +33,7 @@ import judgeControl from '../../docs/schemas/judge-control.schema.json' with { t
 import apiV4 from '../../docs/schemas/runtime-api-v4.schema.json' with { type: 'json' };
 import failureOutcome from '../../docs/schemas/failure-outcome.schema.json' with { type: 'json' };
 import workflowJudgeDecision from '../../docs/schemas/workflow-judge-decision.schema.json' with { type: 'json' };
+import protectedSelfRepair from '../../docs/schemas/protected-self-repair.schema.json' with { type: 'json' };
 
 export const SCHEMAS = {
   'workflow.schema.json': workflow,
@@ -68,6 +69,7 @@ export const SCHEMAS = {
   'judge-control.schema.json': judgeControl,
   'failure-outcome.schema.json': failureOutcome,
   'workflow-judge-decision.schema.json': workflowJudgeDecision,
+  'protected-self-repair.schema.json': protectedSelfRepair,
 };
 
 const AjvClass = Ajv2020.default || Ajv2020;

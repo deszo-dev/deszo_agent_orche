@@ -50,7 +50,8 @@ export type WorkflowNode =
   | { id: string; type: 'loop'; config: LoopConfig }
   | { id: string; type: 'cache'; config: { valueType: ValueType; mode: 'live' | 'frozen' } }
   | { id: string; type: 'route'; config: { valueType: ValueType; selector: string; cases: { id: string; equals: unknown }[]; onUnmatched: 'error' | 'pause' } }
-  | { id: string; type: 'gate'; config: { mode: 'prepare' | 'evaluate' | 'verify'; policy: GatePolicy; carry?: boolean; subject?: 'specification' | 'delivery'; specificationPolicy?: GatePolicy; technicalPolicy?: GatePolicy } }
+  | { id: string; type: 'gate'; config: { mode: 'self-repair-verify'; verificationPolicy: ArtifactRef }
+      | { mode: 'prepare' | 'evaluate' | 'verify'; policy: GatePolicy; carry?: boolean; subject?: 'specification' | 'delivery'; specificationPolicy?: GatePolicy; technicalPolicy?: GatePolicy } }
   | { id: string; type: 'map'; config: MapConfig };
 export type MapRole =
   | { id: string; kind: 'agent'; provider: Provider; model: string; effort?: Effort; instructions: string; timeoutSeconds: number; context: 'task' | { contextId: string } }
@@ -65,7 +66,7 @@ export type NodeType = WorkflowNode['type'];
 export interface WorkflowJudgeRepairProfile {
   profileId: string; repairWorkflowId: string; repairPublishedVersion: number; repairWorkflowSnapshotSha256: string;
   repairWorkspaceId: string; failedNodeInstanceId: string; repairResultNodeInstanceId: string; verificationNodeInstanceIds: string[];
-  acceptanceMode: 'expected_digest' | 'judge_post_execution'; expectedRepairResultSha256?: string; failedNodeRetry: 'explicit_safe' | 'never';
+  acceptanceMode: 'expected_digest' | 'judge_post_execution'; expectedRepairResultSha256?: string; failedNodeRetry: 'explicit_safe' | 'never'; selfRepair?: ArtifactRef;
 }
 export interface WorkflowJudgePolicy {
   version: 'workflow-judge/1'; judgeNodeId: string; maxJudgeAttemptsPerRun: number; maxEvidenceExpansionsPerAttention: number;
@@ -73,7 +74,7 @@ export interface WorkflowJudgePolicy {
 }
 
 export interface WorkflowEdge { id: string; source: { nodeId: string; port: string }; target: { nodeId: string; port: string } }
-export type Capability = 'core-v1' | 'loops-v1' | 'cache-v1' | 'pipeline-v1' | 'delivery-v1' | 'revisions-v1' | 'task-planning-v1';
+export type Capability = 'core-v1' | 'loops-v1' | 'cache-v1' | 'pipeline-v1' | 'delivery-v1' | 'revisions-v1' | 'task-planning-v1' | 'protected-self-repair-v1';
 export interface Workflow {
   schemaVersion: 1; workflowId: string; capabilities: Capability[];
   settings: { nativeConfiguration: 'restricted' | 'inherit' };

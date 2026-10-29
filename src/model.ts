@@ -40,6 +40,7 @@ export function portsOf(node: WorkflowNode): Ports {
     case 'cache': return { inputs: { value: [node.config.valueType] }, outputs: { value: node.config.valueType } };
     case 'route': return { inputs: { selector: ['JsonValue'], value: [node.config.valueType] }, outputs: Object.fromEntries(node.config.cases.map(item => [item.id, node.config.valueType])) };
     case 'gate': {
+      if (node.config.mode === 'self-repair-verify') return { inputs: {}, outputs: { report: 'JsonValue' } };
       const slots = node.config.policy.slots.map(slot => slot.id);
       if (node.config.mode === 'prepare' && node.config.subject === 'delivery') return {
         inputs: { documentation: ['ArtifactSet'], approval: ['JsonValue'], summary: ['JsonValue'], candidate: ['ArtifactSet'], issues: ['JsonValue'], ...(node.config.technicalPolicy ? { technical: ['JsonValue' as PortType] } : {}) },
@@ -225,7 +226,7 @@ export function mapAllNodes(workflow: Workflow, fn: (node: WorkflowNode) => Work
 export function withCapabilities(workflow: Workflow): Workflow {
   const nodes = allNodes(workflow);
   const nested = nodes.some(node => node.type === 'loop' && node.config.body.nodes.some(inner => inner.type === 'loop'));
-  const delivery = nodes.some(node => node.type === 'map' || (node.type === 'gate' && node.config.subject === 'delivery'));
+  const delivery = nodes.some(node => node.type === 'map' || (node.type === 'gate' && node.config.mode === 'prepare' && node.config.subject === 'delivery'));
   const pipeline = delivery || nested || nodes.some(node => node.type === 'gate' || node.type === 'route' || (node.type === 'merge' && node.config.mode === 'selected'));
   const loops = pipeline || nodes.some(node => LOOPS_TYPES.includes(node.type)
     || (node.type === 'agent' && (node.config.attachFiles !== undefined || node.config.captures))
@@ -236,7 +237,9 @@ export function withCapabilities(workflow: Workflow): Workflow {
   if (nodes.some(node => node.type === 'cache')) capabilities.push('cache-v1');
   if (pipeline) capabilities.push('pipeline-v1');
   if (delivery) capabilities.push('delivery-v1');
-  if (nodes.some(node => (node.type === 'gate' && node.config.carry) || (node.type === 'map' && node.config.carryAcrossRevisions))) capabilities.push('revisions-v1');
+  if (nodes.some(node => (node.type === 'gate' && node.config.mode === 'prepare' && node.config.carry) || (node.type === 'map' && node.config.carryAcrossRevisions))) capabilities.push('revisions-v1');
+  if (nodes.some(node => node.type === 'gate' && node.config.mode === 'self-repair-verify')
+    || workflow.judgePolicy?.repairProfiles.some(profile => profile.selfRepair)) capabilities.push('protected-self-repair-v1');
   return { ...workflow, capabilities };
 }
 

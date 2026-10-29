@@ -22,6 +22,9 @@ pub use custody::{run_service as run_custody_service, AllowedExecutable, Custody
 const IPC_MAX_LINE: usize = 128 * 1024;
 const ENGINE_READY_TIMEOUT: Duration = Duration::from_secs(45);
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(15);
+const SOURCE_INVENTORY_PATH: &str = ".deszo-source-inventory.json";
+const SOURCE_INVENTORY_BATCH_MAX: usize = 32;
+const SOURCE_INVENTORY_FILE_MAX_BYTES: u64 = 32 * 1024 * 1024;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -133,9 +136,56 @@ struct BuildManifest {
     runtime_api_version: u32,
     bootstrap: String,
     #[serde(default)]
+    source_commit: Option<String>,
+    #[serde(default)]
+    dirty_source_digest: Option<String>,
+    #[serde(default)]
+    inputs_digest: Option<String>,
+    #[serde(default)]
+    artifacts: Vec<BuildArtifact>,
+    #[serde(default)]
+    source_inventory: Option<BuildArtifactRef>,
+    #[serde(default)]
     desktop_executable: Option<String>,
     #[serde(default)]
     desktop_build_id: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BuildArtifact {
+    path: String,
+    sha256: String,
+    bytes: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BuildArtifactRef {
+    path: String,
+    sha256: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct BuildSourceInventory {
+    schema_version: u32,
+    kind: String,
+    source_commit: String,
+    source_digest: String,
+    files: Vec<BuildSourceInventoryEntry>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct BuildSourceInventoryEntry {
+    path: String,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sha256: Option<String>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    absent: Option<bool>,
 }
 
 #[derive(Deserialize)]
@@ -890,6 +940,95 @@ fn validate_id(id: &str) -> Result<(), String> {
     Ok(())
 }
 
+fn valid_lower_hex(value: &str, length: usize) -> bool {
+    value.len() == length && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn validate_build_inventory_path(path: &str) -> Result<(), String> {
+    if path.is_empty() || path.len() > 4096 || path.starts_with('/') || path.ends_with('/')
+        || path.contains('\\') || path.contains(':') || path.chars().any(|ch| ch.is_control() || matches!(ch, '<' | '>' | '"' | '|' | '?' | '*'))
+    {
+        return Err("build source inventory contains a non-portable path".into());
+    }
+    for part in path.split('/') {
+        if part.is_empty() || part == "." || part == ".." || part.ends_with('.') || part.ends_with(' ') {
+            return Err("build source inventory contains a non-canonical path".into());
+        }
+        let stem = part.split('.').next().unwrap_or("").trim_end_matches(' ').to_ascii_lowercase();
+        if matches!(stem.as_str(), "con" | "prn" | "aux" | "nul")
+            || (stem.len() == 4 && (stem.starts_with("com") || stem.starts_with("lpt"))
+                && stem.as_bytes()[3].is_ascii_digit() && stem.as_bytes()[3] != b'0')
+        {
+            return Err("build source inventory contains a reserved Windows path".into());
+        }
+    }
+    Ok(())
+}
+
+fn read_build_source_inventory(root: &Path, manifest: &BuildManifest) -> Result<Option<BuildSourceInventory>, String> {
+    let Some(reference) = manifest.source_inventory.as_ref() else { return Ok(None); };
+    if reference.path != SOURCE_INVENTORY_PATH || !valid_lower_hex(&reference.sha256, 64) {
+        return Err("build source inventory reference is malformed".into());
+    }
+    let matching = manifest.artifacts.iter().filter(|artifact| artifact.path == SOURCE_INVENTORY_PATH).collect::<Vec<_>>();
+    if matching.len() != 1 || matching[0].sha256 != reference.sha256
+        || matching[0].bytes == 0 || matching[0].bytes > SOURCE_INVENTORY_FILE_MAX_BYTES
+    {
+        return Err("build source inventory reference does not match exactly one packaged artifact".into());
+    }
+    let path = root.join(SOURCE_INVENTORY_PATH);
+    let metadata = fs::symlink_metadata(&path).map_err(err)?;
+    if metadata.file_type().is_symlink() || !metadata.is_file() || metadata.len() != matching[0].bytes {
+        return Err("build source inventory artifact is not a bounded regular file".into());
+    }
+    let bytes = fs::read(&path).map_err(err)?;
+    if bytes.len() as u64 != matching[0].bytes || !digest_eq(&hex::encode(Sha256::digest(&bytes)), &reference.sha256) {
+        return Err("build source inventory artifact digest is invalid".into());
+    }
+    let inventory: BuildSourceInventory = serde_json::from_slice(&bytes).map_err(err)?;
+    if inventory.schema_version != 1 || inventory.kind != "DeszoBuildSourceInventory"
+        || inventory.files.is_empty() || inventory.files.len() > 50_000
+        || !valid_lower_hex(&inventory.source_digest, 64)
+        || !matches!(inventory.source_commit.len(), 40 | 64) || !valid_lower_hex(&inventory.source_commit, inventory.source_commit.len())
+        || manifest.source_commit.as_deref() != Some(inventory.source_commit.as_str())
+        || manifest.dirty_source_digest.as_deref() != Some(inventory.source_digest.as_str())
+    {
+        return Err("build source inventory identity does not match its build manifest".into());
+    }
+    let mut paths = std::collections::HashSet::with_capacity(inventory.files.len());
+    for entry in &inventory.files {
+        validate_build_inventory_path(&entry.path)?;
+        if !paths.insert(entry.path.as_str()) {
+            return Err("build source inventory contains duplicate paths".into());
+        }
+        match (&entry.sha256, entry.absent) {
+            (Some(digest), None) if valid_lower_hex(digest, 64) => {}
+            (None, Some(true)) => {}
+            _ => return Err("build source inventory entry must identify a file digest or absence".into()),
+        }
+    }
+    // serde_json's default Value map is key-sorted, which gives the same JCS object-key order used by
+    // canonicalHash for this restricted {path, sha256|absent} inventory structure.
+    let canonical_files = serde_json::to_vec(&serde_json::to_value(&inventory.files).map_err(err)?).map_err(err)?;
+    let actual_source_digest = hex::encode(Sha256::digest(canonical_files));
+    if !digest_eq(&actual_source_digest, &inventory.source_digest) {
+        return Err("build source inventory content digest is invalid".into());
+    }
+    Ok(Some(inventory))
+}
+
+fn select_source_inventory_entries(inventory: &BuildSourceInventory, paths: &[String]) -> Result<Vec<serde_json::Value>, String> {
+    let by_path = inventory.files.iter().map(|entry| (entry.path.as_str(), entry)).collect::<std::collections::HashMap<_, _>>();
+    paths.iter().map(|path| match by_path.get(path.as_str()) {
+        Some(entry) => match (&entry.sha256, entry.absent) {
+            (Some(sha256), None) => Ok(serde_json::json!({"path": path, "sha256": sha256})),
+            (None, Some(true)) => Ok(serde_json::json!({"path": path, "absent": true})),
+            _ => Err("active source inventory contains an invalid requested entry".into()),
+        },
+        None => Ok(serde_json::json!({"path": path, "missing": true})),
+    }).collect()
+}
+
 fn verify_build(root: &Path, expected_id: &str) -> Result<BuildManifest, String> {
     let root = fs::canonicalize(root).map_err(err)?;
     let manifest_path = root.join("build.json");
@@ -904,6 +1043,7 @@ fn verify_build(root: &Path, expected_id: &str) -> Result<BuildManifest, String>
             "candidate manifest is malformed or incompatible with the managed runtime".into(),
         );
     }
+    read_build_source_inventory(&root, &manifest)?;
     if !root.join("runtime/runner.mjs").is_file() {
         return Err("candidate is missing required artifact runtime/runner.mjs".into());
     }
@@ -1264,6 +1404,14 @@ fn dispatch(shared: &Arc<Shared>, command: &str, payload: serde_json::Value) -> 
                 "invalid engine readiness message: {parse_error}"
             ))),
         },
+        "engine.source_release" => match active_source_release(shared, &payload) {
+            Ok(result) => Dispatch::Reply(ok(result)),
+            Err(message) => Dispatch::Reply(Response { ok: false, result: None, error: Some(message), code: Some("source_release_unavailable".into()) }),
+        },
+        "engine.source_inventory" => match active_source_inventory(shared, &payload) {
+            Ok(result) => Dispatch::Reply(ok(result)),
+            Err(message) => Dispatch::Reply(Response { ok: false, result: None, error: Some(message), code: Some("source_inventory_unavailable".into()) }),
+        },
         "lifecycle.activate_candidate" => match serde_json::from_value::<LifecycleRequest>(payload)
         {
             Ok(request) => match accept_operation(shared, request.clone()) {
@@ -1314,6 +1462,179 @@ fn dispatch(shared: &Arc<Shared>, command: &str, payload: serde_json::Value) -> 
             "unsupported lifecycle protocol command".into(),
         )),
     }
+}
+
+// The Engine does not infer its own trusted source release from a local Git checkout or a build label. The
+// Lifecycle Host returns the active, already verified package identity and the source fields in its build
+// manifest. The whole package is re-hashed for each request, and the active generation is checked again after
+// filesystem work so an activation cannot race the result.
+fn active_source_release(shared: &Arc<Shared>, payload: &serde_json::Value) -> Result<serde_json::Value, String> {
+    let requested_generation = payload.get("generation").and_then(|value| value.as_str())
+        .ok_or_else(|| "source release request is missing its lifecycle generation".to_string())?;
+    let requested_engine_pid = payload.get("pid").and_then(|value| value.as_u64())
+        .and_then(|value| u32::try_from(value).ok()).filter(|value| *value > 0)
+        .ok_or_else(|| "source release request is missing a valid managed Engine PID".to_string())?;
+    let (generation, build_id, expected_digest, application_pid, expected_engine_pid, ready_generation) = {
+        let state = shared.state.lock().map_err(poison)?;
+        let managed = state.managed.as_ref().ok_or("Lifecycle Host has no managed application")?;
+        let application_pid = managed.child.id();
+        if requested_generation != state.durable.generation
+            || managed.generation != state.durable.generation
+            || managed.build_id != state.durable.active_build_id
+        {
+            return Err("source release request belongs to a stale Engine generation".into());
+        }
+        (state.durable.generation.clone(), state.durable.active_build_id.clone(), state.durable.active_digest.clone(),
+            application_pid, managed.engine_pid, state.ready_generation.clone())
+    };
+    let parent_pid = if expected_engine_pid.is_none() && shared.desktop_bootstrap {
+        Some(process_parent_pid(requested_engine_pid)?)
+    } else { None };
+    validate_source_release_engine_pid(requested_engine_pid, application_pid, expected_engine_pid,
+        ready_generation.as_deref(), &generation, shared.desktop_bootstrap, parent_pid)?;
+    let versions = fs::canonicalize(shared.installation_root.join("versions")).map_err(err)?;
+    let root = fs::canonicalize(versions.join(&build_id)).map_err(err)?;
+    if !path_is_within(&versions, &root) {
+        return Err("active source release is outside the managed versions directory".into());
+    }
+    let manifest = verify_build(&root, &build_id)?;
+    let package_digest = candidate_digest(&root)?;
+    if !digest_eq(&package_digest, &expected_digest) {
+        return Err("active managed package changed after Host verification".into());
+    }
+    let result = source_release_value(&shared.installation_id, &build_id, &manifest, &package_digest)?;
+    let state = shared.state.lock().map_err(poison)?;
+    let managed = state.managed.as_ref().ok_or("Lifecycle Host has no managed application")?;
+    let current_application_pid = managed.child.id();
+    let current_parent_pid = if managed.engine_pid.is_none() && shared.desktop_bootstrap {
+        Some(process_parent_pid(requested_engine_pid)?)
+    } else { None };
+    if state.durable.generation != generation || state.durable.active_build_id != build_id
+        || state.durable.active_digest != expected_digest || managed.generation != generation || managed.build_id != build_id
+    {
+        return Err("active source release changed while it was being verified".into());
+    }
+    validate_source_release_engine_pid(requested_engine_pid, current_application_pid, managed.engine_pid,
+        state.ready_generation.as_deref(), &generation, shared.desktop_bootstrap, current_parent_pid)
+        .map_err(|_| "active source release changed while it was being verified".to_string())?;
+    Ok(result)
+}
+
+fn active_source_inventory(shared: &Arc<Shared>, payload: &serde_json::Value) -> Result<serde_json::Value, String> {
+    let requested_generation = payload.get("generation").and_then(|value| value.as_str())
+        .ok_or_else(|| "source inventory request is missing its lifecycle generation".to_string())?;
+    let requested_paths = payload.get("paths").and_then(|value| value.as_array())
+        .ok_or_else(|| "source inventory request is missing its path batch".to_string())?;
+    if requested_paths.is_empty() || requested_paths.len() > SOURCE_INVENTORY_BATCH_MAX {
+        return Err("source inventory path batch is empty or exceeds its bound".into());
+    }
+    let mut paths = Vec::with_capacity(requested_paths.len());
+    let mut unique = std::collections::HashSet::with_capacity(requested_paths.len());
+    let mut total_path_bytes = 0usize;
+    for value in requested_paths {
+        let path = value.as_str().ok_or("source inventory path is not text")?;
+        if !path.is_ascii() || path.len() > 4096 {
+            return Err("source inventory path is outside the portable P5 path bound".into());
+        }
+        validate_build_inventory_path(path)?;
+        if path.split('/').any(|part| matches!(part.to_ascii_lowercase().as_str(), ".git" | ".p5")) {
+            return Err("source inventory query includes a reserved P5 path".into());
+        }
+        total_path_bytes = total_path_bytes.checked_add(path.len()).ok_or("source inventory path batch is too large")?;
+        if total_path_bytes > 32 * 1024 || !unique.insert(path) {
+            return Err("source inventory path batch is too large or contains duplicates".into());
+        }
+        paths.push(path.to_string());
+    }
+
+    let before = active_source_release(shared, payload)?;
+    let build_id = before.get("buildId").and_then(|value| value.as_str()).ok_or("active source release omitted its build identity")?;
+    let package_digest = before.get("packageSha256").and_then(|value| value.as_str()).ok_or("active source release omitted its package digest")?;
+    let versions = fs::canonicalize(shared.installation_root.join("versions")).map_err(err)?;
+    let root = fs::canonicalize(versions.join(build_id)).map_err(err)?;
+    if !path_is_within(&versions, &root) {
+        return Err("active source inventory is outside the managed versions directory".into());
+    }
+    let manifest = verify_build(&root, build_id)?;
+    let inventory = read_build_source_inventory(&root, &manifest)?
+        .ok_or("active build has no attested source inventory")?;
+    if inventory.source_commit != before["sourceCommit"].as_str().unwrap_or_default()
+        || inventory.source_digest != before["sourceDigest"].as_str().unwrap_or_default()
+    {
+        return Err("active source inventory changed its source release identity".into());
+    }
+    let entries = select_source_inventory_entries(&inventory, &paths)?;
+    let result = serde_json::json!({
+        "schemaVersion": 1,
+        "kind": "ProtectedSelfRepairRunningSourceInventory",
+        "installationId": before["installationId"],
+        "buildId": build_id,
+        "packageSha256": package_digest,
+        "sourceCommit": inventory.source_commit,
+        "sourceDigest": inventory.source_digest,
+        "generation": requested_generation,
+        "entries": entries,
+    });
+    let after = active_source_release(shared, payload)?;
+    if before != after {
+        return Err("active source release changed while its inventory was being read".into());
+    }
+    Ok(result)
+}
+
+fn validate_source_release_engine_pid(requested_pid: u32, application_pid: u32, managed_engine_pid: Option<u32>,
+    ready_generation: Option<&str>, active_generation: &str, desktop_bootstrap: bool,
+    observed_parent_pid: Option<u32>) -> Result<(), String> {
+    if requested_pid == 0 { return Err("source release request has an invalid Engine PID".into()); }
+    if ready_generation == Some(active_generation) {
+        return if managed_engine_pid == Some(requested_pid) { Ok(()) }
+            else { Err("source release request belongs to a different ready Engine process".into()) };
+    }
+    if ready_generation.is_some() || managed_engine_pid.is_some() {
+        return Err("source release request belongs to a stale or inconsistent Engine generation".into());
+    }
+    if desktop_bootstrap {
+        if observed_parent_pid == Some(application_pid) { Ok(()) }
+        else { Err("source release request did not come from the managed desktop Engine child".into()) }
+    } else if requested_pid == application_pid {
+        Ok(())
+    } else {
+        Err("source release request did not come from the managed runtime process".into())
+    }
+}
+
+fn source_release_value(installation_id: &str, build_id: &str, manifest: &BuildManifest, package_digest: &str) -> Result<serde_json::Value, String> {
+    if installation_id.len() != 32 || !installation_id.bytes().all(|value| value.is_ascii_hexdigit())
+        || build_id.is_empty() || build_id.len() > 100
+        || !build_id.bytes().all(|value| value.is_ascii_alphanumeric() || matches!(value, b'_' | b'-'))
+    {
+        return Err("active installation or build identity is malformed".into());
+    }
+    if package_digest.len() != 64 || !package_digest.bytes().all(|value| value.is_ascii_hexdigit()) {
+        return Err("active managed package digest is malformed".into());
+    }
+    let source_commit = manifest.source_commit.as_deref().ok_or("active build has no trusted source commit")?;
+    if !matches!(source_commit.len(), 40 | 64) || !source_commit.bytes().all(|value| value.is_ascii_hexdigit()) {
+        return Err("active build source commit is malformed".into());
+    }
+    let source_digest = manifest.dirty_source_digest.as_deref().ok_or("active build has no captured source digest")?;
+    let inputs_digest = manifest.inputs_digest.as_deref().ok_or("active build has no captured input digest")?;
+    for (label, digest) in [("source", source_digest), ("input", inputs_digest)] {
+        if digest.len() != 64 || !digest.bytes().all(|value| value.is_ascii_hexdigit()) {
+            return Err(format!("active build {label} digest is malformed"));
+        }
+    }
+    Ok(serde_json::json!({
+        "schemaVersion": 1,
+        "kind": "ProtectedSelfRepairRunningSourceRelease",
+        "installationId": installation_id.to_ascii_lowercase(),
+        "buildId": build_id,
+        "bootstrap": manifest.bootstrap,
+        "packageSha256": package_digest.to_ascii_lowercase(),
+        "sourceCommit": source_commit.to_ascii_lowercase(),
+        "sourceDigest": source_digest.to_ascii_lowercase(),
+        "inputsDigest": inputs_digest.to_ascii_lowercase(),
+    }))
 }
 
 #[derive(Debug, Deserialize)]
@@ -2095,6 +2416,11 @@ fn path_is_within(root: &Path, candidate: &Path) -> bool {
     candidate == root || candidate.starts_with(&format!("{root}\\"))
 }
 
+#[cfg(not(windows))]
+fn path_is_within(root: &Path, candidate: &Path) -> bool {
+    candidate == root || candidate.starts_with(root)
+}
+
 fn validate_request_shape(request: &LifecycleRequest) -> Result<(), String> {
     if request.operation_id.is_empty()
         || request.run_id.is_empty()
@@ -2134,6 +2460,80 @@ mod tests {
         )
         .unwrap();
         path
+    }
+    #[test]
+    fn running_source_release_binds_host_package_and_build_source_fields() {
+        let manifest: BuildManifest = serde_json::from_value(serde_json::json!({
+            "schemaVersion": 1, "buildId": "release-1", "runtimeApiVersion": 2, "bootstrap": "runtime",
+            "sourceCommit": "A".repeat(40), "dirtySourceDigest": "B".repeat(64), "inputsDigest": "C".repeat(64)
+        })).unwrap();
+        let release = source_release_value("a".repeat(32).as_str(), "release-1", &manifest, "D".repeat(64).as_str()).unwrap();
+        assert_eq!(release["kind"], "ProtectedSelfRepairRunningSourceRelease");
+        assert_eq!(release["installationId"], "a".repeat(32));
+        assert_eq!(release["packageSha256"], "d".repeat(64));
+        assert_eq!(release["sourceCommit"], "a".repeat(40));
+        assert_eq!(release["sourceDigest"], "b".repeat(64));
+        assert_eq!(release["inputsDigest"], "c".repeat(64));
+
+        let incomplete: BuildManifest = serde_json::from_value(serde_json::json!({
+            "schemaVersion": 1, "buildId": "release-1", "runtimeApiVersion": 2, "bootstrap": "runtime",
+            "sourceCommit": "a".repeat(40), "dirtySourceDigest": null, "inputsDigest": "c".repeat(64)
+        })).unwrap();
+        assert!(source_release_value("a".repeat(32).as_str(), "release-1", &incomplete, "d".repeat(64).as_str()).is_err());
+    }
+    #[test]
+    fn packaged_source_inventory_is_digest_bound_and_returns_only_requested_entries() {
+        let root = temp("source-inventory");
+        fs::create_dir_all(&root).unwrap();
+        let files = vec![
+            BuildSourceInventoryEntry { path: "runtime/core/engine.mjs".into(), sha256: Some("a".repeat(64)), absent: None },
+            BuildSourceInventoryEntry { path: "runtime/optional.mjs".into(), sha256: None, absent: Some(true) },
+        ];
+        let canonical_files = serde_json::to_vec(&serde_json::to_value(&files).unwrap()).unwrap();
+        let source_digest = hex::encode(Sha256::digest(&canonical_files));
+        let source_commit = "b".repeat(40);
+        let inventory_bytes = serde_json::to_vec(&serde_json::json!({
+            "schemaVersion": 1, "kind": "DeszoBuildSourceInventory", "sourceCommit": source_commit,
+            "sourceDigest": source_digest, "files": files,
+        })).unwrap();
+        fs::write(root.join(SOURCE_INVENTORY_PATH), &inventory_bytes).unwrap();
+        let artifact_digest = hex::encode(Sha256::digest(&inventory_bytes));
+        let manifest: BuildManifest = serde_json::from_value(serde_json::json!({
+            "schemaVersion": 1, "buildId": "release-1", "runtimeApiVersion": 2, "bootstrap": "runtime",
+            "sourceCommit": source_commit, "dirtySourceDigest": source_digest, "inputsDigest": "c".repeat(64),
+            "artifacts": [{"path": SOURCE_INVENTORY_PATH, "sha256": artifact_digest, "bytes": inventory_bytes.len()}],
+            "sourceInventory": {"path": SOURCE_INVENTORY_PATH, "sha256": artifact_digest}
+        })).unwrap();
+        let inventory = read_build_source_inventory(&root, &manifest).unwrap().unwrap();
+        let selected = select_source_inventory_entries(&inventory, &[
+            "runtime/core/engine.mjs".into(), "runtime/optional.mjs".into(), "runtime/missing.mjs".into(),
+        ]).unwrap();
+        assert_eq!(selected, vec![
+            serde_json::json!({"path":"runtime/core/engine.mjs", "sha256":"a".repeat(64)}),
+            serde_json::json!({"path":"runtime/optional.mjs", "absent":true}),
+            serde_json::json!({"path":"runtime/missing.mjs", "missing":true}),
+        ]);
+        fs::write(root.join(SOURCE_INVENTORY_PATH), b"{}").unwrap();
+        assert!(read_build_source_inventory(&root, &manifest).is_err(), "a changed inventory must not be served");
+        let _ = fs::remove_dir_all(root);
+    }
+    #[test]
+    fn source_release_pid_is_bound_before_or_after_engine_readiness() {
+        let generation = "generation-a";
+        assert!(validate_source_release_engine_pid(42, 10, None, None, generation, true, Some(10)).is_ok(),
+            "the authenticated Engine child may request read-only release identity before readiness");
+        assert!(validate_source_release_engine_pid(42, 10, None, None, generation, true, Some(11)).is_err(),
+            "a different process tree cannot use the startup source-release path");
+        assert!(validate_source_release_engine_pid(10, 10, None, None, generation, false, None).is_ok(),
+            "the managed in-process runtime may request source identity before readiness");
+        assert!(validate_source_release_engine_pid(42, 10, None, None, generation, false, None).is_err(),
+            "a child process is not the managed in-process runtime");
+        assert!(validate_source_release_engine_pid(42, 10, Some(42), Some(generation), generation, true, None).is_ok(),
+            "a ready Engine remains bound to the PID accepted by engine.ready");
+        assert!(validate_source_release_engine_pid(43, 10, Some(42), Some(generation), generation, true, None).is_err());
+        assert!(validate_source_release_engine_pid(42, 10, Some(42), Some("generation-old"), generation, true, None).is_err());
+        assert!(validate_source_release_engine_pid(42, 10, Some(42), None, generation, true, None).is_err(),
+            "inconsistent readiness state fails closed");
     }
     #[test]
     fn candidate_digest_covers_build_identity_and_all_files() {

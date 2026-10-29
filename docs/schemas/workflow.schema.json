@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://deszo.local/documentation/workflow.schema.json",
-  "title": "Workflow definition (core-v1 with optional loops-v1, cache-v1, pipeline-v1 and workflow-judge/1)",
+  "title": "Workflow definition (core-v1 with optional loops-v1, cache-v1, pipeline-v1, workflow-judge/1 and protected-self-repair-v1)",
   "type": "object",
   "properties": {
     "schemaVersion": {
@@ -24,11 +24,12 @@
           "pipeline-v1",
           "delivery-v1",
           "revisions-v1",
-          "task-planning-v1"
+          "task-planning-v1",
+          "protected-self-repair-v1"
         ]
       },
       "minItems": 1,
-      "maxItems": 7,
+      "maxItems": 8,
       "uniqueItems": true
     },
     "judgePolicy": {
@@ -481,6 +482,9 @@
             "explicit_safe",
             "never"
           ]
+        },
+        "selfRepair": {
+          "$ref": "#/$defs/artifactRef"
         }
       },
       "required": [
@@ -497,6 +501,20 @@
       ],
       "additionalProperties": false,
       "allOf": [
+        {
+          "if": {
+            "properties": {
+              "selfRepair": { "type": "object" }
+            },
+            "required": ["selfRepair"]
+          },
+          "then": {
+            "properties": {
+              "acceptanceMode": { "const": "judge_post_execution" }
+            },
+            "required": ["acceptanceMode"]
+          }
+        },
         {
           "if": {
             "properties": {
@@ -1474,8 +1492,12 @@
               "enum": [
                 "prepare",
                 "evaluate",
-                "verify"
+                "verify",
+                "self-repair-verify"
               ]
+            },
+            "verificationPolicy": {
+              "$ref": "#/$defs/artifactRef"
             },
             "policy": {
               "type": "object",
@@ -1623,11 +1645,32 @@
             }
           },
           "required": [
-            "mode",
-            "policy"
+            "mode"
           ],
           "additionalProperties": false,
           "allOf": [
+            {
+              "if": {
+                "properties": { "mode": { "const": "self-repair-verify" } },
+                "required": ["mode"]
+              },
+              "then": {
+                "required": ["verificationPolicy"],
+                "not": {
+                  "anyOf": [
+                    { "required": ["policy"] },
+                    { "required": ["carry"] },
+                    { "required": ["subject"] },
+                    { "required": ["specificationPolicy"] },
+                    { "required": ["technicalPolicy"] }
+                  ]
+                }
+              },
+              "else": {
+                "required": ["policy"],
+                "not": { "required": ["verificationPolicy"] }
+              }
+            },
             {
               "if": {
                 "properties": {

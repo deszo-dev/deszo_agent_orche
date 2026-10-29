@@ -169,7 +169,7 @@ test('Custody scope excludes Map-step attempts and fails closed when the Host is
   try {
     const engine = api.runner.engine;
     engine.custodyHost = custodyBridgeFromEnvironment({ DESZO_CUSTODY_ADDRESS: '127.0.0.1:9', DESZO_CUSTODY_CAPABILITY: 'a'.repeat(64), DESZO_CUSTODY_GENERATION: 'gen' });
-    const node = { id: 'agent', config: { provider: 'codex' } };
+    const node = { id: 'agent', type: 'agent', config: { provider: 'codex' } };
     const plain = { mapped: false, taskExecutionId: undefined, loops: [] };
     assert.equal(engine.custodyScopeAllows(node, plain), true, 'a plain top-level agent is in scope');
     assert.equal(engine.custodyScopeAllows(node, { ...plain, mapped: true }), false, 'a Map step is outside Custody scope');

@@ -9,6 +9,7 @@ import { HostError } from './authority.mjs';
 const refuse = message => { throw new HostError(403,'source_provenance_refused',message); };
 const normalized = path => path.split(sep).join('/');
 const pathKey=path=>process.platform==='win32'?resolve(path).toLowerCase():resolve(path);
+export const SOURCE_INVENTORY_PATH = '.deszo-source-inventory.json';
 function plain(root,path) {
   const name=relative(root,path);
   if(isAbsolute(name)||name==='..'||name.startsWith(`..${sep}`))refuse('An authority dependency escaped its source root.');
