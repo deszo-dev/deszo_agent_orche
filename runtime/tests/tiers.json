@@ -37,6 +37,8 @@
     "workflow-p1-published-and-ordinary.test.mjs",
     "workflow-p1-recovery-boundaries.test.mjs",
     "adr6-regressions.test.mjs",
-    "supervision.test.mjs"
+    "supervision.test.mjs",
+    "p5-managed-clone.test.mjs",
+    "p5-e2e.test.mjs"
   ]
 }

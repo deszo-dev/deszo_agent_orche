@@ -406,10 +406,26 @@ export function installLinkedRepair(Engine, { ApiError }) {
       || receipt.receiptId !== p5Acceptance.receiptId || receipt.status !== 'passed'
       || resultAttempt?.id !== approval.resultAttemptId || approval.resultSha256 !== resultSha256)
       throw Object.assign(new Error('The accepted P5 candidate, receipt, P2 result and link do not share one exact lineage.'), { code: 'p5_handoff_ineligible' });
+    const currentEligibility = p5Acceptance.currentEligibility;
+    if (!currentEligibility || currentEligibility.eligible !== true || currentEligibility.stage !== 'p5_acceptance'
+      || currentEligibility.candidateSourceDigest !== candidate.candidateSourceDigest
+      || canonicalHash(currentEligibility.gitCandidate ?? null) !== canonicalHash(candidate.gitCandidate ?? null))
+      throw Object.assign(new Error('P5 handoff requires the exact timestamped eligibility evidence captured during acceptance.'), { code: 'p5_handoff_eligibility_missing' });
+    if (candidate.gitCandidate) {
+      const gitCandidate = this.store.readJson(this.store.verifyRef(candidate.gitCandidate).artifactId);
+      validateP5Contract('gitCandidate', gitCandidate);
+      if (currentEligibility.repairBranch !== gitCandidate.git.repairBranch
+        || currentEligibility.candidateCommit !== gitCandidate.git.candidateCommit
+        || currentEligibility.candidateTree !== gitCandidate.git.candidateTree
+        || currentEligibility.storageSnapshotDigest !== gitCandidate.git.storageSnapshotDigest)
+        throw Object.assign(new Error('P5 handoff eligibility evidence differs from the immutable accepted Git subject.'), { code: 'p5_handoff_eligibility_mismatch' });
+    }
 
     const p2OutcomeFields = { schemaVersion: 1, kind: 'ProtectedSelfRepairP2Outcome', parentRunId: link.parent_run_id,
       repairRunId: link.repair_run_id, linkId: link.id, incidentId: link.incident_id, decisionId: approval.decisionId,
       candidateId: candidate.candidateId, receiptId: receipt.receiptId, p2Approval: p2ApprovalRef,
+      ...(candidate.gitCandidate ? { gitCandidate: candidate.gitCandidate } : {}),
+      currentEligibility,
       p5Acceptance: approval.protectedSelfRepairAcceptance, resultAttemptId: resultAttempt.id, resultSha256,
       failedNodeRetry: link.failed_node_retry, continuationState: 'repair_accepted', recordedAt };
     const p2Outcome = { ...p2OutcomeFields, outcomeId: canonicalHash({ kind: p2OutcomeFields.kind, version: 1, ...p2OutcomeFields }) };
@@ -421,6 +437,7 @@ export function installLinkedRepair(Engine, { ApiError }) {
       repairRunId: link.repair_run_id, linkId: link.id, incidentId: link.incident_id,
       candidateManifest: candidateRef, candidateId: candidate.candidateId,
       verificationReceipt: receiptRef, receiptId: receipt.receiptId,
+      ...(candidate.gitCandidate ? { gitCandidate: candidate.gitCandidate } : {}),
       workspaceId: candidate.workspace.workspaceId, allocationId: candidate.workspace.allocationId,
       workspaceIdentity: candidate.workspace.nativeIdentity, status: 'retained', revision: 1,
       retainedAt: recordedAt, cleanupDeferred: true };
@@ -438,15 +455,17 @@ export function installLinkedRepair(Engine, { ApiError }) {
       continuation: { state: 'repair_accepted' },
       retention: { ...retention, artifact: retentionRef },
       sourceBinding: candidate.sourceBinding, enrollment: candidate.enrollment,
-      currentEligibility: { eligible: true, revision: 1, checkedAt: recordedAt },
+      currentEligibility,
     });
     const handoffArtifact = this.store.putJson(handoff);
     const handoffRef = { artifactId: handoffArtifact.artifactId, sha256: handoffArtifact.sha256 };
     this.store.verifyRef(handoffRef);
+    // P5 journal records carry exactly their immutable record reference, like every other self_repair.* event.
+    const p5Event = (type, record) => ({ type, payload: { record }, nodeInstanceId: null, attemptId: null });
     this.store.appendEvents(link.repair_run_id, [
-      event('self_repair.retention_changed', { record: retentionRef }),
-      event('self_repair.cleanup_deferred', { record: retentionRef }),
-      event('self_repair.handoff_recorded', { record: handoffRef }),
+      p5Event('self_repair.retention_changed', retentionRef),
+      p5Event('self_repair.cleanup_deferred', retentionRef),
+      p5Event('self_repair.handoff_recorded', handoffRef),
     ]);
     return { p2Outcome: { artifactId: p2OutcomeArtifact.artifactId, sha256: p2OutcomeArtifact.sha256 },
       retention: retentionRef, handoff: handoffRef };
@@ -1026,6 +1045,8 @@ export function installLinkedRepair(Engine, { ApiError }) {
       const acceptanceFields = { schemaVersion: 1, kind: 'ProtectedSelfRepairAcceptance',
         candidateManifest: admission.candidateRef, candidateId: admission.candidateId,
         candidateSourceDigest: admission.candidateSourceDigest, verificationReceipt: admission.receiptRef,
+        ...(p5Review.candidate.gitCandidate ? { gitCandidate: p5Review.candidate.gitCandidate } : {}),
+        currentEligibility: admission.currentEligibility,
         receiptId: admission.receiptId, gateAttemptId: admission.gateAttemptId,
         parentRunId: link.parent_run_id, repairRunId: state.id, linkId: link.id, incidentId: link.incident_id,
         decisionId, judgeAttemptId: attempt.id, attentionKey: attention.attentionKey,

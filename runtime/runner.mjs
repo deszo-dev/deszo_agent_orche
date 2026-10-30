@@ -306,6 +306,17 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
       const publication = engine.getWorkflowPublication(match[1], Number(match[2])); return [200, publication, { ETag: publication.etag }];
     }],
     ['GET', 'public', /^\/api\/v2\/capabilities$/, async () => [200, await engine.capabilities()]],
+    ['GET', 'public', /^\/api\/v2\/installation\/source-release$/, async () => [200, await engine.installedSourceRelease()]],
+    ['GET', 'public', new RegExp(`^/api/v2/runs/(${UUID})/self-repair$`), ({ match }) => {
+      const projection = engine.protectedSelfRepairRunProjection(match[1]);
+      if (!projection) throw new ApiError(404, 'not_found', 'This Run has no Protected Self-Repair projection.');
+      return [200, projection];
+    }],
+    ['POST', 'public', new RegExp(`^/api/v2/runs/(${UUID})/self-repair/publication$`), async ({ match }) => {
+      const { status, body } = await engine.publishProtectedSelfRepairBranch(match[1]);
+      return [status, body];
+    }],
+    ['GET', 'public', new RegExp(`^/api/v2/runs/(${UUID})/self-repair/publication$`), ({ match }) => [200, engine.protectedSelfRepairPublicationStatus(match[1])]],
     ['GET', 'public', /^\/api\/v2\/settings$/, () => [200, engine.settingsBody()]],
     ['PUT', 'public', /^\/api\/v2\/settings$/, async ({ req }) => { const result = engine.updateSettings(parse(await bodyText(req))); return [result.status, result.body]; }],
     ['GET', 'public', /^\/api\/v2\/workspaces$/, ({ url }) => [200, engine.listWorkspaces(query(url, ['limit', 'cursor'], ['limit']))]],

@@ -1,9 +1,11 @@
 import { chmodSync, closeSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, writeSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { canonicalBytes, canonicalHash, compareText, parseStrictJson, sha256 } from './canonical.mjs';
 import { assertValid } from './schemas.mjs';
 import { workspaceRootsOverlap } from './workspaceIsolation.mjs';
+import { assertP5HostBoundary, classifyP5Mutation, deriveP5HostProtection, P5_SENSITIVE_TIERS, p5HostStaticReason as p5HostProtectedReason,
+  verifyP5MutationClassification } from './p5HostBoundary.mjs';
 
 export const P5_CAPABILITY = 'protected-self-repair-v1';
 export const P5_ENROLLMENT_RELATIVE_PATH = join('p5', 'enrollment.json');
@@ -11,9 +13,10 @@ export const P5_VERIFICATION_INPUT_MANIFEST_ENV = 'DESZO_P5_INPUT_MANIFEST';
 export const P5_VERIFICATION_CANDIDATE_ENTRYPOINT_ENV = 'DESZO_P5_CANDIDATE_ENTRYPOINT';
 export const P5_EVENT_TYPES = Object.freeze([
   'self_repair.source_bound', 'self_repair.preparation_intent', 'self_repair.workspace_prepared',
-  'self_repair.candidate_captured', 'self_repair.verification_started', 'self_repair.verification_recorded',
+  'self_repair.candidate_capture_started', 'self_repair.git_commit_intent', 'self_repair.candidate_captured', 'self_repair.verification_started', 'self_repair.verification_recorded',
   'self_repair.candidate_invalidated', 'self_repair.review_delivery_carried', 'self_repair.handoff_recorded',
   'self_repair.retention_changed', 'self_repair.cleanup_deferred',
+  'self_repair.publication_intent', 'self_repair.publication_recorded', 'self_repair.capture_held',
 ]);
 
 const DEVICE_NAME = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i;
@@ -21,6 +24,24 @@ const CONTROL = /[\u0000-\u001f\u007f]/;
 const HEX = /^[a-f0-9]{64}$/;
 const asRef = artifact => ({ artifactId: artifact.artifactId, sha256: artifact.sha256 });
 const sortEntries = entries => [...entries].sort((a, b) => compareText(a.path, b.path));
+
+// P5-FINAL E-01: a capture failure caused by an unavailable Host or dependency is not evidence about the candidate. Such a
+// failure holds the Developer Attempt unsettled, so its durable anchor and Git commit intent resume when Custody next re-delivers
+// the terminal record (Host reattachment or Engine start), exactly as after an Engine exit. Every other failure, including
+// every integrity, drift, scope and boundary refusal, still fails closed.
+export const P5_TRANSIENT_CAPTURE_CODES = Object.freeze(['p5_host_unavailable', 'lifecycle_host_unavailable', 'custody_unavailable',
+  'custody_unreachable', 'host_unavailable', 'ECONNREFUSED', 'ECONNRESET', 'EPIPE', 'ETIMEDOUT']);
+export function p5CaptureFailureDisposition(error) {
+  return P5_TRANSIENT_CAPTURE_CODES.includes(error?.code) ? 'hold' : 'fail';
+}
+// P5-CLOSURE F10: a held capture is retried for the same Attempt, anchor and Git intent at these delays, counted durably across
+// Engine restarts; when the budget is spent the Attempt fails closed. Never an unbounded background retry.
+export const P5_CAPTURE_HOLD_DELAYS_MS = Object.freeze([10_000, 30_000, 60_000]);
+export function p5CaptureHoldDecision(previousHolds) {
+  return previousHolds < P5_CAPTURE_HOLD_DELAYS_MS.length
+    ? { action: 'retry', holdNumber: previousHolds + 1, delayMs: P5_CAPTURE_HOLD_DELAYS_MS[previousHolds] }
+    : { action: 'fail', holdNumber: previousHolds };
+}
 
 export class ProtectedSelfRepairError extends Error {
   constructor(code, message) { super(message); this.name = 'ProtectedSelfRepairError'; this.code = code; }
@@ -34,6 +55,10 @@ export function validateP5Contract(name, value) {
     repositoryIdentity: 'repositoryIdentity', sourcePathPolicy: 'sourcePathPolicy', runningSourceRelease: 'runningSourceRelease',
     runningSourceInventory: 'runningSourceInventory',
     preparationIntent: 'preparationIntent', workspacePreparation: 'workspacePreparation',
+    gitRepository: 'gitRepository', gitCandidate: 'gitCandidate', gitCommitIntent: 'gitCommitIntent',
+    gitSource: 'gitSource', gitFetchProvenance: 'gitFetchProvenance', hostProtection: 'hostProtection',
+    candidateCaptureAnchor: 'candidateCaptureAnchor', gitPublicationPolicy: 'gitPublicationPolicy',
+    gitPublicationIntent: 'gitPublicationIntent', gitPublicationResult: 'gitPublicationResult',
     verificationStarted: 'verificationStarted', verificationOutcome: 'verificationOutcome',
     subjectResolution: 'subjectResolution', materializedCheckInputs: 'materializedCheckInputs',
     executionTreeCaptureEvidence: 'executionTreeCaptureEvidence', overlayManifest: 'overlayManifest',
@@ -41,6 +66,7 @@ export function validateP5Contract(name, value) {
     checkObservationEvidence: 'checkObservationEvidence', changeManifest: 'changeManifest', sourceCaptureEvidence: 'sourceCaptureEvidence', candidate: 'candidate',
     reviewDossierChunk: 'reviewDossierChunk', reviewDeliveryCarry: 'reviewDeliveryCarry', candidateInvalidation: 'candidateInvalidation',
     verificationReceipt: 'verificationReceipt', acceptance: 'acceptance', p2Outcome: 'p2Outcome',
+    causalReproduction: 'causalReproduction', dependencyClosure: 'dependencyClosure', captureHold: 'captureHold',
     retentionRecord: 'retentionRecord', handoff: 'handoff' })[name];
   if (!definition) p5Fail('p5_contract_unknown', `Unknown P5 contract "${name}".`);
   assertValid('protected-self-repair.schema.json', definition, value, `P5 ${name}`);
@@ -182,7 +208,8 @@ export async function loadP5EnrollmentWithHostIdentity({ profileRoot, store, ins
 }
 
 /** Bind the selected, content-addressed P5 baseline files to the active Host-verified build inventory. */
-export async function verifyP5RunningSourceInventory({ store, enrollment, currentRunningSourceRelease, generation, readBatch, batchSize = 32 }) {
+export async function verifyP5RunningSourceInventory({ store, enrollment, currentRunningSourceRelease, generation, readBatch, batchSize = 32,
+  installedInventory = null }) {
   validateP5Contract('enrollment', enrollment);
   validateP5Contract('runningSourceRelease', currentRunningSourceRelease);
   if (!store || typeof generation !== 'string' || !generation || typeof readBatch !== 'function'
@@ -222,6 +249,20 @@ export async function verifyP5RunningSourceInventory({ store, enrollment, curren
 
   if (enrolledRelease.sourceCommit !== enrollment.baseCommit || enrolledRelease.sourceDigest !== currentRunningSourceRelease.sourceDigest)
     p5Fail('p5_runtime_source_mismatch', 'The enrolled source baseline commit or full build inventory digest differs from the active package.');
+  // The installed package's own committed source inventory, authenticated by the Host-attested source digest (which is by
+  // definition the canonical hash of that inventory's file list), proves every entry with one Host attestation instead of one
+  // Host round trip (and package digest) per batch. Without it the Host serves the inventory in batches.
+  if (installedInventory) {
+    if (installedInventory.schemaVersion !== 1 || installedInventory.kind !== 'DeszoBuildSourceInventory' || !Array.isArray(installedInventory.files)
+      || installedInventory.sourceCommit !== enrolledRelease.sourceCommit || installedInventory.sourceDigest !== currentRunningSourceRelease.sourceDigest
+      || canonicalHash(installedInventory.files) !== currentRunningSourceRelease.sourceDigest)
+      p5Fail('p5_runtime_source_mismatch', 'The installed source inventory is not the one the Host attests for the running release.');
+    const byPath = new Map(installedInventory.files.map(item => [item.path, item]));
+    for (const entry of sourceManifest.entries)
+      if (byPath.get(entry.path)?.sha256 !== entry.sha256)
+        p5Fail('p5_runtime_source_mismatch', `The running build source differs from the enrolled baseline at "${entry.path}".`);
+    return true;
+  }
   for (let offset = 0; offset < sourceManifest.entries.length; offset += batchSize) {
     const batch = sourceManifest.entries.slice(offset, offset + batchSize);
     const paths = batch.map(entry => entry.path);
@@ -351,6 +392,46 @@ export function validateP5SourcePath(path) {
   return path;
 }
 
+/** P5 Git adapter entry point; all commands share the pinned, scrubbed process policy below. */
+export function runP5GitCommand(gitTool, repositoryRoot, args, options = {}) {
+  return p5GitRun(gitTool, repositoryRoot, args, options);
+}
+
+/**
+ * The same pinned, sanitized Git invocation without blocking the Engine event loop (P5-CLOSURE F9: remote reads and the
+ * publication push may be slow). The bounded timeout ends the child; its outcome is then unknown to the caller.
+ */
+export function runP5GitCommandAsync(gitTool, repositoryRoot, args, { timeoutMs = 120_000, maxBuffer = 4 * 1024 * 1024 } = {}) {
+  const root = resolve(repositoryRoot);
+  return new Promise((resolvePromise, reject) => {
+    const child = spawn(gitTool.path, [...P5_GIT_CONFIG, '-c', `safe.directory=${root.replace(/\\/g, '/')}`, '-C', root, ...args], {
+      cwd: root, env: p5GitEnvironment({}), windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const out = [];
+    let size = 0, settled = false;
+    const finish = error => { if (settled) return; settled = true; clearTimeout(timer); error ? reject(error) : resolvePromise(Buffer.concat(out)); };
+    const timer = setTimeout(() => { try { child.kill(); } catch { /* already ended */ } finish(new ProtectedSelfRepairError('p5_git_timeout', `Pinned Git timed out for ${args[0]}.`)); }, timeoutMs);
+    child.stdout.on('data', chunk => { size += chunk.length; if (size <= maxBuffer) out.push(chunk); });
+    child.stderr.resume();
+    child.once('error', error => finish(new ProtectedSelfRepairError('p5_git_source_unavailable', `Pinned Git failed for ${args[0]}: ${error.message}.`)));
+    child.once('close', (code, signal) => finish(code === 0 && !signal ? null
+      : new ProtectedSelfRepairError('p5_git_source_unavailable', `Pinned Git failed for ${args[0]}.`)));
+  });
+}
+
+/** Reuse enrollment's pinned Git executable checks from the narrow candidate adapter. */
+export async function verifyP5GitToolIdentity({ gitTool, identityReader = null, nativeToolIdentityReader = null }) {
+  verifyGitTool(gitTool, identityReader, { hostIdentityProven: process.platform === 'win32' });
+  const nativeIdentity = process.platform === 'win32' ? await readP5NativeToolIdentity(nativeToolIdentityReader, gitTool.path) : null;
+  const after = sha256(readFileSync(gitTool.path));
+  if (after !== gitTool.sha256) p5Fail('p5_git_tool_mismatch', 'The pinned Git executable changed during identity validation.');
+  return { path: realpathSync.native(gitTool.path), sha256: after, nativeIdentity };
+}
+
+/** Reject Git checkout transformations using the same policy as P5 baseline capture. */
+export function verifyP5GitAttributes(gitTool, repositoryRoot, paths) {
+  return p5GitAttributes(gitTool, repositoryRoot, paths);
+}
+
 function assertUniquePortablePaths(entries) {
   const exact = new Set(), folded = new Map(), files = new Set();
   for (const entry of entries) {
@@ -413,10 +494,13 @@ export function p5VerificationCommandDigest(check) {
     maxOutputBytes: check.maxOutputBytes, subjectBinding: check.subjectBinding, overlayPaths: check.overlayPaths });
 }
 
-export function p5VerificationReceiptId({ candidateId, verificationPolicyDigest, gateAttemptId, custodyId, checks }) {
+export function p5VerificationReceiptId({ candidateId, verificationPolicyDigest, gateAttemptId, custodyId, checks,
+  causalReproduction = null, dependencyClosure = null }) {
   const observationSetDigest = canonicalHash([...checks].sort((a, b) => compareText(a.checkId, b.checkId)));
+  // P5-CLOSURE evidence joins the identity only when present, so earlier receipts keep their exact identities.
   return canonicalHash({ kind: 'P5Verification', version: 1, candidateId, verificationPolicyDigest,
-    gateAttemptId, custodyId, observationSetDigest });
+    gateAttemptId, custodyId, observationSetDigest,
+    ...(causalReproduction ? { causalReproduction } : {}), ...(dependencyClosure ? { dependencyClosure } : {}) });
 }
 
 export function p5CheckInputDigest({ candidate, check, verificationInputs }) {
@@ -686,6 +770,105 @@ export async function materializeP5VerificationOverlay({ store, candidateRef, ch
   return { overlayManifest, overlayManifestRef, executionTreeCapture, executionTree: captured };
 }
 
+export const P5_BASELINE_TREE_DIRECTORY = '.baseline';
+
+/**
+ * P5-CLOSURE §6.3: the installed baseline B as an isolated execution tree for the causal reproducer, reconstructed only from the
+ * enrolled baseline source objects (the exact installed commit, verified against its manifest), never from a mutable directory.
+ * The protected test files are baseline objects already, so B is the complete baseline source. The tree is Host-scanned.
+ */
+export async function materializeP5BaselineReproducerTree({ store, candidateRef, check, budgets, nativeSourceReader,
+  identityReader = null, allowPartialReuse = false }) {
+  if (!store || !candidateRef || !check || !budgets || typeof nativeSourceReader !== 'function' || check.subjectBinding !== 'protected-overlay'
+    || check.commandDigest !== p5VerificationCommandDigest(check))
+    p5Fail('p5_baseline_tree_unavailable', 'P5 baseline reproduction requires the Store, exact candidate, a captured protected-overlay check, budgets and the Host reader.');
+  store.verifyRef(candidateRef);
+  const candidate = store.readJson(candidateRef.artifactId);
+  validateP5Contract('candidate', candidate);
+  store.verifyRef(candidate.baselineRef);
+  const baseline = store.readJson(candidate.baselineRef.artifactId);
+  validateP5Contract('baselineManifest', baseline);
+  if (baseline.baselineId !== candidate.baselineId)
+    p5Fail('p5_baseline_tree_mismatch', 'The baseline reproduction tree received a different baseline than the candidate.');
+  const baselineSource = p5ReadVerifiedSourceManifest(store, baseline.sourceManifest, 'baseline');
+  if (baselineSource.manifest.sourceDigest !== baseline.effectiveSourceDigest)
+    p5Fail('p5_baseline_tree_mismatch', 'The baseline source manifest digest differs from the enrolled baseline.');
+  for (const path of [...check.subjectEntryPoints, ...check.overlayPaths])
+    if (!baselineSource.byPath.has(validateP5SourcePath(path)))
+      p5Fail('p5_baseline_tree_subject_missing', `The installed baseline has no source object for reproducer path "${path}".`);
+  const inventory = baselineSource.entries;
+  if (inventory.length > budgets.maxSourceFiles || inventory.reduce((sum, item) => sum + item.byteSize, 0) > budgets.maxSourceBytes)
+    p5Fail('p5_baseline_tree_budget_exceeded', 'The baseline reproduction tree exceeds the enrolled source file or byte budget.');
+  const slotRoot = realpathSync.native(resolve(candidate.workspace.canonicalRoot));
+  const parent = p5EnsureDirectoryChain(slotRoot, ['.p5', 'verify', 'execution', P5_BASELINE_TREE_DIRECTORY]);
+  const root = join(parent, check.checkId);
+  try { mkdirSync(root); }
+  catch (error) {
+    if (error.code !== 'EEXIST') p5Fail('p5_baseline_tree_create_failed', `P5 could not create the baseline reproduction tree (${error.code || 'error'}).`);
+    if (!allowPartialReuse) p5Fail('p5_baseline_tree_conflict', 'A baseline reproduction tree already occupies this check slot; overwrite or cleanup is refused.');
+  }
+  for (const entry of inventory) {
+    const target = resolve(root, ...entry.path.split('/'));
+    const relativeParent = relative(root, dirname(target));
+    if (relativeParent && (relativeParent === '..' || relativeParent.startsWith(`..${sep}`) || isAbsolute(relativeParent)))
+      p5Fail('p5_overlay_path_escape', `Baseline path "${entry.path}" escapes its reproduction tree.`);
+    if (relativeParent) p5EnsureDirectoryChain(root, relativeParent.split(sep));
+    const artifact = baselineSource.byPath.get(entry.path).artifact;
+    store.verifyRef(artifact);
+    const bytes = store.readBytes(artifact.artifactId).bytes;
+    if (bytes.length !== entry.byteSize || sha256(bytes) !== entry.sha256)
+      p5Fail('p5_baseline_tree_object_invalid', `The baseline object for "${entry.path}" failed digest verification.`);
+    if (p5WriteExclusive(target, bytes)) {
+      if (process.platform !== 'win32') chmodSync(target, entry.executable ? 0o755 : 0o644);
+    } else {
+      const existing = readFileSync(target);
+      if (existing.length !== entry.byteSize || sha256(existing) !== entry.sha256)
+        p5Fail('p5_baseline_tree_conflict', `Baseline reproduction path "${entry.path}" already contains different bytes.`);
+    }
+  }
+  p5AssertMaterializedTreeLayout(root, inventory.map(entry => entry.path));
+  const byPath = new Map(inventory.map(entry => [entry.path, entry]));
+  const captured = await inventoryP5SourceWithHost(root, { nativeSourceReader, maxFiles: budgets.maxSourceFiles,
+    maxBytes: budgets.maxSourceBytes, include: ['**'], exclude: [], identityReader, executableFor: path => byPath.get(path)?.executable ?? false });
+  if (canonicalHash(captured.entries) !== canonicalHash(inventory))
+    p5Fail('p5_baseline_tree_mismatch', 'The Host-scanned baseline reproduction tree differs from the exact enrolled baseline source.');
+  const evidence = { schemaVersion: 1, kind: 'ProtectedSelfRepairExecutionTreeCaptureEvidence', rootPath: captured.root,
+    rootIdentity: captured.nativeEvidence.rootIdentity, hostPid: captured.nativeEvidence.hostPid,
+    generation: captured.nativeEvidence.generation, epoch: captured.nativeEvidence.epoch,
+    snapshotDigestBefore: captured.nativeEvidence.snapshotDigest, snapshotDigestAfter: captured.nativeEvidence.snapshotDigest,
+    pathDigest: captured.nativeEvidence.pathDigest, contentDigest: captured.nativeEvidence.contentDigest,
+    fileCount: captured.entries.length, totalBytes: captured.totalBytes };
+  validateP5Contract('executionTreeCaptureEvidence', evidence);
+  return { root: captured.root, capture: asRef(store.putJson(evidence)), inventory, inventoryDigest: canonicalHash(inventory),
+    baselineCommit: baseline.baseCommit, baselineSourceDigest: baseline.effectiveSourceDigest,
+    subject: { path: check.subjectEntryPoints[0], sha256: byPath.get(check.subjectEntryPoints[0]).sha256 } };
+}
+
+// Every sensitive tier is verified by required checks only, at least one of which runs a protected test from the installed
+// baseline over the candidate (a candidate cannot replace it). Repair-authority and Custody-integration tiers are at least as
+// strict as the Engine-core tier, so a more sensitive change can never need fewer checks.
+function assertP5MutationTiers(policy) {
+  const tiers = policy.mutationTiers ?? [];
+  const byId = new Map(tiers.map(tier => [tier.tierId, tier]));
+  const definitions = new Map(policy.checks.map(check => [check.checkId, check]));
+  if (byId.size !== tiers.length || tiers.some(tier => !P5_SENSITIVE_TIERS.includes(tier.tierId)))
+    p5Fail('p5_policy_tier_invalid', 'P5 verification tiers must be unique known Engine tiers.');
+  for (const tier of tiers) {
+    if (tier.requiredCheckIds.some(id => !policy.requiredCheckIds.includes(id)))
+      p5Fail('p5_policy_tier_invalid', `P5 tier "${tier.tierId}" may name only required checks of the captured policy.`);
+    if (!tier.requiredCheckIds.some(id => definitions.get(id)?.subjectBinding === 'protected-overlay'))
+      p5Fail('p5_policy_tier_invalid', `P5 tier "${tier.tierId}" requires at least one protected-overlay check.`);
+  }
+  const core = byId.get('engine-core')?.requiredCheckIds ?? [];
+  for (const tierId of ['repair-authority', 'engine-custody'])
+    if (byId.has(tierId) && core.some(id => !byId.get(tierId).requiredCheckIds.includes(id)))
+      p5Fail('p5_policy_tier_invalid', `P5 tier "${tierId}" must include every engine-core check.`);
+  // Review R6: Engine-side Custody code is imported by the trusted control closure, so it is verified at least as strictly.
+  const authority = byId.get('repair-authority')?.requiredCheckIds ?? [];
+  if (byId.has('engine-custody') && authority.some(id => !byId.get('engine-custody').requiredCheckIds.includes(id)))
+    p5Fail('p5_policy_tier_invalid', 'P5 tier "engine-custody" must include every repair-authority check.');
+}
+
 function assertP5PolicyCommands(policy) {
   const checkIds = policy.checks.map(check => check.checkId);
   const expectedRequired = policy.checks.filter(check => check.required).map(check => check.checkId).sort(compareText);
@@ -715,6 +898,18 @@ export function assertP5VerificationPolicy(policy) {
     if (check.overlayPaths.length || check.expectedAssertions.length !== 1
       || check.expectedAssertions[0] !== 'candidate-entrypoint-syntax')
       p5Fail('p5_policy_candidate_entrypoint_unsupported', 'The installed P5 candidate-entrypoint driver supports only an independent candidate source syntax assertion without overlays.');
+  }
+  assertP5MutationTiers(policy);
+  // P5-CLOSURE §6: causal reproduction names one required protected reproducer and how the installed baseline must answer it:
+  // the harness assertions pass (the captured incident was loaded and recognized) and the defect assertions fail.
+  const causal = policy.causalReproduction;
+  if (causal) {
+    const check = policy.checks.find(item => item.checkId === causal.checkId);
+    const assertions = new Set(check?.expectedAssertions ?? []);
+    if (!check || !check.required || check.subjectBinding !== 'protected-overlay'
+      || [...causal.baselineMustPass, ...causal.baselineMustFail].some(name => !assertions.has(name))
+      || causal.baselineMustPass.some(name => causal.baselineMustFail.includes(name)))
+      p5Fail('p5_policy_causality_invalid', 'P5 causal reproduction must name a required protected-overlay check and two disjoint subsets of its exact assertions.');
   }
   return canonicalHash(policy);
 }
@@ -1005,7 +1200,8 @@ export async function sealP5Candidate({ store, sourceRoot, baseline, authorizati
     || terminalArtifact.attemptId !== authorization.developerAttemptId
     || terminalArtifact.processTreeEnded !== authorization.developerTerminal.processTreeEnded
     || terminalArtifact.spoolComplete !== authorization.developerTerminal.spoolComplete
-    || terminalArtifact.status !== authorization.developerTerminal.status || terminalArtifact.exitCode !== authorization.developerTerminal.exitCode)
+    || (terminalArtifact.kind === 'ProtectedSelfRepairDeveloperTerminalEvidence' ? terminalArtifact.state : terminalArtifact.status) !== authorization.developerTerminal.status
+    || terminalArtifact.exitCode !== authorization.developerTerminal.exitCode)
     p5Fail('p5_authorization_mismatch', 'The P5 candidate authorization differs from its enrolled profile, source binding, incident inputs or Developer terminal artifact.');
   if (!authorization.workspace?.canonicalRoot || !p5RootIsInsideSlot(sourceRoot, authorization.workspace.canonicalRoot))
     p5Fail('p5_workspace_binding_mismatch', 'The P5 candidate source is outside its enrolled workspace allocation.');
@@ -1031,7 +1227,17 @@ export async function sealP5Candidate({ store, sourceRoot, baseline, authorizati
     p5Fail('p5_tracked_secret', 'Candidate source capture selected a path covered by the P5 secret-path deny list.');
   const changes = deriveChanges(baseline.entries, captured.entries);
   if (!changes.length) p5Fail('p5_no_source_change', 'The Developer produced no source changes; P5 does not create a review loop for a no-op candidate.');
+  // P5-GIT-2 §25: Lifecycle Host source, trust, build and packaging inputs are outside Self-Repair for every policy;
+  // no enrolled scope, profile or Judge decision can widen it, so it is checked before the scope.
+  for (const change of changes) {
+    const reason = p5HostProtectedReason(change.path);
+    if (reason) p5Fail('p5_host_boundary_violation', `P5 Self-Repair may not change Lifecycle Host source, trust or build inputs: "${change.path}" (${reason}).`);
+  }
+  // The Host import closure derived from the candidate tree itself applies to every policy, before any durable intent.
+  assertP5HostBoundary({ changes, candidateClosure: await deriveP5HostProtection({ sourceRoot: captured.root, sourceCommit: baseline.baseCommit }) });
   assertScope(changes, authorization.scope);
+  // P5-FINAL §5.2: Engine source is repairable; the captured policy decides how strictly. Unclassified sensitive source fails closed.
+  const mutationClassification = classifyP5Mutation({ changes, policy });
   const candidateId = p5CandidateId({ baselineId: baseline.baselineId, incidentId: authorization.incidentId,
     parentRunId: authorization.parentRunId, repairRunId: authorization.repairRunId, linkId: authorization.linkId,
     developerAttemptId: authorization.developerAttemptId, workspaceAllocationId: authorization.workspace.allocationId,
@@ -1083,7 +1289,7 @@ export async function sealP5Candidate({ store, sourceRoot, baseline, authorizati
     verificationInputsDigest: authorization.verificationInputs.sha256,
     workspaceAllocationId: authorization.workspace.allocationId, parentRunId: authorization.parentRunId,
     repairRunId: authorization.repairRunId, linkId: authorization.linkId, incidentId: authorization.incidentId,
-    changes: changeRecords };
+    changes: changeRecords, mutationClassification };
   assertValid('protected-self-repair.schema.json', 'changeManifest', changeManifest, 'P5 change manifest');
   const changeManifestArtifact = store.putJson(changeManifest); store.verifyRef(changeManifestArtifact);
   const candidate = { schemaVersion: 1, kind: 'ProtectedSelfRepairCandidate', candidateId, enrollment: asRef(authorization.enrollment),
@@ -1154,9 +1360,32 @@ export function verifyP5Receipt(receipt, { store, candidateRef, gateAttemptId, t
     || !sameRef(receipt.terminalEvidence, terminalEvidenceRef))
     p5Fail('p5_receipt_ineligible', 'The P5 receipt does not name the exact sealed candidate, current Gate Attempt and captured lineage.');
 
-  for (const ref of [candidate.enrollment, candidate.baselineRef, candidate.sourceManifest, candidate.changeManifest, candidate.selfRepairProfile,
+  for (const ref of [candidate.enrollment, candidate.baselineRef, candidate.sourceManifest, candidate.changeManifest, candidate.gitCandidate, candidate.selfRepairProfile,
     candidate.sourceCaptureEvidence, candidate.verificationPolicy, candidate.verificationInputs, candidate.developerTerminalEvidence, terminalEvidenceRef,
-    receipt.execution.commandManifest, receipt.execution.testInputManifest]) verifyRef(ref);
+    receipt.execution.commandManifest, receipt.execution.testInputManifest].filter(Boolean)) verifyRef(ref);
+  if (candidate.gitCandidate) {
+    if (!receipt.gitCandidate || !sameRef(receipt.gitCandidate, candidate.gitCandidate))
+      p5Fail('p5_receipt_git_candidate_mismatch', 'The P5 receipt omits or changes the exact committed Git candidate binding.');
+    const gitCandidate = readManifest(candidate.gitCandidate, 'gitCandidate');
+    const { candidateGitId, ...gitCandidateBody } = gitCandidate;
+    if (candidateGitId !== canonicalHash(gitCandidateBody) || gitCandidate.candidateId !== candidate.candidateId
+      || gitCandidate.source.candidateDigest !== candidate.candidateSourceDigest
+      || gitCandidate.source.baselineDigest !== candidate.baseSourceDigest
+      || !sameRef(gitCandidate.source.sourceManifest, candidate.sourceManifest)
+      || !sameRef(gitCandidate.source.changeManifest, candidate.changeManifest))
+      p5Fail('p5_receipt_git_candidate_mismatch', 'The P5 receipt Git binding differs from the immutable source candidate.');
+    const baseCandidate = readManifest(gitCandidate.baseCandidate, 'candidate');
+    const { gitCandidate: _binding, ...sourceCandidate } = candidate;
+    if (!sameRef(receipt.gitCandidate, candidate.gitCandidate) || canonicalHash(baseCandidate) !== canonicalHash(sourceCandidate))
+      p5Fail('p5_receipt_git_candidate_mismatch', 'The P5 Git commit does not extend this exact source candidate.');
+    const commitIntent = readManifest(gitCandidate.commitIntent, 'gitCommitIntent');
+    if (!sameRef(commitIntent.candidateManifest, gitCandidate.baseCandidate)
+      || commitIntent.candidateId !== candidate.candidateId
+      || commitIntent.candidateSourceDigest !== candidate.candidateSourceDigest)
+      p5Fail('p5_receipt_git_candidate_mismatch', 'The P5 Git candidate commit intent differs from the exact sealed source candidate.');
+  } else if (receipt.gitCandidate) {
+    p5Fail('p5_receipt_git_candidate_mismatch', 'The P5 receipt claims a Git candidate that the sealed source candidate does not contain.');
+  }
   const profile = readManifest(candidate.selfRepairProfile, 'profile');
   const policy = readManifest(candidate.verificationPolicy, 'verificationPolicy');
   assertP5PolicyCommands(policy);
@@ -1164,6 +1393,9 @@ export function verifyP5Receipt(receipt, { store, candidateRef, gateAttemptId, t
   const sourceBinding = readManifest(candidate.sourceBinding, 'sourceBinding');
   const enrollment = readManifest(candidate.enrollment, 'enrollment');
   const changeManifest = readManifest(candidate.changeManifest, 'changeManifest');
+  // The tiers are recomputed from the immutable changes and captured policy. A pre-tier manifest (P5-E2E-1 and earlier) has no
+  // recorded classification; it keeps the rules it was captured under and is never re-classified by later rules.
+  if (changeManifest.mutationClassification) verifyP5MutationClassification({ changeManifest, policy });
   const sourceManifest = readManifest(candidate.sourceManifest, 'sourceManifest');
   const baseline = readManifest(candidate.baselineRef, 'baselineManifest');
   const sourceCaptureEvidence = readManifest(candidate.sourceCaptureEvidence, 'sourceCaptureEvidence');
@@ -1237,7 +1469,8 @@ export function verifyP5Receipt(receipt, { store, candidateRef, gateAttemptId, t
   const developerTerminal = readJson(candidate.developerTerminalEvidence);
   if (developerTerminal.attemptId !== candidate.developerAttemptId || developerTerminal.processTreeEnded !== true
     || developerTerminal.spoolComplete !== true || terminal.attemptId !== gateAttemptId
-    || terminal.processTreeEnded !== true || terminal.spoolComplete !== true || terminal.status !== 'exited'
+    || terminal.processTreeEnded !== true || terminal.spoolComplete !== true
+    || (terminal.kind === 'ProtectedSelfRepairGateTerminalEvidence' ? terminal.state : terminal.status) !== 'exited'
     || terminal.exitCode !== 0 || terminal.custodyId !== receipt.execution.custodyId
     || terminal.invocationDigest !== receipt.execution.invocationDigest
     || terminal.lifecycleGeneration !== receipt.execution.lifecycleGeneration
@@ -1418,12 +1651,69 @@ export function verifyP5Receipt(receipt, { store, candidateRef, gateAttemptId, t
     if (observation.executionTreeDigest === null)
       p5Fail('p5_receipt_incomplete', `P5 check "${observation.checkId}" has no captured execution-tree digest.`);
   }
+  // P5-CLOSURE F2: the exact installed dependency bytes served to the checks, bound before execution and re-verified after.
+  let dependencyClosureDigest = null;
+  if (receipt.dependencyClosure) {
+    const closure = readManifest(receipt.dependencyClosure, 'dependencyClosure');
+    const files = [...closure.files].sort((a, b) => compareText(a.path, b.path));
+    if (closure.candidateId !== candidate.candidateId || closure.gateAttemptId !== gateAttemptId
+      || canonicalHash(files) !== canonicalHash(closure.files) || closure.closureDigest !== canonicalHash({ packages: closure.packages, files })
+      || files.some(file => !file.path.startsWith('node_modules/')))
+      p5Fail('p5_receipt_dependency_mismatch', 'The P5 receipt dependency closure is not bound to this candidate Attempt or its own file digests.');
+    const packages = new Set(closure.packages);
+    for (const observation of receipt.checks) {
+      const resolution = readManifest(observation.subjectResolution, 'subjectResolution');
+      if ((resolution.installedPackages ?? []).some(name => !packages.has(name)))
+        p5Fail('p5_receipt_dependency_mismatch', `P5 check "${observation.checkId}" imports an installed package outside the bound dependency closure.`);
+    }
+    const enrolledRelease = readJson(enrollment.runningSourceRelease);
+    if (closure.installedRelease.buildId !== enrolledRelease.buildId || closure.installedRelease.packageSha256 !== enrolledRelease.packageSha256
+      || closure.installedRelease.inputsDigest !== enrolledRelease.inputsDigest)
+      p5Fail('p5_receipt_dependency_mismatch', 'The P5 receipt dependency closure was not served by the enrolled installed release.');
+    dependencyClosureDigest = closure.closureDigest;
+  } else if (receipt.checks.some(observation => (readManifest(observation.subjectResolution, 'subjectResolution').installedPackages ?? []).length)
+    && policy.causalReproduction) {
+    p5Fail('p5_receipt_dependency_missing', 'A causal-verification receipt must bind the installed dependency closure its checks imported.');
+  }
+  // P5-CLOSURE §6: under a causality-required policy the Gate itself ran the protected reproducer on the installed baseline
+  // (expected defect observed) and on the candidate (passed). A receipt cannot claim causality its policy did not require.
+  const causalPolicy = policy.causalReproduction ?? null;
+  if (causalPolicy) {
+    if (!receipt.causalReproduction) p5Fail('p5_receipt_causality_missing', 'The P5 policy requires production causal reproduction and the receipt has none.');
+    const causal = readManifest(receipt.causalReproduction, 'causalReproduction');
+    const definition = definitions.get(causalPolicy.checkId);
+    const observation = checks.get(causalPolicy.checkId);
+    const inputRow = testInputManifest.checks.find(row => row.checkId === causalPolicy.checkId);
+    const sorted = values => [...values].sort(compareText);
+    if (!definition || !observation || !inputRow || causal.checkId !== causalPolicy.checkId
+      || causal.candidateId !== candidate.candidateId || causal.candidateSourceDigest !== candidate.candidateSourceDigest
+      || causal.baselineId !== candidate.baselineId || causal.baselineCommit !== candidate.baseCommit
+      || causal.baselineSourceDigest !== baseline.effectiveSourceDigest || causal.gateAttemptId !== gateAttemptId
+      || causal.incidentId !== candidate.incidentId || causal.outcomeId !== inputs.outcomeId || causal.outcomeRevision !== inputs.outcomeRevision
+      || !sameRef(causal.verificationPolicy, candidate.verificationPolicy) || !sameRef(causal.verificationInputs, candidate.verificationInputs)
+      || causal.commandDigest !== definition.commandDigest || causal.inputDigest !== observation.inputDigest
+      || !sameRef(causal.inputManifest, inputRow.materializedInputs)
+      || canonicalHash(sorted(causal.baselineMustPass)) !== canonicalHash(sorted(causalPolicy.baselineMustPass))
+      || canonicalHash(sorted(causal.baselineMustFail)) !== canonicalHash(sorted(causalPolicy.baselineMustFail))
+      || causal.baselineObservation.status !== 'reproduced' || causal.baselineObservation.exitCode !== 1
+      || causal.baselineExecutionTree.inventoryDigest !== canonicalHash(baselineSource.entries.map(({ artifact: _artifact, ...entry }) => entry))
+      || canonicalHash(sorted(causal.baselineObservation.harnessPassed)) !== canonicalHash(sorted(causalPolicy.baselineMustPass))
+      || canonicalHash(sorted(causal.baselineObservation.defectFailed)) !== canonicalHash(sorted(causalPolicy.baselineMustFail))
+      || causal.candidateObservation.executionTreeDigest !== observation.executionTreeDigest || observation.status !== 'passed'
+      || canonicalHash(sorted(causal.candidateObservation.completedAssertions)) !== canonicalHash(sorted(observation.completedAssertions))
+      || causal.dependencyClosureDigest !== dependencyClosureDigest
+      || baselineSource.entries.find(entry => entry.path === causal.baselineSubject.path)?.sha256 !== causal.baselineSubject.sha256)
+      p5Fail('p5_receipt_causality_mismatch', 'The P5 causal reproduction does not show the expected baseline defect and candidate repair for this exact candidate, incident and reproducer.');
+    for (const ref of [causal.baselineObservation.stdout, causal.baselineObservation.stderr, causal.baselineExecutionTree.capture]) verifyRef(ref);
+  } else if (receipt.causalReproduction) {
+    p5Fail('p5_receipt_causality_unexpected', 'The P5 receipt claims causal reproduction its captured policy did not require.');
+  }
   if (policy.requiredStages.some(stage => !requiredStages.has(stage))
     || canonicalHash(required) !== receipt.requiredCheckSetDigest
     || canonicalHash([...checks.keys()].sort(compareText)) !== receipt.completedCheckSetDigest
     || receipt.receiptId !== p5VerificationReceiptId({ candidateId: candidate.candidateId,
       verificationPolicyDigest: candidate.verificationPolicy.sha256, gateAttemptId, custodyId: receipt.execution.custodyId,
-      checks: receipt.checks }))
+      checks: receipt.checks, causalReproduction: receipt.causalReproduction ?? null, dependencyClosure: receipt.dependencyClosure ?? null }))
     p5Fail('p5_receipt_policy_mismatch', 'The P5 receipt check-set, required-stage or canonical receipt identity is invalid.');
   return true;
 }
@@ -1433,6 +1723,35 @@ export function verifyP5Receipt(receipt, { store, candidateRef, gateAttemptId, t
  * Callers must first validate the complete candidate and receipt with verifyP5Receipt; this
  * helper independently checks every changed-file object and refuses binary or oversized review.
  */
+const p5Lines = text => text.length ? text.split(/(?<=\n)/) : [];
+
+/** One exact hunk between two texts: the common line prefix and suffix are context; every other line is removed/added. */
+export function p5ExactLineHunk(beforeText, afterText, context = 3) {
+  const before = p5Lines(beforeText), after = p5Lines(afterText);
+  let prefix = 0;
+  while (prefix < before.length && prefix < after.length && before[prefix] === after[prefix]) prefix++;
+  let suffix = 0;
+  while (suffix < before.length - prefix && suffix < after.length - prefix && before[before.length - 1 - suffix] === after[after.length - 1 - suffix]) suffix++;
+  return { format: 'exact-line-hunk-v1', beforeLineCount: before.length, afterLineCount: after.length, startLine: prefix + 1,
+    contextBefore: before.slice(Math.max(0, prefix - context), prefix), removed: before.slice(prefix, before.length - suffix),
+    added: after.slice(prefix, after.length - suffix), contextAfter: before.slice(before.length - suffix, before.length - suffix + context) };
+}
+
+/** Apply an exact hunk to the exact before text; any mismatch with its recorded removed lines or counts is refused. */
+export function p5ApplyExactLineHunk(beforeText, hunk) {
+  const before = p5Lines(beforeText), start = hunk.startLine - 1;
+  const removed = before.slice(start, start + hunk.removed.length);
+  if (hunk.format !== 'exact-line-hunk-v1' || before.length !== hunk.beforeLineCount || canonicalHash(removed) !== canonicalHash(hunk.removed)
+    || canonicalHash(before.slice(Math.max(0, start - hunk.contextBefore.length), start)) !== canonicalHash(hunk.contextBefore))
+    p5Fail('p5_review_dossier_diff_mismatch', 'The review hunk does not apply to its exact before text.');
+  const tail = before.slice(start + hunk.removed.length);
+  if (canonicalHash(tail.slice(0, hunk.contextAfter.length)) !== canonicalHash(hunk.contextAfter))
+    p5Fail('p5_review_dossier_diff_mismatch', 'The review hunk context does not match its exact before text.');
+  const after = [...before.slice(0, start), ...hunk.added, ...tail];
+  if (after.length !== hunk.afterLineCount) p5Fail('p5_review_dossier_diff_mismatch', 'The review hunk does not produce its recorded line count.');
+  return after.join('');
+}
+
 export function createP5ReviewDossierArtifacts({ store, candidateRef, candidate, receiptRef, receipt, changeManifestRef, changeManifest }) {
   const maxChunkBytes = 64 * 1024;
   const maxChunks = 4;
@@ -1473,8 +1792,8 @@ export function createP5ReviewDossierArtifacts({ store, candidateRef, candidate,
     const artifactRef = change[`${side}Artifact`];
     if (!entry || !artifactRef?.artifactId || !artifactRef.sha256)
       p5Fail('p5_review_dossier_object_missing', `Changed file "${change.path}" is missing its verified ${side} source object.`);
-    if (!Number.isSafeInteger(entry.byteSize) || entry.byteSize < 0 || entry.byteSize > maxChunkBytes)
-      p5Fail('p5_review_dossier_file_too_large', `Changed file "${change.path}" cannot fit completely in one 64 KiB review artifact.`);
+    if (!Number.isSafeInteger(entry.byteSize) || entry.byteSize < 0)
+      p5Fail('p5_review_dossier_object_mismatch', `Changed file "${change.path}" has an invalid ${side} size.`);
     store.verifyRef(artifactRef);
     const bytes = store.readBytes(artifactRef.artifactId).bytes;
     if (bytes.length !== entry.byteSize || sha256(bytes) !== entry.sha256 || artifactRef.sha256 !== entry.sha256)
@@ -1482,19 +1801,33 @@ export function createP5ReviewDossierArtifacts({ store, candidateRef, candidate,
     return { artifact: artifactRef, byteSize: bytes.length, executable: entry.executable, sha256: entry.sha256,
       text: decodeText(bytes, change.path) };
   };
+  // A file whose complete text fits is reviewed as both full sides. A larger modified file (real Engine modules) is reviewed as
+  // one exact line hunk: every removed and added line with context, both sides' verified Store identities, and a hunk the
+  // Engine has proven reconstructs the exact after bytes from the exact before bytes. Large adds and deletes stay refused.
+  const identity = side => side && { artifact: side.artifact, byteSize: side.byteSize, executable: side.executable, sha256: side.sha256 };
+  const reviewRow = change => {
+    if (!change.before && !change.after) p5Fail('p5_review_dossier_change_invalid', 'P5 review cannot represent a changed file with both sides absent.');
+    const full = { path: change.path, operation: change.operation, before: change.before, after: change.after };
+    if ([change.before, change.after].every(side => !side || side.byteSize <= maxChunkBytes) && canonicalBytes(full).length <= maxChunkBytes - 4096) return full;
+    if (!change.before || !change.after)
+      p5Fail('p5_review_dossier_file_too_large', `Changed file "${change.path}" cannot fit completely in one 64 KiB review artifact.`);
+    const diff = p5ExactLineHunk(change.before.text, change.after.text);
+    if (sha256(Buffer.from(p5ApplyExactLineHunk(change.before.text, diff), 'utf8')) !== change.after.sha256)
+      p5Fail('p5_review_dossier_diff_mismatch', `The review hunk of "${change.path}" does not reconstruct its exact after bytes.`);
+    return { path: change.path, operation: change.operation, before: identity(change.before), after: identity(change.after), diff };
+  };
   const paths = new Set();
   const fileChanges = changeManifest.changes.map(change => {
     if (paths.has(change.path)) p5Fail('p5_review_dossier_duplicate_path', `P5 change manifest repeats "${change.path}".`);
     paths.add(change.path);
-    return { path: change.path, operation: change.operation, before: readSide(change, 'before'), after: readSide(change, 'after') };
+    return reviewRow({ path: change.path, operation: change.operation, before: readSide(change, 'before'), after: readSide(change, 'after') });
   });
-  if (fileChanges.some(change => !change.before && !change.after))
-    p5Fail('p5_review_dossier_change_invalid', 'P5 review cannot represent a changed file with both sides absent.');
 
   const groups = [];
   let group = [];
   const makeChunk = (chunkIndex, fileRows) => ({ schemaVersion: 1, kind: 'ProtectedSelfRepairReviewDossierChunk',
     candidateId: candidate.candidateId, candidateManifest: candidateRef, candidateSourceDigest: candidate.candidateSourceDigest,
+    ...(candidate.gitCandidate ? { gitCandidate: candidate.gitCandidate } : {}),
     changeManifest: changeManifestRef, receiptId: receipt.receiptId, receipt: receiptRef, chunkIndex, fileChanges: fileRows });
   for (const fileChange of fileChanges) {
     const trial = [...group, fileChange];
@@ -1544,6 +1877,7 @@ export function createP5Handoff({ candidate, receipt, approval, continuation, re
   const handoff = { schemaVersion: 1, kind: 'ProtectedSelfRepairHandoff',
     handoffId: canonicalHash({ kind: 'P5Handoff', version: 1, linkId: candidate.linkId, candidateId: candidate.candidateId, decisionId: approval.decisionId }),
     candidateId: candidate.candidateId, candidateSourceDigest: candidate.candidateSourceDigest, candidate: candidate.candidateArtifact,
+    ...(candidate.gitCandidate ? { gitCandidate: candidate.gitCandidate } : {}),
     baselineId: candidate.baselineId, repositoryIdentity: candidate.repositoryIdentity, sourceBinding, enrollment,
     sourceManifest: candidate.sourceManifest, changeManifest: candidate.changeManifest, verificationPolicy: receipt.verificationPolicy,
     verificationInputs: receipt.verificationInputs, verificationReceipt: receipt.artifact, parentRunId: candidate.parentRunId,
@@ -1554,7 +1888,8 @@ export function createP5Handoff({ candidate, receipt, approval, continuation, re
     retention: { status: retention.status, revision: retention.revision, retainedAt: retention.retainedAt, cleanupDeferred: retention.cleanupDeferred },
     currentEligibility,
     authority: { sourceCandidateAccepted: true, sourceApplied: false, branchPublished: false,
-      productionBuilt: false, binaryInstalled: false, activated: false } };
+      productionBuilt: false, binaryInstalled: false, activated: false,
+      hostModificationAuthorized: false, hostReplacementAuthorized: false, hostUpdateAuthorized: false } };
   assertValid('protected-self-repair.schema.json', 'handoff', handoff, 'P5 handoff');
   return handoff;
 }
@@ -1631,8 +1966,7 @@ function p5SelectorMayMatchDescendant(path, selector) {
   return false;
 }
 
-function p5GitRun(gitTool, repositoryRoot, args, { input = null, maxBuffer = 64 * 1024 * 1024 } = {}) {
-  const root = resolve(repositoryRoot);
+function p5GitEnvironment(overrides) {
   const env = { ...process.env };
   for (const key of Object.keys(env)) if (key.toUpperCase().startsWith('GIT_')) delete env[key];
   for (const key of GIT_ENV_KEYS) delete env[key];
@@ -1641,6 +1975,17 @@ function p5GitRun(gitTool, repositoryRoot, args, { input = null, maxBuffer = 64 
   env.GIT_OPTIONAL_LOCKS = '0';
   env.GIT_TERMINAL_PROMPT = '0';
   env.GIT_PAGER = 'cat';
+  for (const [key, value] of Object.entries(overrides)) {
+    if (!['GIT_AUTHOR_DATE', 'GIT_COMMITTER_DATE'].includes(key) || typeof value !== 'string' || !/^@[0-9]{1,12} \+0000$/.test(value))
+      p5Fail('p5_git_environment_invalid', 'P5 Git command environment overrides are restricted to a UTC Engine commit timestamp.');
+    env[key] = value;
+  }
+  return env;
+}
+
+function p5GitRun(gitTool, repositoryRoot, args, { input = null, maxBuffer = 64 * 1024 * 1024, env: overrides = {} } = {}) {
+  const root = resolve(repositoryRoot);
+  const env = p5GitEnvironment(overrides);
   const result = spawnSync(gitTool.path, [...P5_GIT_CONFIG, '-c', `safe.directory=${root.replace(/\\/g, '/')}`, '-C', root, ...args], {
     cwd: root, env, input, encoding: null, windowsHide: true, timeout: 60_000, maxBuffer,
   });
@@ -1846,6 +2191,7 @@ function p5JournalHasRecord(store, runId, type, recordRef) {
 
 /** Materialize only enrolled baseline bytes inside the slot named by a durable preparation intent. */
 export async function prepareP5WorkspaceFromIntent({ store, intentRef, nativeSourceReader, recovery = false,
+  prepareGitRepository = null,
   preparedAt = new Date().toISOString() }) {
   if (!store || typeof recovery !== 'boolean') p5Fail('p5_preparation_invalid', 'P5 workspace preparation requires its Store and an explicit recovery mode.');
   if (process.platform === 'win32' && typeof nativeSourceReader !== 'function')
@@ -1948,7 +2294,7 @@ export async function prepareP5WorkspaceFromIntent({ store, intentRef, nativeSou
     p5Fail('p5_workspace_conflict', 'The P5 source directory exists outside a recoverable durable preparation.');
   if (!sourceBeforeInfo) p5EnsureDirectory(sourceRoot);
   const initialInventory = sourceBeforeInfo
-    ? await inventoryP5SourceWithHost(sourceRoot, { nativeSourceReader, include: ['**'], exclude: [],
+    ? await inventoryP5SourceWithHost(sourceRoot, { nativeSourceReader, include: ['**'], exclude: prepareGitRepository ? ['.git/**'] : [],
       maxFiles: budgets.maxSourceFiles, maxBytes: budgets.maxSourceBytes,
       executableFor: process.platform === 'win32' ? path => baselineModes.get(path) ?? false : null })
     : { entries: [], sourceDigest: p5SourceDigest([]), totalBytes: 0, nativeEvidence: null };
@@ -1972,6 +2318,7 @@ export async function prepareP5WorkspaceFromIntent({ store, intentRef, nativeSou
     || canonicalHash(p5DirectoryEntries(verifyRoot)) !== canonicalHash(['scratch', 'source']))
     p5Fail('p5_workspace_conflict', 'The P5 slot contains an unrecognized path outside the enrolled workspace layout.');
   for (const directory of [controlRoot, verifySourceRoot, verifyScratchRoot]) {
+    if (prepareGitRepository && directory === controlRoot) continue;
     if (p5DirectoryEntries(directory).length) p5Fail('p5_workspace_conflict', `P5 preparation found unexpected content in "${directory}".`);
   }
   for (const directory of [p5Root, controlRoot, verifyRoot, verifySourceRoot, verifyScratchRoot])
@@ -2010,12 +2357,17 @@ export async function prepareP5WorkspaceFromIntent({ store, intentRef, nativeSou
   if (canonicalHash(rootAfter.rootIdentity) !== canonicalHash(rootBefore.rootIdentity)
     || rootAfter.snapshotDigest !== rootBefore.snapshotDigest)
     p5Fail('p5_workspace_identity_mismatch', 'The enrolled P5 workspace root changed during baseline materialization.');
+  const gitRepository = prepareGitRepository ? await prepareGitRepository({ store, intentRef, intent, enrollment, baseline,
+    sourceManifest, sourceRoot, workspaceRoot, nativeSourceReader, expectedEntries }) : null;
+  if (prepareGitRepository && (!gitRepository || gitRepository.kind !== 'ProtectedSelfRepairGitRepository'))
+    p5Fail('p5_git_preparation_invalid', 'The P5 Git adapter did not return a verified private repository identity.');
   const evidence = { schemaVersion: 1, kind: 'ProtectedSelfRepairWorkspacePreparation', intent: intentRef,
     workspaceRoot, sourceRoot, workspaceIdentity: rootAfter.rootIdentity, sourceIdentity: finalInventory.nativeEvidence.rootIdentity,
     baselineId: enrollment.baselineId, sourceDigest: finalInventory.sourceDigest, snapshotDigest: finalInventory.nativeEvidence.snapshotDigest,
     pathDigest: finalInventory.nativeEvidence.pathDigest, contentDigest: finalInventory.nativeEvidence.contentDigest,
     fileCount: finalInventory.entries.length, totalBytes: finalInventory.totalBytes, hostPid: finalInventory.nativeEvidence.hostPid,
-    generation: finalInventory.nativeEvidence.generation, epoch: finalInventory.nativeEvidence.epoch, preparedAt };
+    generation: finalInventory.nativeEvidence.generation, epoch: finalInventory.nativeEvidence.epoch, preparedAt,
+    ...(gitRepository ? { gitRepository } : {}) };
   validateP5Contract('workspacePreparation', evidence);
   const evidenceArtifact = store.putJson(evidence);
   store.verifyRef(evidenceArtifact);
@@ -2024,9 +2376,17 @@ export async function prepareP5WorkspaceFromIntent({ store, intentRef, nativeSou
 
 async function readP5NativeToolIdentity(reader, path) {
   if (typeof reader !== 'function') p5Fail('p5_native_identity_unavailable', 'P5 requires the attached Rust Host native identity reader for the pinned Git executable.');
-  let result;
-  try { result = await reader({ path }); }
-  catch (error) { p5Fail('p5_native_identity_unavailable', `The Rust Host could not establish pinned Git identity${error?.code ? ` (${error.code})` : ''}.`); }
+  let result, lastError;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try { result = await reader({ path }); lastError = null; break; }
+    catch (error) {
+      lastError = error;
+      if (attempt === 0 && ['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'EPIPE'].includes(error?.code))
+        await new Promise(resolvePromise => setTimeout(resolvePromise, 25));
+      else break;
+    }
+  }
+  if (lastError) p5Fail('p5_native_identity_unavailable', `The Rust Host could not establish pinned Git identity${lastError?.code ? ` (${lastError.code})` : ''}.`);
   if (result?.refused) p5Fail('p5_native_identity_unavailable', `The Rust Host refused pinned Git identity (${result.code ?? 'refused'}): ${String(result.message ?? 'no detail').slice(0, 512)}`);
   if (!result || typeof result.canonicalPath !== 'string' || !result.identity
     || typeof result.identity.volumeId !== 'string' || typeof result.identity.fileId !== 'string'
@@ -2237,6 +2597,34 @@ export async function verifyP5GitBaselineCurrent({ store, enrollment, currentRun
     || baseline.baseTree !== enrollment.baseTree || canonicalHash(baseline.repositoryIdentity) !== canonicalHash(enrollment.repositoryIdentity)
     || canonicalHash(baseline.runningSourceRelease) !== canonicalHash(enrollment.runningSourceRelease))
     p5Fail('p5_baseline_mismatch', 'The installed baseline does not match the enrolled source, path policy or runtime release.');
+  if (enrollment.gitCandidatePolicy === 'managed-clone-v1') {
+    // D1: the installed release, not a user checkout, is the source authority. The immutable Store baseline is
+    // revalidated here; the managed repository later proves the fetched commit reproduces exactly these bytes.
+    store.verifyRef(baseline.sourceManifest);
+    const sourceManifest = store.readJson(baseline.sourceManifest.artifactId);
+    validateP5Contract('sourceManifest', sourceManifest);
+    const entries = sourceManifest.entries.map(({ artifact: _artifact, ...entry }) => entry);
+    for (const entry of sourceManifest.entries) {
+      store.verifyRef(entry.artifact);
+      const bytes = store.readBytes(entry.artifact.artifactId).bytes;
+      if (bytes.length !== entry.byteSize || sha256(bytes) !== entry.sha256)
+        p5Fail('p5_baseline_object_mismatch', `The enrolled source object for "${entry.path}" does not match its manifest.`);
+    }
+    if (p5SourceDigest(entries) !== enrollment.effectiveSourceDigest || sourceManifest.sourceDigest !== enrollment.effectiveSourceDigest
+      || enrollment.gitSource?.sourceCommit !== enrollment.baseCommit || enrollment.gitSource?.sourceTree !== enrollment.baseTree)
+      p5Fail('p5_baseline_mismatch', 'The enrolled managed-clone source does not match its immutable baseline manifest and installed commit.');
+    const enrolledRelease = store.readJson(enrollment.runningSourceRelease.artifactId);
+    validateP5Contract('runningSourceRelease', enrolledRelease);
+    if (enrolledRelease.sourceCommit !== enrollment.baseCommit || enrolledRelease.sourceDigest !== enrollment.gitSource.releaseSourceDigest)
+      p5Fail('p5_runtime_source_mismatch', 'The installed release provenance does not name the enrolled source commit and digest.');
+    if (!currentRunningSourceRelease || canonicalHash(currentRunningSourceRelease) !== canonicalHash(enrolledRelease))
+      p5Fail('p5_runtime_source_mismatch', 'The Host-verified running source release is unavailable or changed after enrollment.');
+    validateP5Contract('runningSourceRelease', currentRunningSourceRelease);
+    return { baselineId: baseline.baselineId, baselineManifest: enrollment.baselineManifest, sourceManifest: baseline.sourceManifest,
+      repositoryIdentity: baseline.repositoryIdentity, gitObjectFormat: baseline.gitObjectFormat, baseCommit: baseline.baseCommit,
+      baseTree: baseline.baseTree, sourceDigest: baseline.effectiveSourceDigest, entries, repositoryRoot: null,
+      pathPolicy: baseline.pathPolicy, pathPolicyDigest: enrollment.pathPolicyDigest, excludedPaths: baseline.excludedPaths };
+  }
   const current = await collectP5GitBaseline({ store, repositoryRoot: baseline.repositoryRoot, expectedRepositoryRoot: baseline.repositoryRoot,
     gitTool, repositoryIdentity: enrollment.repositoryIdentity, enrollmentId: enrollment.enrollmentId,
     runningSourceRelease: enrollment.runningSourceRelease, pathPolicy: baseline.pathPolicy, budgets: enrollment.budgets,

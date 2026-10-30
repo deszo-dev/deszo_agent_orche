@@ -32,6 +32,9 @@ export async function securityClosure(sourceRoot,gitTool,readGit=null) {
   return { digest: canonicalHash({ inputs, dependencies, importGraph:graph.digest,metadataTool:inventory.gitTool }), inputs, importGraph:graph, dependencyDigest: canonicalHash(dependencies), dependencyFiles: dependencies.length,source:inventory };
 }
 
+// The build-input identity the Host attests as `inputsDigest`: source commit and bytes, authority import and dependency closure, metadata tool.
+export function buildInputsDigest(closure,sourceCommit=closure.source.sourceCommit){return canonicalHash({sourceCommit,sourceDigest:closure.source.sourceDigest,authorityClosureDigest:closure.digest,dependencyDigest:closure.dependencyDigest,gitTool:closure.source.gitTool});}
+
 export class InstalledBuilds {
   constructor({ host, buildRoot, sealDirectory, gitTool=null,readGit=null, allowedBuildCommands=ALLOWED_BUILD_COMMANDS }) {
     // A production installation fixes its build commands; only a fixture host may substitute a test allowlist.
@@ -52,7 +55,7 @@ export class InstalledBuilds {
     if(expectedTcbDigest&&expectedTcbDigest!==closure.digest)fail('The expected closure does not match the actual source/dependencies.');
     if(!diagnosticOnly&&baseline&&JSON.parse(baseline.value).tcbDigest!==closure.digest)fail('Replacing the trusted baseline requires a separate verified trust update; a caller flag cannot widen it.');
     if(!diagnosticOnly&&!sourceBuildAttestation)fail('A routine compilation attestation is required.');
-    const observedInputs=canonicalHash({sourceCommit,sourceDigest:closure.source.sourceDigest,authorityClosureDigest:closure.digest,dependencyDigest:closure.dependencyDigest,gitTool:closure.source.gitTool});
+    const observedInputs=buildInputsDigest(closure,sourceCommit);
     if(inputsDigest&&inputsDigest!==observedInputs)fail('The supplied input digest differs from the independently captured inputs.');
     let sourceInventoryRef = null;
     if (!diagnosticOnly) {

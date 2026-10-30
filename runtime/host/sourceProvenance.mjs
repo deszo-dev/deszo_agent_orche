@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, lstatSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { canonicalHash, sha256 } from '../core/canonical.mjs';
-import { HostError } from './authority.mjs';
+import { HostError } from './hostError.mjs';
 
 const refuse = message => { throw new HostError(403,'source_provenance_refused',message); };
 const normalized = path => path.split(sep).join('/');

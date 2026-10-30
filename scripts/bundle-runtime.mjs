@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { MIGRATION_FILES } from '../runtime/core/migrations.mjs';
 import { writeRuntimeManifest } from './deszo-artifacts.mjs';
+import { bundleRunner } from './runtime-bundle.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const out = resolve(root, 'dist-runtime');
@@ -16,12 +17,7 @@ rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
 if (keptShim) writeFileSync(shimPath, keptShim);
 else console.warn('dist-runtime has no launch shim: run `npm run shim:build` before packaging, or the app will refuse to start.');
-await build({
-  entryPoints: [resolve(root, 'runtime/runner.mjs')], outfile: resolve(out, 'runner.mjs'),
-  bundle: true, platform: 'node', format: 'esm', target: 'node22', legalComments: 'none',
-  banner: { js: "import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);" },
-  define: { __DESZO_PACKAGED__: 'true' },
-});
+await bundleRunner({ root, outfile: resolve(out, 'runner.mjs') });
 await build({
   entryPoints: [resolve(root, 'mcp/bridge.mjs')], outfile: resolve(out, 'bridge.mjs'),
   bundle: true, platform: 'node', format: 'esm', target: 'node22', legalComments: 'none',

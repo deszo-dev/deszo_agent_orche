@@ -12,8 +12,14 @@ import { isAlive, killTree, launch, processStartTime } from './processes.mjs';
 import { UtilityError, captureFiles, jsonValue, ref, resolvePointer, runUtility, textValue, values as valueHelpers } from './utilities.mjs';
 import { loadP5EnrollmentWithHostIdentity, P5_ENROLLMENT_RELATIVE_PATH, P5_EVENT_TYPES, validateP5Contract, verifyP5EnrollmentFileCurrent,
   verifyP5GitBaselineCurrent, prepareP5WorkspaceFromIntent, captureP5VerificationInputs, verifyP5VerificationInputsCurrent,
-  sealP5Candidate, verifyP5RunningSourceInventory, verifyP5Receipt, inventoryP5SourceWithHost } from './protectedSelfRepair.mjs';
+  sealP5Candidate, verifyP5RunningSourceInventory, verifyP5Receipt, inventoryP5SourceWithHost, p5CandidateId, assertP5VerificationPolicy,
+  ProtectedSelfRepairError, verifyP5GitToolIdentity, p5CaptureFailureDisposition, p5CaptureHoldDecision, P5_CAPTURE_HOLD_DELAYS_MS } from './protectedSelfRepair.mjs';
 import { installProtectedSelfRepairGate } from './p5Gate.mjs';
+// The installed release root (no P5 candidate workspace may overlap it) and its P5 package-layout check.
+import { ENGINE_RELEASE_ROOT } from './engineRoot.mjs';
+import { readInstalledSourceInventory, verifyP5PackageLayout } from './p5Support.mjs';
+import { bindP5GitCandidate, createP5GitCommitIntent, executeP5GitPublication, P5_GIT_POLICIES, p5GitPublicationStatus, prepareP5GitRepositoryFromIntent,
+  requestP5GitPublication, verifyP5GitCandidateCurrent } from './p5GitCandidate.mjs';
 import { transportSchema } from './transport.mjs';
 import { allNodesDeep, bodyPrefix, enclosingLoops, fingerprints, parseInstance, requiredSet, returnSources } from './planning.mjs';
 import * as gate from './gate.mjs';
@@ -25,7 +31,7 @@ import { installTaskProcesses } from './taskProcesses.mjs';
 import { installJudgeAttention } from './judgeAttention.mjs';
 import { installWorkflowJudge } from './workflowJudge.mjs';
 import { installLinkedRepair } from './linkedRepair.mjs';
-import { afterBarrierWork, crashBeforeIdentityPoint, custodyFaultPoint, installCustody, STOP_FAMILY } from './custody.mjs';
+import { afterBarrierWork, crashBeforeIdentityPoint, custodyFaultPoint, custodyTransientFault, installCustody, STOP_FAMILY } from './custody.mjs';
 import { deterministicOutcomeId, makeFailureOutcome, normalizeAttemptErrorCode, sameOutcome, sourceForErrorCode } from './failureOutcomes.mjs';
 import { shimFailureOf } from './supervisor-client.mjs';
 import { StreamRecorder } from './streams.mjs';
@@ -102,13 +108,14 @@ export class Engine {
     // two are not combined in this PoC.
     if ((custodyHost || processCustodyRequired) && hostAuthority) throw new Error('Process Custody is not available with a Local Control Host binding in this PoC.');
     this.judgeAttentionEnabled = judgeAttentionEnabled === true;
-    // P5 enrollment may be loaded during managed startup, but admission stays disabled until every
-    // lifecycle stage and its Host recovery proofs, atomic acceptance and handoff are verified.
+    // P5 admission is never a configuration switch: it opens only when managed startup loads a valid
+    // installation-owned enrollment and decideProtectedSelfRepairAdmission proves its installed authority.
     this.protectedSelfRepairEnrollment = null;
     this.protectedSelfRepairEnrollmentFile = null;
     this.protectedSelfRepairEnrollmentArtifact = null;
     this.protectedSelfRepairUnavailableReason = null;
     this.protectedSelfRepairAdmissionEnabled = false;
+    this.protectedSelfRepairAdmissionDecision = null;
     this.protectedSelfRepairRunAdmissions = new WeakSet();
     this.protectedSelfRepairRepairAdmissions = new WeakSet();
     this.protectedSelfRepairAcceptanceAdmissions = new WeakSet();
@@ -217,6 +224,8 @@ export class Engine {
   // active package and binds the request to this managed Engine PID; local Git state and the build
   // label are not source provenance.
   async initializeProtectedSelfRepairEnrollment() {
+    this.protectedSelfRepairAdmissionEnabled = false;
+    this.protectedSelfRepairAdmissionDecision = null;
     this.protectedSelfRepairEnrollment = null;
     this.protectedSelfRepairEnrollmentFile = null;
     this.protectedSelfRepairEnrollmentArtifact = null;
@@ -235,15 +244,165 @@ export class Engine {
       if (!loaded) return false;
       await verifyP5RunningSourceInventory({ store: this.store, enrollment: loaded.enrollment,
         currentRunningSourceRelease: runningSourceRelease, generation: this.lifecycleHost.generation,
+        installedInventory: readInstalledSourceInventory(),
         readBatch: paths => this.lifecycleClient.runningSourceInventory({ pid: process.pid, paths }) });
       this.protectedSelfRepairEnrollment = loaded.enrollment;
       this.protectedSelfRepairEnrollmentFile = loaded;
       this.protectedSelfRepairEnrollmentArtifact = ref(this.store.putJson(loaded.enrollment));
+      const decision = await this.decideProtectedSelfRepairAdmission({ enrollment: loaded.enrollment, runningSourceRelease, readers });
+      this.protectedSelfRepairAdmissionDecision = decision;
+      this.protectedSelfRepairAdmissionEnabled = decision.enabled === true;
+      // F9: a publication whose Engine exited mid-flight is reconciled against the remote ref, never blindly repeated.
+      if (this.protectedSelfRepairAdmissionEnabled) this.recoverProtectedSelfRepairPublications().catch(() => {});
+      if (!decision.enabled) {
+        this.protectedSelfRepairUnavailableReason = `p5_admission_refused: ${decision.reasons.join(', ')}`;
+        process.stderr.write(`Protected Self-Repair admission stays closed: ${this.protectedSelfRepairUnavailableReason}\n`);
+      }
       return true;
     } catch (error) {
       this.protectedSelfRepairUnavailableReason = `${error.code || 'p5_enrollment_unavailable'}: ${error.message}`;
       process.stderr.write(`Protected Self-Repair enrollment was refused: ${this.protectedSelfRepairUnavailableReason}\n`);
       return false;
+    }
+  }
+
+  /**
+   * The only path that opens P5 admission. Every prerequisite is checked against installed, Host-attested
+   * state at startup; each later stage still re-verifies its own inputs. A failure keeps admission closed.
+   */
+  async decideProtectedSelfRepairAdmission({ enrollment, runningSourceRelease, readers }) {
+    const reasons = [];
+    const check = async (reason, predicate) => {
+      try { if (!(await predicate())) reasons.push(reason); }
+      catch (error) { reasons.push(`${reason}(${error.code || 'error'})`); }
+    };
+    await check('runtime_capability', () => enrollment.minimumReaderCapability === 'protected-self-repair-v1');
+    // The trusted Gate runs from an attested source layout: the runtime-bootstrap release itself, or the P5 support payload of a
+    // bundled desktop release, bound to the running bundle (P5-CLOSURE §5). A desktop release without one keeps P5 closed.
+    await check('runtime_package_layout', () => Boolean(verifyP5PackageLayout(runningSourceRelease)));
+    // P5-CLOSURE §6 (review R5): a production Self-Repair policy must make the Gate prove the incident on the installed baseline.
+    await check('causal_verification', () => {
+      this.store.verifyRef(enrollment.verificationPolicy);
+      return Boolean(this.store.readJson(enrollment.verificationPolicy.artifactId).causalReproduction);
+    });
+    await check('host_certainty', () => Boolean(this.lifecycleClient && this.lifecycleHost?.generation && this.custodyHost
+      && !this.custodyUnavailable && Number.isSafeInteger(this.custodyEpoch)));
+    await check('source_baseline', async () => Boolean(await verifyP5GitBaselineCurrent({ store: this.store, enrollment,
+      currentRunningSourceRelease: runningSourceRelease, ...readers })));
+    await check('verification_policy', () => {
+      this.store.verifyRef(enrollment.verificationPolicy);
+      const policy = this.store.readJson(enrollment.verificationPolicy.artifactId);
+      assertP5VerificationPolicy(policy);
+      return canonicalHash(policy) === enrollment.verificationPolicy.sha256 && policy.harnessClosureDigest === enrollment.harnessClosureDigest;
+    });
+    for (const [label, publication] of [['parent_publication', enrollment.parentPublication], ['repair_publication', enrollment.repairPublication]]) {
+      await check(label, () => {
+        const row = this.store.get(`SELECT p.*, a.sha256 AS snapshot_sha256 FROM workflow_publications p JOIN artifacts a ON a.id = p.snapshot_artifact_id
+          WHERE p.id = ? AND p.workflow_id = ? AND p.runnable = 1`, publication.publishedVersionId, publication.workflowId);
+        return Boolean(row && row.version === publication.version && row.snapshot_sha256 === publication.snapshotSha256);
+      });
+    }
+    await check('workspace_slot', async () => {
+      const row = this.store.get('SELECT * FROM workspaces WHERE id = ?', enrollment.workspace.workspaceId);
+      if (!row || resolve(row.cwd).toLowerCase() !== resolve(enrollment.workspace.canonicalRoot).toLowerCase()) return false;
+      const identity = await readers.nativeSourceReader({ root: enrollment.workspace.canonicalRoot, include: [], exclude: [], maxFiles: 0, maxBytes: 0 });
+      return !identity?.refused && canonicalHash(identity.rootIdentity) === canonicalHash(enrollment.workspace.nativeIdentity);
+    });
+    return Object.freeze({ enabled: reasons.length === 0, reasons, enrollmentId: enrollment.enrollmentId,
+      lifecycleGeneration: this.lifecycleHost?.generation ?? null, engineEpoch: this.custodyEpoch ?? null, decidedAt: nowIso() });
+  }
+
+  /**
+   * Owner read of the Lifecycle Host's own attestation for this managed Engine and the current P5 admission decision.
+   * Installation provisioning records this response verbatim; the Engine never synthesizes a release record.
+   */
+  async installedSourceRelease() {
+    if (!this.lifecycleClient || !this.lifecycleHost?.generation)
+      throw new ApiError(409, 'lifecycle_host_unavailable', 'This runtime is not managed by an attesting Lifecycle Host.');
+    const release = await this.lifecycleClient.runningSourceRelease({ pid: process.pid });
+    validateP5Contract('runningSourceRelease', release);
+    return { release, lifecycleGeneration: this.lifecycleHost.generation, installationId: this.lifecycleHost.installationId,
+      protectedSelfRepair: { enrollmentLoaded: Boolean(this.protectedSelfRepairEnrollment), admissionEnabled: this.protectedSelfRepairAdmissionEnabled === true,
+        decision: this.protectedSelfRepairAdmissionDecision, unavailableReason: this.protectedSelfRepairUnavailableReason } };
+  }
+
+  /**
+   * P5-CLOSURE F9: everything publication needs, re-derived from durable state: the handoff, the enrolled Git tool
+   * re-identified through the Host, and the live P5 projection of this Repair Run (an invalidated, stopped or uncertain repair
+   * never publishes). The Owner grants publication only through the installation enrollment.
+   */
+  async protectedSelfRepairPublicationContext(repairRunId) {
+    const projection = this.protectedSelfRepairRunProjection(repairRunId);
+    if (!projection) throw new ApiError(404, 'not_found', 'The run is not a Protected Self-Repair Repair run.');
+    const handoff = this.store.readEvents(repairRunId).find(item => item.type === 'self_repair.handoff_recorded');
+    if (!handoff) throw new ApiError(409, 'p5_publication_refused', 'The Repair has no accepted P6 handoff to publish.');
+    const enrollment = this.protectedSelfRepairEnrollment;
+    const tool = enrollment?.toolIdentities?.find(item => item.name === 'git');
+    const handoffValue = this.store.readJson(handoff.payload.record.artifactId);
+    if (!tool || canonicalHash(enrollment) !== handoffValue.enrollment?.sha256)
+      throw new ApiError(409, 'p5_publication_refused', 'The current installation enrollment does not provide the enrolled Git tool.');
+    const readers = this.protectedSelfRepairHostReaders();
+    const gitTool = { path: tool.path, sha256: tool.sha256 };
+    const identity = await verifyP5GitToolIdentity({ gitTool, nativeToolIdentityReader: readers.nativeToolIdentityReader });
+    if (identity.sha256 !== gitTool.sha256) throw new ApiError(409, 'p5_publication_refused', 'The enrolled Git tool identity changed.');
+    const eligibility = () => {
+      const link = this.logicalRepairLinkForRun(repairRunId);
+      if (!link) return { stage: 'held_uncertain', issues: ['link_missing'], parentStopped: true };
+      const parent = this.store.get('SELECT state FROM runs WHERE id = ?', link.parent_run_id);
+      const parentStopped = ['canceled', 'stopping', 'stopped'].includes(parent?.state) || link.state === 'parent_stopped'
+        || link.parent_suspension_state === 'stopped';
+      return { ...this.protectedSelfRepairRunProjection(repairRunId), parentStopped };
+    };
+    return { store: this.store, repairRunId, handoffRef: handoff.payload.record, gitTool,
+      appendEvent: event => this.store.appendEvents(repairRunId, [event]),
+      verifyCurrent: () => verifyP5GitCandidateCurrent({ store: this.store, candidateRef: handoffValue.candidate,
+        nativeSourceReader: readers.nativeSourceReader, nativeToolIdentityReader: readers.nativeToolIdentityReader,
+        expectedGitCandidateRef: handoffValue.gitCandidate }), eligibility };
+  }
+
+  /**
+   * P5-FINAL §8.2 / P5-CLOSURE F9: Owner-requested publication of an accepted repair branch to the enrolled remote. The request
+   * only records the durable create-only intent (202); execution continues under the Engine, independent of the connection.
+   */
+  async publishProtectedSelfRepairBranch(repairRunId) {
+    try {
+      const context = await this.protectedSelfRepairPublicationContext(repairRunId);
+      const admitted = await requestP5GitPublication({ ...context, eligibility: context.eligibility() });
+      if (admitted.replay) return { status: 200, body: admitted };
+      this.scheduleProtectedSelfRepairPublication(repairRunId, context);
+      return { status: 202, body: { ...admitted, publication: this.protectedSelfRepairPublicationStatus(repairRunId) } };
+    } catch (error) {
+      if (error instanceof ProtectedSelfRepairError) throw new ApiError(409, error.code, error.message);
+      throw error;
+    }
+  }
+
+  /** One executor per Repair at a time; it re-reads the journal, so a duplicate request or restart never pushes twice. */
+  scheduleProtectedSelfRepairPublication(repairRunId, context) {
+    this.protectedSelfRepairPublications ??= new Map();
+    if (this.protectedSelfRepairPublications.has(repairRunId)) return this.protectedSelfRepairPublications.get(repairRunId);
+    const task = (async () => {
+      try { await executeP5GitPublication({ ...context, currentEligibility: context.eligibility }); }
+      catch (error) { process.stderr.write(`Protected Self-Repair publication stays held for reconciliation: ${error.code || 'error'}: ${error.message}\n`); }
+      finally { this.protectedSelfRepairPublications.delete(repairRunId); }
+    })();
+    this.protectedSelfRepairPublications.set(repairRunId, task);
+    return task;
+  }
+
+  protectedSelfRepairPublicationStatus(repairRunId) {
+    if (!this.protectedSelfRepairRunProjection(repairRunId)) throw new ApiError(404, 'not_found', 'The run is not a Protected Self-Repair Repair run.');
+    return p5GitPublicationStatus({ store: this.store, repairRunId, executing: this.protectedSelfRepairPublications?.has(repairRunId) === true });
+  }
+
+  /** At startup with admission open: reconcile every publication intent that has no recorded result (Engine exited mid-flight). */
+  async recoverProtectedSelfRepairPublications() {
+    const runs = this.store.all(`SELECT DISTINCT run_id FROM journal_events WHERE event_type = 'self_repair.publication_intent'`);
+    for (const { run_id: repairRunId } of runs) {
+      try {
+        if (p5GitPublicationStatus({ store: this.store, repairRunId }).state !== 'held_uncertain') continue;
+        this.scheduleProtectedSelfRepairPublication(repairRunId, await this.protectedSelfRepairPublicationContext(repairRunId));
+      } catch (error) { process.stderr.write(`Protected Self-Repair publication recovery deferred for ${repairRunId}: ${error.message}\n`); }
     }
   }
 
@@ -447,15 +606,24 @@ export class Engine {
       const readers = this.protectedSelfRepairHostReaders();
       await verifyP5GitBaselineCurrent({ store: this.store, enrollment, currentRunningSourceRelease, ...readers });
       await verifyP5RunningSourceInventory({ store: this.store, enrollment, currentRunningSourceRelease,
-        generation: this.lifecycleHost.generation,
+        generation: this.lifecycleHost.generation, installedInventory: readInstalledSourceInventory(),
         readBatch: paths => this.lifecycleClient.runningSourceInventory({ pid: process.pid, paths }) });
 
       const candidate = p5Review.candidate;
       const receipt = p5Review.receipt;
+      let currentGitVerification = null;
+      let gitEligibilityCheckedAt = null;
       this.store.verifyRef(p5Review.candidateRef);
       this.store.verifyRef(p5Review.receiptRef);
       verifyP5Receipt(receipt, { store: this.store, candidateRef: p5Review.candidateRef,
         gateAttemptId: receipt.gateAttemptId, terminalEvidenceRef: receipt.terminalEvidence });
+      if (P5_GIT_POLICIES.includes(enrollment.gitCandidatePolicy)) {
+        if (!candidate.gitCandidate) fail('p5_git_candidate_missing', 'The enrolled P5 policy requires an immutable Git candidate before approval.');
+        currentGitVerification = await verifyP5GitCandidateCurrent({ store: this.store, candidateRef: p5Review.candidateRef,
+          nativeSourceReader: readers.nativeSourceReader, nativeToolIdentityReader: readers.nativeToolIdentityReader,
+          expectedGitCandidateRef: candidate.gitCandidate });
+        gitEligibilityCheckedAt = nowIso();
+      }
       let workspaceMatches = false;
       try {
         workspaceMatches = candidate.repairRunId === state.id && candidate.parentRunId === link.parent_run_id
@@ -481,7 +649,7 @@ export class Engine {
           nativeSourceReader: readers.nativeSourceReader,
           maxFiles: enrollment.budgets.maxSourceFiles,
           maxBytes: enrollment.budgets.maxSourceBytes,
-          include: ['**'], exclude: [], executableFor: path => executableModes.get(path) ?? false });
+          include: ['**'], exclude: candidate.gitCandidate ? ['.git/**'] : [], executableFor: path => executableModes.get(path) ?? false });
       } catch (error) {
         const reason = ['p5_host_unavailable', 'p5_native_identity_unavailable', 'p5_native_identity_mismatch'].includes(error.code)
           ? 'host_uncertain' : 'source_drift';
@@ -495,6 +663,14 @@ export class Engine {
         invalidateCandidate('source_drift');
         fail('p5_candidate_source_drift', 'The live candidate source no longer matches the sealed candidate and was durably invalidated.');
       }
+      const currentEligibility = Object.freeze({ eligible: true, revision: 1,
+        checkedAt: gitEligibilityCheckedAt ?? nowIso(), stage: 'p5_acceptance',
+        candidateSourceDigest: candidate.candidateSourceDigest,
+        ...(currentGitVerification ? { gitCandidate: candidate.gitCandidate,
+          repairBranch: currentGitVerification.gitCandidate.git.repairBranch,
+          candidateCommit: currentGitVerification.candidateCommit,
+          candidateTree: currentGitVerification.candidateTree,
+          storageSnapshotDigest: currentGitVerification.storageSnapshotDigest } : {}) });
       const authRow = this.store.artifactRow(link.authorization_artifact_id);
       if (!authRow?.sha256) fail('p5_authorization_missing', 'The exact P2 authorization artifact is unavailable.');
       const admission = Object.freeze({ kind: 'p5-repair-acceptance-admission', repairRunId: state.id,
@@ -502,6 +678,7 @@ export class Engine {
         judgeAttemptId: attempt.id, attentionKey: attention.attentionKey, decisionDigest: canonicalHash(decision),
         candidateRef: p5Review.candidateRef, candidateId: candidate.candidateId,
         candidateSourceDigest: candidate.candidateSourceDigest, receiptRef: p5Review.receiptRef,
+        currentEligibility,
         receiptId: receipt.receiptId, gateAttemptId: receipt.gateAttemptId,
         p2Authorization: { artifactId: link.authorization_artifact_id, sha256: authRow.sha256 },
         sourceIntegrityRevision: p5Review.sourceIntegrityRevision, retentionRevision: p5Review.retentionRevision,
@@ -533,6 +710,10 @@ export class Engine {
       || canonicalHash(admission.candidateRef) !== canonicalHash(p5Review.candidateRef)
       || admission.candidateId !== p5Review.candidate.candidateId
       || admission.candidateSourceDigest !== p5Review.candidate.candidateSourceDigest
+      || admission.currentEligibility?.eligible !== true
+      || admission.currentEligibility?.stage !== 'p5_acceptance'
+      || admission.currentEligibility?.candidateSourceDigest !== p5Review.candidate.candidateSourceDigest
+      || canonicalHash(admission.currentEligibility.gitCandidate ?? null) !== canonicalHash(p5Review.candidate.gitCandidate ?? null)
       || canonicalHash(admission.receiptRef) !== canonicalHash(p5Review.receiptRef)
       || admission.receiptId !== p5Review.receipt.receiptId || admission.gateAttemptId !== p5Review.receipt.gateAttemptId
       || admission.sourceIntegrityRevision !== p5Review.sourceIntegrityRevision
@@ -637,8 +818,6 @@ export class Engine {
       processTreeEnded: status.processTreeEnded, spoolComplete: status.spoolComplete, tailGapPossible: status.tailGapPossible,
       stdoutDurable: status.stdoutDurable, stdoutAcked: status.stdoutAcked, stderrDurable: status.stderrDurable,
       stderrAcked: status.stderrAcked, exitCode: status.exitCode, terminationReason: status.terminationReason ?? null, observedAt: nowIso() };
-    const terminalRef = ref(this.store.putJson(terminalEvidence));
-    this.store.verifyRef(terminalRef);
     const baselineRecord = this.store.readJson(enrollment.baselineManifest.artifactId);
     const baselineSource = this.store.readJson(baselineRecord.sourceManifest.artifactId);
     const baseline = { ...currentBaseline, baselineId: enrollment.baselineId, baselineManifest: enrollment.baselineManifest,
@@ -651,12 +830,155 @@ export class Engine {
       parentPublication: sourceBinding.parentPublication, repairPublication: enrollment.repairPublication,
       workspace: enrollment.workspace, enrollment: authorization.p5Enrollment, selfRepairProfile: authorization.selfRepairProfile,
       verificationPolicy: enrollment.verificationPolicy, verificationInputs: authorization.verificationInputs, sourceBinding: authorization.p5SourceBinding,
-      developerTerminal: { artifact: terminalRef, attemptId: attempt.id, processTreeEnded: true, spoolComplete: true,
-        status: status.state, exitCode: status.exitCode }, scope: profile.scope, capturedAt: nowIso(), journalCursor: this.requireRun(state.id).last_sequence + 3 };
-    const sourceRoot = resolve(workspace.cwd, 'source');
-    const sealed = await sealP5Candidate({ store: this.store, sourceRoot, baseline, authorization: candidateAuthorization,
-      budgets: enrollment.budgets, nativeSourceReader: readers.nativeSourceReader });
-    return { candidate: sealed.candidate, candidateArtifact: sealed.candidateArtifact };
+      scope: profile.scope };
+    return this.captureProtectedSelfRepairCandidateDurably({ runId: state.id, link, enrollment, preparedRef,
+      sourceRoot: resolve(workspace.cwd, 'source'), baseline, candidateAuthorization, terminalEvidence, readers });
+  }
+
+  /**
+   * P5-GIT-2 durable candidate capture. A `self_repair.candidate_capture_started` anchor is journaled before any source
+   * object is sealed; it fixes the Developer terminal evidence, capture time, journal cursor and the Host-measured source
+   * digest. A replay (Engine restart, re-delivered Host terminal) reuses the journaled Git commit intent when one exists,
+   * otherwise reseals under the anchor and refuses unless the live bytes reproduce the anchored identity. It never relaunches
+   * the Developer, never captures a second candidate and never resets, cleans or rewrites the workspace or its Git history.
+   * The caller journals `self_repair.candidate_captured` atomically with the Developer Attempt's success.
+   */
+  async captureProtectedSelfRepairCandidateDurably({ runId, link, enrollment, preparedRef, sourceRoot, baseline,
+    candidateAuthorization, terminalEvidence, readers }) {
+    const fail = (code, message) => { throw new ApiError(409, code, message); };
+    custodyTransientFault('p5_before_capture_anchor');
+    const journal = type => this.store.readEvents(runId).filter(item => item.type === type);
+    const assertAuthorityCurrent = () => {
+      const current = this.store.get('SELECT * FROM run_links WHERE id = ?', link.id);
+      if (!current || current.state !== 'open' || ['stopped', 'resumed'].includes(current.parent_suspension_state)
+        || journal('self_repair.candidate_invalidated').length)
+        fail('p5_candidate_authority_changed', 'The P2 Repair link was stopped, settled or invalidated; no candidate capture or Git mutation follows.');
+    };
+    if (journal('self_repair.candidate_captured').length) fail('p5_candidate_already_captured', 'P5 permits only one sealed candidate for this P2 Repair link.');
+    const gitPolicy = P5_GIT_POLICIES.includes(enrollment.gitCandidatePolicy);
+    const terminalIdentity = { custodyId: terminalEvidence.custodyId, processId: terminalEvidence.processId,
+      processCreationTime: terminalEvidence.processCreationTime, invocationDigest: terminalEvidence.invocationDigest,
+      executableSha256: terminalEvidence.executableSha256, exitCode: terminalEvidence.exitCode };
+    const captureId = canonicalHash({ kind: 'P5CandidateCapture', version: 1, linkId: link.id, repairRunId: runId,
+      developerAttemptId: candidateAuthorization.developerAttemptId, allocationId: enrollment.workspace.allocationId });
+    const inventoryOptions = { nativeSourceReader: readers.nativeSourceReader, include: baseline.pathPolicy.include,
+      exclude: baseline.pathPolicy.exclude, maxFiles: enrollment.budgets.maxSourceFiles, maxBytes: enrollment.budgets.maxSourceBytes,
+      executableFor: process.platform === 'win32' ? (modes => path => modes.get(path) ?? false)(new Map(baseline.entries.map(entry => [entry.path, entry.executable]))) : null };
+
+    let anchors = journal('self_repair.candidate_capture_started');
+    if (anchors.length > 1) fail('p5_capture_journal_conflict', 'P5 found more than one durable candidate-capture anchor.');
+    let anchor;
+    if (!anchors.length) {
+      assertAuthorityCurrent();
+      if (journal('self_repair.git_commit_intent').length)
+        fail('p5_capture_journal_conflict', 'A Git commit intent exists without its candidate-capture anchor; the state is held for reconciliation.');
+      const terminalRef = ref(this.store.putJson(terminalEvidence));
+      this.store.verifyRef(terminalRef);
+      const measured = await inventoryP5SourceWithHost(sourceRoot, inventoryOptions);
+      const expectedCandidateId = p5CandidateId({ baselineId: baseline.baselineId, incidentId: candidateAuthorization.incidentId,
+        parentRunId: candidateAuthorization.parentRunId, repairRunId: runId, linkId: link.id,
+        developerAttemptId: candidateAuthorization.developerAttemptId, workspaceAllocationId: enrollment.workspace.allocationId,
+        candidateSourceDigest: measured.sourceDigest, selfRepairProfileDigest: candidateAuthorization.selfRepairProfile.sha256,
+        verificationPolicyDigest: candidateAuthorization.verificationPolicy.sha256, verificationInputsDigest: candidateAuthorization.verificationInputs.sha256 });
+      const capturedAt = nowIso();
+      // P5-FINAL E-02: the journal cursor is the committed sequence of the anchor event itself, assigned and verified inside the
+      // one transaction that appends it, never a guess about how many events will follow.
+      this.store.transaction(() => {
+        if (journal('self_repair.candidate_capture_started').length)
+          fail('p5_capture_journal_conflict', 'Another Engine journaled this candidate-capture anchor first.');
+        assertAuthorityCurrent();
+        const journalCursor = this.requireRun(runId).last_sequence + 1;
+        const body = { schemaVersion: 1, kind: 'ProtectedSelfRepairCandidateCaptureAnchor', captureId, linkId: link.id,
+          parentRunId: candidateAuthorization.parentRunId, repairRunId: runId, incidentId: candidateAuthorization.incidentId,
+          developerAttemptId: candidateAuthorization.developerAttemptId, developerTerminalEvidence: terminalRef, terminalIdentity,
+          enrollment: candidateAuthorization.enrollment, workspacePreparation: preparedRef, allocationId: enrollment.workspace.allocationId,
+          workspaceIdentity: enrollment.workspace.nativeIdentity, gitCandidatePolicy: enrollment.gitCandidatePolicy ?? 'source-only',
+          expectedSourceDigest: measured.sourceDigest, expectedCandidateId, sourceSnapshotDigest: measured.nativeEvidence.snapshotDigest,
+          capturedAt, journalCursor };
+        validateP5Contract('candidateCaptureAnchor', body);
+        const anchorRef = ref(this.store.putJson(body));
+        this.store.verifyRef(anchorRef);
+        this.store.appendEvents(runId, [{ type: 'self_repair.candidate_capture_started', payload: { record: anchorRef }, nodeInstanceId: null, attemptId: null }]);
+        if (journal('self_repair.candidate_capture_started').at(-1)?.sequence !== journalCursor)
+          fail('p5_capture_journal_conflict', 'The candidate-capture anchor did not commit at its recorded journal sequence.');
+      });
+      custodyFaultPoint('p5_after_capture_anchor');
+      anchors = journal('self_repair.candidate_capture_started');
+    }
+    const anchorRef = anchors[0].payload?.record;
+    if (!anchorRef) fail('p5_capture_journal_corrupt', 'The candidate-capture anchor event has no record.');
+    this.store.verifyRef(anchorRef);
+    anchor = this.store.readJson(anchorRef.artifactId);
+    validateP5Contract('candidateCaptureAnchor', anchor);
+    if (canonicalHash(anchor) !== anchorRef.sha256 || anchor.captureId !== captureId || anchor.linkId !== link.id || anchor.repairRunId !== runId
+      || anchor.developerAttemptId !== candidateAuthorization.developerAttemptId || anchor.allocationId !== enrollment.workspace.allocationId
+      || canonicalHash(anchor.workspaceIdentity) !== canonicalHash(enrollment.workspace.nativeIdentity)
+      || canonicalHash(anchor.workspacePreparation) !== canonicalHash(preparedRef)
+      || canonicalHash(anchor.enrollment) !== canonicalHash(candidateAuthorization.enrollment)
+      || canonicalHash(anchor.terminalIdentity) !== canonicalHash(terminalIdentity)
+      || anchor.gitCandidatePolicy !== (enrollment.gitCandidatePolicy ?? 'source-only'))
+      fail('p5_capture_anchor_mismatch', 'The durable candidate-capture anchor belongs to a different Developer Attempt, process, workspace or policy.');
+    // Every capture derived from this anchor uses its fixed evidence, so a replay yields the same immutable records.
+    const authorization = { ...candidateAuthorization, capturedAt: anchor.capturedAt, journalCursor: anchor.journalCursor,
+      developerTerminal: { artifact: anchor.developerTerminalEvidence, attemptId: anchor.developerAttemptId, processTreeEnded: true,
+        spoolComplete: true, status: terminalEvidence.state, exitCode: terminalEvidence.exitCode } };
+
+    const readCandidate = candidateRef => {
+      this.store.verifyRef(candidateRef);
+      const value = this.store.readJson(candidateRef.artifactId);
+      validateP5Contract('candidate', value);
+      if (value.candidateId !== anchor.expectedCandidateId || value.candidateSourceDigest !== anchor.expectedSourceDigest
+        || value.developerAttemptId !== anchor.developerAttemptId || value.capturedAt !== anchor.capturedAt
+        || canonicalHash(value.developerTerminalEvidence) !== canonicalHash(anchor.developerTerminalEvidence))
+        fail('p5_capture_anchor_mismatch', 'The journaled candidate differs from its durable capture anchor.');
+      return value;
+    };
+    const intents = journal('self_repair.git_commit_intent');
+    if (intents.length > 1) fail('p5_capture_journal_conflict', 'P5 found duplicate durable Git commit intents.');
+    let intentRef = intents[0]?.payload?.record ?? null;
+    let sealedCandidateRef = null;
+    if (intentRef) {
+      this.store.verifyRef(intentRef);
+      sealedCandidateRef = this.store.readJson(intentRef.artifactId).candidateManifest;
+      readCandidate(sealedCandidateRef);
+    } else {
+      assertAuthorityCurrent();
+      const sealed = await sealP5Candidate({ store: this.store, sourceRoot, baseline, authorization, budgets: enrollment.budgets,
+        nativeSourceReader: readers.nativeSourceReader });
+      if (sealed.candidate.candidateSourceDigest !== anchor.expectedSourceDigest || sealed.candidate.candidateId !== anchor.expectedCandidateId)
+        fail('p5_capture_source_drift', 'The live candidate bytes differ from the durably anchored capture; no second candidate was created and the workspace is held.');
+      sealedCandidateRef = sealed.candidateArtifact;
+      readCandidate(sealedCandidateRef);
+      custodyFaultPoint('p5_after_candidate_seal');
+      if (!gitPolicy) return { candidate: sealed.candidate, candidateArtifact: sealed.candidateArtifact, anchor: anchorRef };
+      const gitToolRows = enrollment.toolIdentities.filter(item => item.name === 'git');
+      if (gitToolRows.length !== 1) fail('p5_git_tool_unavailable', 'The enrolled P5 Git candidate policy requires exactly one pinned Git executable.');
+      assertAuthorityCurrent();
+      const commitIntent = await createP5GitCommitIntent({ store: this.store, candidateRef: sealedCandidateRef,
+        preparationRef: preparedRef, gitTool: { path: gitToolRows[0].path, sha256: gitToolRows[0].sha256 },
+        nativeSourceReader: readers.nativeSourceReader, nativeToolIdentityReader: readers.nativeToolIdentityReader });
+      intentRef = commitIntent.intentRef;
+      custodyFaultPoint('p5_after_git_commit_intent');
+    }
+    if (!gitPolicy) fail('p5_capture_journal_conflict', 'A Git commit intent exists for a source-only P5 enrollment.');
+    assertAuthorityCurrent();
+    const bound = await bindP5GitCandidate({ store: this.store, intentRef, nativeSourceReader: readers.nativeSourceReader,
+      nativeToolIdentityReader: readers.nativeToolIdentityReader, capturedAt: anchor.capturedAt, faultPoint: custodyFaultPoint });
+    custodyFaultPoint('p5_after_git_candidate_bound');
+    custodyTransientFault('p5_after_git_candidate_bound');
+    return { candidate: bound.candidate, candidateArtifact: bound.candidateArtifact, anchor: anchorRef, recovered: bound.recovered };
+  }
+
+  /** Startup view of an interrupted P5 capture; recovery itself runs when Custody re-delivers the Developer's terminal record. */
+  protectedSelfRepairCaptureRecoveryState(repairRunId) {
+    const events = this.store.readEvents(repairRunId);
+    const count = type => events.filter(item => item.type === type).length;
+    const anchors = count('self_repair.candidate_capture_started'), intents = count('self_repair.git_commit_intent');
+    const captured = count('self_repair.candidate_captured');
+    if (captured) return { state: 'captured', anchors, intents, captured };
+    if (intents) return { state: 'git_commit_pending', anchors, intents, captured };
+    if (anchors) return { state: 'seal_pending', anchors, intents, captured };
+    return { state: 'none', anchors, intents, captured };
   }
 
   async materializeProtectedSelfRepairPreparation(intentRef, { recovery = false } = {}) {
@@ -670,7 +992,10 @@ export class Engine {
       const currentRunningSourceRelease = await this.lifecycleClient.runningSourceRelease({ pid: process.pid });
     const readers = this.protectedSelfRepairHostReaders();
     await verifyP5GitBaselineCurrent({ store: this.store, enrollment, currentRunningSourceRelease, ...readers });
-    const result = await prepareP5WorkspaceFromIntent({ store: this.store, intentRef, nativeSourceReader: readers.nativeSourceReader, recovery });
+    const prepareGitRepository = P5_GIT_POLICIES.includes(enrollment.gitCandidatePolicy)
+      ? context => prepareP5GitRepositoryFromIntent({ ...context, ...readers, protectedRoots: [ENGINE_RELEASE_ROOT] }) : null;
+    const result = await prepareP5WorkspaceFromIntent({ store: this.store, intentRef, nativeSourceReader: readers.nativeSourceReader,
+      prepareGitRepository, recovery });
     const intent = this.store.readJson(intentRef.artifactId);
     const prior = this.store.readEvents(intent.repairRunId).filter(item => item.type === 'self_repair.workspace_prepared');
     if (prior.length) {
@@ -680,7 +1005,7 @@ export class Engine {
       this.store.verifyRef(priorRef);
       const priorEvidence = this.store.readJson(priorRef.artifactId);
       const stableFields = ['intent', 'workspaceRoot', 'sourceRoot', 'workspaceIdentity', 'sourceIdentity', 'baselineId', 'sourceDigest',
-        'snapshotDigest', 'pathDigest', 'contentDigest', 'fileCount', 'totalBytes'];
+        'snapshotDigest', 'pathDigest', 'contentDigest', 'fileCount', 'totalBytes', 'gitRepository'];
       if (priorEvidence.kind !== 'ProtectedSelfRepairWorkspacePreparation'
         || stableFields.some(field => canonicalHash(priorEvidence[field]) !== canonicalHash(result.evidence[field])))
         throw new ApiError(409, 'p5_preparation_conflict', 'The durable P5 workspace-prepared record no longer matches its enrolled source and native workspace identity.');
@@ -870,8 +1195,22 @@ export class Engine {
       || preparation.value.baselineId !== enrollment?.baselineId
       || preparation.value.sourceDigest !== enrollment?.effectiveSourceDigest)) addIssue('workspace_preparation_mismatch');
 
+    const anchors = records(repairRunId, 'self_repair.candidate_capture_started', 1, 'candidateCaptureAnchor');
+    const anchor = anchors[0];
+    if (anchor && (!preparation || anchor.value.linkId !== link.id || anchor.value.repairRunId !== repairRunId
+      || anchor.value.parentRunId !== link.parent_run_id || anchor.value.incidentId !== link.incident_id
+      || !exactRef(anchor.value.workspacePreparation, preparation.ref) || !exactRef(anchor.value.enrollment, authorization.p5Enrollment)
+      || anchor.value.allocationId !== enrollment?.workspace?.allocationId)) addIssue('capture_anchor_mismatch');
+    const commitIntents = records(repairRunId, 'self_repair.git_commit_intent', 1, 'gitCommitIntent');
+    const commitIntent = commitIntents[0];
+    if (commitIntent && anchor && (commitIntent.value.candidateId !== anchor.value.expectedCandidateId
+      || commitIntent.value.candidateSourceDigest !== anchor.value.expectedSourceDigest || commitIntent.value.linkId !== link.id))
+      addIssue('git_commit_intent_mismatch');
     const candidates = records(repairRunId, 'self_repair.candidate_captured', 1, 'candidate');
     const candidate = candidates[0];
+    if (candidate && anchor && (candidate.value.candidateId !== anchor.value.expectedCandidateId
+      || candidate.value.candidateSourceDigest !== anchor.value.expectedSourceDigest
+      || candidate.value.developerAttemptId !== anchor.value.developerAttemptId)) addIssue('candidate_anchor_mismatch');
     if (candidate && (!preparation || candidate.value.parentRunId !== link.parent_run_id
       || candidate.value.repairRunId !== repairRunId || candidate.value.linkId !== link.id
       || candidate.value.incidentId !== link.incident_id
@@ -990,6 +1329,17 @@ export class Engine {
           addIssue('acceptance_mismatch');
       } catch { addIssue('acceptance_invalid'); }
     }
+    if (handoff && acceptance && (!acceptance.currentEligibility
+      || canonicalHash(handoff.value.currentEligibility) !== canonicalHash(acceptance.currentEligibility)))
+      addIssue('handoff_eligibility_mismatch');
+    if (handoff && acceptance) {
+      try {
+        this.store.verifyRef(handoff.value.p2Outcome);
+        const outcome = this.store.readJson(handoff.value.p2Outcome.artifactId);
+        if (canonicalHash(outcome.currentEligibility) !== canonicalHash(acceptance.currentEligibility))
+          addIssue('p2_outcome_eligibility_mismatch');
+      } catch { addIssue('p2_outcome_eligibility_invalid'); }
+    }
     if (handoff && (!acceptance || approval?.decision !== 'accept_repair')) addIssue('handoff_without_acceptance');
     if (['repair_accepted', 'resumed'].includes(link.state) && !handoff) addIssue('accepted_handoff_missing');
 
@@ -997,6 +1347,8 @@ export class Engine {
       .filter(item => item.type.startsWith('self_repair.') && !P5_EVENT_TYPES.includes(item.type));
     if (unknownEvents.length) addIssue('unknown_p5_event');
 
+    // F10: a capture held on a transient Host/dependency failure, with its durable bounded-retry position.
+    const captureHolds = candidate ? [] : eventsFor(repairRunId, 'self_repair.capture_held').map(event => ({ payload: this.store.readJson(event.payload.record.artifactId) }));
     let stage = 'held_uncertain';
     if (invalidation && !issues.length) stage = 'invalidated';
     else if (!issues.length && (link.state === 'parent_stopped' || link.parent_suspension_state === 'stopped')) stage = 'stopped';
@@ -1007,18 +1359,25 @@ export class Engine {
     else if (!issues.length && verification) stage = ['failed', 'incomplete'].includes(verification.value.status) ? 'incomplete' : 'held_uncertain';
     else if (!issues.length && start) stage = 'verifying';
     else if (!issues.length && candidate) stage = 'captured';
+    else if (!issues.length && (anchor || commitIntent)) stage = 'capturing';
     else if (!issues.length && preparation) {
       const developer = profile?.developerNodeId && this.latestAttempt(repairRunId, profile.developerNodeId);
       stage = developer && ['running', 'waiting'].includes(developer.state) ? 'developing' : 'prepared';
     } else if (!issues.length && intent) stage = 'preparing';
-    if (!issues.length && link.state === 'blocked' && !invalidation) stage = 'held_uncertain';
+    // An accepted source repair whose Parent may not retry its failed node (failed_node_retry = never) is blocked by design:
+    // the old binary must not rerun it. Its handoff stays retained for P6; every other blocked link is held.
+    const retainedNeverRetry = handoff && link.state === 'blocked' && link.failed_node_retry === 'never'
+      && link.decision_status === 'accepted' && link.repair_outcome === 'succeeded';
+    if (!issues.length && link.state === 'blocked' && !invalidation && !retainedNeverRetry) stage = 'held_uncertain';
 
     if (issues.length && ['open', 'repair_completed', 'repair_accepted'].includes(link.state)) stage = 'held_uncertain';
     const terminalStages = new Set(['held_uncertain', 'incomplete', 'invalidated', 'rejected', 'stopped']);
     return { schemaVersion: 1, kind: 'ProtectedSelfRepairRunProjection', parentRunId: link.parent_run_id,
       repairRunId, linkId: link.id, stage, eligible: issues.length === 0 && !terminalStages.has(stage),
       revision: repair?.last_sequence ?? 0, issues: issues.sort(), candidateId: candidate?.value.candidateId ?? null,
-      receiptId: verification?.value.receiptId ?? null, handoffId: handoff?.value.handoffId ?? null };
+      receiptId: verification?.value.receiptId ?? null, handoffId: handoff?.value.handoffId ?? null,
+      ...(captureHolds.length ? { captureHold: { holdNumber: captureHolds.at(-1).payload.holdNumber, maxHolds: captureHolds.at(-1).payload.maxHolds,
+        code: captureHolds.at(-1).payload.code, retryAt: captureHolds.at(-1).payload.retryAt } } : {}) };
   }
 
   reconcileProtectedSelfRepairProjections() {
@@ -3591,6 +3950,110 @@ export class Engine {
       binding, record, outcome, current }); }
     catch (error) {
       const terminal = record.child?.terminalStatus;
+      if (p5CaptureFailureDisposition(error) === 'hold') {
+        // A transient Host or dependency failure is not evidence about the candidate. The exact capture (same Attempt, durable
+        // anchor and Git commit intent) is retried on a bounded durable budget, and fails closed when the budget is spent.
+        // An Engine shutdown is never a Stop and spends no hold: the Attempt stays as it is, and the next Engine continues the same
+        // durable capture through Custody re-delivery (review recheck N1).
+        if (record.runtimeShutdown || this.closing) return null;
+        const previous = this.store.readEvents(state.id).filter(event => event.type === 'self_repair.capture_held'
+          && this.store.readJson(event.payload.record.artifactId).attemptId === current.id).length;
+        const decision = p5CaptureHoldDecision(previous);
+        if (decision.action === 'fail')
+          return this.failAttempt(state, current, 'p5_capture_unavailable', `P5 candidate capture stayed unavailable after ${previous} bounded retries (${error.code}).`,
+            { source: 'host', executionCertainty: 'completed', sideEffectCertainty: 'unknown',
+              observedState: { hostState: terminal?.state || 'exited', processTreeEnded: terminal?.processTreeEnded === true } });
+        const holdRecord = { schemaVersion: 1, kind: 'ProtectedSelfRepairCaptureHold', runId: state.id, attemptId: current.id,
+          code: String(error.code).slice(0, 128), holdNumber: decision.holdNumber, maxHolds: P5_CAPTURE_HOLD_DELAYS_MS.length,
+          retryAt: new Date(Date.now() + decision.delayMs).toISOString() };
+        validateP5Contract('captureHold', holdRecord);
+        const hold = this.store.putJson(holdRecord);
+        this.store.appendEvents(state.id, [{ type: 'self_repair.capture_held', nodeInstanceId: null, attemptId: null,
+          payload: { record: { artifactId: hold.artifactId, sha256: hold.sha256 } } }]);
+        // The hold is live work of this Run (review recheck): the Run stays running and is never parked in an Owner-decision
+        // wait. Root Stop aborts a waiting hold at once (cancelling the held Attempt). During an in-flight retry it is recorded
+        // on the record instead: the retry's own authority checks (candidate invalidation) fail it closed, and whatever the retry
+        // left unsettled is cancelled when it returns.
+        const supersededReason = () => record.stopRequested || this.runState(state.id) === 'stopping'
+          ? 'Root Stop superseded the held P5 candidate capture.'
+          : `The Run left running (${this.runState(state.id)}) while the P5 candidate capture was held; the capture was not retried.`;
+        const cancelHeld = reason => {
+          try {
+            this.store.transaction(() => {
+              const now = this.store.get('SELECT * FROM attempts WHERE id = ?', current.id);
+              if (now && !TERMINAL_ATTEMPT.has(now.state))
+                this.store.appendEvents(state.id, this.attemptTransition(now, 'canceled', reason, null,
+                  { source: 'external_control', code: 'interrupted', causeKnowledge: 'direct_fact', executionCertainty: 'completed', sideEffectCertainty: 'unknown' }));
+            });
+          } catch (journalError) { this.storageUnavailable(journalError); }
+        };
+        // A Stop already requested (or a Run no longer running) is never turned into a hold: the Attempt settles now.
+        if (record.stopRequested || this.runState(state.id) !== 'running') {
+          cancelHeld(supersededReason());
+          return null;
+        }
+        const holdKey = `p5-capture-hold:${current.id}:${decision.holdNumber}`;
+        if (!this.processes.has(holdKey)) {
+          const abortController = new AbortController();
+          let timer = null, retrying = false, ended = null;
+          // `exited` lets an Engine shutdown await an in-flight retry before the Store closes (review recheck 4c).
+          // The held Attempt keeps its workspace locks (review recheck 3): the hold takes them from the record, so `releaseAgent`
+          // frees none, and they are freed only when the hold ends. A retry hands them back to the record; a nested hold takes
+          // them again, otherwise they are freed when the retry returns.
+          const placeholder = { runId: state.id, attemptId: current.id, loops: [], launched: false, p5CaptureHold: true, abortController,
+            keys: record.keys, exited: new Promise(done => { ended = done; }) };
+          record.keys = [];
+          const freeKeys = keys => {
+            for (const key of keys) { this.locks.delete(key); this.store.run('DELETE FROM resource_locks WHERE resource_key = ?', key); }
+          };
+          const release = () => {
+            clearTimeout(timer); this.processes.delete(holdKey);
+            try { freeKeys(placeholder.keys); freeKeys(record.keys); } catch (journalError) { this.storageUnavailable(journalError); }
+            placeholder.keys = []; record.keys = []; ended();
+            if (!this.closing) queueMicrotask(() => this.pump());
+          };
+          abortController.signal.addEventListener('abort', () => {
+            // An Engine shutdown only disposes a waiting timer: the durable hold count and Custody re-delivery continue the same
+            // capture in the next Engine. An in-flight retry is left to finish and settles through `release`.
+            if (placeholder.runtimeShutdown) { if (!retrying) release(); return; }
+            // During an in-flight retry the retry is told to stop and settles the Attempt itself, exactly once.
+            if (retrying) { record.stopRequested = true; record.stopSource = 'external_control'; record.stopReason = placeholder.stopReason || 'Stopped by root Stop.'; return; }
+            // Only a Root or scoped Stop aborts a waiting hold (a shutdown returned above).
+            release();
+            cancelHeld(placeholder.stopReason ? `${placeholder.stopReason} The held P5 candidate capture was cancelled.` : supersededReason());
+          }, { once: true });
+          timer = setTimeout(() => {
+            const latest = this.store.get('SELECT * FROM attempts WHERE id = ?', current.id);
+            if (!latest || TERMINAL_ATTEMPT.has(latest.state)) return release();
+            // A Run that stopped or drained meanwhile never retries; the held Attempt settles as superseded.
+            if (record.stopRequested || this.runState(state.id) !== 'running') {
+              cancelHeld(supersededReason());
+              return release();
+            }
+            retrying = true;
+            record.keys = placeholder.keys; placeholder.keys = [];
+            // A retry that cannot even reach the capture never leaves the Attempt held: it fails closed with its reason recorded.
+            this.settleAgentProcess(state, node, latest, { config, requestedEffort, workspace, binding, transport, spec, record }, outcome)
+              .catch(retryError => {
+                try {
+                  const now = this.store.get('SELECT * FROM attempts WHERE id = ?', current.id);
+                  if (now && !TERMINAL_ATTEMPT.has(now.state))
+                    this.failAttempt(state, now, 'p5_capture_retry_failed', `The bounded P5 capture retry could not run: ${retryError.code || 'error'}: ${retryError.message}`.slice(0, 2000),
+                      { source: 'engine', executionCertainty: 'completed', sideEffectCertainty: 'unknown' });
+                } catch (journalError) { this.storageUnavailable(journalError); }
+              })
+              .finally(() => {
+                // A Stop during the retry: whatever the retry left unsettled is cancelled now, never later.
+                if (record.stopRequested) cancelHeld('Root Stop superseded the retried P5 candidate capture.');
+                release();
+              });
+          }, decision.delayMs);
+          timer.unref?.();
+          this.processes.set(holdKey, placeholder);
+        }
+        process.stderr.write(`P5 candidate capture for Attempt ${current.id} is held (${error.code}); bounded retry ${decision.holdNumber}/${P5_CAPTURE_HOLD_DELAYS_MS.length}.\n`);
+        return null;
+      }
       return this.failAttempt(state, current, error.code || 'capture_failed', `P5 candidate capture failed closed: ${error.message}`,
         { source: 'engine', executionCertainty: 'completed', sideEffectCertainty: 'unknown',
           observedState: { hostState: terminal?.state || 'exited', processTreeEnded: terminal?.processTreeEnded === true,
@@ -3871,7 +4334,9 @@ export class Engine {
         if (loop.state !== 'running') throw new ApiError(409, 'conflict', `Loop "${instanceId}" is ${loop.state}.`);
         loopToStop = { state, instanceId };
       } else {
-        const record = this.processes.get(attempt.id);
+        // A held P5 capture is live under its hold key, not the Attempt id (review recheck 4a).
+        const record = this.processes.get(attempt.id)
+          ?? [...this.processes.values()].find(item => item.p5CaptureHold && item.attemptId === attempt.id);
         if (!record || attempt.state !== 'running') throw new ApiError(409, 'conflict', `"${instanceId}" is not running.`);
         processToStop = record;
       }

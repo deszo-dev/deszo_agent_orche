@@ -2,7 +2,7 @@
 // Candidate test output is captured from the test child and never forwarded to this process's
 // control stdout. The Node JUnit reporter supplies the structured test completion stream.
 import { spawn } from 'node:child_process';
-import { lstatSync, readFileSync, realpathSync } from 'node:fs';
+import { lstatSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { canonicalHash, canonicalize, sha256 } from '../core/canonical.mjs';
@@ -86,6 +86,10 @@ export function parseP5JUnitReport(text, expectedAssertions) {
     if (typeof attrs.name !== 'string' || !attrs.name || attrs.name.length > 4096)
       fail('p5_verifier_report_invalid', 'A Node JUnit test case has no bounded name.');
     let failed = false;
+    // An assertion failure carries Node's AssertionError as the test failure's own (first) `cause:`; a load, dependency or runtime
+    // error carries another cause. Text that merely mentions an AssertionError elsewhere (a message, an input) is not evidence.
+    const firstCause = /^[ \t]*cause: ([^\r\n]*)/m.exec(xmlDecode(nested.replace(/<[^>]*>/g, '')));
+    const assertionFailure = /^AssertionError \[ERR_ASSERTION\]:/.test(firstCause?.[1] ?? '');
     let inner = nested;
     const nestedTags = /<\/?([A-Za-z][A-Za-z0-9-]*)(?:\s[^<>]*?)?\/?>/g;
     for (const tag of inner.matchAll(nestedTags)) {
@@ -97,7 +101,7 @@ export function parseP5JUnitReport(text, expectedAssertions) {
     inner = inner.replace(/<(failure|error|skipped|system-out|system-err)\b[^>]*>[\s\S]*?<\/\1>|<(failure|error|skipped)\b[^>]*\/>/g, '')
       .replace(nestedTags, '').replace(/&(?:amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);/g, '');
     if (inner.trim()) fail('p5_verifier_report_invalid', 'The Node JUnit report contains unstructured text inside a test case.');
-    cases.push({ name: attrs.name, className: attrs.classname ?? '', failed });
+    cases.push({ name: attrs.name, className: attrs.classname ?? '', failed, assertionFailure: failed && assertionFailure });
     return '';
   });
   body = body.replace(/<testsuite\b[^>]*>|<\/testsuite>/g, '').replace(/<!--[\s\S]*?-->/g, '').trim();
@@ -259,7 +263,69 @@ function validatePlan(plan) {
       fail('p5_verifier_inputs_unbound', `P5 check "${check.checkId}" has captured inputs but no Engine-bound materialization manifest.`);
     }
   }
+  const causal = plan.policy.causalReproduction;
+  if (causal || plan.causalReproduction) {
+    const reproduction = plan.causalReproduction;
+    const check = plan.checks.find(item => item.checkId === causal?.checkId);
+    if (!causal || !reproduction || !check || reproduction.checkId !== causal.checkId
+      || canonicalHash([...reproduction.baselineMustPass].sort(ordinal)) !== canonicalHash([...causal.baselineMustPass].sort(ordinal))
+      || canonicalHash([...reproduction.baselineMustFail].sort(ordinal)) !== canonicalHash([...causal.baselineMustFail].sort(ordinal))
+      || typeof reproduction.executionRoot !== 'string' || !isAbsolute(reproduction.executionRoot))
+      fail('p5_verifier_causality_plan_invalid', 'The verifier plan causal reproduction differs from its captured policy.');
+    let canonical, info;
+    try { canonical = realpathSync.native(reproduction.executionRoot); info = lstatSync(reproduction.executionRoot); }
+    catch { fail('p5_verifier_causality_plan_invalid', 'The baseline reproduction tree is unavailable.'); }
+    if (!info.isDirectory() || info.isSymbolicLink() || !samePath(resolve(reproduction.executionRoot), resolve(canonical))
+      || !withinPath(roots['candidate-execution-tree'], canonical) || samePath(canonical, check.executionRoot)
+      || withinPath(check.executionRoot, canonical) || withinPath(canonical, check.executionRoot))
+      fail('p5_verifier_causality_plan_invalid', 'The baseline reproduction tree is not a separate canonical child of the execution root.');
+    reproduction.executionRoot = canonical;
+  }
+  if (plan.dependencyClosure) {
+    // The Engine-bound closure manifest in the verify scratch, authenticated by the digest the plan carries.
+    const closure = plan.dependencyClosure;
+    const manifestPath = assertRegularFileUnder(roots['verify-scratch'], closure.manifestPath, 'The P5 dependency closure manifest');
+    const bytes = readFileSync(manifestPath);
+    let record;
+    try { record = bytes.length <= 16 * 1024 * 1024 && sha256(bytes) === closure.manifestSha256 ? JSON.parse(bytes.toString('utf8')) : null; } catch { record = null; }
+    if (!record || !Array.isArray(record.files) || canonicalHash(record.packages) !== canonicalHash(closure.packages)
+      || record.closureDigest !== closure.closureDigest || canonicalHash({ packages: record.packages, files: record.files }) !== closure.closureDigest
+      || record.files.some(file => typeof file.path !== 'string' || !file.path.startsWith('node_modules/') || file.path.includes('..')))
+      fail('p5_verifier_dependency_plan_invalid', 'The verifier dependency closure manifest is missing, changed or does not match its digest.');
+    closure.files = record.files;
+  }
   return roots;
+}
+
+/**
+ * P5-CLOSURE F2: the dependency files Node serves to the checks (<execution>/node_modules) must hold exactly the planned bytes
+ * before and after every check, so no check can change what a later check imports. Returns a problem or null.
+ */
+function verifyDependencyClosure(plan, roots) {
+  const closure = plan.dependencyClosure;
+  const directory = resolve(roots['candidate-execution-tree'], 'node_modules');
+  const actual = [];
+  const walk = (path, prefix) => {
+    let entries;
+    try { entries = readdirSync(path, { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+      const child = resolve(path, entry.name), name = `${prefix}/${entry.name}`;
+      if (entry.isSymbolicLink()) { actual.push({ path: name, unsafe: true }); continue; }
+      if (entry.isDirectory()) walk(child, name);
+      else actual.push({ path: name, absolute: child, file: entry.isFile() });
+    }
+  };
+  walk(directory, 'node_modules');
+  if (!closure) return actual.length ? 'Dependency files appeared beside the execution trees without a planned closure.' : null;
+  const expected = new Map(closure.files.map(file => [file.path, file]));
+  if (actual.length !== expected.size) return 'The served dependency file set differs from the planned closure.';
+  for (const item of actual) {
+    const file = expected.get(item.path);
+    if (!file || item.unsafe || !item.file) return `Served dependency "${item.path}" is not a planned regular file.`;
+    const bytes = readFileSync(item.absolute);
+    if (bytes.length !== file.byteSize || sha256(bytes) !== file.sha256) return `Served dependency bytes changed: ${item.path}.`;
+  }
+  return null;
 }
 
 function assertRegularFileUnder(root, path, label) {
@@ -369,6 +435,7 @@ function runCommand(check, cwd, remainingMs) {
         stdoutSha256: sha256(stdout), stderrSha256: sha256(stderr),
         reporter: parsed ? { testCaseCount: parsed.cases.length, allCasesPassed: parsed.allCasesPassed,
           expectedAssertionsComplete: parsed.expectedAssertionsComplete } : null,
+        cases: parsed ? parsed.cases : null,
         ...(launchError ? { error: `${launchError.code || 'p5_verifier_check_error'}: ${launchError.message}`.slice(0, 2048) } : {}),
         ...(signal ? { signal } : {}), ...(timedOut ? { timedOut: true } : {}) });
     };
@@ -397,6 +464,11 @@ export async function executeP5VerifierPlan(plan) {
   const deadline = Date.now() + plan.aggregateTimeoutSeconds * 1000;
   const observations = [];
   const definitions = new Map(plan.policy.checks.map(item => [item.checkId, item]));
+  const dependencyBefore = verifyDependencyClosure(plan, roots);
+  if (dependencyBefore) fail('p5_verifier_dependency_drift', dependencyBefore);
+  // R(B): the protected reproducer over the installed baseline, before any candidate code runs, with the identical captured
+  // command, environment and materialized incident inputs of the candidate check.
+  const causalReproduction = plan.causalReproduction ? await reproduceOnBaseline(plan, roots, deadline) : null;
   for (const check of plan.checks) {
     const policyCheck = definitions.get(check.checkId);
     if (!policyCheck || policyCheck.commandDigest !== check.commandDigest)
@@ -411,8 +483,16 @@ export async function executeP5VerifierPlan(plan) {
       continue;
     }
     verifyMaterializedInputs(plan, check, roots);
+    const dependencyDrift = verifyDependencyClosure(plan, roots);
+    if (dependencyDrift) fail('p5_verifier_dependency_drift', dependencyDrift);
     const observation = await runCommand(check, check.executionRoot || roots[check.cwd], remainingMs);
+    delete observation.cases;
     observation.inputDigest = check.inputDigest ?? null;
+    const dependencyAfter = verifyDependencyClosure(plan, roots);
+    if (dependencyAfter) {
+      observation.status = 'incomplete';
+      observation.error = `p5_verifier_dependency_drift: ${dependencyAfter}`.slice(0, 2048);
+    }
     if (check.materializedInputManifest) {
       try { verifyMaterializedInputs(plan, check, roots); }
       catch (error) {
@@ -429,15 +509,61 @@ export async function executeP5VerifierPlan(plan) {
     observations.push(observation);
   }
   const required = observations.filter(item => item.required);
-  const status = required.every(item => item.status === 'passed') ? 'passed'
+  let status = required.every(item => item.status === 'passed') ? 'passed'
     : required.some(item => item.status === 'failed') ? 'failed' : 'incomplete';
+  // Under a causality-required policy the candidate passing is not enough: the installed baseline must show the defect.
+  if (causalReproduction && status === 'passed' && causalReproduction.status !== 'reproduced')
+    status = causalReproduction.status === 'not_reproduced' ? 'failed' : 'incomplete';
   const result = { schemaVersion: 1, kind: 'ProtectedSelfRepairVerifierResult', candidateId: plan.candidateId,
     candidateSourceDigest: plan.candidateSourceDigest, baselineId: plan.baselineId, gateAttemptId: plan.gateAttemptId,
-    status, startedAt, endedAt: new Date().toISOString(), captureStatus: 'complete', checks: observations };
+    status, startedAt, endedAt: new Date().toISOString(), captureStatus: 'complete', checks: observations,
+    ...(causalReproduction ? { causalReproduction } : {}),
+    ...(plan.dependencyClosure ? { dependencyClosureDigest: plan.dependencyClosure.closureDigest } : {}) };
   const serialized = JSON.stringify(result);
   if (Buffer.byteLength(serialized) > MAX_RESULT_BYTES)
     fail('p5_verifier_result_too_large', 'The structured P5 verifier result exceeds its bounded control-output size.');
   return result;
+}
+
+/**
+ * Run the causal check over the baseline tree and classify it. `reproduced` needs a complete report in which every harness
+ * assertion passed (the protected test loaded and recognized the captured incident) and every defect assertion failed with an
+ * assertion failure. A load, dependency or runtime error, a timeout or a missing case can never count as reproduction.
+ */
+async function reproduceOnBaseline(plan, roots, deadline) {
+  const { checkId, baselineMustPass, baselineMustFail, executionRoot } = plan.causalReproduction;
+  const check = plan.checks.find(item => item.checkId === checkId);
+  const remainingMs = deadline - Date.now();
+  const base = { checkId, executionRoot, baselineMustPass: [...baselineMustPass].sort(ordinal), baselineMustFail: [...baselineMustFail].sort(ordinal) };
+  if (remainingMs <= 0) return { ...base, status: 'incomplete', exitCode: null, harnessPassed: [], defectFailed: [], stdoutBase64: '', stderrBase64: '',
+    stdoutSha256: sha256(Buffer.alloc(0)), stderrSha256: sha256(Buffer.alloc(0)), startedAt: new Date().toISOString(), endedAt: new Date().toISOString(),
+    reason: 'P5 aggregate deadline elapsed before baseline reproduction.' };
+  verifyMaterializedInputs(plan, check, roots);
+  const raw = await runCommand(check, executionRoot, remainingMs);
+  let inputsChanged = false;
+  try { verifyMaterializedInputs(plan, check, roots); } catch { inputsChanged = true; }
+  const dependencyDrift = verifyDependencyClosure(plan, roots);
+  const unique = name => {
+    const qualified = name.includes('::') ? name.split('::', 2) : null;
+    return (raw.cases ?? []).filter(item => qualified ? item.className === qualified[0] && item.name === qualified[1] : item.name === name);
+  };
+  const harnessPassed = base.baselineMustPass.filter(name => unique(name).length === 1 && !unique(name)[0].failed);
+  const defectFailed = base.baselineMustFail.filter(name => unique(name).length === 1 && unique(name)[0].assertionFailure);
+  const complete = raw.captureStatus === 'complete' && !raw.error && !raw.timedOut && !raw.signal && Array.isArray(raw.cases) && !inputsChanged && !dependencyDrift;
+  const named = new Set([...base.baselineMustPass, ...base.baselineMustFail].flatMap(name => unique(name)));
+  const others = (raw.cases ?? []).filter(item => !named.has(item));
+  let status = 'incomplete', reason = raw.error ?? (inputsChanged ? 'Captured inputs changed during baseline reproduction.' : dependencyDrift);
+  if (complete) {
+    const harnessOk = harnessPassed.length === base.baselineMustPass.length && others.every(item => !item.failed);
+    if (harnessOk && defectFailed.length === base.baselineMustFail.length && raw.exitCode === 1) { status = 'reproduced'; reason = null; }
+    else {
+      status = 'not_reproduced';
+      reason = !harnessOk ? 'The protected harness assertions did not pass on the installed baseline; the incident was not reproduced.'
+        : 'The defect assertions did not fail as assertion failures on the installed baseline; the incident was not reproduced.';
+    }
+  }
+  return { ...base, status, exitCode: raw.exitCode, harnessPassed, defectFailed, stdoutBase64: raw.stdoutBase64, stderrBase64: raw.stderrBase64,
+    stdoutSha256: raw.stdoutSha256, stderrSha256: raw.stderrSha256, startedAt: raw.startedAt, endedAt: raw.endedAt, reason: reason ?? null };
 }
 
 async function readPlanFromStdin() {

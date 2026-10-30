@@ -22,9 +22,9 @@ test('AMD-19 inventories every route and Owner Token survives rotation and resta
     const inventory = api.runner.routeInventory;
     const counts = Object.groupBy(inventory, route => route.classification);
     assert.deepEqual(Object.fromEntries(Object.entries(counts).map(([key, value]) => [key, value.length])), {
-      public: 92, 'internal-host': 5, retired: 4,
+      public: 96, 'internal-host': 5, retired: 4,
     });
-    assert.equal(inventory.length, 101);
+    assert.equal(inventory.length, 105);
     assert.deepEqual(inventory.filter(route => route.pattern.includes('judge-questions')).map(({ method, classification }) => ({ method, classification })), [
       { method: 'GET', classification: 'public' }, { method: 'POST', classification: 'public' },
     ], 'P4 Owner questions use the existing public Owner Token boundary');

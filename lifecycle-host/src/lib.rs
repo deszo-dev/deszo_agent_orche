@@ -24,6 +24,34 @@ const ENGINE_READY_TIMEOUT: Duration = Duration::from_secs(45);
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(15);
 const SOURCE_INVENTORY_PATH: &str = ".deszo-source-inventory.json";
 const SOURCE_INVENTORY_BATCH_MAX: usize = 32;
+const MANAGED_RELAUNCH_LIMIT: usize = 3;
+const MANAGED_RELAUNCH_WINDOW: Duration = Duration::from_secs(60);
+
+/// What the Host does after a managed Engine exited while Process Custody keeps its CLIs alive.
+#[derive(Debug, PartialEq, Eq)]
+enum RelaunchDecision {
+    /// Start the same active, re-verified build in the same generation.
+    Relaunch,
+    /// The rolling budget is spent: latch relaunch off for this Host's lifetime.
+    Exhausted,
+    /// Keep serving Custody only (clean exit, desktop bootstrap, latched budget, or a lifecycle operation in progress).
+    Hold,
+}
+
+/// Pure relaunch policy. `recent` counts relaunches inside the rolling window. A clean exit, a desktop bootstrap and an
+/// already-latched budget never relaunch; a durable lifecycle operation is never raced; the budget is finite.
+fn managed_relaunch_decision(bootstrap: &str, clean_exit: bool, already_exhausted: bool, operation_active: bool, recent: usize) -> RelaunchDecision {
+    if bootstrap != "runtime" || clean_exit || already_exhausted {
+        return RelaunchDecision::Hold;
+    }
+    if recent >= MANAGED_RELAUNCH_LIMIT {
+        return RelaunchDecision::Exhausted;
+    }
+    if operation_active {
+        return RelaunchDecision::Hold;
+    }
+    RelaunchDecision::Relaunch
+}
 const SOURCE_INVENTORY_FILE_MAX_BYTES: u64 = 32 * 1024 * 1024;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -593,6 +621,9 @@ impl Host {
                 }
             })
             .map_err(err)?;
+        // Abnormal managed-Engine exits relaunched under Process Custody, bounded per rolling window.
+        let mut relaunches: Vec<Instant> = Vec::new();
+        let mut relaunch_exhausted = false;
         loop {
             if rx.recv_timeout(Duration::from_millis(250)).is_ok() {
                 break;
@@ -619,13 +650,14 @@ impl Host {
                             process.generation.clone(),
                             process.bootstrap.clone(),
                             status.to_string(),
+                            status.success(),
                         )
                     })
                 } else {
                     None
                 }
             };
-            if let Some((pid, build_id, generation, bootstrap, status)) = unexpected_exit {
+            if let Some((pid, build_id, generation, bootstrap, status, clean_exit)) = unexpected_exit {
                 let message = format!("managed {bootstrap} application {pid} exited unexpectedly with status {status}");
                 log_event(
                     &self.shared,
@@ -642,6 +674,31 @@ impl Host {
                         let _ = process.child.wait();
                     }
                     guard.ready_generation = None;
+                    drop(guard);
+                    // A runtime Engine that crashed is replaced from the same active, re-verified package and generation,
+                    // so the replacement reattaches the Custody-owned CLIs instead of leaving them without an Engine. A clean
+                    // exit, a desktop bootstrap or an exhausted relaunch budget leaves the Host serving custody only.
+                    let now = Instant::now();
+                    relaunches.retain(|at| now.duration_since(*at) < MANAGED_RELAUNCH_WINDOW);
+                    // A crash loop latches off for the Host's lifetime; a lifecycle operation in progress is never raced.
+                    let operation_active = self.shared.state.lock().map_err(poison)?.durable.operation.is_some();
+                    let decision = managed_relaunch_decision(&bootstrap, clean_exit, relaunch_exhausted, operation_active, relaunches.len());
+                    if decision == RelaunchDecision::Exhausted {
+                        relaunch_exhausted = true;
+                        log_event(&self.shared, "managed_application_relaunch_exhausted",
+                            serde_json::json!({ "previousPid": pid, "buildId": build_id, "generation": generation }))?;
+                    }
+                    if decision == RelaunchDecision::Relaunch {
+                        relaunches.push(now);
+                        match start_current_build(&self.shared) {
+                            Ok(()) => log_event(&self.shared, "managed_application_relaunched",
+                                serde_json::json!({ "previousPid": pid, "buildId": build_id, "generation": generation,
+                                    "attempt": relaunches.len() }))?,
+                            Err(error) => log_event(&self.shared, "managed_application_relaunch_failed",
+                                serde_json::json!({ "previousPid": pid, "buildId": build_id, "generation": generation,
+                                    "message": error }))?,
+                        }
+                    }
                     continue;
                 }
                 if let Err(error) = shutdown_managed(&self.shared) {
@@ -2445,6 +2502,23 @@ fn validate_request_shape(request: &LifecycleRequest) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
+    use super::{managed_relaunch_decision, RelaunchDecision, MANAGED_RELAUNCH_LIMIT};
+
+    #[test]
+    fn managed_relaunch_policy_is_bounded_and_never_races() {
+        // An abnormal runtime Engine exit relaunches while the rolling budget lasts.
+        for recent in 0..MANAGED_RELAUNCH_LIMIT {
+            assert_eq!(managed_relaunch_decision("runtime", false, false, false, recent), RelaunchDecision::Relaunch);
+        }
+        // The budget is finite, and once latched no later exit relaunches, even after the window empties.
+        assert_eq!(managed_relaunch_decision("runtime", false, false, false, MANAGED_RELAUNCH_LIMIT), RelaunchDecision::Exhausted);
+        assert_eq!(managed_relaunch_decision("runtime", false, true, false, 0), RelaunchDecision::Hold);
+        // A clean exit, a desktop bootstrap and a durable lifecycle operation never relaunch.
+        assert_eq!(managed_relaunch_decision("runtime", true, false, false, 0), RelaunchDecision::Hold);
+        assert_eq!(managed_relaunch_decision("tauri", false, false, false, 0), RelaunchDecision::Hold);
+        assert_eq!(managed_relaunch_decision("runtime", false, false, true, 0), RelaunchDecision::Hold);
+    }
+
     use super::*;
     fn temp(label: &str) -> PathBuf {
         std::env::temp_dir().join(format!("deszo-host-{label}-{}", Uuid::new_v4()))

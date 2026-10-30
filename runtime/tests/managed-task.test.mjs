@@ -241,13 +241,16 @@ test('managed delivery preserves hooks when runTaskCommand cannot prove an abort
     assert.ok(existsSync(hooksPath), 'The temporary hooks directory must exist while the descendant is running.');
     assert.ok(isAlive(descendantPid), 'The test-owned detached descendant must be alive before cancellation.');
 
-    // The invalid executable makes this exact taskkill request fail. Changing cwd and aborting are synchronous;
-    // the production killTree call starts taskkill before cwd is restored.
+    // The invalid executable makes this exact taskkill request fail. Node resolves the bare `taskkill` of the production
+    // killTree through PATH (and the current directory only without NoDefaultCurrentDirectoryInExePath), so the fixture is put
+    // first on PATH. Changing PATH and aborting are synchronous; killTree spawns taskkill before PATH is restored.
     const failingTaskkillDirectory = join(api.root, 'failing-taskkill');
     mkdirSync(failingTaskkillDirectory);
     writeFileSync(join(failingTaskkillDirectory, 'taskkill.exe'), 'not a Windows executable');
-    try { process.chdir(failingTaskkillDirectory); controller.abort(); }
-    finally { process.chdir(originalCwd); }
+    const pathKey = Object.keys(process.env).find(key => key.toUpperCase() === 'PATH') || 'PATH';
+    const originalPath = process.env[pathKey];
+    try { process.env[pathKey] = `${failingTaskkillDirectory};${originalPath}`; controller.abort(); }
+    finally { process.env[pathKey] = originalPath; }
 
     const finished = await api.waitFor(runId, undefined, 30000);
     assert.equal(finished.run.state, 'waiting_for_user', JSON.stringify(finished));

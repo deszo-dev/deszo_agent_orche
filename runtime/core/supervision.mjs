@@ -434,8 +434,8 @@ export function installSupervision(Engine, { ApiError }) {
 
   P.runProcesses = function runProcesses(runId) {
     this.requireRun(runId);
-    return [...this.processes.entries()].filter(([, record]) => record.runId === runId).map(([attemptId, record]) => ({
-      attemptId, pid: record.child?.pid ?? null, launched: Boolean(record.launched), stopRequested: Boolean(record.stopRequested),
+    return [...this.processes.entries()].filter(([, record]) => record.runId === runId).map(([key, record]) => ({
+      attemptId: record.attemptId ?? key, pid: record.child?.pid ?? null, launched: Boolean(record.launched), stopRequested: Boolean(record.stopRequested),
       alive: record.child?.pid ? isAlive(record.child.pid) : false }));
   };
 

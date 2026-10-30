@@ -2271,6 +2271,8 @@
             "self_repair.source_bound",
             "self_repair.preparation_intent",
             "self_repair.workspace_prepared",
+            "self_repair.candidate_capture_started",
+            "self_repair.git_commit_intent",
             "self_repair.candidate_captured",
             "self_repair.verification_started",
             "self_repair.verification_recorded",
@@ -2278,7 +2280,10 @@
             "self_repair.review_delivery_carried",
             "self_repair.handoff_recorded",
             "self_repair.retention_changed",
-            "self_repair.cleanup_deferred"
+            "self_repair.cleanup_deferred",
+            "self_repair.publication_intent",
+            "self_repair.publication_recorded",
+            "self_repair.capture_held"
           ]
         },
         "payload": {

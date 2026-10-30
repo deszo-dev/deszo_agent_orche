@@ -451,7 +451,8 @@ test('Root Stop invalidates P5 eligibility for an already terminal Parent in one
       authorization: { artifactId: authorization.artifactId, sha256: authorization.sha256 }, artifact: anchorRef, outcome: anchorRef },
     continuation: { state: 'repair_accepted' },
     retention: { status: 'retained', revision: 1, retainedAt: now, cleanupDeferred: true, artifact: anchorRef },
-    sourceBinding: anchorRef, enrollment: anchorRef, currentEligibility: { eligible: true, revision: 1, checkedAt: now } });
+    sourceBinding: anchorRef, enrollment: anchorRef, currentEligibility: { eligible: true, revision: 1, checkedAt: now,
+      stage: 'p5_acceptance', candidateSourceDigest: candidate.candidateSourceDigest } });
   const handoffRef = store.putJson(handoff);
   store.appendEvents(repairRunId, [
     { type: 'self_repair.candidate_captured', payload: { record: candidateRef }, nodeInstanceId: null, attemptId: null },

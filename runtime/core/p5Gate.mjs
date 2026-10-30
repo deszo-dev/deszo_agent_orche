@@ -1,4 +1,5 @@
 import { builtinModules } from 'node:module';
+import ts from 'typescript';
 import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, posix, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,33 +12,25 @@ import {
   p5CheckInputDigest, p5ExecutionTreeDigest, p5VerificationReceiptId, validateP5Contract,
   verifyP5GitBaselineCurrent, verifyP5OverlayManifest, verifyP5Receipt, verifyP5RunningSourceInventory, verifyP5VerificationInputsCurrent,
   P5_VERIFICATION_INPUT_MANIFEST_ENV, P5_VERIFICATION_CANDIDATE_ENTRYPOINT_ENV,
+  materializeP5BaselineReproducerTree, P5_BASELINE_TREE_DIRECTORY,
 } from './protectedSelfRepair.mjs';
+import { verifyP5GitCandidateCurrent } from './p5GitCandidate.mjs';
+import { custodyCrashOnce } from './custody.mjs';
+import { ENGINE_PACKAGED, ENGINE_ROOT } from './engineRoot.mjs';
+import { P5_TRUSTED_CONTROL_PATHS } from './p5HostBoundary.mjs';
+import { readInstalledSourceInventory, verifyP5PackageLayout } from './p5Support.mjs';
 
 const P5_PROVIDER = 'p5-verifier';
-const ENGINE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const VERIFIER_RELATIVE = 'runtime/verification/p5Verifier.mjs';
 const VERIFIER_PATH = resolve(ENGINE_ROOT, VERIFIER_RELATIVE);
 const CANDIDATE_SYNTAX_DRIVER_RELATIVE = 'runtime/verification/p5CandidateSyntaxCheck.test.mjs';
 const CANDIDATE_SYNTAX_DRIVER = resolve(ENGINE_ROOT, CANDIDATE_SYNTAX_DRIVER_RELATIVE);
 const MAX_P5_CHECK_INPUT_BYTES = 64 * 1024 * 1024;
 const MAX_P5_GATE_INPUT_BYTES = 128 * 1024 * 1024;
-const TRUSTED_SOURCE_PATHS = Object.freeze([
-  VERIFIER_RELATIVE,
-  CANDIDATE_SYNTAX_DRIVER_RELATIVE,
-  'runtime/core/p5Gate.mjs',
-  'runtime/core/engine.mjs',
-  'runtime/core/custody.mjs',
-  'runtime/core/linkedRepair.mjs',
-  'runtime/core/workflowJudge.mjs',
-  'runtime/core/store.mjs',
-  'runtime/core/utilities.mjs',
-  'runtime/core/validate.mjs',
-  'runtime/core/protectedSelfRepair.mjs',
-  'runtime/core/canonical.mjs',
-  'runtime/core/schemas.mjs',
-  'runtime/runner.mjs',
-  'docs/schemas/protected-self-repair.schema.json',
-]);
+// One list for attestation (here) and mutation tiers (p5HostBoundary.mjs), so they can never disagree (review F5).
+export const TRUSTED_SOURCE_PATHS = P5_TRUSTED_CONTROL_PATHS;
+if (!TRUSTED_SOURCE_PATHS.includes(VERIFIER_RELATIVE) || !TRUSTED_SOURCE_PATHS.includes(CANDIDATE_SYNTAX_DRIVER_RELATIVE))
+  throw new Error('The P5 trusted control closure must include the installed verifier and syntax driver.');
 const COMPATIBLE_BUILTINS = new Set(builtinModules.flatMap(name => [name, name.replace(/^node:/, '')]));
 const compareText = (left, right) => left < right ? -1 : left > right ? 1 : 0;
 const samePath = (left, right) => process.platform === 'win32' ? left.toLowerCase() === right.toLowerCase() : left === right;
@@ -47,7 +40,7 @@ function fail(code, message) { throw Object.assign(new Error(message), { code })
 
 function verifyP5ActiveSourceInventory(engine, currentRunningSourceRelease) {
   return verifyP5RunningSourceInventory({ store: engine.store, enrollment: engine.protectedSelfRepairEnrollment,
-    currentRunningSourceRelease, generation: engine.lifecycleHost?.generation,
+    currentRunningSourceRelease, generation: engine.lifecycleHost?.generation, installedInventory: readInstalledSourceInventory(),
     readBatch: paths => engine.lifecycleClient.runningSourceInventory({ pid: process.pid, paths }) });
 }
 
@@ -281,19 +274,188 @@ function readCandidateModule(store, entry) {
   return bytes.toString('utf8');
 }
 
-function importSpecifiers(source, label) {
-  if (/\bimport\s*\(|\brequire\s*\(|\bcreateRequire\b|\bimport\.meta\.resolve\b/.test(source))
-    fail('p5_subject_resolver_unsupported', `P5 cannot statically resolve dynamic or CommonJS imports in "${label}".`);
-  const values = [];
-  const pattern = /\b(?:import|export)\s+(?:[^'";]*?\s+from\s*)?(['"])([^'"]+)\1/g;
-  for (const match of source.matchAll(pattern)) values.push(match[2]);
-  return [...new Set(values)];
+// Executable resolution the recorded closure cannot follow (review F14). `node:module` may be imported only for these
+// read-only names and is never re-exported. Loader entry points are refused as syntax (identifiers and property names, never
+// text inside strings or comments), so an alias or re-export of the loader cannot reach a module outside the closure.
+const LOADER_MODULES = new Set(['module', 'node:module']);
+const SAFE_LOADER_BINDINGS = new Set(['builtinModules', 'isBuiltin']);
+const CODE_LOADING_BUILTINS = new Set(['vm', 'worker_threads', 'wasi'].flatMap(name => [name, `node:${name}`]));
+const LOADER_NAMES = new Set(['require', 'createRequire', '_load', '_resolveFilename', 'getBuiltinModule']);
+const PROCESS_LOADERS = new Set(['binding', '_linkedBinding', 'dlopen', 'getBuiltinModule', 'mainModule']);
+const CODE_EVALUATORS = new Set(['eval', 'Function']);
+const GLOBAL_OWNERS = new Set(['process', 'globalThis', 'global']);
+
+export function importSpecifiers(source, label) {
+  if (/\.json$/i.test(label)) return [];
+  const refuse = what => fail('p5_subject_resolver_unsupported', `P5 cannot statically resolve ${what} in "${label}".`);
+  const file = ts.createSourceFile(label, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
+  if (file.parseDiagnostics.length) refuse('a module that does not parse');
+  const specifiers = new Set();
+  const nameOf = node => ts.isIdentifier(node) || ts.isPrivateIdentifier(node) || ts.isStringLiteralLike(node) ? node.text : null;
+  const visit = node => {
+    if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier) {
+      if (!ts.isStringLiteral(node.moduleSpecifier)) refuse('a computed module specifier');
+      const specifier = node.moduleSpecifier.text;
+      if (CODE_LOADING_BUILTINS.has(specifier)) refuse(`an import of the code-loading builtin "${specifier}"`);
+      if (LOADER_MODULES.has(specifier)) {
+        const clause = ts.isImportDeclaration(node) ? node.importClause : null;
+        const named = clause?.namedBindings && ts.isNamedImports(clause.namedBindings) ? clause.namedBindings.elements : null;
+        if (!clause || clause.name || !named || named.some(item => !SAFE_LOADER_BINDINGS.has((item.propertyName ?? item.name).text)))
+          refuse('a module-loader import or re-export');
+      }
+      specifiers.add(specifier);
+    }
+    if (ts.isImportEqualsDeclaration(node)) refuse('an import-equals declaration');
+    if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) refuse('a dynamic import');
+    if (ts.isMetaProperty(node) && ts.isPropertyAccessExpression(node.parent) && node.parent.name.text === 'resolve') refuse('import.meta.resolve');
+    if (ts.isIdentifier(node) && LOADER_NAMES.has(node.text)) refuse(`the module loader "${node.text}"`);
+    // Code evaluation reaches modules outside the closure as well (review R4).
+    if (ts.isIdentifier(node) && CODE_EVALUATORS.has(node.text)) refuse(`the code evaluator "${node.text}"`);
+    if ((ts.isElementAccessExpression(node) || ts.isPropertyAccessExpression(node)) && ts.isIdentifier(node.expression)
+      && GLOBAL_OWNERS.has(node.expression.text)) {
+      const key = ts.isPropertyAccessExpression(node) ? node.name.text : ts.isStringLiteralLike(node.argumentExpression) ? node.argumentExpression.text : null;
+      if (key === null) refuse(`a computed member of "${node.expression.text}"`);
+      // `globalThis.eval`, `globalThis['process'].binding`, `process['dlopen']`: the same references by another spelling.
+      if (GLOBAL_OWNERS.has(key) || CODE_EVALUATORS.has(key)) refuse(`an indirect "${key}" reference`);
+    }
+    if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
+      const property = ts.isPropertyAccessExpression(node) ? nameOf(node.name) : nameOf(node.argumentExpression);
+      const owner = ts.isIdentifier(node.expression) ? node.expression.text : null;
+      if (property && (LOADER_NAMES.has(property) || owner === 'process' && PROCESS_LOADERS.has(property)))
+        refuse(`the module loader "${property}"`);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  return [...specifiers];
 }
 
-function resolveRelativeImport(fromPath, specifier, candidateByPath, overlayBytes) {
+const packageNameOf = specifier => specifier.startsWith('@') ? specifier.split('/').slice(0, 2).join('/') : specifier.split('/')[0];
+
+/**
+ * Third-party packages of the installed control release. Candidate source never carries dependencies (package manifests and
+ * lockfiles are Host build inputs and node_modules is outside the source policy), so a subject's bare imports are served
+ * only from the running release, whose bytes the Lifecycle Host covers by the attested package digest.
+ */
+function installedDependencyClosure(names) {
+  const pending = [...names], closure = new Set();
+  while (pending.length) {
+    const name = pending.pop();
+    if (closure.has(name)) continue;
+    const manifestPath = resolve(ENGINE_ROOT, 'node_modules', ...name.split('/'), 'package.json');
+    if (!existsSync(manifestPath)) fail('p5_subject_external_dependency_unsupported', `P5 subject dependency "${name}" is not part of the installed release.`);
+    closure.add(name);
+    let manifest;
+    try { manifest = JSON.parse(readFileSync(manifestPath, 'utf8')); }
+    catch { fail('p5_subject_external_dependency_unsupported', `The installed manifest of "${name}" is unreadable.`); }
+    // Review F17: what Node can load from this package includes its installed optional and peer dependencies.
+    pending.push(...Object.keys(manifest.dependencies || {}), ...Object.keys({ ...manifest.optionalDependencies, ...manifest.peerDependencies })
+      .filter(item => existsSync(resolve(ENGINE_ROOT, 'node_modules', ...item.split('/'), 'package.json'))));
+  }
+  return [...closure].sort(compareText);
+}
+
+function listPlainFiles(root) {
+  const out = [];
+  const visit = directory => {
+    for (const name of readdirSync(directory).sort(compareText)) {
+      const path = join(directory, name), info = lstatSync(path);
+      if (info.isSymbolicLink()) fail('p5_subject_dependency_unsafe', `An installed dependency contains a reparse point: ${relative(ENGINE_ROOT, path)}`);
+      if (info.isDirectory()) visit(path); else if (info.isFile()) out.push(path);
+    }
+  };
+  visit(root);
+  return out;
+}
+
+/**
+ * Materialize the installed packages a protected subject imports beside the per-check execution trees
+ * (<verify>/execution/node_modules), where Node resolves them and outside every Host-scanned candidate tree. Bytes are
+ * copied from installed control only; an existing file must already hold identical bytes (recovery), never different ones.
+ */
+/** The exact installed dependency files (portable path under node_modules/ and installed bytes) for the named packages. */
+function installedDependencyFiles(names) {
+  const files = [];
+  for (const name of installedDependencyClosure(names)) {
+    const source = resolve(ENGINE_ROOT, 'node_modules', ...name.split('/'));
+    for (const from of listPlainFiles(source))
+      files.push({ path: ['node_modules', ...name.split('/'), ...relative(source, from).split(sep)].join('/'), from });
+  }
+  return files.sort((left, right) => compareText(left.path, right.path));
+}
+
+function materializeInstalledDependencies(executionParent, names) {
+  if (!names.length) return [];
+  ensureDirectory(join(executionParent, 'node_modules'));
+  for (const file of installedDependencyFiles(names)) {
+    const parts = file.path.split('/');
+    let current = executionParent;
+    for (const part of parts.slice(0, -1)) current = ensureDirectory(join(current, part));
+    writeOrVerifyP5File({ path: join(executionParent, ...parts), bytes: readFileSync(file.from), mode: 0o644, allowExisting: true,
+      conflictCode: 'p5_subject_dependency_conflict', failedCode: 'p5_subject_dependency_failed', label: `Installed dependency ${parts[1]}` });
+  }
+  return installedDependencyFiles(names).map(file => file.path);
+}
+
+/**
+ * After the checks ran: the materialized dependency set still equals the installed bytes, file for file, with nothing added.
+ * Candidate code under verification runs as the same user and could otherwise rewrite a package a later check imports.
+ */
+function verifyInstalledDependenciesCurrent(executionParent, names) {
+  const target = join(executionParent, 'node_modules');
+  if (!names.length) return existsSync(target) ? 'An unexpected dependency directory appeared beside the execution trees.' : null;
+  const expected = installedDependencyFiles(names);
+  const actual = listPlainFiles(target).map(path => relative(executionParent, path).split(sep).join('/')).sort(compareText);
+  if (canonicalHash(actual) !== canonicalHash(expected.map(file => file.path))) return 'The materialized installed dependency set changed during verification.';
+  for (const file of expected)
+    if (sha256(readFileSync(join(executionParent, ...file.path.split('/')))) !== sha256(readFileSync(file.from)))
+      return `Installed dependency bytes changed during verification: ${file.path}.`;
+  return null;
+}
+
+/**
+ * P5-CLOSURE F2: the installed release's own artifact list (runtime `build.json`; desktop `p5/p5-support.json`), inside the
+ * Host-attested package, names every shipped dependency file and its digest. Served dependency bytes must equal it.
+ */
+function installedReleaseArtifacts(release) {
+  const name = ENGINE_PACKAGED ? 'p5-support.json' : 'build.json';
+  const path = resolve(ENGINE_ROOT, name);
+  let bytes, value;
+  try { bytes = readFileSync(path); value = JSON.parse(bytes.toString('utf8')); }
+  catch { fail('p5_dependency_release_unattested', `The installed release artifact list ${name} is unavailable.`); }
+  const rows = ENGINE_PACKAGED ? value.files : value.artifacts;
+  if (!Array.isArray(rows) || value.buildId !== release.buildId || value.sourceCommit !== release.sourceCommit
+    || value.inputsDigest !== release.inputsDigest)
+    fail('p5_dependency_release_unattested', `The installed release artifact list ${name} does not describe the Host-attested running release.`);
+  return { name, sha256: sha256(bytes), byPath: new Map(rows.map(row => [row.path, row.sha256])) };
+}
+
+function dependencyClosureRecord({ names, candidate, gateAttemptId, release }) {
+  const files = installedDependencyFiles(names).map(file => {
+    const bytes = readFileSync(file.from);
+    return { path: file.path, sha256: sha256(bytes), byteSize: bytes.length };
+  });
+  const listed = installedReleaseArtifacts(release);
+  for (const file of files)
+    if (listed.byPath.get(file.path) !== file.sha256)
+      fail('p5_dependency_release_mismatch', `Installed dependency "${file.path}" differs from the attested release artifact list.`);
+  const packages = installedDependencyClosure(names);
+  const record = { schemaVersion: 1, kind: 'ProtectedSelfRepairVerificationDependencyClosure', candidateId: candidate.candidateId,
+    gateAttemptId, installedRelease: { buildId: release.buildId, bootstrap: release.bootstrap, packageSha256: release.packageSha256,
+      inputsDigest: release.inputsDigest, artifactList: listed.name, artifactListSha256: listed.sha256 },
+    resolutionRoot: 'candidate-execution-tree/node_modules', packages, files, closureDigest: canonicalHash({ packages, files }) };
+  validateP5Contract('dependencyClosure', record);
+  return record;
+}
+
+function resolveRelativeImport(fromPath, specifier, candidateByPath, overlayBytes, installedPackages = null) {
   if (!specifier.startsWith('./') && !specifier.startsWith('../')) {
     const normalized = specifier.replace(/^node:/, '');
     if (specifier.startsWith('node:') || COMPATIBLE_BUILTINS.has(normalized)) return null;
+    if (installedPackages && !specifier.startsWith('/') && existsSync(resolve(ENGINE_ROOT, 'node_modules', ...packageNameOf(specifier).split('/'), 'package.json'))) {
+      installedPackages.add(packageNameOf(specifier));
+      return null;
+    }
     fail('p5_subject_external_dependency_unsupported', `P5 subject closure contains an uncaptured external dependency "${specifier}".`);
   }
   const base = posix.normalize(posix.join(posix.dirname(fromPath), specifier));
@@ -320,6 +482,7 @@ function resolveProtectedSubject({ store, candidate, sourceManifest, policyRef, 
   }
 
   const visited = new Set();
+  const installedPackages = new Set();
   const candidateClosure = new Set();
   const reachedSubjects = new Set();
   const visit = (path, textOverride = null) => {
@@ -332,7 +495,7 @@ function resolveProtectedSubject({ store, candidate, sourceManifest, policyRef, 
       : candidateEntry ? readCandidateModule(store, candidateEntry) : null);
     if (source === null) fail('p5_subject_import_unresolved', `Protected test input reaches uncaptured path "${path}".`);
     for (const specifier of importSpecifiers(source, path)) {
-      const next = resolveRelativeImport(path, specifier, candidateByPath, overlayBytes);
+      const next = resolveRelativeImport(path, specifier, candidateByPath, overlayBytes, installedPackages);
       if (next !== null) visit(next);
     }
   };
@@ -351,7 +514,8 @@ function resolveProtectedSubject({ store, candidate, sourceManifest, policyRef, 
     candidateSourceDigest: candidate.candidateSourceDigest, baselineId: candidate.baselineId, checkId: check.checkId,
     verificationPolicy: policyRef, verificationInputs: inputsRef, inputDigest,
     driverIdentity: check.executable, driverSha256: check.executableSha256, entryPoints: [...check.subjectEntryPoints],
-    resolvedFiles, sourceClosureDigest: canonicalHash(resolvedFiles), assertionBindings };
+    resolvedFiles, sourceClosureDigest: canonicalHash(resolvedFiles), assertionBindings,
+    ...(installedPackages.size ? { installedPackages: [...installedPackages].sort(compareText) } : {}) };
   validateP5Contract('subjectResolution', resolution);
   return { resolution, ref: asRef(store.putJson(resolution)), inputDigest };
 }
@@ -400,7 +564,10 @@ function canonicalWorkspaceRoots(candidate, gateAttemptId) {
   return { slot, verify, candidateSource, scratch, executionRoot };
 }
 
-function checkReceiptResult(result, policy, candidate, gateAttemptId, verificationInputs) {
+function checkReceiptResult(result, policy, candidate, gateAttemptId, verificationInputs, verifierPlan = null) {
+  if (verifierPlan && (canonicalHash(result?.dependencyClosureDigest ?? null) !== canonicalHash(verifierPlan.dependencyClosure?.closureDigest ?? null)
+    || policy.causalReproduction && result?.causalReproduction?.checkId !== policy.causalReproduction.checkId))
+    fail('p5_verifier_result_mismatch', 'Trusted verifier result omits the planned baseline reproduction or dependency closure.');
   if (!result || result.kind !== 'ProtectedSelfRepairVerifierResult' || result.schemaVersion !== 1
     || result.candidateId !== candidate.candidateId || result.candidateSourceDigest !== candidate.candidateSourceDigest
     || result.baselineId !== candidate.baselineId || result.gateAttemptId !== gateAttemptId
@@ -510,6 +677,8 @@ export function installProtectedSelfRepairGate(Engine) {
       fail('p5_projection_unavailable', 'P5 verification requires the current journal projection to identify one intact captured candidate.');
     const candidateRef = candidateEvents[0].payload.record;
     const candidate = readRecord(this.store, candidateRef, 'candidate');
+    if (['sanitized-seed-v1', 'managed-clone-v1'].includes(enrollment.gitCandidatePolicy) && !candidate.gitCandidate)
+      fail('p5_git_candidate_missing', 'The enrolled P5 policy requires the exact committed Git candidate binding.');
     const developer = this.store.get('SELECT * FROM attempts WHERE id = ? AND run_id = ?', candidate.developerAttemptId, state.id);
     if (!developer || developer.state !== 'succeeded' || candidate.repairRunId !== state.id || candidate.parentRunId !== link.parent_run_id
       || candidate.linkId !== link.id || candidate.incidentId !== link.incident_id
@@ -576,6 +745,7 @@ export function installProtectedSelfRepairGate(Engine) {
     const readers = this.protectedSelfRepairHostReaders();
     await verifyP5GitBaselineCurrent({ store, enrollment: this.protectedSelfRepairEnrollment, currentRunningSourceRelease, ...readers });
     await verifyP5ActiveSourceInventory(this, currentRunningSourceRelease);
+    const packageLayout = verifyP5PackageLayout(currentRunningSourceRelease);
     const release = store.readJson(this.protectedSelfRepairEnrollment.runningSourceRelease.artifactId);
     if (policy.harnessClosureDigest !== this.protectedSelfRepairEnrollment.harnessClosureDigest
       || policy.harnessClosureDigest !== release.inputsDigest
@@ -612,11 +782,15 @@ export function installProtectedSelfRepairGate(Engine) {
     const roots = canonicalWorkspaceRoots(candidate, attempt.id);
     const actualCandidate = await inventoryP5SourceWithHost(candidate.workspace.sourceRoot, { nativeSourceReader: readers.nativeSourceReader,
       maxFiles: this.protectedSelfRepairEnrollment.budgets.maxSourceFiles,
-      maxBytes: this.protectedSelfRepairEnrollment.budgets.maxSourceBytes, include: ['**'], exclude: [], executableFor: executableForManifest(sourceManifest) });
+      maxBytes: this.protectedSelfRepairEnrollment.budgets.maxSourceBytes, include: ['**'],
+      exclude: candidate.gitCandidate ? ['.git/**'] : [], executableFor: executableForManifest(sourceManifest) });
     if (!sourceEntriesMatch(actualCandidate.entries, sourceManifest)
       || canonicalHash(actualCandidate.nativeEvidence.rootIdentity) !== canonicalHash(candidateCapture.rootIdentity)
       || actualCandidate.nativeEvidence.generation !== this.lifecycleHost.generation || actualCandidate.nativeEvidence.epoch !== this.custodyEpoch)
       fail('p5_candidate_source_drift', 'Live candidate source differs from the sealed candidate before verification.');
+    if (candidate.gitCandidate) await verifyP5GitCandidateCurrent({ store, candidateRef,
+      nativeSourceReader: readers.nativeSourceReader, nativeToolIdentityReader: readers.nativeToolIdentityReader,
+      expectedGitCandidateRef: candidate.gitCandidate });
     materializeCandidateSource({ store, candidate, sourceManifest, root: roots.candidateSource,
       allowExisting: authorized.preStartRecovery === true });
     const freshCapture = await inventoryP5SourceWithHost(roots.candidateSource, { nativeSourceReader: readers.nativeSourceReader,
@@ -630,7 +804,7 @@ export function installProtectedSelfRepairGate(Engine) {
 
     const policyRef = candidate.verificationPolicy;
     const inputsRef = candidate.verificationInputs;
-    const checkPlans = [], inputRows = [], commandRows = [], resolutions = new Map(), overlays = new Map();
+    const checkPlans = [], inputRows = [], commandRows = [], resolutions = new Map(), overlays = new Map(), dependencyFiles = new Set();
     const aggregateInputBytes = { value: 0 };
     for (const check of policy.checks) {
       if (!['protected-overlay', 'candidate-entrypoint'].includes(check.subjectBinding))
@@ -655,6 +829,7 @@ export function installProtectedSelfRepairGate(Engine) {
       }
       const subject = resolveProtectedSubject({ store, candidate, sourceManifest, policyRef, inputsRef, inputs: verificationInputs,
         check, overlayManifest: materialized?.overlayManifest ?? null });
+      for (const path of materializeInstalledDependencies(roots.executionRoot, subject.resolution.installedPackages ?? [])) dependencyFiles.add(path);
       const checkInputs = materializeP5CheckInputs({ store, candidate, check, verificationInputs,
         inputDigest: subject.inputDigest, scratchRoot: roots.scratch, aggregateBytes: aggregateInputBytes,
         allowExisting: authorized.preStartRecovery === true });
@@ -701,13 +876,56 @@ export function installProtectedSelfRepairGate(Engine) {
         materializedInputPath: checkInputs.relativeManifestPath, materializedInputDigest: checkInputs.manifestDigest,
         overlayManifest: materialized?.overlayManifestRef ?? null });
     }
+    // P5-FINAL §5.2 (review F4): every sensitive changed path must be executed by at least one check its tier requires, so a
+    // tier is verification of that code, not only a configuration flag.
+    const changeManifest = store.readJson(verifyRef(store, candidate.changeManifest, 'change manifest').artifactId);
+    for (const entry of changeManifest.mutationClassification?.entries ?? []) {
+      if (entry.tier === 'ordinary') continue;
+      const tierChecks = (policy.mutationTiers ?? []).find(tier => tier.tierId === entry.tier)?.requiredCheckIds ?? [];
+      // Only a protected-overlay check (installed protected test over the candidate) counts; a syntax-only check does not.
+      if (!tierChecks.some(id => policy.checks.find(item => item.checkId === id)?.subjectBinding === 'protected-overlay'
+        && resolutions.get(id)?.resolution.resolvedFiles.some(file => file.path === entry.path)))
+        fail('p5_mutation_tier_unverified', `Sensitive ${entry.tier} change "${entry.path}" is not executed by any check its verification tier requires.`);
+    }
+    // P5-CLOSURE §6: the installed baseline B as its own Host-scanned execution tree for the causal reproducer R(B).
+    let causalPlan = null;
+    if (policy.causalReproduction) {
+      const causalCheck = policy.checks.find(item => item.checkId === policy.causalReproduction.checkId);
+      const tree = await materializeP5BaselineReproducerTree({ store, candidateRef, check: causalCheck,
+        budgets: this.protectedSelfRepairEnrollment.budgets, nativeSourceReader: readers.nativeSourceReader,
+        allowPartialReuse: authorized.preStartRecovery === true });
+      const baselineRecord = readRecord(store, candidate.baselineRef, 'baselineManifest');
+      const baselineSourceManifest = readRecord(store, baselineRecord.sourceManifest, 'sourceManifest');
+      const baselineSubject = resolveProtectedSubject({ store, candidate, sourceManifest: baselineSourceManifest, policyRef, inputsRef,
+        inputs: verificationInputs, check: causalCheck, overlayManifest: overlays.get(causalCheck.checkId)?.overlayManifest ?? null });
+      for (const path of materializeInstalledDependencies(roots.executionRoot, baselineSubject.resolution.installedPackages ?? [])) dependencyFiles.add(path);
+      for (const entry of tree.inventory) dependencyFiles.add(`${P5_BASELINE_TREE_DIRECTORY}/${causalCheck.checkId}/${entry.path}`);
+      causalPlan = { checkId: causalCheck.checkId, executionRoot: tree.root, baselineMustPass: [...policy.causalReproduction.baselineMustPass].sort(compareText),
+        baselineMustFail: [...policy.causalReproduction.baselineMustFail].sort(compareText), baselineCommit: tree.baselineCommit,
+        baselineSourceDigest: tree.baselineSourceDigest, capture: tree.capture, inventoryDigest: tree.inventoryDigest,
+        fileCount: tree.inventory.length, subject: tree.subject, installedPackages: baselineSubject.resolution.installedPackages ?? [] };
+    }
+    const dependencyNames = [...new Set([...[...resolutions.values()].flatMap(item => item.resolution.installedPackages ?? []),
+      ...(causalPlan?.installedPackages ?? [])])].sort(compareText);
+    // The closure record is materialized in the verify scratch and named in the plan by path and digest: the plan itself must
+    // fit one bounded Custody admission, while the verifier needs every planned dependency digest.
+    let dependencyPlan = null;
+    if (dependencyNames.length) {
+      const closure = dependencyClosureRecord({ names: dependencyNames, candidate, gateAttemptId: attempt.id, release: currentRunningSourceRelease });
+      const bytes = Buffer.from(canonicalize(closure), 'utf8');
+      const manifestPath = join(roots.scratch, 'dependency-closure.json');
+      writeOrVerifyP5File({ path: manifestPath, bytes, mode: 0o644, allowExisting: authorized.preStartRecovery === true,
+        conflictCode: 'p5_dependency_closure_conflict', failedCode: 'p5_dependency_closure_failed', label: 'The dependency closure manifest' });
+      dependencyPlan = { packages: closure.packages, closureDigest: closure.closureDigest, manifestPath, manifestSha256: sha256(bytes),
+        record: asRef(store.putJson(closure)) };
+    }
     const expectedInputPaths = checkPlans.flatMap(plan => [
       `${plan.checkId}/manifest.json`,
-      ...plan.materializedInputManifest.inputs.map(item => item.relativePath.slice(`inputs/${plan.checkId}/`.length)),
+      ...plan.materializedInputManifest.inputs.map(item => `${plan.checkId}/${item.relativePath.slice(`inputs/${plan.checkId}/`.length)}`),
     ]);
-    assertMaterializedTreeLayout(roots.scratch, expectedInputPaths.map(path => `inputs/${path}`),
+    assertMaterializedTreeLayout(roots.scratch, [...expectedInputPaths.map(path => `inputs/${path}`), ...(dependencyPlan ? ['dependency-closure.json'] : [])],
       'p5_verification_input_conflict', 'P5 Gate scratch materialization');
-    const expectedExecutionFiles = [], expectedExecutionDirectories = [];
+    const expectedExecutionFiles = [...dependencyFiles], expectedExecutionDirectories = [];
     for (const check of policy.checks) {
       expectedExecutionDirectories.push(check.checkId);
       const overlay = overlays.get(check.checkId);
@@ -733,7 +951,9 @@ export function installProtectedSelfRepairGate(Engine) {
       requiredCheckIds: [...policy.requiredCheckIds], aggregateTimeoutSeconds: policy.aggregateTimeoutSeconds,
       roots: { 'candidate-source': roots.candidateSource, 'candidate-execution-tree': roots.executionRoot,
         'verify-scratch': roots.scratch, 'installed-control': ENGINE_ROOT },
-      policy, verificationInputs, commandManifest, checks: checkPlans };
+      policy, verificationInputs, commandManifest, checks: checkPlans,
+      ...(causalPlan ? { causalReproduction: causalPlan } : {}), ...(dependencyPlan ? { dependencyClosure: dependencyPlan } : {}),
+      packageLayoutDigest: canonicalHash(packageLayout) };
     const verifierPlanRef = asRef(store.putJson(verifierPlan));
     const stdin = canonicalize(verifierPlan);
     const stdinArtifact = asRef(store.putText(stdin));
@@ -757,6 +977,7 @@ export function installProtectedSelfRepairGate(Engine) {
       repairRunId: state.id, parentRunId: link.parent_run_id, linkId: link.id, incidentId: link.incident_id,
       gateNodeId: node.id, gateAttemptId: attempt.id, candidateId: candidate.candidateId,
       candidateSourceDigest: candidate.candidateSourceDigest, candidateManifest: candidateRef,
+      ...(candidate.gitCandidate ? { gitCandidate: candidate.gitCandidate } : {}),
       verificationPolicy: policyRef, verificationInputs: inputsRef, verifierPlan: verifierPlanRef,
       commandManifest: commandManifestRef, testInputManifest: testInputManifestRef, invocation: invocationRef,
       candidateSourceRoot: candidate.workspace.sourceRoot, candidateSourceBefore: actualCandidate.nativeEvidence.contentDigest,
@@ -770,7 +991,7 @@ export function installProtectedSelfRepairGate(Engine) {
       verifierPlan, verifierPlanRef, invocation, invocationManifest, invocationRef, commandManifest, commandManifestRef,
       testInputManifest, testInputManifestRef, startRecord, startArtifactRef, resolutions, overlays, startedAt,
       harnessSourceDigest: release.sourceDigest, harnessSourceEntries: attestedByPath,
-      nodeToolIdentity: nativeTool, nodeToolSha256: nodeTool[0].sha256 };
+      nodeToolIdentity: nativeTool, nodeToolSha256: nodeTool[0].sha256, packageLayout };
   };
 
   P.executeProtectedSelfRepairGate = async function executeProtectedSelfRepairGate(state, node, attempt, workspace, record, authorized) {
@@ -786,7 +1007,7 @@ export function installProtectedSelfRepairGate(Engine) {
         this.attemptTransition(this.store.get('SELECT * FROM attempts WHERE id = ?', attempt.id), 'canceled', 'P5 Gate was stopped before Host admission.')));
     this.store.transaction(() => {
       const current = this.store.get('SELECT * FROM attempts WHERE id = ?', attempt.id);
-      if (!current || !['scheduled', 'waiting'].includes(current.state) || this.store.get('SELECT id FROM attempt_custody WHERE attempt_id = ?', attempt.id))
+      if (!current || !['scheduled', 'waiting'].includes(current.state) || this.store.get('SELECT custody_id FROM attempt_custody WHERE attempt_id = ?', attempt.id))
         fail('p5_gate_attempt_stale', 'P5 Gate Attempt changed before its one-time Host invocation was committed.');
       if (current.invocation_artifact_id != null
         || this.store.readEvents(state.id).some(event => event.type === 'self_repair.verification_started'))
@@ -834,7 +1055,7 @@ export function installProtectedSelfRepairGate(Engine) {
       launchOrCaptureProblem ||= 'Host terminal executable identity differs from the enrollment-pinned Node runtime.';
     let classified = { status: 'incomplete', byId: new Map() };
     if (complete && result) {
-      try { classified = checkReceiptResult(result, prepared.policy, prepared.candidate, current.id, prepared.verificationInputs); }
+      try { classified = checkReceiptResult(result, prepared.policy, prepared.candidate, current.id, prepared.verificationInputs, prepared.verifierPlan); }
       catch (error) { launchOrCaptureProblem = error.message; }
     } else if (!launchOrCaptureProblem) launchOrCaptureProblem = 'Trusted verifier did not produce one bounded structured result.';
 
@@ -843,8 +1064,12 @@ export function installProtectedSelfRepairGate(Engine) {
     try {
       sourceAfter = await inventoryP5SourceWithHost(prepared.candidate.workspace.sourceRoot, { nativeSourceReader: readers.nativeSourceReader,
         maxFiles: this.protectedSelfRepairEnrollment.budgets.maxSourceFiles,
-        maxBytes: this.protectedSelfRepairEnrollment.budgets.maxSourceBytes, include: ['**'], exclude: [], executableFor: executableForManifest(prepared.sourceManifest) });
+        maxBytes: this.protectedSelfRepairEnrollment.budgets.maxSourceBytes, include: ['**'],
+        exclude: prepared.candidate.gitCandidate ? ['.git/**'] : [], executableFor: executableForManifest(prepared.sourceManifest) });
       if (!sourceEntriesMatch(sourceAfter.entries, prepared.sourceManifest)) launchOrCaptureProblem ||= 'Candidate source drifted during trusted verification.';
+      if (prepared.candidate.gitCandidate) await verifyP5GitCandidateCurrent({ store: this.store,
+        candidateRef: prepared.candidateRef, nativeSourceReader: readers.nativeSourceReader,
+        nativeToolIdentityReader: readers.nativeToolIdentityReader, expectedGitCandidateRef: prepared.candidate.gitCandidate });
       const freshAfter = await inventoryP5SourceWithHost(prepared.roots.candidateSource, { nativeSourceReader: readers.nativeSourceReader,
         maxFiles: this.protectedSelfRepairEnrollment.budgets.maxSourceFiles,
         maxBytes: this.protectedSelfRepairEnrollment.budgets.maxSourceBytes, include: ['**'], exclude: [], executableFor: executableForManifest(prepared.sourceManifest) });
@@ -874,6 +1099,20 @@ export function installProtectedSelfRepairGate(Engine) {
       await verifyP5GitBaselineCurrent({ store: this.store, enrollment: this.protectedSelfRepairEnrollment,
         currentRunningSourceRelease: currentRelease, ...readers });
       await verifyP5ActiveSourceInventory(this, currentRelease);
+      const causalPlan = prepared.verifierPlan.causalReproduction ?? null;
+      if (causalPlan) {
+        const baselineRecord = readRecord(this.store, prepared.candidate.baselineRef, 'baselineManifest');
+        const baselineSourceManifest = readRecord(this.store, baselineRecord.sourceManifest, 'sourceManifest');
+        const tree = await inventoryP5SourceWithHost(causalPlan.executionRoot, { nativeSourceReader: readers.nativeSourceReader,
+          maxFiles: this.protectedSelfRepairEnrollment.budgets.maxSourceFiles,
+          maxBytes: this.protectedSelfRepairEnrollment.budgets.maxSourceBytes, include: ['**'], exclude: [],
+          executableFor: executableForManifest(baselineSourceManifest) });
+        if (canonicalHash(tree.entries) !== causalPlan.inventoryDigest)
+          launchOrCaptureProblem ||= 'The baseline reproduction tree changed during verification.';
+      }
+      const dependencyNames = prepared.verifierPlan.dependencyClosure?.packages
+        ?? [...new Set([...prepared.resolutions.values()].flatMap(item => item.resolution.installedPackages ?? []))];
+      launchOrCaptureProblem ||= verifyInstalledDependenciesCurrent(prepared.roots.executionRoot, dependencyNames);
       const harnessAfter = await this.lifecycleClient.runningSourceInventory({ pid: process.pid, paths: [...TRUSTED_SOURCE_PATHS] });
       const harnessAfterByPath = new Map((harnessAfter.entries || []).filter(item => item && typeof item.path === 'string' && item.sha256).map(item => [item.path, item]));
       if (currentRelease.inputsDigest !== prepared.policy.harnessClosureDigest
@@ -881,6 +1120,8 @@ export function installProtectedSelfRepairGate(Engine) {
         || TRUSTED_SOURCE_PATHS.some(path => harnessAfterByPath.get(path)?.sha256 !== prepared.harnessSourceEntries.get(path)?.sha256
           || sha256(readFileSync(resolve(ENGINE_ROOT, ...path.split('/')))) !== prepared.harnessSourceEntries.get(path)?.sha256))
         launchOrCaptureProblem ||= 'Host-attested verifier source closure changed during verification.';
+      if (canonicalHash(verifyP5PackageLayout(currentRelease)) !== prepared.verifierPlan.packageLayoutDigest)
+        launchOrCaptureProblem ||= 'The installed P5 package layout changed during verification.';
       const nativeToolAfter = await readers.nativeToolIdentityReader({ path: process.execPath });
       if (nativeToolAfter?.refused || nativeToolAfter?.generation !== this.lifecycleHost.generation || nativeToolAfter?.epoch !== this.custodyEpoch
         || nativeToolAfter?.hostPid !== this.custodyHostPid || nativeToolAfter?.linkCount !== 1
@@ -920,16 +1161,47 @@ export function installProtectedSelfRepairGate(Engine) {
       }
     }
 
+    // The causal record is issued only for a passing verification: R(B) showed the expected defect and R(C) passed.
+    const causalPlan = prepared.verifierPlan.causalReproduction ?? null;
+    const dependencyRef = prepared.verifierPlan.dependencyClosure?.record ?? null;
+    let causalRef = null;
+    if (passed && causalPlan) {
+      const reproduced = result.causalReproduction;
+      const stdout = Buffer.from(reproduced.stdoutBase64 || '', 'base64'), stderr = Buffer.from(reproduced.stderrBase64 || '', 'base64');
+      const definition = prepared.policy.checks.find(item => item.checkId === causalPlan.checkId);
+      const inputRow = prepared.testInputManifest.checks.find(item => item.checkId === causalPlan.checkId);
+      const row = checkRows.find(item => item.checkId === causalPlan.checkId);
+      const record = { schemaVersion: 1, kind: 'ProtectedSelfRepairCausalReproduction', candidateId: prepared.candidate.candidateId,
+        candidateSourceDigest: prepared.candidate.candidateSourceDigest, baselineId: prepared.candidate.baselineId,
+        baselineCommit: causalPlan.baselineCommit, baselineSourceDigest: causalPlan.baselineSourceDigest, gateAttemptId: current.id,
+        incidentId: prepared.candidate.incidentId, outcomeId: prepared.verificationInputs.outcomeId,
+        outcomeRevision: prepared.verificationInputs.outcomeRevision, verificationPolicy: prepared.policyRef, verificationInputs: prepared.inputsRef,
+        checkId: causalPlan.checkId, commandDigest: definition.commandDigest, inputDigest: inputRow.inputDigest, inputManifest: inputRow.materializedInputs,
+        baselineMustPass: causalPlan.baselineMustPass, baselineMustFail: causalPlan.baselineMustFail,
+        baselineExecutionTree: { capture: causalPlan.capture, inventoryDigest: causalPlan.inventoryDigest, fileCount: causalPlan.fileCount },
+        baselineSubject: causalPlan.subject,
+        baselineObservation: { status: reproduced.status, exitCode: reproduced.exitCode, harnessPassed: reproduced.harnessPassed,
+          defectFailed: reproduced.defectFailed, stdout: asRef(this.store.putBytes(stdout, 'application/octet-stream')),
+          stderr: asRef(this.store.putBytes(stderr, 'application/octet-stream')), startedAt: reproduced.startedAt, endedAt: reproduced.endedAt,
+          reason: reproduced.reason ?? null },
+        candidateObservation: { status: 'passed', completedAssertions: row.completedAssertions, executionTreeDigest: row.executionTreeDigest },
+        dependencyClosureDigest: prepared.verifierPlan.dependencyClosure?.closureDigest ?? null, recordedAt: nowIso() };
+      if (sha256(stdout) !== reproduced.stdoutSha256 || sha256(stderr) !== reproduced.stderrSha256)
+        return this.failAttempt(state, current, 'p5_verification_incomplete', 'The baseline reproduction output failed its digest.');
+      validateP5Contract('causalReproduction', record);
+      causalRef = asRef(this.store.putJson(record));
+    }
     const outcomeBody = { schemaVersion: 1, kind: 'ProtectedSelfRepairVerificationOutcome',
       status: stopped || (!passed && launchOrCaptureProblem) ? 'incomplete' : passed ? 'passed' : classified.status,
       candidateManifest: prepared.candidateRef, candidateId: prepared.candidate.candidateId,
+      ...(prepared.candidate.gitCandidate ? { gitCandidate: prepared.candidate.gitCandidate } : {}),
       candidateSourceDigest: prepared.candidate.candidateSourceDigest, baselineId: prepared.candidate.baselineId,
       repairRunId: state.id, linkId: prepared.candidate.linkId, incidentId: prepared.candidate.incidentId,
       gateAttemptId: current.id, verificationPolicy: prepared.policyRef, verificationInputs: prepared.inputsRef,
       verifierResult: result ? asRef(this.store.putJson(result)) : null, terminalEvidence: terminalRef,
       streamEvidence: streamEvidenceRef, captureStatus: complete ? 'complete' : 'incomplete',
       reason: stopped ? 'Root Stop superseded P5 Gate verification.' : launchOrCaptureProblem,
-      checks: checkRows, recordedAt: nowIso() };
+      checks: checkRows, causalReproduction: causalRef, dependencyClosure: dependencyRef, recordedAt: nowIso() };
     validateP5Contract('verificationOutcome', outcomeBody);
     const outcomeRef = asRef(this.store.putJson(outcomeBody));
 
@@ -962,8 +1234,12 @@ export function installProtectedSelfRepairGate(Engine) {
     const hostIdentity = String(this.custodyHostPid ?? '');
     if (!binding || !hostIdentity || !Number.isSafeInteger(this.custodyEpoch) || !this.lifecycleHost?.generation)
       return this.failAttempt(state, current, 'p5_verification_incomplete', 'P5 Gate terminal evidence has no current Host identity, generation, epoch or Custody binding.');
+    // The execution is the Host invocation admitted and launched under the durable verification-start record. A
+    // replacement Engine that reattaches it settles the same execution, so the receipt binds the admitting epoch.
+    if (prepared.startRecord.lifecycleGeneration !== this.lifecycleHost.generation || !Number.isSafeInteger(prepared.startRecord.engineEpoch))
+      return this.failAttempt(state, current, 'p5_verification_incomplete', 'P5 Gate execution crossed a Lifecycle generation; its receipt is not issued.');
     const execution = { custodyId: binding.custody_id, hostIdentity, lifecycleGeneration: this.lifecycleHost.generation,
-      engineEpoch: this.custodyEpoch, invocationDigest: terminal.invocationDigest,
+      engineEpoch: prepared.startRecord.engineEpoch, invocationDigest: terminal.invocationDigest,
       commandManifest: prepared.commandManifestRef, executableIdentity: process.execPath,
       harnessClosureDigest: prepared.policy.harnessClosureDigest, testInputManifest: prepared.testInputManifestRef,
       environmentDigest: prepared.environmentDigest ?? canonicalHash(prepared.invocation.env) };
@@ -972,6 +1248,7 @@ export function installProtectedSelfRepairGate(Engine) {
       receiptId: '0'.repeat(64), status: 'passed', candidateId: prepared.candidate.candidateId,
       candidateSourceDigest: prepared.candidate.candidateSourceDigest, baselineId: prepared.candidate.baselineId,
       candidateManifest: prepared.candidateRef, changeManifest: prepared.candidate.changeManifest,
+      ...(prepared.candidate.gitCandidate ? { gitCandidate: prepared.candidate.gitCandidate } : {}),
       selfRepairProfile: prepared.candidate.selfRepairProfile, verificationPolicy: prepared.policyRef,
       verificationInputs: prepared.inputsRef, repairRunId: state.id, linkId: prepared.candidate.linkId,
       incidentId: prepared.candidate.incidentId, verificationNodeId: node.id, gateAttemptId: current.id,
@@ -982,10 +1259,11 @@ export function installProtectedSelfRepairGate(Engine) {
       liveCandidateDigest: prepared.candidate.candidateSourceDigest, harnessAfterDigest: prepared.policy.harnessClosureDigest,
       terminalEvidence: terminalRef, captureStatus: 'complete', startedAt: prepared.startedAt, completedAt: now,
       observationJournalCursor: this.requireRun(state.id).last_sequence + checkRows.length,
-      issuedJournalCursor: this.requireRun(state.id).last_sequence + checkRows.length + 2 };
+      issuedJournalCursor: this.requireRun(state.id).last_sequence + checkRows.length + 2,
+      ...(causalRef ? { causalReproduction: causalRef } : {}), ...(dependencyRef ? { dependencyClosure: dependencyRef } : {}) };
     receipt.receiptId = p5VerificationReceiptId({ candidateId: receipt.candidateId,
       verificationPolicyDigest: prepared.policyRef.sha256, gateAttemptId: current.id,
-      custodyId: binding.custody_id, checks: receipt.checks });
+      custodyId: binding.custody_id, checks: receipt.checks, causalReproduction: causalRef, dependencyClosure: dependencyRef });
     try { verifyP5Receipt(receipt, { store: this.store, candidateRef: prepared.candidateRef,
       gateAttemptId: current.id, terminalEvidenceRef: terminalRef }); }
     catch (error) { return this.failAttempt(state, current, error.code || 'p5_receipt_invalid', error.message); }
@@ -1000,6 +1278,7 @@ export function installProtectedSelfRepairGate(Engine) {
       startedAt: prepared.startedAt, endedAt: now, command: prepared.invocationRef,
       streams: { stdout: stdoutRef, stderr: stderrRef }, captureVerdict: 'complete', reason: 'All required enrolled P5 verification checks passed with complete Host Custody evidence.' };
     const executionEvidenceRef = asRef(this.store.putJson(executionEvidence));
+    custodyCrashOnce('p5_before_gate_receipt');
     const issued = this.store.transaction(() => {
       const latestRun = this.requireRun(state.id);
       const latestAttempt = this.store.get('SELECT * FROM attempts WHERE id = ?', current.id);
@@ -1077,6 +1356,8 @@ export function installProtectedSelfRepairGate(Engine) {
       fail('p5_gate_resume_plan_missing', 'P5 Gate recovery cannot prove the exact persisted invocation and candidate plan.');
     const { start } = stored;
     const candidate = readRecord(this.store, start.candidateManifest, 'candidate');
+    if (canonicalHash(start.gitCandidate ?? null) !== canonicalHash(candidate.gitCandidate ?? null))
+      fail('p5_gate_resume_plan_mismatch', 'Recovered P5 Gate Git candidate differs from the exact captured candidate binding.');
     const policy = readRecord(this.store, start.verificationPolicy, 'verificationPolicy');
     const inputs = readRecord(this.store, start.verificationInputs, 'verificationInputs');
     const verifierPlan = this.store.readJson(start.verifierPlan.artifactId);

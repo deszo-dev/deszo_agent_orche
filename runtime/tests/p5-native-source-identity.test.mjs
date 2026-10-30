@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdirSync, writeFileSync, linkSync, symlinkSync, readFileSync, existsSync, unlinkSync } from 'node:fs';
+import { mkdirSync, writeFileSync, linkSync, symlinkSync, readFileSync, existsSync, unlinkSync, readdirSync, renameSync, cpSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { attachEngine, eventually, newScratch, startCustodyHost } from './custody-support.mjs';
@@ -10,7 +10,10 @@ import { ownedDir, releaseOwnedDir, testsRoot } from './test-roots.mjs';
 import { Store } from '../core/store.mjs';
 import { canonicalHash } from '../core/canonical.mjs';
 import { captureP5EnrollmentFileWithHostIdentity, captureP5VerificationInputs, collectP5GitBaseline, inventoryP5SourceWithHost, materializeP5VerificationOverlay,
-  p5VerificationCommandDigest, prepareP5WorkspaceFromIntent, sealP5Candidate, verifyP5EnrollmentFileCurrent, verifyP5GitBaselineCurrent } from '../core/protectedSelfRepair.mjs';
+  p5VerificationCommandDigest, prepareP5WorkspaceFromIntent, sealP5Candidate, verifyP5EnrollmentFileCurrent, verifyP5GitBaselineCurrent,
+  verifyP5GitAttributes } from '../core/protectedSelfRepair.mjs';
+import { bindP5GitCandidate, createP5GitCommitIntent, ensureP5GitCandidateCommit, prepareP5GitRepositoryFromIntent,
+  verifyP5GitCandidateCurrent } from '../core/p5GitCandidate.mjs';
 import { makeFailureOutcome } from '../core/failureOutcomes.mjs';
 
 const sha256 = value => createHash('sha256').update(value).digest('hex');
@@ -87,9 +90,7 @@ test('P5 native source identity is Host measured, stable, generation fenced, and
       const nativeSourceReader = request => host.request('custody.source_identity', {
         generation: host.generation, epoch, ...request,
       });
-      const nativeToolIdentityReader = request => host.request('custody.tool_identity', {
-        generation: host.generation, epoch, ...request,
-      });
+      const nativeToolIdentityReader = request => host.request('custody.tool_identity', { generation: host.generation, epoch, ...request });
       const managedProfile = join(scratch.root, 'native-managed-profile');
       const enrollmentPath = join(managedProfile, 'p5', 'enrollment.json');
       mkdirSync(dirname(enrollmentPath), { recursive: true });
@@ -201,6 +202,7 @@ test('P5 native source identity is Host measured, stable, generation fenced, and
       const parentPublication = { workflowId: 'p5-parent', publishedVersionId: randomUUID(), version: 1, snapshotSha256: profileRef.sha256 };
       const enrollment = { schemaVersion: 1, kind: 'ProtectedSelfRepairEnrollment', enrollmentId, repositoryIdentity,
         gitObjectFormat: baseline.gitObjectFormat, baseCommit: baseline.baseCommit, baseTree: baseline.baseTree,
+        gitCandidatePolicy: 'sanitized-seed-v1',
         pathPolicyDigest: baseline.pathPolicyDigest, effectiveSourceDigest: baseline.sourceDigest, baselineId: baseline.baselineId,
         baselineManifest: baseline.baselineManifest, runningSourceRelease: { artifactId: runningSourceRelease.artifactId, sha256: runningSourceRelease.sha256 },
         parentPublication, profile: { artifactId: profileRef.artifactId, sha256: profileRef.sha256 }, repairPublication, workspace,
@@ -304,19 +306,36 @@ test('P5 native source identity is Host measured, stable, generation fenced, and
         sourceBinding: { artifactId: sourceBinding.artifactId, sha256: sourceBinding.sha256 }, verificationInputs: capturedVerificationInputs.artifact, parentRunId,
         repairRunId, linkId, workspace: enrollment.workspace, createdAt: at });
       store.appendEvents(repairRunId, [{ type: 'self_repair.preparation_intent', payload: { record: { artifactId: intent.artifactId, sha256: intent.sha256 } } }]);
+      const prepareGitRepository = context => prepareP5GitRepositoryFromIntent({ ...context, nativeSourceReader, nativeToolIdentityReader });
       const unjournaledIntent = store.putJson({ ...store.readJson(intent.artifactId), linkId: randomUUID() });
       await assert.rejects(prepareP5WorkspaceFromIntent({ store,
         intentRef: { artifactId: unjournaledIntent.artifactId, sha256: unjournaledIntent.sha256 }, nativeSourceReader }),
       { code: 'p5_preparation_intent_missing' });
       assert.equal(existsSync(join(slotRoot, 'source')), false, 'P5 must not materialize before the matching intent event is durable');
-      const prepared = await prepareP5WorkspaceFromIntent({ store, intentRef: { artifactId: intent.artifactId, sha256: intent.sha256 }, nativeSourceReader });
+      const crashAfterGitSeed = async context => {
+        await prepareGitRepository(context);
+        throw Object.assign(new Error('fixture crash after Git seed, before workspace-prepared event'), { code: 'fixture_crash_after_git_seed' });
+      };
+      await assert.rejects(prepareP5WorkspaceFromIntent({ store,
+        intentRef: { artifactId: intent.artifactId, sha256: intent.sha256 }, nativeSourceReader, prepareGitRepository: crashAfterGitSeed }),
+      { code: 'fixture_crash_after_git_seed' });
+      assert.equal(store.readEvents(repairRunId).filter(item => item.type === 'self_repair.workspace_prepared').length, 0,
+        'the fixture stops after Git seeding and before the prepared-workspace journal event');
+      const seedHeadBeforeRecovery = execFileSync(gitPath, ['-C', join(slotRoot, 'source'), 'rev-parse', '--verify', 'HEAD^{commit}'], {
+        cwd: join(slotRoot, 'source'), env: gitEnvironment, encoding: 'utf8', windowsHide: true, timeout: 30_000 }).trim();
+      const prepared = await prepareP5WorkspaceFromIntent({ store, intentRef: { artifactId: intent.artifactId, sha256: intent.sha256 },
+        nativeSourceReader, prepareGitRepository, recovery: true });
       assert.equal(prepared.evidence.sourceDigest, baseline.sourceDigest);
       assert.equal(prepared.evidence.fileCount, baseline.entries.length);
       assert.equal(prepared.evidence.hostPid, host.pid);
       assert.deepEqual(prepared.inventory.entries, baseline.entries);
       store.verifyRef(prepared.evidenceArtifact);
+      assert.ok(prepared.evidence.gitRepository?.seedCommit, 'the prepared P5 workspace owns an independent synthetic Git seed');
+      assert.equal(prepared.evidence.gitRepository.seedCommit, seedHeadBeforeRecovery,
+        'pre-journal recovery reuses the same synthetic seed commit and durable timestamp');
+      store.appendEvents(repairRunId, [{ type: 'self_repair.workspace_prepared', payload: { record: prepared.evidenceArtifact } }]);
       const recoveredPreparation = await prepareP5WorkspaceFromIntent({ store,
-        intentRef: { artifactId: intent.artifactId, sha256: intent.sha256 }, nativeSourceReader, recovery: true });
+        intentRef: { artifactId: intent.artifactId, sha256: intent.sha256 }, nativeSourceReader, prepareGitRepository, recovery: true });
       assert.equal(recoveredPreparation.evidence.sourceDigest, baseline.sourceDigest);
       assert.deepEqual(recoveredPreparation.inventory.entries, baseline.entries);
       const baselineFile = join(slotRoot, 'source', 'src', 'core', 'engine.mjs');
@@ -325,18 +344,21 @@ test('P5 native source identity is Host measured, stable, generation fenced, and
         intentRef: { artifactId: intent.artifactId, sha256: intent.sha256 }, nativeSourceReader }),
       { code: 'p5_workspace_conflict' });
       const resumedPreparation = await prepareP5WorkspaceFromIntent({ store,
-        intentRef: { artifactId: intent.artifactId, sha256: intent.sha256 }, nativeSourceReader, recovery: true });
+        intentRef: { artifactId: intent.artifactId, sha256: intent.sha256 }, nativeSourceReader, prepareGitRepository, recovery: true });
       assert.equal(readFileSync(baselineFile).toString(), files.get('src/core/engine.mjs').toString());
       assert.deepEqual(resumedPreparation.inventory.entries, baseline.entries);
       writeFileSync(join(slotRoot, 'source', 'unexpected.mjs'), 'export const unexpected = true;\n');
       await assert.rejects(prepareP5WorkspaceFromIntent({ store,
-        intentRef: { artifactId: intent.artifactId, sha256: intent.sha256 }, nativeSourceReader, recovery: true }),
+        intentRef: { artifactId: intent.artifactId, sha256: intent.sha256 }, nativeSourceReader, prepareGitRepository, recovery: true }),
       { code: 'p5_workspace_conflict' });
+      unlinkSync(join(slotRoot, 'source', 'unexpected.mjs'));
 
       const candidateSourceRoot = join(slotRoot, 'source');
       writeFileSync(join(candidateSourceRoot, 'src', 'core', 'engine.mjs'), 'export const boundary = "candidate";\n');
       writeFileSync(join(candidateSourceRoot, 'src', 'core', 'engine.test.mjs'),
         "import test from 'node:test'; test('candidate-edited-test', () => {});\n");
+      writeFileSync(join(candidateSourceRoot, 'src', '.gitignore'), 'core/candidate-ignored.txt\n');
+      writeFileSync(join(candidateSourceRoot, 'src', 'core', 'candidate-ignored.txt'), 'sealed source files are force-staged exactly\n');
       const developerAttemptId = randomUUID();
       const developerTerminal = store.putJson({ attemptId: developerAttemptId, processTreeEnded: true, spoolComplete: true,
         status: 'exited', exitCode: 0 });
@@ -352,7 +374,144 @@ test('P5 native source identity is Host measured, stable, generation fenced, and
         budgets: enrollment.budgets, nativeSourceReader });
       assert.equal(sealedCandidate.candidate.candidateSourceDigest, sealedCandidate.sourceManifest.sourceDigest);
       assert.deepEqual(sealedCandidate.changeManifest.changes.map(change => change.path),
-        ['src/core/engine.mjs', 'src/core/engine.test.mjs']);
+        ['src/.gitignore', 'src/core/candidate-ignored.txt', 'src/core/engine.mjs', 'src/core/engine.test.mjs']);
+
+      const originalIndexDigest = sha256(readFileSync(join(sourceRoot, '.git', 'index')));
+      const originalRefs = git(['for-each-ref', '--format=%(refname)%09%(objectname)']);
+      const originalStatus = git(['status', '--porcelain=v2', '--untracked-files=all', '-z']);
+      store.run("UPDATE runs SET state='running' WHERE id = ?", repairRunId);
+      const gitTool = { path: gitPath, sha256: captureArgs.gitTool.sha256 };
+      const commitIntent = await createP5GitCommitIntent({ store, candidateRef: sealedCandidate.candidateArtifact,
+        preparationRef: prepared.evidenceArtifact, gitTool, nativeSourceReader, nativeToolIdentityReader });
+      const repeatedCommitIntent = await createP5GitCommitIntent({ store, candidateRef: sealedCandidate.candidateArtifact,
+        preparationRef: prepared.evidenceArtifact, gitTool, nativeSourceReader, nativeToolIdentityReader });
+      assert.deepEqual(repeatedCommitIntent.intentRef, commitIntent.intentRef, 'commit intent recovery reuses the durable timestamp and reference');
+      const firstCommit = await ensureP5GitCandidateCommit({ store, intentRef: commitIntent.intentRef, nativeSourceReader, nativeToolIdentityReader });
+      const recoveredCommit = await ensureP5GitCandidateCommit({ store, intentRef: commitIntent.intentRef, nativeSourceReader, nativeToolIdentityReader });
+      assert.equal(firstCommit.recovered, false);
+      assert.equal(recoveredCommit.recovered, true);
+      assert.equal(recoveredCommit.candidateCommit, firstCommit.candidateCommit,
+        'a crash after branch update recovers the exact deterministic candidate commit');
+      assert.equal(recoveredCommit.candidateTree, firstCommit.candidateTree);
+      const boundCandidate = await bindP5GitCandidate({ store, intentRef: commitIntent.intentRef, nativeSourceReader, nativeToolIdentityReader });
+      assert.equal(boundCandidate.candidate.gitCandidate.artifactId, boundCandidate.gitCandidateArtifact.artifactId);
+      const candidateGit = args => execFileSync(gitPath, ['-C', candidateSourceRoot, ...args], {
+        cwd: candidateSourceRoot, env: gitEnvironment, encoding: 'utf8', windowsHide: true, timeout: 30_000 });
+      assert.equal(candidateGit(['remote']), '', 'the private candidate repository has no remote');
+      assert.deepEqual(candidateGit(['for-each-ref', '--format=%(refname)']).trim().split(/\r?\n/),
+        [`refs/heads/${boundCandidate.gitCandidate.git.repairBranch}`], 'the private repository has only its enrolled repair branch');
+      assert.equal(candidateGit(['rev-list', '--parents', '-n', '1', firstCommit.candidateCommit]).trim().split(/\s+/).length, 2,
+        'the candidate commit has exactly one parent');
+      assert.equal(candidateGit(['rev-list', '--parents', '-n', '1', boundCandidate.gitCandidate.git.seedCommit]).trim().split(/\s+/).length, 1,
+        'the sanitized baseline seed has no source-history parent');
+      assert.throws(() => execFileSync(gitPath, ['-C', candidateSourceRoot, 'cat-file', '-e', `${baseCommit}^{commit}`], {
+        cwd: candidateSourceRoot, env: gitEnvironment, encoding: 'utf8', windowsHide: true, timeout: 30_000, stdio: ['ignore', 'pipe', 'pipe'],
+      }), 'the private candidate repository does not copy the original source commit object');
+      assert.equal(existsSync(join(candidateSourceRoot, '.git', 'objects', 'info', 'alternates')), false);
+      const hooksDirectory = join(candidateSourceRoot, '.git', 'hooks');
+      assert.ok(!existsSync(hooksDirectory) || readdirSync(hooksDirectory).length === 0);
+      assert.equal(candidateGit(['status', '--porcelain=v2', '--untracked-files=all', '--ignored=matching', '-z']), '',
+        'the committed private candidate worktree is clean');
+      assert.equal(candidateGit(['check-ignore', '--quiet', '--no-index', 'src/core/candidate-ignored.txt']), '',
+        'the manifest includes a source file that ordinary Git add would ignore');
+      assert.ok(candidateGit(['ls-tree', '-r', '--name-only', firstCommit.candidateCommit]).split(/\r?\n/).includes('src/core/candidate-ignored.txt'),
+        'the exact-manifest force-stage commits the ignored source file');
+      const privateStorage = await nativeSourceReader({ root: join(candidateSourceRoot, '.git'), include: ['**'], exclude: [],
+        maxFiles: 20_000, maxBytes: 536_870_912 });
+      assert.equal(privateStorage.refused, undefined, privateStorage.message);
+      assert.equal(privateStorage.rootIdentity.fileId, prepared.evidence.gitRepository.nativeDirectoryIdentity.fileId);
+      const currentGitBinding = await verifyP5GitCandidateCurrent({ store, candidateRef: boundCandidate.candidateArtifact,
+        nativeSourceReader, nativeToolIdentityReader, expectedGitCandidateRef: boundCandidate.candidate.gitCandidate });
+      assert.equal(currentGitBinding.candidateCommit, firstCommit.candidateCommit);
+
+      const privateGitDir = join(candidateSourceRoot, '.git');
+      const preservedGitDirectory = join(candidateSourceRoot, '.git-preserved-before-identity-replacement');
+      renameSync(privateGitDir, preservedGitDirectory);
+      try {
+        cpSync(preservedGitDirectory, privateGitDir, { recursive: true, errorOnExist: true });
+        await assert.rejects(verifyP5GitCandidateCurrent({ store, candidateRef: boundCandidate.candidateArtifact,
+          nativeSourceReader, nativeToolIdentityReader }), { code: 'p5_git_repository_identity_mismatch' },
+        'a copied .git directory at the same path does not inherit the prepared native identity');
+      } finally {
+        const replacement = resolve(privateGitDir), expectedReplacement = resolve(join(candidateSourceRoot, '.git'));
+        assert.equal(replacement, expectedReplacement, 'identity replacement cleanup stays inside the private candidate repository');
+        rmSync(replacement, { recursive: true, force: true });
+        renameSync(preservedGitDirectory, privateGitDir);
+      }
+
+      const trackedCandidatePath = join(candidateSourceRoot, 'src', 'core', 'engine.mjs');
+      const candidateSourceBytes = readFileSync(trackedCandidatePath);
+      writeFileSync(trackedCandidatePath, 'export const boundary = "drifted";\n');
+      await assert.rejects(verifyP5GitCandidateCurrent({ store, candidateRef: boundCandidate.candidateArtifact,
+        nativeSourceReader, nativeToolIdentityReader }), { code: 'p5_git_source_mismatch' }, 'source drift invalidates the commit binding');
+      writeFileSync(trackedCandidatePath, candidateSourceBytes);
+      await verifyP5GitCandidateCurrent({ store, candidateRef: boundCandidate.candidateArtifact, nativeSourceReader, nativeToolIdentityReader });
+
+      candidateGit(['remote', 'add', 'p5-unauthorized', 'https://example.invalid/unused.git']);
+      await assert.rejects(verifyP5GitCandidateCurrent({ store, candidateRef: boundCandidate.candidateArtifact,
+        nativeSourceReader, nativeToolIdentityReader }), { code: 'p5_git_remote_unsupported' }, 'a configured remote is rejected before it can publish a candidate');
+      candidateGit(['remote', 'remove', 'p5-unauthorized']);
+
+      const alternatesPath = join(privateGitDir, 'objects', 'info', 'alternates');
+      mkdirSync(dirname(alternatesPath), { recursive: true });
+      writeFileSync(alternatesPath, `${join(sourceRoot, '.git', 'objects')}\n`);
+      await assert.rejects(verifyP5GitCandidateCurrent({ store, candidateRef: boundCandidate.candidateArtifact,
+        nativeSourceReader, nativeToolIdentityReader }), { code: 'p5_git_metadata_unsupported' }, 'Git alternates cannot expose original repository objects');
+      unlinkSync(alternatesPath);
+
+      const branchRef = `refs/heads/${boundCandidate.gitCandidate.git.repairBranch}`;
+      candidateGit(['update-ref', branchRef, boundCandidate.gitCandidate.git.seedCommit]);
+      await assert.rejects(verifyP5GitCandidateCurrent({ store, candidateRef: boundCandidate.candidateArtifact,
+        nativeSourceReader, nativeToolIdentityReader }), { code: 'p5_git_branch_moved' }, 'a moved private branch invalidates its captured Git binding');
+      candidateGit(['update-ref', branchRef, firstCommit.candidateCommit]);
+
+      execFileSync(gitPath, ['-C', candidateSourceRoot, 'hash-object', '-w', '--stdin'], { cwd: candidateSourceRoot,
+        env: gitEnvironment, input: 'unreachable private Git object', encoding: 'utf8', windowsHide: true, timeout: 30_000 });
+      await assert.rejects(verifyP5GitCandidateCurrent({ store, candidateRef: boundCandidate.candidateArtifact,
+        nativeSourceReader, nativeToolIdentityReader }), { code: 'p5_git_unreachable_objects' },
+      'unreferenced objects cannot smuggle private or excluded Git history into the candidate repository');
+
+      const missingGitPath = join(candidateSourceRoot, '.git');
+      const preservedGitPath = join(candidateSourceRoot, '.git-preserved-for-refusal-proof');
+      renameSync(missingGitPath, preservedGitPath);
+      try {
+        await assert.rejects(prepareP5GitRepositoryFromIntent({ store, intentRef: { artifactId: intent.artifactId, sha256: intent.sha256 },
+          sourceRoot: candidateSourceRoot, workspaceRoot: slotRoot, nativeSourceReader, nativeToolIdentityReader }),
+        { code: 'p5_git_seed_missing' }, 'recovery refuses a journaled repository whose .git storage was lost');
+        assert.equal(existsSync(missingGitPath), false, 'recovery does not recreate a lost prepared repository');
+        assert.equal(existsSync(preservedGitPath), true, 'recovery preserves the renamed private Git storage');
+      } finally {
+        renameSync(preservedGitPath, missingGitPath);
+      }
+
+      const markerPath = join(slotRoot, '.p5', 'control', 'git-repository-intent.json');
+      const markerBytes = readFileSync(markerPath);
+      const privateConfigDigest = sha256(readFileSync(join(privateGitDir, 'config')));
+      unlinkSync(markerPath);
+      await assert.rejects(prepareP5GitRepositoryFromIntent({ store, intentRef: { artifactId: intent.artifactId, sha256: intent.sha256 },
+        sourceRoot: candidateSourceRoot, workspaceRoot: slotRoot, nativeSourceReader, nativeToolIdentityReader }),
+      { code: 'p5_git_unknown_repository' }, 'a missing ownership marker causes refusal without adopting or cleaning the private repository');
+      assert.equal(sha256(readFileSync(join(privateGitDir, 'config'))), privateConfigDigest);
+      assert.equal(candidateGit(['rev-parse', 'HEAD']).trim(), firstCommit.candidateCommit);
+      writeFileSync(markerPath, markerBytes);
+
+      assert.equal(git(['rev-parse', 'HEAD']).trim(), baseCommit, 'candidate Git preparation leaves the original source HEAD unchanged');
+      assert.equal(git(['for-each-ref', '--format=%(refname)%09%(objectname)']), originalRefs, 'candidate Git preparation leaves original refs unchanged');
+      assert.equal(sha256(readFileSync(join(sourceRoot, '.git', 'index'))), originalIndexDigest,
+        'candidate Git preparation leaves the original index unchanged');
+      assert.equal(git(['status', '--porcelain=v2', '--untracked-files=all', '-z']), originalStatus,
+        'candidate Git preparation leaves the original working tree status unchanged');
+
+      const attributesRoot = join(scratch.root, 'attributes-attack');
+      const attributesTemplate = join(scratch.root, 'attributes-template');
+      mkdirSync(attributesRoot); mkdirSync(attributesTemplate);
+      const attributesGit = args => execFileSync(gitPath, ['-c', 'core.autocrlf=false', '-c', 'core.hooksPath=NUL',
+        '-C', attributesRoot, ...args], { cwd: attributesRoot, env: gitEnvironment, encoding: 'utf8', windowsHide: true, timeout: 30_000 });
+      attributesGit(['init', '--quiet', '--initial-branch=main', `--template=${attributesTemplate}`]);
+      writeFileSync(join(attributesRoot, '.gitattributes'), '*.txt filter=unsafe\n');
+      writeFileSync(join(attributesRoot, 'sample.txt'), 'fixture\n');
+      assert.throws(() => verifyP5GitAttributes(gitTool, attributesRoot, ['sample.txt']),
+        { code: 'p5_checkout_filter_unsupported' }, 'Git checkout filters are refused before source staging');
 
       const overlayRoot = join(slotRoot, '.p5', 'verify', 'execution', verificationPolicy.checks[0].checkId);
       const partialCandidateEntry = sealedCandidate.sourceManifest.entries.find(entry => entry.path === 'src/core/engine.mjs');

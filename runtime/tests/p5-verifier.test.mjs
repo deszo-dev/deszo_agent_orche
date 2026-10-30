@@ -240,3 +240,155 @@ test('P5 installed candidate-entrypoint check independently validates candidate-
     rmSync(invalid.root, { recursive: true, force: true });
   }
 });
+
+// P5-CLOSURE §6: R(B) over the installed baseline tree and R(C) over the candidate tree run in one trusted verifier
+// invocation with the identical captured command. `harness` is the protected incident recognition; `repaired` is the defect.
+async function runCausal({ baseline = 'export const value = 7;\n', candidate = 'export const value = 42;\n', planWithoutPolicy = false,
+  dependency = null, mustPass = ['harness'], mustFail = ['repaired'], extraTests = '' } = {}) {
+  const root = mkdtempSync(join(tmpdir(), 'deszo-p5-causal-'));
+  try {
+    const sourceRoot = join(root, 'source'), executionRoot = join(root, 'execution'), scratchRoot = join(root, 'scratch');
+    const controlRoot = join(root, 'installed-control');
+    const candidateTree = join(executionRoot, 'unit-check'), baselineTree = join(executionRoot, '.baseline', 'unit-check');
+    const protectedTest = "import assert from 'node:assert/strict';\nimport test from 'node:test';\n"
+      + (dependency ? "import { marker } from 'p5-fixture-dependency';\n" : '')
+      + "import { value } from '../../source/src/value.mjs';\n"
+      + "test('harness', () => assert.ok(true));\n"
+      + "test('repaired', () => assert.equal(value, 42));\n" + extraTests
+      + (dependency?.mutateDuringCheck ? "import { writeFileSync } from 'node:fs';\ntest('mutates', () => writeFileSync(process.env.P5_DEPENDENCY_FILE, 'export const marker = 2;\\n'));\n" : '');
+    for (const [tree, subject] of [[candidateTree, candidate], [baselineTree, baseline]]) {
+      mkdirSync(join(tree, 'runtime', 'tests'), { recursive: true });
+      writeFileSync(join(tree, 'runtime', 'tests', 'protected-check.test.mjs'), protectedTest);
+      if (subject !== null) { mkdirSync(join(tree, 'source', 'src'), { recursive: true }); writeFileSync(join(tree, 'source', 'src', 'value.mjs'), subject); }
+    }
+    mkdirSync(join(sourceRoot, 'src'), { recursive: true });
+    writeFileSync(join(sourceRoot, 'src', 'value.mjs'), candidate);
+    mkdirSync(scratchRoot); mkdirSync(controlRoot);
+    let dependencyClosure = null;
+    const environment = Object.fromEntries(Object.entries({ PATH: process.env.PATH, SYSTEMROOT: process.env.SystemRoot,
+      TEMP: scratchRoot, TMP: scratchRoot }).filter(([, item]) => typeof item === 'string'));
+    if (dependency) {
+      const packageRoot = join(executionRoot, 'node_modules', 'p5-fixture-dependency');
+      mkdirSync(packageRoot, { recursive: true });
+      const files = [['package.json', '{"name":"p5-fixture-dependency","type":"module","main":"index.js"}'], ['index.js', 'export const marker = 1;\n']];
+      for (const [name, text] of files) writeFileSync(join(packageRoot, name), text);
+      const rows = files.map(([name, text]) => ({ path: `node_modules/p5-fixture-dependency/${name}`, sha256: sha256(Buffer.from(text)), byteSize: Buffer.byteLength(text) }))
+        .sort((left, right) => (left.path < right.path ? -1 : 1));
+      const closureDigest = canonicalHash({ packages: ['p5-fixture-dependency'], files: rows });
+      const manifest = Buffer.from(canonicalize({ packages: ['p5-fixture-dependency'], files: rows, closureDigest }), 'utf8');
+      writeFileSync(join(scratchRoot, 'dependency-closure.json'), manifest);
+      dependencyClosure = { packages: ['p5-fixture-dependency'], closureDigest, manifestPath: join(scratchRoot, 'dependency-closure.json'), manifestSha256: sha256(manifest) };
+      if (dependency.mutateDuringCheck) environment.P5_DEPENDENCY_FILE = join(packageRoot, 'index.js');
+      if (dependency.mutateBefore) writeFileSync(join(packageRoot, 'index.js'), 'export const marker = 3;\n');
+    }
+    const expectedAssertions = [...new Set(['harness', 'repaired', ...mustPass, ...mustFail, ...(dependency?.mutateDuringCheck ? ['mutates'] : [])])];
+    const check = { checkId: 'unit-check', stageId: 'unit', required: true, executable: process.execPath,
+      executableSha256: sha256(readFileSync(process.execPath)), argv: ['--test-reporter=junit', '--test', 'runtime/tests/protected-check.test.mjs'],
+      cwd: 'candidate-execution-tree', inputRefs: [], environment, subjectEntryPoints: ['source/src/value.mjs'], expectedAssertions,
+      expectedExitCodes: [0], timeoutSeconds: 30, maxOutputBytes: 128 * 1024, subjectBinding: 'protected-overlay',
+      overlayPaths: ['runtime/tests/protected-check.test.mjs'] };
+    check.commandDigest = p5VerificationCommandDigest(check);
+    const causal = { schemaVersion: 1, checkId: 'unit-check', baselineMustPass: mustPass, baselineMustFail: mustFail };
+    const policy = { schemaVersion: 1, kind: 'ProtectedSelfRepairVerificationPolicy', planVersion: 1, requiredStages: ['unit'],
+      requiredCheckIds: ['unit-check'], optionalCheckIds: [], harnessClosureDigest: '1'.repeat(64),
+      incidentInputSelectors: [{ selector: 'p3-outcome-artifacts', source: 'p3-outcome-artifacts', maxItems: 8, maxBytesPerArtifact: 65536, maxTotalBytes: 262144 }],
+      checks: [check], verificationRetries: 0, aggregateTimeoutSeconds: 90, ...(planWithoutPolicy ? {} : { causalReproduction: causal }) };
+    const plan = { schemaVersion: 1, kind: 'ProtectedSelfRepairVerifierPlan', candidateId: 'a'.repeat(64),
+      candidateSourceDigest: sha256(Buffer.from(candidate)), baselineId: 'b'.repeat(64), gateAttemptId: randomUUID(), requiredCheckIds: ['unit-check'],
+      policy, roots: { 'candidate-source': sourceRoot, 'candidate-execution-tree': executionRoot, 'verify-scratch': scratchRoot, 'installed-control': controlRoot },
+      aggregateTimeoutSeconds: 90, checks: [{ ...check, executionRoot: candidateTree }],
+      causalReproduction: { checkId: 'unit-check', executionRoot: baselineTree, baselineMustPass: [...mustPass].sort(), baselineMustFail: [...mustFail].sort() },
+      ...(dependencyClosure ? { dependencyClosure } : {}) };
+    return { result: await executeP5VerifierPlan(plan), root };
+  } catch (error) { rmSync(root, { recursive: true, force: true }); throw error; }
+}
+
+test('P5-CLOSURE causal Gate: R(B) must show the defect and R(C) must pass; infrastructure errors never reproduce', async () => {
+  const cases = {
+    repaired: await runCausal(),
+    alreadyPassing: await runCausal({ baseline: 'export const value = 42;\n' }),
+    missingSubject: await runCausal({ baseline: null }),
+    runtimeError: await runCausal({ baseline: 'export const value = (() => { throw new TypeError("not the defect"); })();\n' }),
+    stillBroken: await runCausal({ candidate: 'export const value = 7;\n' }),
+  };
+  try {
+    assert.equal(cases.repaired.result.status, 'passed');
+    assert.equal(cases.repaired.result.causalReproduction.status, 'reproduced');
+    assert.deepEqual(cases.repaired.result.causalReproduction.harnessPassed, ['harness']);
+    assert.deepEqual(cases.repaired.result.causalReproduction.defectFailed, ['repaired']);
+    assert.equal(cases.repaired.result.causalReproduction.exitCode, 1);
+    assert.equal(cases.alreadyPassing.result.checks[0].status, 'passed', 'the candidate passes, but');
+    assert.equal(cases.alreadyPassing.result.causalReproduction.status, 'not_reproduced');
+    assert.equal(cases.alreadyPassing.result.status, 'failed', 'a baseline that already passes cannot produce a causal pass');
+    for (const name of ['missingSubject', 'runtimeError']) {
+      assert.notEqual(cases[name].result.causalReproduction.status, 'reproduced', `${name} is not causal reproduction`);
+      assert.notEqual(cases[name].result.status, 'passed', name);
+    }
+    assert.deepEqual(cases.runtimeError.result.causalReproduction.defectFailed, [], 'a TypeError is not the asserted defect');
+    assert.equal(cases.stillBroken.result.causalReproduction.status, 'reproduced');
+    assert.equal(cases.stillBroken.result.status, 'failed', 'reproduced defect plus failing candidate is no approval');
+  } finally { for (const item of Object.values(cases)) rmSync(item.root, { recursive: true, force: true }); }
+  await assert.rejects(runCausal({ planWithoutPolicy: true }), { code: 'p5_verifier_causality_plan_invalid' });
+});
+
+test('P5-CLOSURE F2: served dependency bytes are bound before and after every check', async () => {
+  await assert.rejects(runCausal({ dependency: { mutateBefore: true } }), { code: 'p5_verifier_dependency_drift' });
+  // A run that rewrites a served dependency is caught at the next boundary (here before the candidate check): no result, no pass.
+  await assert.rejects(runCausal({ dependency: { mutateDuringCheck: true } }), { code: 'p5_verifier_dependency_drift' });
+  const bound = await runCausal({ dependency: {} });
+  try {
+    assert.equal(bound.result.status, 'passed');
+    assert.equal(typeof bound.result.dependencyClosureDigest, 'string');
+  } finally { rmSync(bound.root, { recursive: true, force: true }); }
+});
+
+// P5-CLOSURE F14: the protected subject closure refuses every executable-resolution path it cannot follow, as syntax, while
+// loader-like text inside strings and comments stays inert. The Engine's own closure (only `builtinModules`) stays resolvable.
+test('P5-CLOSURE F14: module-loader bypasses are refused in subject closures; inert text and the Engine closure are not', async () => {
+  const { importSpecifiers } = await import('../core/p5Gate.mjs');
+  const refused = {
+    reexportCreateRequire: "export { createRequire as c } from 'node:module';",
+    reexportAll: "export * from 'module';",
+    namespaceLoader: "import * as m from 'node:module';",
+    defaultLoader: "import Module from 'module';",
+    aliasedCreateRequire: "import { createRequire as load } from 'node:module';",
+    getBuiltinModule: "const m = process.getBuiltinModule('module');",
+    getBuiltinModuleElement: "const m = process['getBuiltinModule']('module');",
+    processBinding: "process.binding('fs');",
+    processDlopen: "process.dlopen(module, 'x.node');",
+    moduleLoad: "const x = SomeModule._load('x');",
+    requireCall: "const fs = require('fs');",
+    dynamicImport: "const m = await import('./x.mjs');",
+    importMetaResolve: "const p = import.meta.resolve('./x.mjs');",
+    vm: "import vm from 'node:vm';",
+    workerThreads: "import { Worker } from 'worker_threads';",
+    computedSpecifier: "export * from `./x.mjs`;",
+    globalEvalElement: "globalThis['eval']('1');",
+    globalFunctionElement: "globalThis['Function']('return 1')();",
+    globalEvalProperty: "globalThis.eval('1');",
+    globalProcessElement: "globalThis['process'].binding('fs');",
+    processDlopenElement: "process['dlopen'](module, 'x.node');",
+    computedProcessKey: "const k = 'bin' + 'ding'; process[k]('fs');",
+  };
+  for (const [name, source] of Object.entries(refused))
+    assert.throws(() => importSpecifiers(source, `${name}.mjs`), { code: 'p5_subject_resolver_unsupported' }, name);
+  assert.deepEqual(importSpecifiers("import { builtinModules, isBuiltin } from 'node:module';\nconst s = 'createRequire require( import(x)'; // getBuiltinModule\n", 'safe.mjs'),
+    ['node:module']);
+  for (const path of ['runtime/core/engine.mjs', 'runtime/core/p5Gate.mjs', 'runtime/core/protectedSelfRepair.mjs', 'runtime/host/sourceProvenance.mjs'])
+    assert.ok(Array.isArray(importSpecifiers(readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8'), path)), `${path} stays resolvable`);
+});
+
+// Review R3, R9, R11: unsorted multi-assertion causal policies, class-qualified defect names, and assertion-like text in a
+// non-assertion error.
+test('P5-CLOSURE review R3/R9/R11: causal classification is order-independent, qualified, and reads only the failure cause', async () => {
+  const multi = await runCausal({ mustPass: ['zeta-harness', 'harness'], mustFail: ['repaired'],
+    extraTests: "test('zeta-harness', () => assert.ok(true));\n" });
+  const qualified = await runCausal({ mustFail: ['test::repaired'] });
+  const mimic = await runCausal({ mustFail: ['mimic'], extraTests: "test('mimic', () => { throw new TypeError('looks like AssertionError [ERR_ASSERTION]: not one'); });\n" });
+  try {
+    assert.equal(multi.result.status, 'passed', 'an unsorted multi-element causal policy is accepted');
+    assert.equal(multi.result.causalReproduction.status, 'reproduced');
+    assert.equal(qualified.result.causalReproduction.status, 'reproduced', 'a class-qualified defect assertion reproduces');
+    assert.notEqual(mimic.result.causalReproduction.status, 'reproduced', 'assertion-like text in another error is not an assertion failure');
+  } finally { for (const item of [multi, qualified, mimic]) rmSync(item.root, { recursive: true, force: true }); }
+});

@@ -759,3 +759,63 @@ Only this architecture document was created, as an unstaged untracked file. Fina
 - Final `git status --porcelain=v2 --branch --untracked-files=all` reports only `? docs/reviews/2026-10-28-p5-protected-self-repair-architecture.md`; branch/HEAD/upstream relationship is unchanged.
 - `git diff --cached --exit-code` and `git diff --exit-code HEAD` both passed, exit 0. No file was staged, committed or pushed; no production code, schema or migration was changed.
 - No real Self-Repair, Host/Engine behavior change, binary build/activation, new full regression or historical artifact cleanup was performed. Independent review was read-only. All implementation and acceptance tests in §§18–19 remain future work under separate authorization.
+
+---
+
+# 24. P5 Git-Based Candidate Model — Architecture Amendment
+
+> **Superseded for the target policy (2026-10-29):** [Amendment 25](2026-10-29-p5-managed-git-ancestry-and-host-boundary.md) replaces `sanitized-seed-v1` with `managed-clone-v1` for new candidates and revokes Self-Repair authority over Host/Custody source. This section is kept unchanged as the historical record for `sanitized-seed-v1` artifacts.
+
+**Status:** Additive implementation preparation for the Git-backed candidate substrate. This amendment preserves the source-manifest identity, independent verification, P4 Judge and P2 Parent/Repair decisions above. It does not claim full P5 runtime acceptance or readiness for P6.
+
+## 24.1 Motivation and candidate model
+
+The prior candidate contract sealed a complete source manifest and its SHA-256 identity, but did not give the candidate a private Git commit. The amendment retains that source manifest as the content authority and adds a private, synthetic Git history for review, recovery and later handoff. The Engine continues to decide which candidate source bytes are eligible. Git branch names and commit IDs are evidence, never approval authority.
+
+The approved preparation policy is `sanitized-seed-v1`. It starts a new ordinary repository in the exact enrolled Repair workspace, writes the already sealed baseline files, and creates a synthetic root commit. It does not clone or fetch the original repository. The original base commit and repository identity remain recorded as provenance only; source ancestry is explicitly unverified. Therefore excluded files, credentials and historical objects from the original `.git` directory are not copied into the candidate store.
+
+## 24.2 Branch and commit authority
+
+P5 creates one local branch, `self-repair/<12-hex>`, derived from the durable P2 Repair link UUID. The Engine owns initialization, baseline commit, final staging and candidate commit. The Developer edits files in the prepared source workspace and must not stage or commit Git changes. Before the Engine commit, it compares actual source paths with the sealed change manifest and refuses Developer-staged changes.
+
+The final commit has exactly one parent: the synthetic baseline seed. Its subject and author/committer are Engine-controlled. A durable `self_repair.git_commit_intent` event records the source-candidate reference, prepared-workspace reference, branch, seed, exact source/change manifests and fixed UTC commit timestamp before Engine staging. Repeating this intent reuses its recorded timestamp. The Engine force-stages only exact paths in the sealed source/change manifests, including manifest files ignored by `.gitignore`, verifies the index tree and every blob against the Store-sealed source objects, then commits. Ignored paths outside the sealed change set are refused. The branch must be the only ref and point to that exact commit.
+
+## 24.3 Git identity and source identity
+
+The Git object format follows the enrolled baseline, so Git commit/tree/blob IDs may use SHA-1 or SHA-256 as Git defines them. P5's source digest remains the existing canonical SHA-256 over the complete portable path, byte-size, per-file SHA-256 and executable-mode manifest. These identities are separate. Verification checks every committed tree path and mode, retrieves each blob from Git, hashes its bytes with SHA-256 and compares them with the immutable Store objects. The candidate source digest is unchanged by adding Git metadata.
+
+The Git candidate artifact records the original repository identity and base commit, synthetic seed and tree, private repository identity, repair branch, candidate commit and tree, candidate source/change-manifest references, Git configuration/exclude digests and a Host-measured private `.git` storage identity. Gate start/outcome/receipt, Judge dossier, P2 acceptance/retention and handoff records carry the Git-candidate reference when the enrolled policy requires it.
+
+## 24.4 History and metadata boundary
+
+Git commands use the enrolled executable and P5's scrubbed process environment. System/global configuration, inherited `GIT_*` redirection, optional locks, paging, automatic maintenance, hooks and checkout transformations are disabled or rejected. The repository must have one ordinary independent `.git` directory, no worktree indirection, remotes, alternates, grafts, shallow boundary, replacement refs, extra refs, unsupported configuration or hook files. Git attributes that request filters, text/EOL conversion, ident expansion or working-tree encoding are refused. Host identity checks reject redirected or unsupported Windows metadata paths.
+
+P5 also compares the complete private object-store inventory with the objects reachable through the one repair branch. Unreachable objects are rejected, preventing a Developer or partial operation from smuggling extra Git history into the candidate. Commit and tree checks still bind source scope to the existing P5 manifest; Git metadata cannot widen source authorization.
+
+## 24.5 Recovery and preservation
+
+Preparation uses the durable P2 preparation intent, a private ownership marker and an immutable prepared-workspace record. The synthetic seed timestamp and pre-record marker time derive from the durable preparation intent, making recovery deterministic. Before `workspace_prepared` is journaled, recovery may finish only missing allowlisted config and empty-exclude setup in the marker-owned repository; it reuses an exact seed commit if one already exists. Conflicting settings, malformed or redirected metadata and unknown storage are preserved and refused. If a journaled `.git` directory is missing, recovery refuses before recreating it. P5 does not reset, clean, force-delete, prune, rewrite or adopt an arbitrary repository.
+
+Commit recovery uses the durable Git commit intent. If the exact expected commit already reached the one branch, the Engine verifies its parent, identity, author and committer timestamps, tree, paths, blobs, source digest, prepared native `.git` directory identity and clean source tree, then reuses that commit. An unexpected branch tip, metadata change, extra object or source drift invalidates the candidate. The fixture injects a crash after seed creation but before the prepared event and retries the already-committed candidate intent; it does not inject a process termination at every filesystem or Store-write boundary. In particular, Engine restart recovery from a source candidate sealed before its atomic `candidate_captured` event remains unproven and blocks full P5 completion.
+
+## 24.6 Verification and P4/P2 compatibility
+
+The existing trusted Verification Gate remains responsible for the captured plan, protected harness, complete required checks, Host terminal/spool evidence and receipt. When Git policy is enrolled, Gate eligibility additionally checks the current exact branch and committed source before verification and after terminal verification. The receipt remains bound to the source-candidate digest and now also binds the Git-candidate reference. A moved branch cannot satisfy the captured Git subject.
+
+Acceptance still enters the existing `judge_post_execution` path and atomic P2 Judge settlement. It captures the exact branch, commit, tree, source and metadata check time as evidence labeled `p5_acceptance`; the P2 outcome and handoff carry that same evidence instead of assigning a later settlement time as a new Git check. P6 must independently revalidate it. No Git-specific model decision type or model-selected ref, repository or policy is added. P2 link authority, Judge role, Stop precedence, retries and custody-uncertainty holds remain unchanged. `protectedSelfRepairAdmissionEnabled` remains `false`; a commit alone cannot pass the Gate or produce P2 acceptance.
+
+## 24.7 P6 and unsupported operations
+
+The additive handoff records the original source identity/base commit and the immutable private Git-candidate identity, commit/tree and source/change-manifest references alongside the existing receipt, Judge and P2 approval. A future P6 consumer must independently validate the stored source objects and exact commit/tree. This implementation does not apply patches to the original repository, merge, push, build a release, replace a running executable or activate a binary. Any later import or publication requires separate explicit authorization.
+
+This policy refuses unsupported Git metadata, extra refs/remotes/objects, unsafe paths, source drift, stale P2 authority, non-clean or redirected source trees, and ambiguous recovery. It is not a hostile-code sandbox: the Developer's execution and filesystem profile remains bounded by the existing P5/Host deployment model.
+
+## 24.8 Schema compatibility and migration
+
+New `ProtectedSelfRepairGitRepository`, `ProtectedSelfRepairGitCommitIntent` and `ProtectedSelfRepairGitCandidate` artifacts use `schemaVersion: 1` for their new kinds. Existing source candidate, Gate receipt, acceptance, retention and handoff schemas gain optional Git-candidate references; existing version-1 source-only records remain valid to the updated reader. A strict older Engine does not accept those newly extended records, so mixed-version consumption is unsupported. Git policy is opt-in through the external enrollment; enrollments without it retain source-only behavior. No database migration is required. Runtime admission stays disabled until the entire P5 deployment and compatibility path is independently accepted.
+
+## 24.9 Preparation evidence and limits
+
+The native Windows fixture uses Git for Windows' actual `git.exe` and the authenticated Rust Host identity reader. It injects failure after the private seed commit but before the prepared event, then recovers the same seed and stable timestamp. It also creates the candidate commit, retries its durable commit intent, checks exact tree/source identity, force-stages an ignored but manifest-sealed source file, verifies no original source commit object or remote is present, refuses a copied `.git` directory, alternates, unreachable objects, a moved branch, source drift, an unsupported filter, missing ownership marker and missing journaled `.git` storage, and checks the original fixture's HEAD, refs, index and status are unchanged. The focused test is helper and fixture evidence; it is not a real enrolled Engine/P2/Developer/Gate/Judge E2E.
+
+The current checkout's HEAD, enrollment and production feature flag are recorded in the date-stamped implementation-preparation report. That report distinguishes passing Git substrate proofs from unexecuted P5 lifecycle, Engine restart recovery around atomic candidate capture, P4/P2 end-to-end, P6 and publication acceptance. The resulting preparation verdict does not replace the earlier `P5 IMPLEMENTATION NOT VERIFIED` status or claim `READY FOR P6`.

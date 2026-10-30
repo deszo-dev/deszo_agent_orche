@@ -8,7 +8,7 @@
 // process tree has ended (`processTreeEnded`). Losing the Host is a fact about the Engine's knowledge, not about the process: an
 // unreachable Host is waited for, never settled as an outcome, and never releases a hold.
 import { EventEmitter } from 'node:events';
-import { appendFileSync, existsSync, readFileSync, unlinkSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { parseStrictJson } from './canonical.mjs';
 import { nowIso } from './store.mjs';
 import { isAlive, killTree } from './processes.mjs';
@@ -38,6 +38,28 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 // Engine must recover from exactly the state that point leaves. Unset in production, it does nothing.
 export function custodyFaultPoint(name) {
   if (process.env.DESZO_CUSTODY_TEST_FAULT === name) process.exit(97);
+}
+
+// Test-only one-shot Engine exit (P5-CLOSURE C07). Inert unless DESZO_P5_TEST_CRASH_ONCE names a marker file holding the
+// point name, and never in a packaged runtime. The first pass consumes the marker, so the relaunched Engine continues.
+export function custodyCrashOnce(name) {
+  const path = process.env.DESZO_P5_TEST_CRASH_ONCE;
+  if (!path || (typeof __DESZO_PACKAGED__ !== 'undefined' && __DESZO_PACKAGED__) || !existsSync(path)) return;
+  if (readFileSync(path, 'utf8').trim() !== name) return;
+  writeFileSync(path, 'consumed');
+  process.exit(97);
+}
+
+// Test-only transient Host failure (P5-CLOSURE F10). Inert unless DESZO_P5_TEST_TRANSIENT_CAPTURE names a counter file holding
+// "<point> <count>", and never in a packaged runtime. Each pass through the named point consumes one count and throws the
+// connection-reset code a real Custody Host outage produces.
+export function custodyTransientFault(name) {
+  const path = process.env.DESZO_P5_TEST_TRANSIENT_CAPTURE;
+  if (!path || (typeof __DESZO_PACKAGED__ !== 'undefined' && __DESZO_PACKAGED__) || !existsSync(path)) return;
+  const [point, count] = readFileSync(path, 'utf8').trim().split(/\s+/);
+  if (point !== name || !(Number(count) > 0)) return;
+  writeFileSync(path, `${point} ${Number(count) - 1}`);
+  throw Object.assign(new Error(`Injected transient Host unavailability at ${name}.`), { code: 'ECONNRESET' });
 }
 
 // Test-only identity hold and crash point, between the OS creation of a launched process and the durable record of its identity (the spawn handler,

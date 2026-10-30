@@ -60,9 +60,8 @@ const RUNTIME_REQUESTABLE = new Set([PROVIDER_OPERATION, 'repair.run', 'runtime.
 // Stop, evidence and reconciliation stay available when dispatch is blocked; they start no new work.
 const FAIL_CLOSED_EXEMPT = new Set(['run.stop_and_report']);
 
-export class HostError extends Error {
-  constructor(status, code, message) { super(message); this.status = status; this.code = code; }
-}
+import { HostError } from './hostError.mjs';
+export { HostError };
 
 function preserveCleanupFailure(primaryError, cleanupError) {
   const diagnostic = cleanupError instanceof Error ? cleanupError : new Error(String(cleanupError));
