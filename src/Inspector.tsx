@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, GitBranch, Lock, Play, Plus, RefreshCw, Repeat, Square, Trash2, Unlock, X } from 'lucide-react';
-import { DECISION_SCHEMA, MODEL_SUGGESTIONS, NODE_LABELS, syncSlots, validId } from './model';
-import { PROVIDERS, PROVIDER_NAMES, VALUE_TYPES, type CachePin, type ContextBinding, type GatePolicy, type MapHistory, type MapNavigator, type MapRole, type FieldSource, type JournalEvent, type Provider, type TextSource, type ValueType, type WorkflowNode } from './types';
+import { DECISION_SCHEMA, DEFAULT_POLICY, MODEL_SUGGESTIONS, NODE_LABELS, syncSlots, validId } from './model';
+import { PROVIDERS, PROVIDER_NAMES, VALUE_TYPES, type CachePin, type ContextBinding, type GatePolicy, type MapHistory, type MapNavigator, type ManagedTaskNavigator, type MapRole, type FieldSource, type JournalEvent, type Provider, type TextSource, type ValueType, type WorkflowNode } from './types';
 import type { Client } from './transport';
 import { STATE_LABELS } from './nodes';
 import { DEFAULT_EFFORT, EFFORT_LEVELS, type Effort } from '../shared/effort.mjs';
@@ -29,6 +29,7 @@ export function Inspector(props: Props) {
   };
   const update = (config: object) => onChange({ ...node, config: { ...node.config, ...config } } as WorkflowNode);
   const replaceConfig = (config: object) => onChange({ ...node, config } as WorkflowNode);
+  const gatePolicy = node.type === 'gate' && 'policy' in node.config ? node.config.policy : structuredClone(DEFAULT_POLICY);
 
   return <div className="inspector-body">
     <div className="inspector-title">
@@ -51,6 +52,11 @@ export function Inspector(props: Props) {
       {props.onRunNode && <button className="button small ghost" onClick={props.onRunNode} title="Run only this node, reusing current committed inputs"><Play size={12} />Run node</button>}
     </div>}
 
+    {node.type === 'task' && <>
+      <p className="muted">The Analyst assesses this request. The engine selects stages, runs independent reviews and checks, and verifies the chosen delivery boundary. Set an explicit model and effort for every role.</p>
+      <JsonField label="Roles, scope, limits and delivery" hint="Captured with the workflow; no automatic model substitution" value={node.config} readOnly={readOnly} keyId={node.id} objectOnly onChange={value => value && replaceConfig(value)} />
+      {client && props.runId && instanceId && <ManagedTaskView client={client} runId={props.runId} instanceId={instanceId} live={Boolean(props.runActive)} />}
+    </>}
     {node.type === 'text' && <label className="field"><span>Literal text</span>
       <textarea rows={10} value={node.config.value} disabled={readOnly} onChange={event => update({ value: event.target.value })} spellCheck={false} />
     </label>}
@@ -225,7 +231,7 @@ export function Inspector(props: Props) {
     {node.type === 'cache' && <>
       <TypeSelect label="Value type" value={node.config.valueType} readOnly={readOnly} onChange={valueType => update({ valueType })} />
       <label className="field"><span>Mode</span>
-        <select value={node.config.mode} disabled={readOnly} onChange={event => update({ mode: event.target.value })}>
+        <select value={node.config.mode} disabled={readOnly} onChange={event => update({ mode: event.target.value as 'live' | 'frozen' })}>
           <option value="live">Live — pass the producer's value through</option>
           <option value="frozen">Frozen — use the pinned value; the producer is not run for it</option>
         </select>
@@ -265,16 +271,27 @@ export function Inspector(props: Props) {
 
     {node.type === 'gate' && <>
       <label className="field"><span>Mode</span>
-        <select value={node.config.mode} disabled={readOnly} onChange={event => update({ mode: event.target.value })}>
+        <select value={node.config.mode} disabled={readOnly} onChange={event => {
+          const mode = event.target.value;
+          if (mode === 'self-repair-verify') replaceConfig({ mode, verificationPolicy: 'verificationPolicy' in node.config ? node.config.verificationPolicy : { artifactId: '', sha256: '' } });
+          else if ('policy' in node.config) replaceConfig({ ...node.config, mode: mode as 'prepare' | 'evaluate' | 'verify' });
+          else replaceConfig({ mode: mode as 'prepare' | 'evaluate' | 'verify', policy: gatePolicy });
+        }}>
           <option value="prepare">Prepare — validate the bundle, build role views and a review plan</option>
           <option value="evaluate">Evaluate — check every review, update issues, issue a certificate</option>
           <option value="verify">Verify — accept only an engine-issued certificate for this subject</option>
+          <option value="self-repair-verify">Self-Repair Verification — installed enrollment only</option>
         </select>
       </label>
+      {node.config.mode === 'self-repair-verify' ? <>
+        <JsonField label="Enrolled verification-policy reference" hint="ArtifactRef only; the Engine requires an exact match with installation enrollment" value={node.config.verificationPolicy} readOnly={readOnly} keyId={`${node.id}-p5-policy`} objectOnly
+          onChange={verificationPolicy => update({ verificationPolicy })} />
+        <small className="muted">The Engine supplies candidate and incident inputs from the exact P2 Repair authorization. A caller-supplied policy body or direct command is not accepted.</small>
+      </> : <>
       {node.config.mode === 'prepare' && <label className="field"><span>Subject</span>
         <select value={node.config.subject || 'specification'} disabled={readOnly} onChange={event => replaceConfig(event.target.value === 'delivery'
-          ? { mode: 'prepare', policy: node.config.policy, subject: 'delivery', specificationPolicy: structuredClone(node.config.policy) }
-          : { mode: 'prepare', policy: node.config.policy })}>
+          ? { mode: 'prepare', policy: gatePolicy, subject: 'delivery', specificationPolicy: structuredClone(gatePolicy) }
+          : { mode: 'prepare', policy: gatePolicy })}>
           <option value="specification">Specification bundle (SPEC + index + map)</option>
           <option value="delivery">Delivery: approved spec + completed Map + candidate + passing checks</option>
         </select></label>}
@@ -289,8 +306,9 @@ export function Inspector(props: Props) {
       {node.config.mode === 'prepare' && node.config.subject !== 'delivery' && <label className="check"><input type="checkbox" checked={Boolean(node.config.carry)} disabled={readOnly}
         onChange={event => update({ carry: event.target.checked || undefined })} />Carry unchanged approvals (adds a <code>prior</code> input and a <code>&lt;slot&gt;-need</code> output per slot)</label>}
       {node.config.mode === 'prepare' && node.config.carry && <small className="muted">Route each slot on <code>/needsReview</code>: live → the reviewer's prompt, carried → JSON Select <code>/carry</code>; join both with a selected Merge into evaluate.</small>}
-      <PolicyEditor policy={node.config.policy} readOnly={readOnly} onChange={policy => update({ policy })} />
+      <PolicyEditor policy={gatePolicy} readOnly={readOnly} onChange={policy => update({ policy })} />
       <small className="muted">Use the same policy in prepare, evaluate and verify; a certificate from another policy never opens the gate. Review slots must come from the <code>json</code> output of an Agent.</small>
+      </>}
     </>}
 
     {node.type === 'map' && <>
@@ -359,6 +377,30 @@ function RolesEditor({ roles, readOnly, contexts, onChange }: { roles: MapRole[]
       <button className="button small ghost" onClick={() => onChange([...roles, { id: `role-${roles.length + 1}`, kind: 'agent', provider: 'codex', model: '', effort: DEFAULT_EFFORT, instructions: 'Describe this role.', timeoutSeconds: 600, context: 'task' }])}><Plus size={12} />Agent role</button>
       {!roles.some(role => role.kind === 'utility') && <button className="button small ghost" onClick={() => onChange([...roles, { id: 'verification', kind: 'utility', template: 'verification', embeddedRoles: { triage: roles.find(role => role.kind === 'agent')?.id || 'analyst' } }])}><Plus size={12} />Verification utility</button>}
     </div>}
+  </div>;
+}
+
+function ManagedTaskView({ client, runId, instanceId, live }: { client: Client; runId: string; instanceId: string; live: boolean }) {
+  const [nav, setNav] = useState<ManagedTaskNavigator | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let canceled = false;
+    const load = () => client.get<ManagedTaskNavigator>(`/runs/${runId}/tasks/${encodeURIComponent(instanceId)}`)
+      .then(value => { if (!canceled) { setNav(value); setError(null); } }).catch(problem => { if (!canceled) setError((problem as Error).message); });
+    void load(); const timer = live ? setInterval(load, 1000) : null;
+    return () => { canceled = true; if (timer) clearInterval(timer); };
+  }, [client, runId, instanceId, live]);
+  if (error) return <p className="muted small">{error}</p>;
+  if (!nav) return null;
+  return <div className="result-section">
+    <h4>Task execution <span className={`state-chip ${nav.state}`}>{nav.state}</span></h4>
+    <p className="small">Current phase: <code>{nav.phase || '—'}</code></p>
+    <p className="muted small">{nav.work.attempts} aggregate attempts · {nav.work.repairs} repairs · {Math.ceil(nav.work.remainingMilliseconds / 1000)} s remaining · {nav.work.outputBytes} captured bytes</p>
+    {nav.plan && <><p className="small">Risk: <strong>{nav.plan.classification.winningClassification}</strong></p><p className="muted small">{nav.plan.classification.reason}</p><p className="small">{nav.plan.selectedStages.join(' → ')}</p></>}
+    {nav.incompleteReason && <p className="field-error">{nav.incompleteReason}</p>}
+    <p className="muted small">Acceptance records: {nav.acceptanceRecordIds.length}</p>
+    {nav.delivery && <p className="small">{nav.delivery.status} · <code>{nav.delivery.targetBranchRef}</code></p>}
+    {nav.deliveryOperation && <p className="muted small">Delivery operation: {nav.deliveryOperation.phase}</p>}
   </div>;
 }
 

@@ -1,0 +1,168 @@
+{
+  "capturedAt": "2026-10-16T13:27:40.604Z",
+  "checkout": "C:\\my\\2026\\deszo_agent_orche",
+  "head": "7178032a9c8b4ce1f7a97590e57ab10c7af05fcf",
+  "scratch": "C:\\Users\\jusse\\AppData\\Local\\Temp\\deszo-follow-up-Wn7C17",
+  "inputDigests": {
+    "runtime/core/branchDelivery.mjs": "72a79ce4f16c2202ed173b57aad625961bee32cc7d6400e9a6d5b39c5deb97a7",
+    "runtime/core/taskAssessment.mjs": "0486ef738b1f70dbaeda2577d5cca5773d2b2bf6f0fb5e1dd7321f0ef518932f",
+    "runtime/core/contextPackage.mjs": "6356f6f4b9dec307576d7df944fc830066853ce2bc07f94fdebd68124536ab98",
+    "runtime/core/store.mjs": "615cc03009e39bac9195872739d1a8b48f8c8e1b406f966a857366957cc523a4",
+    "docs/schemas/delivery-plan.schema.json": "54e50374bcfa29f168971906595e26556a9c091d1076b5d1981871d6705fbe0f",
+    "docs/schemas/acceptance-record.schema.json": "690d9a89059fad7bac2375850a864ecb8a03588b6632d74717064525ebf6601c",
+    "docs/schemas/execution-plan.schema.json": "bf80858ca0784ec3d434fcc0966003f5b50ba0635293b004897cf08d808cadf2",
+    "docs/storage/m9.sql": "74179d9176d004169de4dfeefaf95dbf89331d95318923c29f7d58c25624d432"
+  },
+  "changedInputs": [],
+  "summary": {
+    "total": 14,
+    "passed": 3,
+    "failed": 11
+  },
+  "results": [
+    {
+      "name": "existing_directory_and_traversal_are_rejected",
+      "passed": true,
+      "observed": {
+        "existingStatus": "precondition_failed",
+        "sentinel": "PRESERVE",
+        "traversalStatus": "precondition_failed"
+      }
+    },
+    {
+      "name": "explicit_bindings_and_distinct_role_ids_are_required",
+      "passed": true,
+      "observed": {
+        "rejectionsConfirmed": true
+      }
+    },
+    {
+      "name": "context_expansion_ignores_attempt_ids_and_retains_missing_dependencies",
+      "passed": true,
+      "observed": {
+        "sameExpandedFingerprint": true,
+        "resumed": false,
+        "missing": [
+          "missing.js"
+        ]
+      }
+    },
+    {
+      "name": "every_candidate_file_must_exist_in_the_commit",
+      "passed": false,
+      "observed": {
+        "status": "READY_FOR_MERGE",
+        "ready": true,
+        "candidateFileCommitted": false
+      },
+      "error": "AssertionError [ERR_ASSERTION]: READY_FOR_MERGE omitted an approved candidate file after git add failed.\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes.mjs:134:10\n    at probe (file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes.mjs:88:11)\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes.mjs:128:7"
+    },
+    {
+      "name": "undeclared_git_conversions_cannot_change_accepted_bytes",
+      "passed": false,
+      "observed": {
+        "status": "READY_FOR_MERGE",
+        "candidateContent": "APPROVED\r\n",
+        "committedContent": "APPROVED\n"
+      },
+      "error": "AssertionError [ERR_ASSERTION]: READY_FOR_MERGE accepted a different blob without a captured transformation policy.\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes.mjs:143:10\n    at probe (file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes.mjs:88:11)\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes.mjs:137:7"
+    },
+    {
+      "name": "smoke_must_not_verify_a_different_tracked_source_tree",
+      "passed": false,
+      "observed": {
+        "status": "READY_FOR_MERGE",
+        "statusAfterSmoke": " M README.md\n",
+        "smokeSource": "SMOKE-ONLY SOURCE\n",
+        "committedSource": "BASE\n"
+      },
+      "error": "AssertionError [ERR_ASSERTION]: READY_FOR_MERGE was published after smoke mutated a tracked source file.\n\ntrue !== false\n\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes.mjs:151:10\n    at probe (file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes.mjs:88:11)\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes.mjs:146:7"
+    },
+    {
+      "name": "delivery_cannot_silently_switch_the_declared_base",
+      "passed": false,
+      "observed": {
+        "status": "READY_FOR_MERGE",
+        "declaredBase": "3dabf6db57b7209b927e5bb66bfc559ae2dfacb9",
+        "reportedSource": "3dabf6db57b7209b927e5bb66bfc559ae2dfacb9",
+        "actualParent": "627586535de86e57d1dba294e8cb0d02423b6e56"
+      },
+      "error": "AssertionError [ERR_ASSERTION]: A different target head became the source without a new captured candidate/base.\n\ntrue !== false\n\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes.mjs:163:10\n    at probe (file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes.mjs:88:11)\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes.mjs:154:7"
+    },
+    {
+      "name": "delivery_must_preserve_the_callers_checked_out_branch_state",
+      "passed": false,
+      "observed": {
+        "status": "READY_FOR_MERGE",
+        "headChanged": true,
+        "hostStatus": "D  approved.txt"
+      },
+      "error": "AssertionError [ERR_ASSERTION]: Publishing the ref changed a clean caller checkout into a checkout with staged deletions.\n+ actual - expected\n\n+ 'D  approved.txt'\n- ''\n\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes.mjs:173:10\n    at probe (file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes.mjs:88:11)\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes.mjs:166:7"
+    },
+    {
+      "name": "hooks_none_must_apply_before_clone_and_checkout",
+      "passed": false,
+      "observed": {
+        "status": "READY_FOR_MERGE",
+        "hookExecution": {
+          "status": "none",
+          "journal": "Hooks policy: none"
+        },
+        "ambientHookRan": true
+      },
+      "error": "AssertionError [ERR_ASSERTION]: An ambient post-checkout hook ran before hooks:none was enforced.\n\ntrue !== false\n\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes.mjs:191:12\n    at probe (file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes.mjs:88:11)\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes.mjs:176:7"
+    },
+    {
+      "name": "acceptance_cannot_open_with_unresolved_evidence",
+      "passed": false,
+      "observed": {
+        "valid": true,
+        "canOpenGate": true,
+        "reason": "All criteria satisfied with typed evidence."
+      },
+      "error": "AssertionError [ERR_ASSERTION]: A syntactically valid reference to nonexistent evidence opened the acceptance Gate.\n\ntrue !== false\n\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes.mjs:207:10\n    at probe (file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes.mjs:88:11)\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes.mjs:198:7"
+    },
+    {
+      "name": "plan_fingerprint_must_include_constraints_and_exclusions",
+      "passed": false,
+      "observed": {
+        "sameFingerprint": true,
+        "first": "5c7d2a6cce902de1d095aa2ad98f648e1b7e9249d0147f959670d40a50fcda9b",
+        "second": "5c7d2a6cce902de1d095aa2ad98f648e1b7e9249d0147f959670d40a50fcda9b"
+      },
+      "error": "AssertionError [ERR_ASSERTION]: Changed normative task restrictions retained the same plan fingerprint.\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes.mjs:215:10\n    at probe (file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes.mjs:88:11)\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes.mjs:210:7"
+    },
+    {
+      "name": "fixed_planning_inputs_must_not_depend_on_the_clock",
+      "passed": false,
+      "observed": {
+        "sameFingerprint": false,
+        "firstConfirmation": "2026-10-16T13:27:35.728Z",
+        "secondConfirmation": "2026-10-16T13:27:35.759Z"
+      },
+      "error": "AssertionError [ERR_ASSERTION]: The selector inserts current time into semantic fingerprint inputs.\n+ actual - expected\n\n+ '84477546b1f09794b6bc9ac38a779aaaef0d7d847331218147649197ed4e3183'\n- '3c06a9ee4833837355b4bca000ec0004754c34f18ed0e4eac4441264be36cf4b'\n\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes.mjs:224:10\n    at async probe (file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes.mjs:88:5)\n    at async file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes.mjs:218:1"
+    },
+    {
+      "name": "store_must_retain_multiple_revisions_of_one_plan",
+      "passed": false,
+      "observed": {
+        "firstPlanId": "PLAN-92c606da7fd5",
+        "revisedPlanId": "PLAN-92c606da7fd5",
+        "distinctRevisionIds": true,
+        "persistenceError": "UNIQUE constraint failed: execution_plans.id",
+        "storedRevisions": 1
+      },
+      "error": "AssertionError [ERR_ASSERTION]: The first persisted revision prevents storing the escalated revision of the same plan.\n\n1 !== 2\n\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes.mjs:244:12\n    at probe (file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes.mjs:88:11)\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes.mjs:227:7"
+    },
+    {
+      "name": "delivery_must_not_block_runtime_control_callbacks",
+      "passed": false,
+      "observed": {
+        "status": "READY_FOR_MERGE",
+        "elapsedMs": 3245,
+        "controlCallbackRan": false
+      },
+      "error": "AssertionError [ERR_ASSERTION]: A 50ms runtime callback could not run during synchronous delivery and smoke execution.\n\nfalse !== true\n\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes.mjs:257:10\n    at async probe (file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes.mjs:88:5)\n    at async file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-follow-up-probes.mjs:248:1"
+    }
+  ]
+}

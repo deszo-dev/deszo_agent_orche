@@ -1,0 +1,98 @@
+{
+  "scratch": "C:\\Users\\jusse\\AppData\\Local\\Temp\\deszo-adr-probes-Kr0msq",
+  "source": "runtime modules from this checkout",
+  "results": [
+    {
+      "name": "smoke_mutation_commits_unreviewed_source",
+      "status": "verification_failed",
+      "ready": false,
+      "resultDigestStillEqualsApproved": true,
+      "committed": null,
+      "extraCommitted": null
+    },
+    {
+      "name": "candidate_path_escapes_clone",
+      "status": "precondition_failed",
+      "outsideContent": "PRESERVE",
+      "outsideIsBeyondClone": true
+    },
+    {
+      "name": "existing_clone_directory_is_deleted",
+      "status": "precondition_failed",
+      "existingFilePreserved": true
+    },
+    {
+      "name": "configured_hook_is_not_installed_or_executed",
+      "status": "delivery_failed",
+      "reportedHookExecution": "executed",
+      "requiredRejectingHookPresent": false
+    },
+    {
+      "name": "hook_mutation_is_not_compared_to_recorded_tree",
+      "status": "READY_FOR_MERGE",
+      "reportedHookExecution": "none",
+      "recordedTreeMatchesActual": true,
+      "committed": "APPROVED"
+    },
+    {
+      "name": "existing_branch_can_be_rewound_to_older_base",
+      "status": "precondition_failed",
+      "parentMatchesExpectedOld": false,
+      "previousHeadIsAncestor": null,
+      "existingFeatureStillInBranch": null
+    },
+    {
+      "name": "empty_acceptance_opens_gate",
+      "valid": false,
+      "canOpenGate": false,
+      "reason": "Invalid AcceptanceRecord: must NOT have fewer than 1 items ({\"limit\":1})"
+    },
+    {
+      "name": "satisfied_without_evidence_opens_gate",
+      "valid": false,
+      "canOpenGate": false,
+      "reason": "Satisfied criteria lack required evidence references: AC-1."
+    },
+    {
+      "name": "package_expansion_hash_depends_on_attempt_identity",
+      "originalSemanticHashesEqual": true,
+      "expandedSemanticHashesEqual": true
+    },
+    {
+      "name": "partially_missing_context_request_is_treated_as_resumable",
+      "resumed": false,
+      "reportedMissing": [
+        "src/missing.js"
+      ],
+      "containsRequiredMissingFile": false
+    },
+    {
+      "name": "missing_bindings_get_invented_model_defaults",
+      "error": "Error: Explicit role bindings required for all invoked roles. No automatic model or provider substitution allowed.\n    at selectExecutionPlan (file:///C:/my/2026/deszo_agent_orche/runtime/core/taskAssessment.mjs:127:11)\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-negative-probes.mjs:98:13\n    at probe (file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-negative-probes.mjs:33:63)\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-negative-probes.mjs:97:7\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"
+    },
+    {
+      "name": "equivalent_but_distinct_reviewer_objects_bypass_separation",
+      "error": "Error: Code reviewer and test reviewer must have distinct roles; observed identical role \"reviewer\".\n    at selectExecutionPlan (file:///C:/my/2026/deszo_agent_orche/runtime/core/taskAssessment.mjs:139:11)\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-negative-probes.mjs:104:13\n    at probe (file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-negative-probes.mjs:33:63)\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-negative-probes.mjs:101:7\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"
+    },
+    {
+      "name": "plan_fingerprint_ignores_requirement_and_budget_changes",
+      "sameFingerprint": false,
+      "firstBounds": 5,
+      "secondBounds": 100
+    },
+    {
+      "name": "high_uncertainty_unverified_task_still_gets_compact_plan",
+      "classification": "modular",
+      "stages": [
+        "define",
+        "readiness_review",
+        "prepare",
+        "implement",
+        "assemble_and_check",
+        "delivery_review",
+        "accept_outcome"
+      ],
+      "hasIndependentAccepter": false
+    }
+  ]
+}

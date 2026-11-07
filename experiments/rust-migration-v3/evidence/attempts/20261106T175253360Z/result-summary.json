@@ -1,0 +1,12 @@
+{
+  "status": "BLOCKED_LAUNCHER_PREFLIGHT",
+  "exit_code": 5,
+  "launcher_preflight_exit": 5,
+  "host_exit": 5,
+  "finished": false,
+  "failed_cases": [],
+  "blocked_cases": [],
+  "unproven_cases": [],
+  "executable_hashes_unchanged": true,
+  "report_path": null
+}

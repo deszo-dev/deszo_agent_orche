@@ -338,6 +338,8 @@
   "createBranch": {
     "workflowId": "cached-research",
     "workflowSnapshotSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "publishedVersionId": "00000000-0000-4000-8000-000000000062",
+    "definitionDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
     "workspaceId": "main",
     "requestId": "00000000-0000-4000-8000-000000000060",
     "mode": "branch",
@@ -351,6 +353,8 @@
   "createNode": {
     "workflowId": "cached-research",
     "workflowSnapshotSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "publishedVersionId": "00000000-0000-4000-8000-000000000062",
+    "definitionDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
     "workspaceId": "main",
     "requestId": "00000000-0000-4000-8000-000000000061",
     "mode": "node",

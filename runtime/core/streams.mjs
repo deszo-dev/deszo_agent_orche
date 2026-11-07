@@ -19,10 +19,14 @@ export class CaptureLimitError extends Error {
 
 export class StreamRecorder {
   // extended: a journal-v2 run may carry byte offsets and the closure event; v1 runs keep the original shape.
-  constructor({ store, runId, attempt, stream, mediaType, hardLimitBytes = STREAM_HARD_LIMIT_BYTES, onFault = () => {}, extended = true }) {
-    Object.assign(this, { store, runId, attempt, stream, mediaType, hardLimitBytes, onFault, extended });
+  // resume: a recorder continuing a stream that an earlier Engine already committed (Process Custody reattach). Its chunks and
+  // committed byte count come from that Engine's durable journal, so the manifest and offsets continue without a gap or a repeat.
+  constructor({ store, runId, attempt, stream, mediaType, hardLimitBytes = STREAM_HARD_LIMIT_BYTES, onFault = () => {}, extended = true, resume = null, deferFlush = false }) {
+    Object.assign(this, { store, runId, attempt, stream, mediaType, hardLimitBytes, onFault, extended, deferFlush });
     this.pending = []; this.pendingBytes = 0; this.timer = null;
-    this.chunks = []; this.committedBytes = 0; this.receivedBytes = 0; this.uncommittedBytes = 0;
+    this.chunks = resume ? resume.chunks.map(entry => ({ ...entry })) : [];
+    this.committedBytes = resume ? resume.committedBytes : 0;
+    this.receivedBytes = this.committedBytes; this.uncommittedBytes = 0;
     this.tail = Buffer.alloc(0); this.failed = null; this.writeFailed = false; this.closed = false;
   }
 
@@ -35,7 +39,9 @@ export class StreamRecorder {
     if (accepted) {
       this.pending.push(accepted === chunk.length ? chunk : chunk.subarray(0, accepted));
       this.pendingBytes += accepted;
-      if (this.pendingBytes >= STREAM_BATCH_BYTES) this.flush();
+      // deferFlush: the owner commits this stream explicitly (with its companion stream), so no size or timer flush happens here.
+      if (this.deferFlush) { /* Held until the owner's flush. */ }
+      else if (this.pendingBytes >= STREAM_BATCH_BYTES) this.flush();
       else if (!this.timer) this.timer = setTimeout(() => this.flush(), STREAM_BATCH_MS);
     }
     if (!this.failed && accepted < chunk.length) this.fault(new CaptureLimitError(this.stream, this.hardLimitBytes));

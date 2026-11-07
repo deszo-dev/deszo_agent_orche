@@ -1,19 +1,18 @@
-// Builds the native launch shim (ADR-0002 section 4). Every supervised process starts through it, so the desktop app
-// refuses to start without it. A release build also copies it into dist-runtime, which Tauri bundles beside the runtime.
+// Compiles the native launch shim on its own (ADR-0002 section 4) for development (`npm run shim:dev`) or a standalone compile check
+// (`npm run shim:build`). It never publishes a shim to the runtime. The shipped shim is the one `tauri build` compiles together with
+// deszo.exe, and build-finish copies exactly that copy into the runtime. A separate compilation has different feature flags and
+// therefore different bytes, so a second copy here would be a second, unreceipted identity.
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { assertPlainDirectories, buildLayout, PROJECT } from './build-layout.mjs';
 
-const root = resolve(import.meta.dirname, '..');
 const release = process.argv.includes('--release');
-const manifest = resolve(root, 'src-tauri/Cargo.toml');
-const built = resolve(root, 'src-tauri/target', release ? 'release' : 'debug', 'deszo-launch-shim.exe');
+const manifest = resolve(PROJECT, 'src-tauri/Cargo.toml');
+const layout = buildLayout();
+const built = release ? layout.shim : resolve(PROJECT, 'src-tauri/target/debug', 'deszo-launch-shim.exe');
 
-const result = spawnSync('cargo', ['build', '--manifest-path', manifest, '--bin', 'deszo-launch-shim', ...(release ? ['--release'] : [])], { stdio: 'inherit' });
+if (release) assertPlainDirectories(layout);
+const result = spawnSync('cargo', ['build', '--manifest-path', manifest, '--bin', 'deszo-launch-shim', ...(release ? ['--release'] : [])],
+  { stdio: 'inherit', env: { ...process.env, ...(release ? layout.env : {}) } });
 if (result.status !== 0) process.exit(result.status ?? 1);
-
-if (release) {
-  mkdirSync(resolve(root, 'dist-runtime'), { recursive: true });
-  copyFileSync(built, resolve(root, 'dist-runtime/deszo-launch-shim.exe'));
-}
-console.log(`Launch shim built at ${built}${release ? ' and copied to dist-runtime' : ''}`);
+console.log(`Launch shim compiled at ${built}; it is not published to the runtime (npm run desktop:build publishes the shipped shim).`);

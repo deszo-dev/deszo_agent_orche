@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "kind": "Stage1ReadOnlyProviderInspection",
+  "recordedAt": "2026-10-22T02:35:09.461Z",
+  "capabilities": {
+    "provider": "antigravity",
+    "cliVersion": "1.4.4",
+    "available": true,
+    "structuredOutput": false,
+    "resume": false,
+    "explicitModel": false,
+    "explicitEffort": false,
+    "nativeOwnershipVerified": false,
+    "subscriptionVerified": false,
+    "productionLaunchAvailable": false,
+    "limits": "Capability inspection does not establish entitlement, protected custody, actual turn start or billing attribution."
+  },
+  "authentication": {
+    "status": "INCONCLUSIVE",
+    "verified": false,
+    "reason": "No installed authoritative account/entitlement inspector is registered."
+  },
+  "billing": {
+    "verified": false,
+    "code": "judge_billing_forbidden"
+  },
+  "providerInferenceCalls": 0,
+  "authenticationStoresRead": false,
+  "modelLaunchAttempted": false
+}

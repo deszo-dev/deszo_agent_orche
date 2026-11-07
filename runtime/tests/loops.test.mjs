@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { check } from '../core/schemas.mjs';
 import { Engine, loopStep, m2Transition } from '../core/engine.mjs';
 import { startTestRunner } from './helpers.mjs';
+import { ownedDir } from './test-roots.mjs';
 
 const example = () => JSON.parse(readFileSync(resolve(import.meta.dirname, '../../docs/examples/m2-review-loop/workflow.json'), 'utf8'));
 const decisions = JSON.parse(readFileSync(resolve(import.meta.dirname, '../../docs/fixtures/decisions.json'), 'utf8'));
@@ -94,6 +95,13 @@ test('an invalid checker decision pauses the loop as a body failure without inve
     const events = await api.events(snapshot.run.runId);
     const error = events.find(event => event.type === 'attempt.error');
     assert.equal(error.nodeInstanceId, 'refine'); assert.match(error.payload.message, /loop-decision/);
+    const outcomes = await api.call('GET', `/api/v2/runs/${snapshot.run.runId}/failure-outcomes/page?afterSequence=0&limit=10`);
+    assert.equal(outcomes.status, 200);
+    const loopOutcome = events.find(event => event.type === 'attempt.failure_outcome' && event.attemptId === error.attemptId)?.payload.outcome;
+    assert.ok(loopOutcome, 'the loop-return failure has a typed outcome');
+    assert.equal(loopOutcome.category, 'task_failure');
+    assert.equal(loopOutcome.canonicalCode, 'output_contract');
+    assert.ok(loopOutcome.evidenceReferences.some(ref => ref.type === 'journal_event' && ref.id === error.id));
     assert.ok(!events.some(event => event.type === 'loop.iteration_returned'), 'a malformed decision never means finish');
     const final = await api.waitFor(snapshot.run.runId);
     assert.equal(final.run.state, 'failed'); assert.equal(final.loops[0].state, 'canceled');
@@ -263,7 +271,7 @@ test('a deterministic Condition loop, files, merges, JSON Select, attachments an
   } finally { await api.close(); }
 });
 
-test('a missing input file fails with input_unavailable and a path escape is rejected before running', async () => {
+test('a missing input file fails with input_unavailable and a path escape is refused before Publication or Run admission', async () => {
   const api = await startTestRunner();
   try {
     await api.workspace();
@@ -272,8 +280,16 @@ test('a missing input file fails with input_unavailable and a path escape is rej
       nodes: [{ id: 'files', type: 'file-input', config: { mode: 'files', paths } }, { id: 'view', type: 'result-viewer', config: {} }],
       edges: [{ id: 'e', source: { nodeId: 'files', port: 'value' }, target: { nodeId: 'view', port: 'value' } }], after: [],
     });
-    const escaped = await api.run(base(['../outside.txt'], 'escape'));
-    assert.equal(escaped.status, 422);
+    const escapedWorkflow = base(['../outside.txt'], 'escape');
+    const escapedDraft = await api.save(escapedWorkflow);
+    const persistedEscapedDraft = await api.call('GET', `/api/v4/workflows/${escapedWorkflow.workflowId}/draft`);
+    assert.equal(escapedDraft.validation.valid, false, 'the unsafe path is rejected by Draft validation');
+    assert.equal(api.publication(escapedWorkflow.workflowId), null, 'an invalid workflow has no Runnable Published Version');
+    const escaped = await api.call('POST', '/api/v2/runs', { requestId: randomUUID(), workflowId: escapedWorkflow.workflowId,
+      workflowSnapshotSha256: escapedDraft.snapshotSha256, publishedVersionId: randomUUID(), definitionDigest: persistedEscapedDraft.body.definitionDigest, workspaceId: 'main' });
+    assert.equal(escaped.status, 404);
+    assert.equal(escaped.body.code, 'published_version_not_found');
+    assert.equal(api.runner.engine.store.get('SELECT COUNT(*) AS count FROM runs').count, 0, 'the unpublished unsafe workflow creates no Run');
     const missing = await api.run(base(['missing.txt'], 'missing'));
     const snapshot = await api.waitFor(missing.body.run.runId);
     assert.equal(snapshot.run.state, 'waiting_for_user');
@@ -326,12 +342,12 @@ test('restart recovery interrupts a running loop and its body attempt without re
   await api.close();
 });
 
-test('an M1 store migrates through migration 8, keeps its v1 journal and backfills M6 identities', async () => {
+test('an M1 store migrates to the latest migration, keeps its v1 journal and backfills M6 identities', async () => {
   const { DatabaseSync } = await import('node:sqlite');
-  const { mkdtempSync, readdirSync, writeFileSync } = await import('node:fs');
+  const { readdirSync, writeFileSync } = await import('node:fs');
   const { MIGRATION_PATHS, Store } = await import('../core/store.mjs');
   const { sha256 } = await import('../core/canonical.mjs');
-  const root = mkdtempSync(join(resolve(import.meta.dirname, '../../.deszo/tests'), 'm1-store-'));
+  const root = ownedDir(join(resolve(import.meta.dirname, '../../.deszo/tests'), 'm1-store-'));
   mkdirSync(join(root, 'store', 'objects'), { recursive: true });
   const ddl = readFileSync(resolve(import.meta.dirname, '../../docs/storage/m1.sql'), 'utf8');
   const snapshot = Buffer.from(JSON.stringify({ workflowId: 'wf', nodes: [{ id: 'cache-live', type: 'cache' }] }));
@@ -354,7 +370,8 @@ test('an M1 store migrates through migration 8, keeps its v1 journal and backfil
   v5.close();
 
   const store = new Store(root);
-  assert.equal(store.get('SELECT MAX(version) AS v FROM schema_migrations').v, 8);
+  // The store reaches the end of the migration catalogue (m14 added the continuation tables after this test was written).
+  assert.equal(store.get('SELECT MAX(version) AS v FROM schema_migrations').v, MIGRATION_PATHS.length);
   assert.equal(store.get('SELECT kind FROM runs WHERE id = ?', 'r').kind, 'workflow');
   assert.equal(store.get('SELECT revision FROM workflows WHERE id = ?', 'wf').revision, 1);
   assert.deepEqual({ ...store.get('SELECT state, journal_version FROM runs WHERE id = ?', 'r') }, { state: 'failed', journal_version: 1 });

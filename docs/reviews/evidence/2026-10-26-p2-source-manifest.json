@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-26T19:25:14.046Z",
+  "repository": "deszo_agent_orche",
+  "branch": "codex/adr-0003-0005-completion",
+  "baseCommit": "40fa26aadaef4450934bd6d7db1e3a3cb1cf0997",
+  "workingTree": {
+    "dirty": true,
+    "stagedChanges": false
+  },
+  "verification": {
+    "focusedP2": {
+      "command": "node --disable-warning=ExperimentalWarning --test --test-concurrency=1 runtime/tests/p2-migration.test.mjs runtime/tests/parent-repair-coordination.test.mjs runtime/tests/parent-repair-custody-e2e.test.mjs",
+      "passed": 24,
+      "failed": 0,
+      "exitCode": 0
+    },
+    "npmTest": {
+      "command": "npm test",
+      "passed": 839,
+      "failed": 0,
+      "canceled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 3484916.7906,
+      "exitCode": 0
+    },
+    "cargoTest": {
+      "command": "cargo test --manifest-path lifecycle-host/Cargo.toml",
+      "passed": 23,
+      "failed": 0,
+      "exitCode": 0
+    },
+    "docsCheck": {
+      "command": "npm run docs:check",
+      "schemas": 31,
+      "localLinks": 1246,
+      "errors": 0,
+      "exitCode": 0
+    },
+    "build": {
+      "command": "npm run build",
+      "exitCode": 0,
+      "warning": "Main minified JavaScript chunk is 691.67 kB; Vite advisory threshold is 500 kB."
+    },
+    "diffCheck": {
+      "command": "git diff --check",
+      "exitCode": 0
+    }
+  },
+  "hashAlgorithm": "SHA-256",
+  "manifestExcludesItself": true,
+  "files": [
+    {
+      "path": "docs/schemas/journal-event-v2.schema.json",
+      "role": "contract",
+      "sha256": "e1d05e4d154f5f1b5420ea9aec159b0a0834216d380e4d7aed97de33f10ff021"
+    },
+    {
+      "path": "docs/schemas/runtime-api-v2.schema.json",
+      "role": "contract",
+      "sha256": "cc409064232e2de54b656043bef4c7299fb2fd15d8730ac64f4c04868a4fa5ca"
+    },
+    {
+      "path": "docs/storage/m19.sql",
+      "role": "migration",
+      "sha256": "b0a70b98939255cb4b192a35d0bda0d8574b735210f3681c719a40b5ddc14b08"
+    },
+    {
+      "path": "runtime/core/custody.mjs",
+      "role": "production",
+      "sha256": "ad46790f40a16414e85cbf190048b34e99d010c54785a709b14159cd27c09dc9"
+    },
+    {
+      "path": "runtime/core/engine.mjs",
+      "role": "production",
+      "sha256": "22431157ee772df9b27fde54c81dc9da1a5e9100a96aee88eaab00814f10c030"
+    },
+    {
+      "path": "runtime/core/linkedRepair.mjs",
+      "role": "production",
+      "sha256": "2a8f6251f5fc6d150fc8983c1fc853cf3b9e4ac74e7c3b11a962ceccf020691e"
+    },
+    {
+      "path": "runtime/core/migrations.mjs",
+      "role": "production",
+      "sha256": "a4a986df7ce71d578301f5da1c3e152373262addacd7478ee4ec76e60aad270f"
+    },
+    {
+      "path": "runtime/tests/fixtures/custody-cli.rs",
+      "role": "fixture",
+      "sha256": "0cdf8d02e59287b1da06e874d31e51b407c62c18a0d5df652f15ebd4ca143dc8"
+    },
+    {
+      "path": "runtime/tests/p2-migration.test.mjs",
+      "role": "test",
+      "sha256": "424551909b63e1b3060643b64c865755d468a14ba097acf32215d55d70a865aa"
+    },
+    {
+      "path": "runtime/tests/parent-repair-coordination.test.mjs",
+      "role": "test",
+      "sha256": "4e45326bb54b1b39c3c45a7633a84447581258eb00fb632d4bd17416009da994"
+    },
+    {
+      "path": "runtime/tests/parent-repair-custody-e2e.test.mjs",
+      "role": "test",
+      "sha256": "8e421cf6ea7ed481c28703dade2ff5f1371c29ebaed185a83e4edbb76b3b70e2"
+    },
+    {
+      "path": "docs/reviews/2026-10-26-p2-parent-repair-coordination.md",
+      "role": "report",
+      "sha256": "67d494a00c11e871a15c438daa16aaf8e41ebde06c5585554b125d643924e0c3"
+    },
+    {
+      "path": "docs/reviews/evidence/2026-10-26-p2-parent-repair-e2e.json",
+      "role": "e2e-evidence",
+      "sha256": "9d3040bda81ea200637f3f36be69d1d4b5e49f9dd8ed5e1f4e7894c60b770cd7"
+    }
+  ]
+}

@@ -182,7 +182,8 @@
                   "enum": [
                     "codex",
                     "claude",
-                    "antigravity"
+                    "antigravity",
+                    "p5-verifier"
                   ]
                 },
                 "requestedModel": {
@@ -290,7 +291,8 @@
           "enum": [
             "codex",
             "claude",
-            "antigravity"
+            "antigravity",
+            "p5-verifier"
           ]
         },
         "requestedModel": {
@@ -332,13 +334,13 @@
           "pattern": "^[a-f0-9]{64}$"
         },
         "environmentPolicy": {
-          "const": "subscription-only"
+          "enum": ["subscription-only", "captured-p5-policy"]
         },
         "managedToolIsolation": {
           "type": "object",
           "properties": {
             "mechanism": {
-              "enum": ["bridge-marker-refusal", "verified-neutralizer", "fixture-cli"]
+              "enum": ["bridge-marker-refusal", "verified-neutralizer", "fixture-cli", "protected-p5-verifier"]
             },
             "runtimeInstanceId": {
               "type": "string",

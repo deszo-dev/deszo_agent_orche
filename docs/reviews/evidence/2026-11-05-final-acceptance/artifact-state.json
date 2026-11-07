@@ -1,0 +1,981 @@
+{
+  "schemaVersion": 1,
+  "kind": "P6FinalAcceptanceArtifactState",
+  "recordedAt": "2026-11-05T10:43:45.457Z",
+  "snapshotDigest": "18d5a06dfc30bd83d4641305a609ad6fe6ce1b58fe5f8760fda4bf0d78833d19",
+  "note": "Current build outputs after the production restore (desktop build id p6-final-2026-11-05, DESZO_TEST_FAULT_HOOKS unset). Recorded values are from the 2026-11-05 freeze manifest.",
+  "receipts": {
+    "shellBuildReceipt": {
+      "schemaVersion": 1,
+      "desktopBuildId": "p6-final-2026-11-05",
+      "testFaultHooks": false,
+      "desktopInputsSha256": "6b3aba3a0cc30960977614b2f0f4b36335df54266bc85cd4b24ece86d907c0e9",
+      "runtimeInputsSha256": "47f057e8066bdf4d8be6b23848d185f96f247b3c10b12d6efe9d97cccd51307b",
+      "runtimeManifestSha256": "c9570ab8625ec25181eeef92c0efdf611fa11b934563f53803585068ef0926b7",
+      "runtimeFiles": {
+        "bridge.mjs": "ff2b9842e3beae99b47ff0e823d2a73dcb432c557f37c587ff158c7a33a3bc50",
+        "deszo-launch-shim.exe": "675e47b9640fdf00e6945c0a6325c0b93656f4acffb201a1fa4ce6924a71fc7d",
+        "host-h1.sql": "7691e3f709cb315d69d17ae7d369f3af6807d776cd939fec3efbed7974791117",
+        "host-h2.sql": "17fd9345100e8120b80549ca04585f6c358c27225e72a47a02bcbae25371734c",
+        "host-h3.sql": "8e3cfcf22e5f77f26a41bb605897a8007833f2a2a040512536f01b9fda7c4da7",
+        "host-h4.sql": "f21895c05983bb038498e7599ce8b35c03a3ae9f34a1da7e4669cb7f949aba0a",
+        "host-h5.sql": "480117fa740b0bb48d476fe2e5fcc686e9ec991027652e9581e925251dde8715",
+        "host.mjs": "e53b1445db582a4e3c7f62643e42ec769a7d598acbd31bc17a1178f0fa7d7a9f",
+        "m1.sql": "31380786a58380a5b397ed9089bcdf051d9dd2a39f664a67b83ba1dee62a2197",
+        "m10.sql": "ee59469ef780e51c113857b443d33e4f1823828e06e7aa5bc45377f0862719f6",
+        "m11.sql": "079a883d25053c86c254e5124cd63792a946f3bcbc3927e488e3edc7c33b1612",
+        "m12.sql": "cc699b4cf99aebe541b3172c7ff56c4e8ebe477a17bc35bcf233891d261c2f83",
+        "m13.sql": "3511906083ed587dae60d8f29d3b7bac58546127f4296df65dda630c21b60a77",
+        "m14.sql": "5a390baf77bce83bca7a3626af6b21668521393f094a64c8ce5c0080e892b8f7",
+        "m15.sql": "b5e4f9ed6d26d5bde53de0a03ecf751cefad24f20a18e95a974b1681e22bbe98",
+        "m16.sql": "a80a4ce319ee5a7d29f9a003239d42b68cf2e9700e4231c4941f720ecb3b9117",
+        "m17.sql": "11c239a1dde0c5390db667bb3aabf0de2c94312f199c8f6f5016648c2d11c493",
+        "m18.sql": "8ad90c3ca41bb6e943d408fca86280d2e43fc8af7ae5e6c1280582af96031449",
+        "m19.sql": "b0a70b98939255cb4b192a35d0bda0d8574b735210f3681c719a40b5ddc14b08",
+        "m2.sql": "88fc4ad1976d2153eea77ce177e138c1b7c74eea5bba9dbccc5a27bcbaef3c9b",
+        "m20.sql": "cc7dc2941e7ce3e28a029232369ea6b36e10810e31ec1149ed5acc13a2474d66",
+        "m21.sql": "29e41322a3b0a062ede3d6fc2b93570fb70022817b6eb1ffbe23cadc1a6b28bd",
+        "m22.sql": "6fabcf99e5456667f2ae278aa3f1fa2feaa6a3751e2439d8e0e60bc31ab61b73",
+        "m3.sql": "054cdc35a3f9eba36329552367b6d09016a8ee41695d649633e699bcd5342245",
+        "m4.sql": "d7fa40960652d2426c16a36b6eaa88a1b5f3ceb10015ea8497dbd209545a94c2",
+        "m5.sql": "e5ed02f8a75106a061655965392d312f090f2f02ba6b8ec7928a22ac619ac231",
+        "m6.sql": "229bf5f3adc23741a9721b40f99196e56e41a1b85fa436e24fab3d1019c352b8",
+        "m7.sql": "bedba4c8956d4c20260df500b0c89e4844e58f76581b81b0d4d7f228179706fd",
+        "m8.sql": "ac7d800f02a14592eb9f1b0a9b9def20a3a164aeaed20742798cdaecc8c36b0f",
+        "m9.sql": "74179d9176d004169de4dfeefaf95dbf89331d95318923c29f7d58c25624d432",
+        "runner.mjs": "e613e385c6e10e7e69c77b3a676ade2a2102f247cf16da3117aa9d2d4af4267d",
+        "service-runtime.mjs": "9826db216025180d55b1019aec3f5e996c4af08b97784796345f27f9e6575f2e",
+        "worker.mjs": "a49db7e31f780cd1df05a7cfed0753870aa601e3f9437dcf53ead7b26eca3037"
+      },
+      "exeSha256": "ee711807410007c5db22ad762aeda7e2a5614494d02af65484b2f5b696e2a21f",
+      "builtAt": "2026-11-05T09:58:00.806Z"
+    },
+    "runtimeManifest": {
+      "kind": "DeszoRuntimeBuild",
+      "version": 1,
+      "builtAt": "2026-11-05T09:58:00.595Z",
+      "testFaultHooks": false,
+      "sourceHead": "1f54c47fe265c6b47bf36695be56214056fc3af1",
+      "runtimeInputs": {
+        "sha256": "47f057e8066bdf4d8be6b23848d185f96f247b3c10b12d6efe9d97cccd51307b",
+        "entries": [
+          {
+            "path": "docs/authoring/client-timeouts.json",
+            "sha256": "73185c5a7ddf03ab8b0b05c4e1c3befe7994f65cbcf3a70c16ee912e9311e888"
+          },
+          {
+            "path": "docs/authoring/controller-transport.json",
+            "sha256": "245ae08deedecde642de90f302e7b7ffe073c14813514e7fb668392d6a6143f9"
+          },
+          {
+            "path": "docs/authoring/mcp-neutralizers.json",
+            "sha256": "f85e7459505e2e7a959e39f6658dfb3acdf5147c1a076ab2808d3ec9a72dfef5"
+          },
+          {
+            "path": "docs/schemas/acceptance-record.schema.json",
+            "sha256": "690d9a89059fad7bac2375850a864ecb8a03588b6632d74717064525ebf6601c"
+          },
+          {
+            "path": "docs/schemas/application-settings.schema.json",
+            "sha256": "7fb53e332155b32993e3818159873b021eb359984853a4b0522cf6dfdf288a0f"
+          },
+          {
+            "path": "docs/schemas/attempt-record.schema.json",
+            "sha256": "a668b096521d1d3bc521288799f8f9761934a429810e84774332408e3a64da08"
+          },
+          {
+            "path": "docs/schemas/audit-manifest.schema.json",
+            "sha256": "cea093345c45d04d45b4a133cd5813ce165fe566c058ddaab1095878f6a0995a"
+          },
+          {
+            "path": "docs/schemas/autonomy-policy.schema.json",
+            "sha256": "77d99444b166427919c507f2e1d4e02023745a96d78620750c73514e289e0d9b"
+          },
+          {
+            "path": "docs/schemas/context-package.schema.json",
+            "sha256": "ae428bd13eb4e2f4071d2f6681a5500ca01545eef3cb6f1ef88caa4b2c8f2ddf"
+          },
+          {
+            "path": "docs/schemas/delivery-plan.schema.json",
+            "sha256": "737dfe7a67a4f166b3f0347269cc39b1408cd80bc8720f6a5e60602f5c68024a"
+          },
+          {
+            "path": "docs/schemas/delivery-result.schema.json",
+            "sha256": "bb849180691e63cc8dfb7d109757ef59c9efb8f787f7260f97b164d4dd2379ff"
+          },
+          {
+            "path": "docs/schemas/evaluation-record.schema.json",
+            "sha256": "2ee02e0fea02d0712edc56ffe87128f5fdbe70d161b52b06c76cf2fd151729b1"
+          },
+          {
+            "path": "docs/schemas/execution-evidence.schema.json",
+            "sha256": "733a592d6155e826db92994aad70a7943c6603bed5b3cbad63ab47cbf982ee77"
+          },
+          {
+            "path": "docs/schemas/execution-plan.schema.json",
+            "sha256": "eb2797c72b76584bfb2caafb79939a3133b3428f2c2c9a035ef8d77aad99e991"
+          },
+          {
+            "path": "docs/schemas/failure-outcome.schema.json",
+            "sha256": "99489e9072c05acb0c09fc809a30a62a5f1fd77a841073bda9b0407be6285173"
+          },
+          {
+            "path": "docs/schemas/gate.schema.json",
+            "sha256": "1f85cd28c964df9cfb961e6ddb8d0af4348e8161f631778e02dcb9d5064e77b6"
+          },
+          {
+            "path": "docs/schemas/implementation-map.schema.json",
+            "sha256": "9da1cefc528ed11d0f2bbfce218d53c0756ed4ef9dde0a2bac204b47260808fe"
+          },
+          {
+            "path": "docs/schemas/incident.schema.json",
+            "sha256": "6fc24d0eee5231c2f2ab53e168c8ced03a8eaeef9554f41c4432ebe285aeea9b"
+          },
+          {
+            "path": "docs/schemas/journal-event-v2.schema.json",
+            "sha256": "9c3ca70c2f5bfe92c4f4b44a3772a85b886b653f9500d5fc24ac8452cbdc0166"
+          },
+          {
+            "path": "docs/schemas/journal-event.schema.json",
+            "sha256": "4202eb9bc073acb00cd95176874b4c8cc6e63be34a685480b93d8398225fc8a9"
+          },
+          {
+            "path": "docs/schemas/judge-control.schema.json",
+            "sha256": "decbc1cbb14bd2cf8eeffde545257580d2e86e2e7cd468d388b5658d27ebaf80"
+          },
+          {
+            "path": "docs/schemas/loop-decision.schema.json",
+            "sha256": "930be663aee4ccd94a350e170320553ed5813536578206b49012ea63cfb7e8ae"
+          },
+          {
+            "path": "docs/schemas/managed-task.schema.json",
+            "sha256": "a5ba7773007ea1fcda7ca8d04af8242426df7856c4fd5bc264115dc50edf9bba"
+          },
+          {
+            "path": "docs/schemas/map.schema.json",
+            "sha256": "9d4227fa43d466713eaffb0522a85f4adbebebc838e5def5d2ba6a7cdbba9db3"
+          },
+          {
+            "path": "docs/schemas/pipeline-state.schema.json",
+            "sha256": "72fbe1f73aba59478cd5af8471f0b127acb08dc245abc0524d67459d5810ac0e"
+          },
+          {
+            "path": "docs/schemas/protected-self-repair.schema.json",
+            "sha256": "96fc12af15380df64260b0aed839ef21e9dba508bd4da14cae2d3f5a451dd5a0"
+          },
+          {
+            "path": "docs/schemas/review-decision.schema.json",
+            "sha256": "3a717690a1528687aeac8ea8ae260090d1186972e5470216d61f0f431b414866"
+          },
+          {
+            "path": "docs/schemas/run-control-api.schema.json",
+            "sha256": "51f7798f6e826bd1af468b718ecd53d7a0e4c9379f084a835c887f0cc77fccfb"
+          },
+          {
+            "path": "docs/schemas/runtime-api-v2.schema.json",
+            "sha256": "54bf8f1d330b56de5bdcd7ffe3cce4ec2fcbd7fbf7d6532ac91c97651a06a11a"
+          },
+          {
+            "path": "docs/schemas/runtime-api-v3.schema.json",
+            "sha256": "e46a7bb6cd95c072fdfb4ca2e74ebd505fc35dad2073f64a89db9623db8286e3"
+          },
+          {
+            "path": "docs/schemas/runtime-api-v4.schema.json",
+            "sha256": "63f97039ecbcb496ca2dfe7d727858308c44ddfc5e5d254c1bf54de39077b43d"
+          },
+          {
+            "path": "docs/schemas/runtime-api.schema.json",
+            "sha256": "78234d4b68c4a2dcacfbc41bcedceecbe05e81b0242f44dc425dc8c4cd308a9c"
+          },
+          {
+            "path": "docs/schemas/spec-section-index.schema.json",
+            "sha256": "0d7fd7f5b0c4121886dc518da0264c990d01ad66dc305be1d08481397309cf77"
+          },
+          {
+            "path": "docs/schemas/task-assessment.schema.json",
+            "sha256": "6a1c4dbd526982605031a8d017eef6b7cd62bccad050551b3d84766480b17b58"
+          },
+          {
+            "path": "docs/schemas/value.schema.json",
+            "sha256": "e01fd6a6e096f65b20ea51526086e14d9a6dae6395ddac8abf05efabfdfc5a7f"
+          },
+          {
+            "path": "docs/schemas/workflow-judge-decision.schema.json",
+            "sha256": "264cee5ed9c529f7cfb28a91e5be8e9e4d1a1caafd290480beba6f2201d4c584"
+          },
+          {
+            "path": "docs/schemas/workflow.schema.json",
+            "sha256": "3813d78f0080bf01359954bd7d363caf307e7b2c57612743b102651cd925714a"
+          },
+          {
+            "path": "docs/storage/m1.sql",
+            "sha256": "31380786a58380a5b397ed9089bcdf051d9dd2a39f664a67b83ba1dee62a2197"
+          },
+          {
+            "path": "docs/storage/m10.sql",
+            "sha256": "ee59469ef780e51c113857b443d33e4f1823828e06e7aa5bc45377f0862719f6"
+          },
+          {
+            "path": "docs/storage/m11.sql",
+            "sha256": "079a883d25053c86c254e5124cd63792a946f3bcbc3927e488e3edc7c33b1612"
+          },
+          {
+            "path": "docs/storage/m12.sql",
+            "sha256": "cc699b4cf99aebe541b3172c7ff56c4e8ebe477a17bc35bcf233891d261c2f83"
+          },
+          {
+            "path": "docs/storage/m13.sql",
+            "sha256": "3511906083ed587dae60d8f29d3b7bac58546127f4296df65dda630c21b60a77"
+          },
+          {
+            "path": "docs/storage/m14.sql",
+            "sha256": "5a390baf77bce83bca7a3626af6b21668521393f094a64c8ce5c0080e892b8f7"
+          },
+          {
+            "path": "docs/storage/m15.sql",
+            "sha256": "b5e4f9ed6d26d5bde53de0a03ecf751cefad24f20a18e95a974b1681e22bbe98"
+          },
+          {
+            "path": "docs/storage/m16.sql",
+            "sha256": "a80a4ce319ee5a7d29f9a003239d42b68cf2e9700e4231c4941f720ecb3b9117"
+          },
+          {
+            "path": "docs/storage/m17.sql",
+            "sha256": "11c239a1dde0c5390db667bb3aabf0de2c94312f199c8f6f5016648c2d11c493"
+          },
+          {
+            "path": "docs/storage/m18.sql",
+            "sha256": "8ad90c3ca41bb6e943d408fca86280d2e43fc8af7ae5e6c1280582af96031449"
+          },
+          {
+            "path": "docs/storage/m19.sql",
+            "sha256": "b0a70b98939255cb4b192a35d0bda0d8574b735210f3681c719a40b5ddc14b08"
+          },
+          {
+            "path": "docs/storage/m2.sql",
+            "sha256": "88fc4ad1976d2153eea77ce177e138c1b7c74eea5bba9dbccc5a27bcbaef3c9b"
+          },
+          {
+            "path": "docs/storage/m20.sql",
+            "sha256": "cc7dc2941e7ce3e28a029232369ea6b36e10810e31ec1149ed5acc13a2474d66"
+          },
+          {
+            "path": "docs/storage/m21.sql",
+            "sha256": "29e41322a3b0a062ede3d6fc2b93570fb70022817b6eb1ffbe23cadc1a6b28bd"
+          },
+          {
+            "path": "docs/storage/m22.sql",
+            "sha256": "6fabcf99e5456667f2ae278aa3f1fa2feaa6a3751e2439d8e0e60bc31ab61b73"
+          },
+          {
+            "path": "docs/storage/m3.sql",
+            "sha256": "054cdc35a3f9eba36329552367b6d09016a8ee41695d649633e699bcd5342245"
+          },
+          {
+            "path": "docs/storage/m4.sql",
+            "sha256": "d7fa40960652d2426c16a36b6eaa88a1b5f3ceb10015ea8497dbd209545a94c2"
+          },
+          {
+            "path": "docs/storage/m5.sql",
+            "sha256": "e5ed02f8a75106a061655965392d312f090f2f02ba6b8ec7928a22ac619ac231"
+          },
+          {
+            "path": "docs/storage/m6.sql",
+            "sha256": "229bf5f3adc23741a9721b40f99196e56e41a1b85fa436e24fab3d1019c352b8"
+          },
+          {
+            "path": "docs/storage/m7.sql",
+            "sha256": "bedba4c8956d4c20260df500b0c89e4844e58f76581b81b0d4d7f228179706fd"
+          },
+          {
+            "path": "docs/storage/m8.sql",
+            "sha256": "ac7d800f02a14592eb9f1b0a9b9def20a3a164aeaed20742798cdaecc8c36b0f"
+          },
+          {
+            "path": "docs/storage/m9.sql",
+            "sha256": "74179d9176d004169de4dfeefaf95dbf89331d95318923c29f7d58c25624d432"
+          },
+          {
+            "path": "mcp/bridge.mjs",
+            "sha256": "30c00741fa578c2a96d2d0e72376525fb3d60f37dc8f2a0912085af29b97f861"
+          },
+          {
+            "path": "mcp/managed-invocation.mjs",
+            "sha256": "1c453581412db5675e707203f3a1b1699e195641657dee2000139b8d35562e69"
+          },
+          {
+            "path": "mcp/run-observer.mjs",
+            "sha256": "50f70552adfab2053549f19ac459047353079f2b5f76d8119437a7418b036513"
+          },
+          {
+            "path": "mcp/runtime-client.mjs",
+            "sha256": "65cb1cd0f3c4cfc30bc752c471fe963e9ebbb7032c3b3fa6c64f6494b6f27319"
+          },
+          {
+            "path": "mcp/supervisor-pipe.mjs",
+            "sha256": "ebd78efee14d46d350ece77da3e2d540ac94bc28b4b79d2a0b7305dfca503d62"
+          },
+          {
+            "path": "package-lock.json",
+            "sha256": "c59a01bca806debabd9e245507463deb6f2f4b1c9c18ccfc28cc67dcdbb2909a"
+          },
+          {
+            "path": "package.json",
+            "sha256": "b67c1a96cdc25ffdb19165735a630ae227a0e91a67296af06d47f5dde05779ad"
+          },
+          {
+            "path": "runtime/core/adapters.mjs",
+            "sha256": "0824484ee7b15e14c2b5afb2cbd035f8f59866d57a78d1a98abf43775cc49da0"
+          },
+          {
+            "path": "runtime/core/antigravityJudgeAdapter.mjs",
+            "sha256": "038067e6a179a77e4f37fe58ee9565ae373b7a193892b81e8e268aa664b95c02"
+          },
+          {
+            "path": "runtime/core/branchDelivery.mjs",
+            "sha256": "8f329cf82fa31b1ffa3e9c57f9c2583642123a0869cbb59467283dbdf856097e"
+          },
+          {
+            "path": "runtime/core/canonical.mjs",
+            "sha256": "466a93536b30b95d922897e1ce8149bef95bc43cc7a3f16b9acad3e71fac0803"
+          },
+          {
+            "path": "runtime/core/contextPackage.mjs",
+            "sha256": "1b13325f4fb3fcded2f98528b5a3a200cee0e3f6a0f6c5da65a6efc7f1b55fca"
+          },
+          {
+            "path": "runtime/core/custody.mjs",
+            "sha256": "8c51beb3872c8ca353ad66ea7b5977044a0f2c1bbba9cabd8b79394a3677c12d"
+          },
+          {
+            "path": "runtime/core/engine.mjs",
+            "sha256": "7c6ad4f26cf035d145a4959decc2827a3324aadaae1c282a15354814d622b88c"
+          },
+          {
+            "path": "runtime/core/engineRoot.mjs",
+            "sha256": "e2b90610a7ec0c13aaed9a9264c8143a1f4910efe552b1b1d62d8e3fcf88020d"
+          },
+          {
+            "path": "runtime/core/failureOutcomes.mjs",
+            "sha256": "c4fbd838ebc168f6335a72cee5a6a3a822c87cf22f249ae4a9fecb97db569ffc"
+          },
+          {
+            "path": "runtime/core/gate.mjs",
+            "sha256": "c0026e29fb203d779218f5f8f3418505c91f6c42cca0b9313f4a474c393f3871"
+          },
+          {
+            "path": "runtime/core/hostAutonomy.mjs",
+            "sha256": "1de02cba11a773270163ab28b49e2d00b04c8e72637c64bf3a48cdd21f65f25b"
+          },
+          {
+            "path": "runtime/core/judgeAttention.mjs",
+            "sha256": "49ba475155245bb37db0373396dd248a636628ed952ad8b1ab00794303703d9e"
+          },
+          {
+            "path": "runtime/core/linkedRepair.mjs",
+            "sha256": "f053e9b6f20914273c2be330eeea50eb7caaee10d9c155fe5c50e52f2f797341"
+          },
+          {
+            "path": "runtime/core/managed-isolation.mjs",
+            "sha256": "c8d10d8a5b5b78b128eb9f36b2e2d7ddc5b223bdaae84ea8779b64c7c888bac6"
+          },
+          {
+            "path": "runtime/core/map.mjs",
+            "sha256": "97b87f64b8859289d26f846d4157b65ae152a3280a9906bde7f3222b23cb6890"
+          },
+          {
+            "path": "runtime/core/mapRuntime.mjs",
+            "sha256": "d05b2904d77fbb7bcd692a5d1931bbfe6c1036bcc236f05fb3844296c4442392"
+          },
+          {
+            "path": "runtime/core/migrations.mjs",
+            "sha256": "1721f4c56b498559a9aa259419c99dea72d8fe520d88f1527c7853649b985e23"
+          },
+          {
+            "path": "runtime/core/p5Gate.mjs",
+            "sha256": "32f4545c22775389af7da07520bb74927a429bb0755f9f3b8066788e425c5f36"
+          },
+          {
+            "path": "runtime/core/p5GitCandidate.mjs",
+            "sha256": "b1e57b6c1d16c1f65a0b940645b0dd13e076a6488225350c5084859abe83cf4f"
+          },
+          {
+            "path": "runtime/core/p5HostBoundary.mjs",
+            "sha256": "403cd60a3e0d2e8b3c11c4ede43b54ec4a95692a922efe18e37cbfbbff82e91a"
+          },
+          {
+            "path": "runtime/core/p5Provisioning.mjs",
+            "sha256": "1304299a3bd77730e80a3940d0400111ec6520a5bdf7ec266ce782c3a7f8328b"
+          },
+          {
+            "path": "runtime/core/p5Support.mjs",
+            "sha256": "46b48adbc81bc471b3ec783f5e640d64e3087aa660c67902d6b257181ed10b4d"
+          },
+          {
+            "path": "runtime/core/p6Builder.mjs",
+            "sha256": "593e34ef67ccfb7496631aa9394151bbf89de1db6ce1c0dd52c0f3eff9d822cc"
+          },
+          {
+            "path": "runtime/core/p6Consumer.mjs",
+            "sha256": "a134e0c8b01255a002cc4de7ddffe647a663b347a0d43ae8d481a019727244a8"
+          },
+          {
+            "path": "runtime/core/p6Continuation.mjs",
+            "sha256": "8ea632f249841817b70c1c778309b7a936a37a7b5429b53ecab764098e40e503"
+          },
+          {
+            "path": "runtime/core/p6GitObjectSource.mjs",
+            "sha256": "8d0aed9112410e46bc6b91392644e536c20325791b0643f34833b54c30b64047"
+          },
+          {
+            "path": "runtime/core/p6Reconstruction.mjs",
+            "sha256": "ead42914119efd372605e4899c5a3c20d2cab2ded9e3725f5d37105b8aaf876e"
+          },
+          {
+            "path": "runtime/core/p6Scope.mjs",
+            "sha256": "70c55134dd0a86635b9b5c65886baa58abf99fdd49d817b9dd922e7936572650"
+          },
+          {
+            "path": "runtime/core/p6Successor.mjs",
+            "sha256": "61e4b714f539310a7c243848d41015c2727fc58507434cd956945c940f49f13f"
+          },
+          {
+            "path": "runtime/core/planning.mjs",
+            "sha256": "8103dbf04db38df10d3f2c5a3c9c6cb619d6dd376a3646c704f95311c8ea41da"
+          },
+          {
+            "path": "runtime/core/processes.mjs",
+            "sha256": "d09d71860a11ef4d9459ac7561daf681583a44aef7b65b1282216b294989dff0"
+          },
+          {
+            "path": "runtime/core/protectedSelfRepair.mjs",
+            "sha256": "b7a97823ac82a50bd6ea80984dffddad17d7b8d71d77e826147d728f5e6d6bb9"
+          },
+          {
+            "path": "runtime/core/schemas.mjs",
+            "sha256": "caece3a8c781e907d3c6ec17a2333cd50c0e6e56bc3202fbbf52437550df0ade"
+          },
+          {
+            "path": "runtime/core/store.mjs",
+            "sha256": "c7761a96eabc5e768c7f72fc47ed5e9b7b74ac222df8e7345238a0fafb39e1c3"
+          },
+          {
+            "path": "runtime/core/streams.mjs",
+            "sha256": "923d0c7672fa7846df6a6f2f5ac215beb7b191c9d08911566b361be4f06f2b02"
+          },
+          {
+            "path": "runtime/core/supervision.mjs",
+            "sha256": "13ba0c4e274b5e2379377fdc7fcc9caa8b9a9d4bccb542cbe69f57e50162cf1c"
+          },
+          {
+            "path": "runtime/core/supervisor-client.mjs",
+            "sha256": "5dc8fd5d5b865995d266e6053972f8a21b79b8ed09c2618f340bcd36803573cb"
+          },
+          {
+            "path": "runtime/core/taskAssessment.mjs",
+            "sha256": "823cf684d66c4c4e08eb12c535dfcfcfa227c8d52f6547b5b7b623abe23b7f86"
+          },
+          {
+            "path": "runtime/core/taskProcesses.mjs",
+            "sha256": "5b119e9c78e52ac04704a942c8a22f314c148b2beaa697f6217b7a67e0349f5a"
+          },
+          {
+            "path": "runtime/core/taskRuntime.mjs",
+            "sha256": "231e6d2efc2883dbdc6ba4a194dc4d1ddfd0491a64392a43378a32869c9f2ddf"
+          },
+          {
+            "path": "runtime/core/testEngineProbe.mjs",
+            "sha256": "fd24515a0247404454b08ffb690e119f8a523b0536fd073380d45215c9956f6e"
+          },
+          {
+            "path": "runtime/core/testFaultPolicy.mjs",
+            "sha256": "bb791a274350f2c721ed61917e65b8286e5a02acb497efb64ff87587b01d9b29"
+          },
+          {
+            "path": "runtime/core/transport.mjs",
+            "sha256": "ebcbe0e2cab6415ef19bbfc5585b8d5133732587b47b0cdcb6518c4cf88c9077"
+          },
+          {
+            "path": "runtime/core/utilities.mjs",
+            "sha256": "a09134d1551626f89396ddf789327edf74536241c38112c3e593e6efae3f27e4"
+          },
+          {
+            "path": "runtime/core/validate.mjs",
+            "sha256": "a87205c991ca2d705a72657c296a5d877f8c9bb6310ac2e91bf72fe3c33dc6ab"
+          },
+          {
+            "path": "runtime/core/workflowJudge.mjs",
+            "sha256": "601bcb91339611e78a16ba49f70865b74a79b61d2d2eaa0887dbfce671a9e7ea"
+          },
+          {
+            "path": "runtime/core/workspaceIsolation.mjs",
+            "sha256": "9d670017135a8e92046e3e02c8119ff7bbdfce8e50e5269f8e62ada0b72e4bab"
+          },
+          {
+            "path": "runtime/host/applicationStop.mjs",
+            "sha256": "a767cc027daa673acb29bbd4dfa1c9a616ad1acdcf1faf55862c61b812827827"
+          },
+          {
+            "path": "runtime/host/authority.mjs",
+            "sha256": "04e0b61124ba63c55851d5b3d7fff14d2082ea59ebc919b677b4439bfd9c9b41"
+          },
+          {
+            "path": "runtime/host/buildAttestation.mjs",
+            "sha256": "d89c475f6c79bf128f1570ec0dc610dfda813c6a42c49956ea7f67f1d3815548"
+          },
+          {
+            "path": "runtime/host/buildRunner.mjs",
+            "sha256": "08121d3a9cef91e05d9208d41fb22ecfdfc05d3492e70dc05dcb44cefe255ab0"
+          },
+          {
+            "path": "runtime/host/capabilities.mjs",
+            "sha256": "cbe2813d5f0eada70c1b6b06dee12e62c7949a3c01cdcd10e5eab5254ddbaaf7"
+          },
+          {
+            "path": "runtime/host/controllerQueue.mjs",
+            "sha256": "dd4cb1af2e71c0360ea8ec8a8a9b2943f6b6f35f2246c464a119fc546aca1ca9"
+          },
+          {
+            "path": "runtime/host/hostError.mjs",
+            "sha256": "a207cad9dc2e715fed6c697ed3ecd40d97c91bfca3075e87ebde6599f9430911"
+          },
+          {
+            "path": "runtime/host/incidentOutbox.mjs",
+            "sha256": "3be9c906a314b44e50d9f79d8397436299ce260dc201f2cdad63a6a2d2bc7044"
+          },
+          {
+            "path": "runtime/host/installedBuilds.mjs",
+            "sha256": "295749f0eef161760a2787bb8de4367e22d72486637e8816f24c8fd33a088089"
+          },
+          {
+            "path": "runtime/host/installedEnablement.mjs",
+            "sha256": "e217e320516b97f21b5d307ae9f9d5706c03f0e5c00b3e4e8edaa4db788920de"
+          },
+          {
+            "path": "runtime/host/ipc.mjs",
+            "sha256": "57ffa447ac2c69e70c443270629ba15c5424a42316be7e7c309645b88596b76d"
+          },
+          {
+            "path": "runtime/host/judgeDelivery.mjs",
+            "sha256": "c7d2084edac7f9be96cbdb33ce2ddc4594f821bd982216b67c3bd8c42c3736c4"
+          },
+          {
+            "path": "runtime/host/lifecycle.mjs",
+            "sha256": "5a8a936b910a0215b435b4690347111c59cad4da63f41b8f1abe0f1325cf9eb3"
+          },
+          {
+            "path": "runtime/host/lifecycleBridge.mjs",
+            "sha256": "e1b708dd67bd894e7e76d5d57f1215214bdc4af264d58f389e978204e0fdea32"
+          },
+          {
+            "path": "runtime/host/main.mjs",
+            "sha256": "48c0a3852acf6957391677e6b3caa3965d319576997a49219b6c7cfa55257d96"
+          },
+          {
+            "path": "runtime/host/native/BoundedCommand.cs",
+            "sha256": "91967c90bcbd0f32e4f1f50a42d1e75a2e15ffb229cea6f1bfb88dce036de420"
+          },
+          {
+            "path": "runtime/host/native/ConsentBroker.cs",
+            "sha256": "d567b38346574ab2767c02105f30c5bbbb4649791c54696f7174b174cc209d16"
+          },
+          {
+            "path": "runtime/host/native/ControlService.cs",
+            "sha256": "e68ef526bae47fcd9b1d8dc1d5b6b40dd4177ac2778d4bcf4c292cf7cd3cc87b"
+          },
+          {
+            "path": "runtime/host/native/InteractiveLauncher.cs",
+            "sha256": "085a0b0b2a9dec00b6f9a753277ddb97ed18d75b400ca0c5739e5c6aef506aca"
+          },
+          {
+            "path": "runtime/host/native/NativeWindows.cs",
+            "sha256": "8e562440940cf5af39abf507689cdb58d25031aca4db2c5977b498f3a135651b"
+          },
+          {
+            "path": "runtime/host/native/SourceMetadata.cs",
+            "sha256": "4435395dadd9d730987b9eb5f98e1f6ed75392a08bd49fc3071b8feecd749145"
+          },
+          {
+            "path": "runtime/host/native/jobguard.cs",
+            "sha256": "43243e787d95ea58f60e668b1f0b86e26b1e2340ab8d48a9288af3186f0b93f8"
+          },
+          {
+            "path": "runtime/host/nativeClient.mjs",
+            "sha256": "0183b880fca13205a553c40cdb9b6ff887821e48e913abc7f818926a4e0df24f"
+          },
+          {
+            "path": "runtime/host/nativeUi.mjs",
+            "sha256": "7a886ca4c990510f326e389b339689df696420a38dc6bf5c7ce76bc2e7487e86"
+          },
+          {
+            "path": "runtime/host/observation.mjs",
+            "sha256": "7ac58765af485ba44e3796c10c6363401602aeeed1c4b2a2b14f633941222874"
+          },
+          {
+            "path": "runtime/host/p6Maintenance.mjs",
+            "sha256": "a9e5e1fa36c51ee08999602ab1d92de688854476dd1741ec38bff54a42d8dbcf"
+          },
+          {
+            "path": "runtime/host/p6Switch.mjs",
+            "sha256": "6fe3ec594b4ec6e9e7991f5d8713e39473a01531d0690d2d8e24535501a4c476"
+          },
+          {
+            "path": "runtime/host/profileRecovery.mjs",
+            "sha256": "583248a355c6e38d877588ecc0ba5636a3f32a4fd1c1ec5b7332dee66afe28dc"
+          },
+          {
+            "path": "runtime/host/runtimeBinding.mjs",
+            "sha256": "41633a64669e3e10001bc3a05c0a327b0786e9547c185a3d216a028d3d618d6c"
+          },
+          {
+            "path": "runtime/host/runtimeHttp.mjs",
+            "sha256": "f5793f0361d3a415ee65c71e1e2c0e38fd8555ea9a9e9fb9bb509036b0b81593"
+          },
+          {
+            "path": "runtime/host/runtimeRecovery.mjs",
+            "sha256": "066833e2a0340cf171368d35c46e1cbd9705892b6222b0df20269cdc9ca515fe"
+          },
+          {
+            "path": "runtime/host/runtimeRelease.mjs",
+            "sha256": "5ec350cdb692db5fee0620488613ef3e7053f6de0f6a99698cb95b3e32666d44"
+          },
+          {
+            "path": "runtime/host/serviceActions.mjs",
+            "sha256": "5083235a7b985bb770f24b388f7fe4a648ab32085a4278328730a90a398ebb57"
+          },
+          {
+            "path": "runtime/host/serviceLifecycle.mjs",
+            "sha256": "8aa50152b7ba90007101fcae615f21ee8c5bc6893761a4daa245f08240a60412"
+          },
+          {
+            "path": "runtime/host/serviceRuntime.mjs",
+            "sha256": "a07760f42894c08825f9e98ba9409940321c2bf9fbdf1817efd5bbd8a3b5bef4"
+          },
+          {
+            "path": "runtime/host/sourceProvenance.mjs",
+            "sha256": "8c230e6b9d7c4660af711190a6c229ffd0537f26cfacb14266f513e4c539011b"
+          },
+          {
+            "path": "runtime/host/timeSource.mjs",
+            "sha256": "9e13b6158b45b0788ee17aa757550fbec0dd25702ba9c5ebace0f7d4133cfab5"
+          },
+          {
+            "path": "runtime/host/uiGateway.mjs",
+            "sha256": "7567e2a0fe8d840846dc829b8bd1112aaa94a83c4e7deb2e7cb8b00bbe87e63b"
+          },
+          {
+            "path": "runtime/host/webauthn.mjs",
+            "sha256": "e28ca403555116c4c4ab370a5aef4ce888520e5fcd229dc82829388b3fb44ef2"
+          },
+          {
+            "path": "runtime/host/worker.mjs",
+            "sha256": "4c48afc12b2d24edf96c81bacd98a8756ac306dfb1d9f80b76158e3cac33bebf"
+          },
+          {
+            "path": "runtime/host/workerReconciliation.mjs",
+            "sha256": "36ceafad1743bb22b5b46ea225825777feaabadaafcd844970b3f53505b0799e"
+          },
+          {
+            "path": "runtime/lock.mjs",
+            "sha256": "bcabfbf888629a283473b2ec9884d372692c5714f73e7f971ea1c75d3e7df946"
+          },
+          {
+            "path": "runtime/runner.mjs",
+            "sha256": "8baf78c3085838577a01a458d45ce301e6909867f1eb9f2a7e23afcd42318716"
+          },
+          {
+            "path": "runtime/verification/p5CandidateSyntaxCheck.test.mjs",
+            "sha256": "bebda9d090480731c462dbb1cde067c592d70e9dc3da487c30c8d18c40997e2b"
+          },
+          {
+            "path": "runtime/verification/p5Verifier.mjs",
+            "sha256": "3e3ca6a87f555c1a0198b250bc1a1297c3a02f459880e20a1ff0a2ca21ee66b4"
+          },
+          {
+            "path": "scripts/bundle-runtime.mjs",
+            "sha256": "0dda39218b5438da03a5a977b441fcd42d2a3705fecaa2fe5e0227b9d17509dd"
+          },
+          {
+            "path": "shared/effort.d.mts",
+            "sha256": "490b7c5109411c34e294dc6d05f09497881bed183951b16cc399d692f66e9ca3"
+          },
+          {
+            "path": "shared/effort.mjs",
+            "sha256": "2b440cfc241e9155df70a5779480d22340f5d91c8af2e79284a7cd4fd1a105d8"
+          },
+          {
+            "path": "shared/replay.d.mts",
+            "sha256": "545eb1db470a9ebf15c45b062ed73b3d95c5692c265c7e938be1bdafd9e8ae00"
+          },
+          {
+            "path": "shared/replay.mjs",
+            "sha256": "62e7fc82068d57cc7f4d6241ff920b21eed81707f44a7988fe3db487f74c2d36"
+          },
+          {
+            "path": "shared/task-config.d.mts",
+            "sha256": "4ce04984798446794b538ec2de11f123a5faae0cb470c4ead64de91930f815a8"
+          },
+          {
+            "path": "shared/task-config.mjs",
+            "sha256": "1059e6fb7d33b85a8989dc2941557edfef1642bd775adcb9f2027d3b002e7ad8"
+          },
+          {
+            "path": "tsconfig.json",
+            "sha256": "a84829b1f98ef8fc5d15fa395bf5da42b0e3670e07fdbfd735de4fa57ab9a2cb"
+          },
+          {
+            "path": "vite.config.ts",
+            "sha256": "7d8988304d69d1dcaf3f60246b53510bcf6fd83823ea496f445b2b203303752e"
+          }
+        ]
+      },
+      "migrations": [
+        {
+          "version": 1,
+          "file": "m1.sql",
+          "sha256": "31380786a58380a5b397ed9089bcdf051d9dd2a39f664a67b83ba1dee62a2197",
+          "lfSha256": "31380786a58380a5b397ed9089bcdf051d9dd2a39f664a67b83ba1dee62a2197",
+          "crlfSha256": "50319fd20d83a1658db1268015a89743f7b787610db89efbd3a0f475cc37924c"
+        },
+        {
+          "version": 2,
+          "file": "m2.sql",
+          "sha256": "88fc4ad1976d2153eea77ce177e138c1b7c74eea5bba9dbccc5a27bcbaef3c9b",
+          "lfSha256": "0eb40cfe30b9af45853de1a38fceb2696d6a506585c8310ec8c6324e3811e1fb",
+          "crlfSha256": "88fc4ad1976d2153eea77ce177e138c1b7c74eea5bba9dbccc5a27bcbaef3c9b"
+        },
+        {
+          "version": 3,
+          "file": "m3.sql",
+          "sha256": "054cdc35a3f9eba36329552367b6d09016a8ee41695d649633e699bcd5342245",
+          "lfSha256": "054cdc35a3f9eba36329552367b6d09016a8ee41695d649633e699bcd5342245",
+          "crlfSha256": "3d6521753c02e06ffd8e87d2954fe6a4c64685ad2b3e12e798d73c7715969a5c"
+        },
+        {
+          "version": 4,
+          "file": "m4.sql",
+          "sha256": "d7fa40960652d2426c16a36b6eaa88a1b5f3ceb10015ea8497dbd209545a94c2",
+          "lfSha256": "d7fa40960652d2426c16a36b6eaa88a1b5f3ceb10015ea8497dbd209545a94c2",
+          "crlfSha256": "49d133c1873758169714ade29f0bf61dae1ff2879e2cb59fb29cd4f3e2f45551"
+        },
+        {
+          "version": 5,
+          "file": "m5.sql",
+          "sha256": "e5ed02f8a75106a061655965392d312f090f2f02ba6b8ec7928a22ac619ac231",
+          "lfSha256": "e5ed02f8a75106a061655965392d312f090f2f02ba6b8ec7928a22ac619ac231",
+          "crlfSha256": "359845dc9cc6aa794449b77544e084be82e0e2ba523c18d022155edd5dd7b2cb"
+        },
+        {
+          "version": 6,
+          "file": "m6.sql",
+          "sha256": "229bf5f3adc23741a9721b40f99196e56e41a1b85fa436e24fab3d1019c352b8",
+          "lfSha256": "229bf5f3adc23741a9721b40f99196e56e41a1b85fa436e24fab3d1019c352b8",
+          "crlfSha256": "a10e43c627da85ec237eb16c88956d2ce8f2a14688a1a076a4d2405112f21bdd"
+        },
+        {
+          "version": 7,
+          "file": "m7.sql",
+          "sha256": "bedba4c8956d4c20260df500b0c89e4844e58f76581b81b0d4d7f228179706fd",
+          "lfSha256": "bedba4c8956d4c20260df500b0c89e4844e58f76581b81b0d4d7f228179706fd",
+          "crlfSha256": "7fe885ec960e8805e9967d59954e9430db4294bedc2d3ba1356ab7e63ffe26a7"
+        },
+        {
+          "version": 8,
+          "file": "m8.sql",
+          "sha256": "ac7d800f02a14592eb9f1b0a9b9def20a3a164aeaed20742798cdaecc8c36b0f",
+          "lfSha256": "2be8fd0ddf0b95904b55d3a547b642826bd54d66963ce477b2736e5377018c00",
+          "crlfSha256": "ac7d800f02a14592eb9f1b0a9b9def20a3a164aeaed20742798cdaecc8c36b0f"
+        },
+        {
+          "version": 9,
+          "file": "m9.sql",
+          "sha256": "74179d9176d004169de4dfeefaf95dbf89331d95318923c29f7d58c25624d432",
+          "lfSha256": "68734a8348d18a40a1e9756f06e9f093cb19a0e44e49380271d3203f3e0d749c",
+          "crlfSha256": "74179d9176d004169de4dfeefaf95dbf89331d95318923c29f7d58c25624d432"
+        },
+        {
+          "version": 10,
+          "file": "m10.sql",
+          "sha256": "ee59469ef780e51c113857b443d33e4f1823828e06e7aa5bc45377f0862719f6",
+          "lfSha256": "ee59469ef780e51c113857b443d33e4f1823828e06e7aa5bc45377f0862719f6",
+          "crlfSha256": "d27d249dad4ff2d82b5f1fada4a3b7a60696bf391702e4f82b4cfcf34eb57c5d"
+        },
+        {
+          "version": 11,
+          "file": "m11.sql",
+          "sha256": "079a883d25053c86c254e5124cd63792a946f3bcbc3927e488e3edc7c33b1612",
+          "lfSha256": "079a883d25053c86c254e5124cd63792a946f3bcbc3927e488e3edc7c33b1612",
+          "crlfSha256": "76eb22c78b8dae61770260b76ee33f8bf46a0ea2e6492e1c3c3ba303a913e3bf"
+        },
+        {
+          "version": 12,
+          "file": "m12.sql",
+          "sha256": "cc699b4cf99aebe541b3172c7ff56c4e8ebe477a17bc35bcf233891d261c2f83",
+          "lfSha256": "cc699b4cf99aebe541b3172c7ff56c4e8ebe477a17bc35bcf233891d261c2f83",
+          "crlfSha256": "d64a2655c1e987ac636ee1f436ef49644ce2bbe11d0d1338481c8a2d7828d19c"
+        },
+        {
+          "version": 13,
+          "file": "m13.sql",
+          "sha256": "3511906083ed587dae60d8f29d3b7bac58546127f4296df65dda630c21b60a77",
+          "lfSha256": "3511906083ed587dae60d8f29d3b7bac58546127f4296df65dda630c21b60a77",
+          "crlfSha256": "6f9ddd16fdf3d919da80326ae422a65ed2bdcf1d6b23a507d6ab5933a5ff6de8"
+        },
+        {
+          "version": 14,
+          "file": "m14.sql",
+          "sha256": "5a390baf77bce83bca7a3626af6b21668521393f094a64c8ce5c0080e892b8f7",
+          "lfSha256": "5a390baf77bce83bca7a3626af6b21668521393f094a64c8ce5c0080e892b8f7",
+          "crlfSha256": "591fad89224e0a3971d6bd6b760dea6f2c7f2cee1f735d6f51e9feafae0051cc"
+        },
+        {
+          "version": 15,
+          "file": "m15.sql",
+          "sha256": "b5e4f9ed6d26d5bde53de0a03ecf751cefad24f20a18e95a974b1681e22bbe98",
+          "lfSha256": "b5e4f9ed6d26d5bde53de0a03ecf751cefad24f20a18e95a974b1681e22bbe98",
+          "crlfSha256": "5a7def118047a4f92537b1c0c6372b2ab8086300e3b130ecf39d2845860993df"
+        },
+        {
+          "version": 16,
+          "file": "m16.sql",
+          "sha256": "a80a4ce319ee5a7d29f9a003239d42b68cf2e9700e4231c4941f720ecb3b9117",
+          "lfSha256": "a80a4ce319ee5a7d29f9a003239d42b68cf2e9700e4231c4941f720ecb3b9117",
+          "crlfSha256": "b232b9585160dffb00276ca87fa7e31d79883843cf9b5033077a6e9f399694e4"
+        },
+        {
+          "version": 17,
+          "file": "m17.sql",
+          "sha256": "11c239a1dde0c5390db667bb3aabf0de2c94312f199c8f6f5016648c2d11c493",
+          "lfSha256": "11c239a1dde0c5390db667bb3aabf0de2c94312f199c8f6f5016648c2d11c493",
+          "crlfSha256": "7dfcf144fc0fa200d172475ebc5bc9d0c738bc945b882527ab7d6f22101357a9"
+        },
+        {
+          "version": 18,
+          "file": "m18.sql",
+          "sha256": "8ad90c3ca41bb6e943d408fca86280d2e43fc8af7ae5e6c1280582af96031449",
+          "lfSha256": "8ad90c3ca41bb6e943d408fca86280d2e43fc8af7ae5e6c1280582af96031449",
+          "crlfSha256": "317766119f6cb9e38d296a6408f551e48cf74e894896be4f5e1289dd20b2b223"
+        },
+        {
+          "version": 19,
+          "file": "m19.sql",
+          "sha256": "b0a70b98939255cb4b192a35d0bda0d8574b735210f3681c719a40b5ddc14b08",
+          "lfSha256": "b0a70b98939255cb4b192a35d0bda0d8574b735210f3681c719a40b5ddc14b08",
+          "crlfSha256": "7283aa3ce37f77280ae0bd31c0085cbc9271acd0bd9173512e1339eac9b478ab"
+        },
+        {
+          "version": 20,
+          "file": "m20.sql",
+          "sha256": "cc7dc2941e7ce3e28a029232369ea6b36e10810e31ec1149ed5acc13a2474d66",
+          "lfSha256": "cc7dc2941e7ce3e28a029232369ea6b36e10810e31ec1149ed5acc13a2474d66",
+          "crlfSha256": "713302725972a0002e7a2847d60818ffe6712e7954f05e864f43ccab96a423ca"
+        },
+        {
+          "version": 21,
+          "file": "m21.sql",
+          "sha256": "29e41322a3b0a062ede3d6fc2b93570fb70022817b6eb1ffbe23cadc1a6b28bd",
+          "lfSha256": "29e41322a3b0a062ede3d6fc2b93570fb70022817b6eb1ffbe23cadc1a6b28bd",
+          "crlfSha256": "741f42431a6f912987bbf4e5bb2d3ee8b7756b0d5918ff66976a79a138554098"
+        },
+        {
+          "version": 22,
+          "file": "m22.sql",
+          "sha256": "6fabcf99e5456667f2ae278aa3f1fa2feaa6a3751e2439d8e0e60bc31ab61b73",
+          "lfSha256": "6fabcf99e5456667f2ae278aa3f1fa2feaa6a3751e2439d8e0e60bc31ab61b73",
+          "crlfSha256": "4743aa66c46b371c297b9c1613fafc1ac8febbd1b77b721a63082e9834b3dd95"
+        }
+      ],
+      "files": {
+        "bridge.mjs": "ff2b9842e3beae99b47ff0e823d2a73dcb432c557f37c587ff158c7a33a3bc50",
+        "deszo-launch-shim.exe": "675e47b9640fdf00e6945c0a6325c0b93656f4acffb201a1fa4ce6924a71fc7d",
+        "host-h1.sql": "7691e3f709cb315d69d17ae7d369f3af6807d776cd939fec3efbed7974791117",
+        "host-h2.sql": "17fd9345100e8120b80549ca04585f6c358c27225e72a47a02bcbae25371734c",
+        "host-h3.sql": "8e3cfcf22e5f77f26a41bb605897a8007833f2a2a040512536f01b9fda7c4da7",
+        "host-h4.sql": "f21895c05983bb038498e7599ce8b35c03a3ae9f34a1da7e4669cb7f949aba0a",
+        "host-h5.sql": "480117fa740b0bb48d476fe2e5fcc686e9ec991027652e9581e925251dde8715",
+        "host.mjs": "e53b1445db582a4e3c7f62643e42ec769a7d598acbd31bc17a1178f0fa7d7a9f",
+        "m1.sql": "31380786a58380a5b397ed9089bcdf051d9dd2a39f664a67b83ba1dee62a2197",
+        "m10.sql": "ee59469ef780e51c113857b443d33e4f1823828e06e7aa5bc45377f0862719f6",
+        "m11.sql": "079a883d25053c86c254e5124cd63792a946f3bcbc3927e488e3edc7c33b1612",
+        "m12.sql": "cc699b4cf99aebe541b3172c7ff56c4e8ebe477a17bc35bcf233891d261c2f83",
+        "m13.sql": "3511906083ed587dae60d8f29d3b7bac58546127f4296df65dda630c21b60a77",
+        "m14.sql": "5a390baf77bce83bca7a3626af6b21668521393f094a64c8ce5c0080e892b8f7",
+        "m15.sql": "b5e4f9ed6d26d5bde53de0a03ecf751cefad24f20a18e95a974b1681e22bbe98",
+        "m16.sql": "a80a4ce319ee5a7d29f9a003239d42b68cf2e9700e4231c4941f720ecb3b9117",
+        "m17.sql": "11c239a1dde0c5390db667bb3aabf0de2c94312f199c8f6f5016648c2d11c493",
+        "m18.sql": "8ad90c3ca41bb6e943d408fca86280d2e43fc8af7ae5e6c1280582af96031449",
+        "m19.sql": "b0a70b98939255cb4b192a35d0bda0d8574b735210f3681c719a40b5ddc14b08",
+        "m2.sql": "88fc4ad1976d2153eea77ce177e138c1b7c74eea5bba9dbccc5a27bcbaef3c9b",
+        "m20.sql": "cc7dc2941e7ce3e28a029232369ea6b36e10810e31ec1149ed5acc13a2474d66",
+        "m21.sql": "29e41322a3b0a062ede3d6fc2b93570fb70022817b6eb1ffbe23cadc1a6b28bd",
+        "m22.sql": "6fabcf99e5456667f2ae278aa3f1fa2feaa6a3751e2439d8e0e60bc31ab61b73",
+        "m3.sql": "054cdc35a3f9eba36329552367b6d09016a8ee41695d649633e699bcd5342245",
+        "m4.sql": "d7fa40960652d2426c16a36b6eaa88a1b5f3ceb10015ea8497dbd209545a94c2",
+        "m5.sql": "e5ed02f8a75106a061655965392d312f090f2f02ba6b8ec7928a22ac619ac231",
+        "m6.sql": "229bf5f3adc23741a9721b40f99196e56e41a1b85fa436e24fab3d1019c352b8",
+        "m7.sql": "bedba4c8956d4c20260df500b0c89e4844e58f76581b81b0d4d7f228179706fd",
+        "m8.sql": "ac7d800f02a14592eb9f1b0a9b9def20a3a164aeaed20742798cdaecc8c36b0f",
+        "m9.sql": "74179d9176d004169de4dfeefaf95dbf89331d95318923c29f7d58c25624d432",
+        "runner.mjs": "e613e385c6e10e7e69c77b3a676ade2a2102f247cf16da3117aa9d2d4af4267d",
+        "service-runtime.mjs": "9826db216025180d55b1019aec3f5e996c4af08b97784796345f27f9e6575f2e",
+        "worker.mjs": "a49db7e31f780cd1df05a7cfed0753870aa601e3f9437dcf53ead7b26eca3037"
+      },
+      "controllerTransport": {
+        "fingerprint": "c5f27a74be22ec8cb41cdbbb0f21725eefd8d086af126529b94772b2a3284f5d",
+        "clientVersion": "deszo-stdio-controller/1"
+      },
+      "assurance": "Local build metadata; not ADR-0006 trusted build attestation or authority."
+    }
+  },
+  "artifacts": [
+    {
+      "name": "lifecycleHost",
+      "path": "lifecycle-host/target/release/deszo-lifecycle-host.exe",
+      "currentSha256": "9b910e59742548999512c373a638a9316f6aa216b26c377e9be259045aca486f",
+      "recordedSha256": "9b910e59742548999512c373a638a9316f6aa216b26c377e9be259045aca486f",
+      "matchesRecorded": true
+    },
+    {
+      "name": "shell",
+      "path": "src-tauri/target/release/deszo.exe",
+      "currentSha256": "ee711807410007c5db22ad762aeda7e2a5614494d02af65484b2f5b696e2a21f",
+      "recordedSha256": "5fcf84378721fa02ec21ad297fbc7a4441bf43c9fb5b9c8448bc995fc0181807",
+      "matchesRecorded": false
+    },
+    {
+      "name": "launchShim(src-tauri)",
+      "path": "src-tauri/target/release/deszo-launch-shim.exe",
+      "currentSha256": "0e7ca42b7dd02a28db97213433a9094b7f430c94e4356abea0f90d3102524a74",
+      "recordedSha256": "27f7d83d3e015031b189d74296b6aa5c796df2039c980b70b1ae903461a850f8",
+      "matchesRecorded": false
+    },
+    {
+      "name": "runner",
+      "path": "dist-runtime/runner.mjs",
+      "currentSha256": "e613e385c6e10e7e69c77b3a676ade2a2102f247cf16da3117aa9d2d4af4267d",
+      "recordedSha256": "e613e385c6e10e7e69c77b3a676ade2a2102f247cf16da3117aa9d2d4af4267d",
+      "matchesRecorded": true
+    },
+    {
+      "name": "bridge",
+      "path": "dist-runtime/bridge.mjs",
+      "currentSha256": "ff2b9842e3beae99b47ff0e823d2a73dcb432c557f37c587ff158c7a33a3bc50",
+      "recordedSha256": "ff2b9842e3beae99b47ff0e823d2a73dcb432c557f37c587ff158c7a33a3bc50",
+      "matchesRecorded": true
+    },
+    {
+      "name": "host.mjs",
+      "path": "dist-runtime/host.mjs",
+      "currentSha256": "e53b1445db582a4e3c7f62643e42ec769a7d598acbd31bc17a1178f0fa7d7a9f",
+      "recordedSha256": "e53b1445db582a4e3c7f62643e42ec769a7d598acbd31bc17a1178f0fa7d7a9f",
+      "matchesRecorded": true
+    },
+    {
+      "name": "launchShim(dist-runtime)",
+      "path": "dist-runtime/deszo-launch-shim.exe",
+      "currentSha256": "675e47b9640fdf00e6945c0a6325c0b93656f4acffb201a1fa4ce6924a71fc7d",
+      "recordedSha256": "932347c5ec8338807f787ad70ae25e99fbc06811dbfdffb6a5013773a036774b",
+      "matchesRecorded": false
+    }
+  ]
+}

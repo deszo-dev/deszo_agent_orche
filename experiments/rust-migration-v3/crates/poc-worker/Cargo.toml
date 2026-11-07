@@ -1,0 +1,22 @@
+[package]
+name = "poc-worker"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+poc-protocol = { path = "../poc-protocol" }
+serde_json.workspace = true
+windows-sys.workspace = true
+
+[[bin]]
+name = "poc-worker-a"
+path = "src/bin/worker_a.rs"
+
+[[bin]]
+name = "poc-worker-b"
+path = "src/bin/worker_b.rs"
+
+[[bin]]
+name = "poc-worker-fault"
+path = "src/bin/worker_fault.rs"
+

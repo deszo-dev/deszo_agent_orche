@@ -1,0 +1,21 @@
+{
+  "suite": "ADR-0007 Multi-Provider External Judge Verification",
+  "timestamp": "2026-10-21T12:11:44.169Z",
+  "results": [
+    {
+      "provider": "CODEX",
+      "status": "BLOCKED",
+      "version": "0.163.0-alpha.10.2"
+    },
+    {
+      "provider": "ANTIGRAVITY",
+      "status": "PASS",
+      "version": "1.4.4"
+    },
+    {
+      "provider": "CLAUDE",
+      "status": "POLICY_BLOCKED",
+      "version": "2.1.302 (Claude Code)"
+    }
+  ]
+}

@@ -8,6 +8,7 @@ import { Store } from '../core/store.mjs';
 import { values as valueHelpers } from '../core/utilities.mjs';
 import * as gate from '../core/gate.mjs';
 import { contextChain, singleAgent, startTestRunner } from './helpers.mjs';
+import { ownedPath } from './test-roots.mjs';
 
 const read = path => JSON.parse(readFileSync(resolve(import.meta.dirname, '../../docs', path), 'utf8'));
 const decisions = read('fixtures/decisions.json');
@@ -276,7 +277,8 @@ test('manual chat continues a ready binding as a chat run hidden from workflow l
     const reserved = await api.call('PUT', '/api/v3/workflows/context-chat', {
       requestId: randomUUID(), expectedEtag: null, workflow: { ...singleAgent(), workflowId: 'context-chat' },
     }, { headers: { 'If-None-Match': '*' } });
-    assert.equal(reserved.status, 409);
+    assert.equal(reserved.status, 410);
+    assert.equal(reserved.body.code, 'api_upgrade_required');
     const unknown = await api.call('POST', `/api/v2/context-bindings/${randomUUID()}/messages`, { requestId: randomUUID(), workspaceId: 'main', model: 'fixture-echo', prompt: 'x' });
     assert.equal(unknown.status, 404);
   } finally { await api.close(); }
@@ -392,7 +394,7 @@ test('a scoped Stop pauses a nested loop, active time counts for both loops, and
 const claimRef = store => (({ artifactId, sha256 }) => ({ artifactId, sha256 }))(store.putJson({ review: true }));
 
 test('verify never accepts a certificate the engine did not issue or one for another subject', () => {
-  const root = join(resolve(import.meta.dirname, '../../.deszo/tests'), `gate-${randomUUID()}`);
+  const root = ownedPath(join(resolve(import.meta.dirname, '../../.deszo/tests'), `gate-${randomUUID()}`));
   mkdirSync(root, { recursive: true });
   const store = new Store(root);
   try {

@@ -1,0 +1,23 @@
+{
+  "runRoot": "<POC_ROOT>",
+  "generatedBy": "run-poc.mjs",
+  "experiments": [
+    {
+      "id": "POC-02",
+      "status": "PASS",
+      "failedChecks": [],
+      "elapsedMs": 5965,
+      "exitCode": 0
+    },
+    {
+      "id": "POC-05",
+      "status": "FAIL",
+      "failedChecks": [
+        "S2 a write from a superseded owner generation is refused by the client",
+        "S3c a copied rollout cannot be resumed as the same session in another profile while the owner is alive"
+      ],
+      "elapsedMs": 3562,
+      "exitCode": 0
+    }
+  ]
+}

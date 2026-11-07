@@ -1,0 +1,507 @@
+{
+  "schemaVersion": 1,
+  "kind": "P6BuildGenuineE2EEvidence",
+  "phases": {
+    "aToB": {
+      "parentRunId": "3a77dd09-e89f-401b-b268-ee87c19057b2",
+      "linkId": "23caaabc-7fbb-432a-8f50-c71754213431",
+      "repairRunId": "23865238-3f3e-4b6f-b45f-946ed56743ef",
+      "handoffSequence": 91,
+      "handoff": {
+        "record": {
+          "artifactId": "3235b283-db8f-4e06-94bc-7668b9ecd838",
+          "sha256": "fe199ecb4117c2d6b0db175213555bf2dd0170d04717a7f8f405ca7e2571b49b"
+        },
+        "candidateId": "1620fa34e7c80d9320e2644a1574fb6ccc0765d9ff659595d21d8b944560fe9b",
+        "gitCandidate": {
+          "artifactId": "e15e1fef-4774-4799-8c70-84b12bac1cd2",
+          "sha256": "4f74a6de6f8e5732e47f91f8cc7f6b3e02b19d2350ebfdd8830e6851cb8322e5"
+        }
+      },
+      "operation": {
+        "operationId": "a26577ac-93a6-4aff-9c07-d12979f724fb",
+        "phase": "verified",
+        "toBuildId": "engine-1620fa34e7c8",
+        "packageSha256": "aad41a884e9da80b0c2c7d77b0b6412579110ecb1dd17f12f2b87661133134c1",
+        "fallbackAttempted": false
+      },
+      "verifiedAt": "1793801496880"
+    },
+    "claimedSlotRefusal": {
+      "slot": "p5-slot-1",
+      "status": 409,
+      "code": "p5_workspace_reserved"
+    },
+    "bContinuation": {
+      "release": {
+        "bootstrap": "engine",
+        "buildId": "engine-1620fa34e7c8",
+        "committedOperationId": "a26577ac-93a6-4aff-9c07-d12979f724fb",
+        "inputsDigest": "28dac2285a701a9ddbcf9b4a6e666563dd89ba67fc90e4b0b07e5d1df66c3622",
+        "installationId": "5f97023b2741b826ddbc8816f36a4a23",
+        "kind": "ProtectedSelfRepairRunningSourceRelease",
+        "packageSha256": "aad41a884e9da80b0c2c7d77b0b6412579110ecb1dd17f12f2b87661133134c1",
+        "schemaVersion": 1,
+        "sourceCommit": "5eb1b2bc2cc76bffafb1b1253a26b61b2f43a7b5",
+        "sourceDigest": "40226cd3df073ed10397812fb4f55a7c5a5422b3609f8e06fb2712ee42837e14"
+      },
+      "admission": {
+        "enabled": true,
+        "reasons": [],
+        "enrollmentId": "0e3c2fda-e6e0-4f35-a1c8-72df47c076d3",
+        "lifecycleGeneration": "7e960b22-5766-4429-a876-24f6a55f45fd",
+        "engineEpoch": 4,
+        "decidedAt": "2026-11-04T14:11:35.941Z"
+      }
+    },
+    "bToC": {
+      "parentRunId": "ca38fb23-eaa0-404c-bec8-04256834799f",
+      "linkId": "7338804e-670c-41a1-81e2-ff351c5abf79",
+      "repairRunId": "cf7a46ae-d3e8-4984-87bc-d7f38833e53b",
+      "settled": "handoff",
+      "evidence": {
+        "sequence": 91,
+        "type": "self_repair.handoff_recorded",
+        "payload": {
+          "record": {
+            "artifactId": "ec9b5c45-9f21-4884-af31-9978ed09c757",
+            "sha256": "266266ffd362b33b9449b230a88dbca3d34cf27b40d05262ce1a59462993b72d"
+          }
+        }
+      },
+      "handoff": {
+        "record": {
+          "artifactId": "ec9b5c45-9f21-4884-af31-9978ed09c757",
+          "sha256": "266266ffd362b33b9449b230a88dbca3d34cf27b40d05262ce1a59462993b72d"
+        },
+        "candidateId": "5229a00add21a8f4faf56204aaa6771ea7492e99812aa2ddab2d5905c6d7f37e",
+        "gitCandidate": {
+          "artifactId": "0b500310-7f0b-42b6-af6f-d4ff414e8828",
+          "sha256": "e6e063196e07c4efbe55f2fbe80c7e174e817137d7c5afae9f76d58341a038fd"
+        }
+      },
+      "operation": {
+        "operationId": "3e40db4d-b2fe-42cd-bf9d-fbd9fe8e8428",
+        "phase": "verified",
+        "toBuildId": "engine-5229a00add21",
+        "packageSha256": "f4702a58341aac59116827289fde167c85dfa5a19e02ec51479ded12067a255d",
+        "fallbackAttempted": false,
+        "verifiedAt": "1793801804972"
+      }
+    },
+    "cContinuation": {
+      "release": {
+        "bootstrap": "engine",
+        "buildId": "engine-5229a00add21",
+        "committedOperationId": "3e40db4d-b2fe-42cd-bf9d-fbd9fe8e8428",
+        "inputsDigest": "10785dd74c834fd8b3e49a4a70dab3195cf7fa28d510ae8120cce78320931dfb",
+        "installationId": "5f97023b2741b826ddbc8816f36a4a23",
+        "kind": "ProtectedSelfRepairRunningSourceRelease",
+        "packageSha256": "f4702a58341aac59116827289fde167c85dfa5a19e02ec51479ded12067a255d",
+        "schemaVersion": 1,
+        "sourceCommit": "f050d5f28afaf606f2ee6552af783cfedc90344a",
+        "sourceDigest": "bfe26ec7232b7282119c5f1724213c5e4743dd1594947b72e90f8cf0b3f9887f"
+      },
+      "admission": {
+        "enabled": true,
+        "reasons": [],
+        "enrollmentId": "0e3c2fda-e6e0-4f35-a1c8-72df47c076d3",
+        "lifecycleGeneration": "4cceb511-35a0-41f0-86c9-d65e36e3181b",
+        "engineEpoch": 5,
+        "decidedAt": "2026-11-04T14:16:43.567Z"
+      }
+    }
+  },
+  "source": {
+    "releaseCommit": "53cb7905a77d71bcd384e4762de9e3c7de2411ff",
+    "historyRoot": "bb747886827c4fe1f61da2e6f0abac56f4064bfa"
+  },
+  "engineA": {
+    "buildId": "engine-a",
+    "sourceCommit": "53cb7905a77d71bcd384e4762de9e3c7de2411ff",
+    "sourceDigest": "8a715d26f06aa6d19496e5340d0620a98315cd35d21250f43a6708f3f15c301e",
+    "inputsDigest": "d92a883decf71ae12f783b9364f5790f60e503e7b137a6e28a77ba3183785042"
+  },
+  "enrollment": {
+    "enrollmentId": "0e3c2fda-e6e0-4f35-a1c8-72df47c076d3",
+    "baselineId": "18c395cdcd240c9f449c71428988441c9088ed181a91f805d56c43a351b8062b",
+    "verificationPolicy": {
+      "artifactId": "d7bdc5d5-57f7-4dd5-9dd0-e36cbc776653",
+      "sha256": "b9ce53d841abae79b2e7143e2134977772bc2d3bae84d82f80375770e7065504"
+    },
+    "runningSourceRelease": {
+      "artifactId": "1dabe2de-6007-4a97-b672-7ea77e03aed6",
+      "sha256": "9dff70f50f432152015e4c8a45267420a206693186807a09a8d68fdc582bea5b"
+    }
+  },
+  "ownerActions": {
+    "setupCalls": 14,
+    "window": [
+      {
+        "window": "a_to_c",
+        "method": "GET",
+        "path": "/api/v2/installation/source-release",
+        "status": 200
+      },
+      {
+        "window": "a_to_c",
+        "method": "POST",
+        "path": "/api/v2/runs",
+        "status": 409
+      },
+      {
+        "window": "a_to_c",
+        "method": "POST",
+        "path": "/api/v2/runs",
+        "status": 202
+      }
+    ],
+    "forbidden": [],
+    "boundaries": {
+      "open": {
+        "rootEnrollmentSha256": "b2703c79299c02956f9d499557a87af223bf72ef15ca7c9694fa665008146598",
+        "originRefs": "refs/heads/main 53cb7905a77d71bcd384e4762de9e3c7de2411ff"
+      },
+      "close": {
+        "rootEnrollmentSha256": "b2703c79299c02956f9d499557a87af223bf72ef15ca7c9694fa665008146598",
+        "originRefs": "refs/heads/main 53cb7905a77d71bcd384e4762de9e3c7de2411ff"
+      }
+    }
+  },
+  "rootEnrollmentSha256": "b2703c79299c02956f9d499557a87af223bf72ef15ca7c9694fa665008146598",
+  "originMain": "53cb7905a77d71bcd384e4762de9e3c7de2411ff",
+  "claims": [
+    {
+      "repairRunId": "23865238-3f3e-4b6f-b45f-946ed56743ef",
+      "slot": "p5-slot-1",
+      "state": "succeeded"
+    },
+    {
+      "repairRunId": "cf7a46ae-d3e8-4984-87bc-d7f38833e53b",
+      "slot": "p5-slot-2",
+      "state": "succeeded"
+    }
+  ],
+  "pool": [
+    "p5-slot-1",
+    "p5-slot-2",
+    "p5-slot-3"
+  ],
+  "switches": [
+    {
+      "at": "1793801199925",
+      "type": "engine_ready",
+      "buildId": "engine-a",
+      "operationId": null,
+      "packageSha256": null
+    },
+    {
+      "at": "1793801224312",
+      "type": "engine_ready",
+      "buildId": "engine-a",
+      "operationId": null,
+      "packageSha256": null
+    },
+    {
+      "at": "1793801243224",
+      "type": "engine_ready",
+      "buildId": "engine-a",
+      "operationId": null,
+      "packageSha256": null
+    },
+    {
+      "at": "1793801462875",
+      "type": "engine_staged",
+      "buildId": "engine-1620fa34e7c8",
+      "operationId": "a26577ac-93a6-4aff-9c07-d12979f724fb",
+      "packageSha256": "aad41a884e9da80b0c2c7d77b0b6412579110ecb1dd17f12f2b87661133134c1"
+    },
+    {
+      "at": "1793801471623",
+      "type": "engine_switch_accepted",
+      "buildId": null,
+      "operationId": "a26577ac-93a6-4aff-9c07-d12979f724fb",
+      "packageSha256": null
+    },
+    {
+      "at": "1793801488795",
+      "type": "engine_switch_committed",
+      "buildId": "engine-1620fa34e7c8",
+      "operationId": "a26577ac-93a6-4aff-9c07-d12979f724fb",
+      "packageSha256": "aad41a884e9da80b0c2c7d77b0b6412579110ecb1dd17f12f2b87661133134c1"
+    },
+    {
+      "at": "1793801496880",
+      "type": "engine_switch_verified",
+      "buildId": null,
+      "operationId": "a26577ac-93a6-4aff-9c07-d12979f724fb",
+      "packageSha256": null
+    },
+    {
+      "at": "1793801496882",
+      "type": "engine_ready",
+      "buildId": "engine-1620fa34e7c8",
+      "operationId": null,
+      "packageSha256": null
+    },
+    {
+      "at": "1793801769717",
+      "type": "engine_staged",
+      "buildId": "engine-5229a00add21",
+      "operationId": "3e40db4d-b2fe-42cd-bf9d-fbd9fe8e8428",
+      "packageSha256": "f4702a58341aac59116827289fde167c85dfa5a19e02ec51479ded12067a255d"
+    },
+    {
+      "at": "1793801778777",
+      "type": "engine_switch_accepted",
+      "buildId": null,
+      "operationId": "3e40db4d-b2fe-42cd-bf9d-fbd9fe8e8428",
+      "packageSha256": null
+    },
+    {
+      "at": "1793801796261",
+      "type": "engine_switch_committed",
+      "buildId": "engine-5229a00add21",
+      "operationId": "3e40db4d-b2fe-42cd-bf9d-fbd9fe8e8428",
+      "packageSha256": "f4702a58341aac59116827289fde167c85dfa5a19e02ec51479ded12067a255d"
+    },
+    {
+      "at": "1793801804972",
+      "type": "engine_switch_verified",
+      "buildId": null,
+      "operationId": "3e40db4d-b2fe-42cd-bf9d-fbd9fe8e8428",
+      "packageSha256": null
+    },
+    {
+      "at": "1793801804974",
+      "type": "engine_ready",
+      "buildId": "engine-5229a00add21",
+      "operationId": null,
+      "packageSha256": null
+    }
+  ],
+  "handoffs": {
+    "a": {
+      "parentRunId": "3a77dd09-e89f-401b-b268-ee87c19057b2",
+      "linkId": "23caaabc-7fbb-432a-8f50-c71754213431",
+      "repairRunId": "23865238-3f3e-4b6f-b45f-946ed56743ef",
+      "handoffSequence": 91,
+      "handoff": {
+        "record": {
+          "artifactId": "3235b283-db8f-4e06-94bc-7668b9ecd838",
+          "sha256": "fe199ecb4117c2d6b0db175213555bf2dd0170d04717a7f8f405ca7e2571b49b"
+        },
+        "candidateId": "1620fa34e7c80d9320e2644a1574fb6ccc0765d9ff659595d21d8b944560fe9b",
+        "gitCandidate": {
+          "artifactId": "e15e1fef-4774-4799-8c70-84b12bac1cd2",
+          "sha256": "4f74a6de6f8e5732e47f91f8cc7f6b3e02b19d2350ebfdd8830e6851cb8322e5"
+        }
+      },
+      "operation": {
+        "operationId": "a26577ac-93a6-4aff-9c07-d12979f724fb",
+        "phase": "verified",
+        "toBuildId": "engine-1620fa34e7c8",
+        "packageSha256": "aad41a884e9da80b0c2c7d77b0b6412579110ecb1dd17f12f2b87661133134c1",
+        "fallbackAttempted": false
+      },
+      "verifiedAt": "1793801496880"
+    },
+    "b": {
+      "parentRunId": "ca38fb23-eaa0-404c-bec8-04256834799f",
+      "linkId": "7338804e-670c-41a1-81e2-ff351c5abf79",
+      "repairRunId": "cf7a46ae-d3e8-4984-87bc-d7f38833e53b",
+      "settled": "handoff",
+      "evidence": {
+        "sequence": 91,
+        "type": "self_repair.handoff_recorded",
+        "payload": {
+          "record": {
+            "artifactId": "ec9b5c45-9f21-4884-af31-9978ed09c757",
+            "sha256": "266266ffd362b33b9449b230a88dbca3d34cf27b40d05262ce1a59462993b72d"
+          }
+        }
+      },
+      "handoff": {
+        "record": {
+          "artifactId": "ec9b5c45-9f21-4884-af31-9978ed09c757",
+          "sha256": "266266ffd362b33b9449b230a88dbca3d34cf27b40d05262ce1a59462993b72d"
+        },
+        "candidateId": "5229a00add21a8f4faf56204aaa6771ea7492e99812aa2ddab2d5905c6d7f37e",
+        "gitCandidate": {
+          "artifactId": "0b500310-7f0b-42b6-af6f-d4ff414e8828",
+          "sha256": "e6e063196e07c4efbe55f2fbe80c7e174e817137d7c5afae9f76d58341a038fd"
+        }
+      },
+      "operation": {
+        "operationId": "3e40db4d-b2fe-42cd-bf9d-fbd9fe8e8428",
+        "phase": "verified",
+        "toBuildId": "engine-5229a00add21",
+        "packageSha256": "f4702a58341aac59116827289fde167c85dfa5a19e02ec51479ded12067a255d",
+        "fallbackAttempted": false,
+        "verifiedAt": "1793801804972"
+      }
+    }
+  },
+  "receipts": [
+    {
+      "command": "p6.operation",
+      "requestId": "p6-operation-3375704188f77cdd5534c75bd20e997ded645ab24cc09c1948acf8e842cacd41",
+      "artifactId": "d4c51d98-c24c-44ce-9a2c-11517a45c618",
+      "sha256": "72bc0f89ee6327bb48b53a84c585ca9c5a6a0df4411c4a66f7b9dac87066d86c",
+      "payloadSha256": "72bc0f89ee6327bb48b53a84c585ca9c5a6a0df4411c4a66f7b9dac87066d86c",
+      "kind": "P6Operation",
+      "operationId": "a26577ac-93a6-4aff-9c07-d12979f724fb",
+      "handoffId": "3375704188f77cdd5534c75bd20e997ded645ab24cc09c1948acf8e842cacd41",
+      "engineBuildId": "engine-1620fa34e7c8",
+      "packageSha256": null,
+      "reproducedPackageSha256": null,
+      "reproducible": null,
+      "sourceCommit": null,
+      "sourceTree": null
+    },
+    {
+      "command": "p6.build",
+      "requestId": "p6-build-3375704188f77cdd5534c75bd20e997ded645ab24cc09c1948acf8e842cacd41",
+      "artifactId": "7023822c-ca3d-4c22-b0a0-7d4e4d5e5742",
+      "sha256": "1f7bc2304e6c8c02d3226b0839eb85510580ccab5d0da2a5cb7ec7aaf1140853",
+      "payloadSha256": "aad41a884e9da80b0c2c7d77b0b6412579110ecb1dd17f12f2b87661133134c1",
+      "kind": "P6BuildReceipt",
+      "operationId": "a26577ac-93a6-4aff-9c07-d12979f724fb",
+      "handoffId": "3375704188f77cdd5534c75bd20e997ded645ab24cc09c1948acf8e842cacd41",
+      "engineBuildId": "engine-1620fa34e7c8",
+      "packageSha256": "aad41a884e9da80b0c2c7d77b0b6412579110ecb1dd17f12f2b87661133134c1",
+      "reproducedPackageSha256": "aad41a884e9da80b0c2c7d77b0b6412579110ecb1dd17f12f2b87661133134c1",
+      "reproducible": true,
+      "sourceCommit": "5eb1b2bc2cc76bffafb1b1253a26b61b2f43a7b5",
+      "sourceTree": "308d0e6a694b2f45ba1194a7cf73848d2a6cccba"
+    },
+    {
+      "command": "p6.stage",
+      "requestId": "p6-stage-a26577ac-93a6-4aff-9c07-d12979f724fb",
+      "artifactId": "6a4573db-7620-4aae-aad8-2fd1fa64295c",
+      "sha256": "68aed1f758f8000396a2c76f021d2ed3371d1353b81409988b3a7680c67c6fe1",
+      "payloadSha256": "aad41a884e9da80b0c2c7d77b0b6412579110ecb1dd17f12f2b87661133134c1",
+      "kind": "P6StageReceipt",
+      "operationId": "a26577ac-93a6-4aff-9c07-d12979f724fb",
+      "handoffId": null,
+      "engineBuildId": null,
+      "packageSha256": "aad41a884e9da80b0c2c7d77b0b6412579110ecb1dd17f12f2b87661133134c1",
+      "reproducedPackageSha256": null,
+      "reproducible": null,
+      "sourceCommit": null,
+      "sourceTree": null
+    },
+    {
+      "command": "p6.switch_admitted",
+      "requestId": "p6-switch-admitted-a26577ac-93a6-4aff-9c07-d12979f724fb",
+      "artifactId": "82312e49-e5e4-46ba-bf1a-52a4d194570a",
+      "sha256": "68269d8dbab43589203a58474f2290e3a86373150829aeb877c288e5ec422a28",
+      "payloadSha256": "aad41a884e9da80b0c2c7d77b0b6412579110ecb1dd17f12f2b87661133134c1",
+      "kind": "P6SwitchAdmission",
+      "operationId": "a26577ac-93a6-4aff-9c07-d12979f724fb",
+      "handoffId": null,
+      "engineBuildId": "engine-1620fa34e7c8",
+      "packageSha256": "aad41a884e9da80b0c2c7d77b0b6412579110ecb1dd17f12f2b87661133134c1",
+      "reproducedPackageSha256": null,
+      "reproducible": null,
+      "sourceCommit": null,
+      "sourceTree": null
+    },
+    {
+      "command": "p6.continuation",
+      "requestId": "p6-continuation-a26577ac-93a6-4aff-9c07-d12979f724fb",
+      "artifactId": "8d9cc96e-19be-4b8b-8f88-efab2eb48037",
+      "sha256": "57a09ac2f323b9be1aa694d7f6b1f1dec631d022162e7e65e00c3b0fbebca4dd",
+      "payloadSha256": "aad41a884e9da80b0c2c7d77b0b6412579110ecb1dd17f12f2b87661133134c1",
+      "kind": "P6ContinuationReceipt",
+      "operationId": "a26577ac-93a6-4aff-9c07-d12979f724fb",
+      "handoffId": null,
+      "engineBuildId": null,
+      "packageSha256": "aad41a884e9da80b0c2c7d77b0b6412579110ecb1dd17f12f2b87661133134c1",
+      "reproducedPackageSha256": null,
+      "reproducible": null,
+      "sourceCommit": null,
+      "sourceTree": null
+    },
+    {
+      "command": "p6.operation",
+      "requestId": "p6-operation-9711396615ef05f315d9744e3f46645a947b7097033b818ff6527292669ee442",
+      "artifactId": "6d92833d-ad2c-4cad-acf6-5ef28b08a749",
+      "sha256": "5eb8f2a37a9be0031a3535a8a67ae9c96c6a5d1d3336be9a41e737c21fa8b192",
+      "payloadSha256": "5eb8f2a37a9be0031a3535a8a67ae9c96c6a5d1d3336be9a41e737c21fa8b192",
+      "kind": "P6Operation",
+      "operationId": "3e40db4d-b2fe-42cd-bf9d-fbd9fe8e8428",
+      "handoffId": "9711396615ef05f315d9744e3f46645a947b7097033b818ff6527292669ee442",
+      "engineBuildId": "engine-5229a00add21",
+      "packageSha256": null,
+      "reproducedPackageSha256": null,
+      "reproducible": null,
+      "sourceCommit": null,
+      "sourceTree": null
+    },
+    {
+      "command": "p6.build",
+      "requestId": "p6-build-9711396615ef05f315d9744e3f46645a947b7097033b818ff6527292669ee442",
+      "artifactId": "6b63f1dc-17e7-429a-8e7a-feacf11e839c",
+      "sha256": "1b0007a82bb9be8cc1a9394bbc4820881d580e4d9af0173c8b0795526451bd41",
+      "payloadSha256": "f4702a58341aac59116827289fde167c85dfa5a19e02ec51479ded12067a255d",
+      "kind": "P6BuildReceipt",
+      "operationId": "3e40db4d-b2fe-42cd-bf9d-fbd9fe8e8428",
+      "handoffId": "9711396615ef05f315d9744e3f46645a947b7097033b818ff6527292669ee442",
+      "engineBuildId": "engine-5229a00add21",
+      "packageSha256": "f4702a58341aac59116827289fde167c85dfa5a19e02ec51479ded12067a255d",
+      "reproducedPackageSha256": "f4702a58341aac59116827289fde167c85dfa5a19e02ec51479ded12067a255d",
+      "reproducible": true,
+      "sourceCommit": "f050d5f28afaf606f2ee6552af783cfedc90344a",
+      "sourceTree": "a2314a4a7cfcb30a443a97e568f8175b51cbef83"
+    },
+    {
+      "command": "p6.stage",
+      "requestId": "p6-stage-3e40db4d-b2fe-42cd-bf9d-fbd9fe8e8428",
+      "artifactId": "82b5da6f-0b4a-454a-aa34-a9015b6db82a",
+      "sha256": "e7c346ff83c8fb0d70b1f571f33272d9170c64bd9d958ab4f7b3027f9b179c66",
+      "payloadSha256": "f4702a58341aac59116827289fde167c85dfa5a19e02ec51479ded12067a255d",
+      "kind": "P6StageReceipt",
+      "operationId": "3e40db4d-b2fe-42cd-bf9d-fbd9fe8e8428",
+      "handoffId": null,
+      "engineBuildId": null,
+      "packageSha256": "f4702a58341aac59116827289fde167c85dfa5a19e02ec51479ded12067a255d",
+      "reproducedPackageSha256": null,
+      "reproducible": null,
+      "sourceCommit": null,
+      "sourceTree": null
+    },
+    {
+      "command": "p6.switch_admitted",
+      "requestId": "p6-switch-admitted-3e40db4d-b2fe-42cd-bf9d-fbd9fe8e8428",
+      "artifactId": "63644d0e-89e6-458c-9436-a9fcdb302eb7",
+      "sha256": "4858928acfe65f40933b031ac87433c8fceafe56d2024a56f196268c6dc7ac9a",
+      "payloadSha256": "f4702a58341aac59116827289fde167c85dfa5a19e02ec51479ded12067a255d",
+      "kind": "P6SwitchAdmission",
+      "operationId": "3e40db4d-b2fe-42cd-bf9d-fbd9fe8e8428",
+      "handoffId": null,
+      "engineBuildId": "engine-5229a00add21",
+      "packageSha256": "f4702a58341aac59116827289fde167c85dfa5a19e02ec51479ded12067a255d",
+      "reproducedPackageSha256": null,
+      "reproducible": null,
+      "sourceCommit": null,
+      "sourceTree": null
+    },
+    {
+      "command": "p6.continuation",
+      "requestId": "p6-continuation-3e40db4d-b2fe-42cd-bf9d-fbd9fe8e8428",
+      "artifactId": "fc9a50bc-07d0-4adc-9ec4-c368bebf2222",
+      "sha256": "678c8d39b35fbb23bcda34ca3976be03c9f6d7c023a66e14987acbbef57f5493",
+      "payloadSha256": "f4702a58341aac59116827289fde167c85dfa5a19e02ec51479ded12067a255d",
+      "kind": "P6ContinuationReceipt",
+      "operationId": "3e40db4d-b2fe-42cd-bf9d-fbd9fe8e8428",
+      "handoffId": null,
+      "engineBuildId": null,
+      "packageSha256": "f4702a58341aac59116827289fde167c85dfa5a19e02ec51479ded12067a255d",
+      "reproducedPackageSha256": null,
+      "reproducible": null,
+      "sourceCommit": null,
+      "sourceTree": null
+    }
+  ]
+}

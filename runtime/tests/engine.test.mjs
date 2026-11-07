@@ -10,6 +10,27 @@ import { contextChain, fixtureAdapters, singleAgent, startTestRunner } from './h
 
 const schemaClean = (definition, body) => assert.deepEqual(check('runtime-api-v2.schema.json', definition, body), [], definition);
 
+test('provider detection forwards and caches Process Custody scope independently', async () => {
+  const api = await startTestRunner();
+  try {
+    const calls = [];
+    api.runner.engine.adapters.detect = async (provider, options) => {
+      calls.push({ provider, options });
+      return { provider, available: true, processCustody: options.processCustody };
+    };
+    const standard = await api.runner.engine.detect('codex', { fresh: true });
+    const custody = await api.runner.engine.detect('codex', { processCustody: true });
+    const cached = await api.runner.engine.detect('codex', { processCustody: true });
+    assert.equal(standard.processCustody, false);
+    assert.equal(custody.processCustody, true);
+    assert.equal(cached.processCustody, true);
+    assert.deepEqual(calls, [
+      { provider: 'codex', options: { processCustody: false } },
+      { provider: 'codex', options: { processCustody: true } },
+    ]);
+  } finally { await api.close(); }
+});
+
 test('saved Context chain runs Codex → Claude → Codex, resuming the first Codex conversation', async () => {
   const api = await startTestRunner();
   try {
@@ -58,8 +79,10 @@ test('createRun is idempotent per requestId and rejects a reused ID with another
     await api.workspace();
     const workflow = singleAgent({ context: null });
     const saved = await api.save(workflow);
+    const publication = api.publication(workflow.workflowId);
     const requestId = randomUUID();
-    const body = { workflowId: workflow.workflowId, workflowSnapshotSha256: saved.snapshotSha256, workspaceId: 'main', requestId };
+    const body = { workflowId: workflow.workflowId, workflowSnapshotSha256: saved.snapshotSha256, publishedVersionId: publication.publishedVersionId,
+      definitionDigest: publication.definitionDigest, workspaceId: 'main', requestId };
     const first = await api.call('POST', '/api/v2/runs', body);
     const again = await api.call('POST', '/api/v2/runs', body);
     assert.equal(first.status, 202); assert.deepEqual(again.body, first.body);
@@ -81,6 +104,7 @@ test('a failed run receipt write rolls back run records and skips post-commit di
     await api.workspace();
     const workflow = singleAgent({ context: null });
     const saved = await api.save(workflow);
+    const publication = api.publication(workflow.workflowId);
     await new Promise(resolve => setImmediate(resolve));
 
     engine.startRun = function (...args) {
@@ -97,6 +121,8 @@ test('a failed run receipt write rolls back run records and skips post-commit di
     assert.throws(() => engine.createRun({
       workflowId: workflow.workflowId,
       workflowSnapshotSha256: saved.snapshotSha256,
+      publishedVersionId: publication.publishedVersionId,
+      definitionDigest: publication.definitionDigest,
       workspaceId: 'main',
       requestId,
     }), /injected receipt persistence failure/);
@@ -141,7 +167,10 @@ test('typed provider failures stay distinct', async () => {
   const api = await startTestRunner({ unavailable: ['claude'] });
   try {
     await api.workspace();
-    for (const [model, provider, code] of [['fixture-quota', 'codex', 'quota'], ['fixture-no-terminal', 'codex', 'output_contract'], ['fixture-not-json', 'codex', 'output_contract'], ['fixture-echo', 'claude', 'authentication']]) {
+    for (const [model, provider, code] of [['fixture-quota', 'codex', 'quota'], ['fixture-rate-limited', 'codex', 'rate_limited'],
+      ['fixture-auth-required', 'codex', 'authentication'], ['fixture-service-unavailable', 'codex', 'provider_unavailable'],
+      ['fixture-malformed-jsonl', 'codex', 'provider_protocol'], ['fixture-no-terminal', 'codex', 'output_contract'],
+      ['fixture-not-json', 'codex', 'output_contract'], ['fixture-echo', 'claude', 'authentication']]) {
       const workflow = singleAgent({ id: `typed-${code.replace('_', '-')}-${provider}-${model.replace('fixture-', '')}`, model, provider, context: null, output: model === 'fixture-not-json' ? { format: 'json' } : { format: 'text' } });
       const created = await api.run(workflow);
       const snapshot = await api.waitFor(created.body.run.runId);
@@ -316,8 +345,10 @@ test('validation rejects executable defects and save keeps disconnected drafts',
     assert.ok(saved.validation.issues.some(issue => /answer.value/.test(issue.message)));
     schemaClean('savedWorkflow', saved);
     await api.workspace();
-    const created = await api.call('POST', '/api/v2/runs', { workflowId: 'draft', workflowSnapshotSha256: saved.snapshotSha256, workspaceId: 'main', requestId: randomUUID() });
-    assert.equal(created.status, 422);
+    const created = await api.call('POST', '/api/v2/runs', { workflowId: 'draft', workflowSnapshotSha256: saved.snapshotSha256,
+      publishedVersionId: randomUUID(), definitionDigest: saved.snapshotSha256, workspaceId: 'main', requestId: randomUUID() });
+    assert.equal(created.status, 404, 'a Draft has no launchable Published Version');
+    assert.equal(created.body.code, 'published_version_not_found');
     const legacy = await api.call('PUT', '/api/v2/workflows/dup', { workflowId: 'dup' });
     assert.equal(legacy.status, 410);
     assert.equal(legacy.body.code, 'api_upgrade_required');

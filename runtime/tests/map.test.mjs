@@ -117,6 +117,11 @@ test('round recovery: a failed real check is triaged, only the auth code is repa
     // The failing check is real process evidence of the boundary defect.
     const failed = events.filter(event => event.type === 'attempt.state_changed' && /CHECK-AUTH failed: exit 1/.test(event.payload.reason));
     assert.equal(failed.length, 1);
+    const failedCheck = events.find(event => event.type === 'attempt.failure_outcome' && event.attemptId === failed[0].attemptId);
+    assert.equal(failedCheck.payload.outcome.source, 'workflow');
+    assert.equal(failedCheck.payload.outcome.category, 'task_failure');
+    assert.equal(failedCheck.payload.outcome.canonicalCode, 'process');
+    assert.equal(failedCheck.payload.outcome.observedState.attemptState, 'succeeded', 'the check failure is evidence while the Map step itself succeeds');
 
     // Triage is an embedded Analyst invocation through the declared analyst Context.
     const analyst = done.contexts.find(item => item.contextNodeId === 'analyst-history').bindingId;

@@ -1,0 +1,34 @@
+{
+  "kind": "DeszoControllerTransport",
+  "version": 1,
+  "measuredAt": "2026-10-21T08:26:30.531Z",
+  "fingerprint": "c5f27a74be22ec8cb41cdbbb0f21725eefd8d086af126529b94772b2a3284f5d",
+  "identity": {
+    "clientVersion": "deszo-stdio-controller/1",
+    "protocolVersion": "2025-03-26",
+    "maxWatchWaitMs": 20000,
+    "bridgeHttpTimeoutMs": 30000,
+    "toolTimeoutMs": 45000,
+    "enclosingToolTimeoutMs": 55000,
+    "platform": "win32",
+    "nodeMajor": 22,
+    "driverSha256": "f117fe15b5e5973c6342125c13f645e678ec19253293bbf45f8dd3a90c84dfaf"
+  },
+  "passed": true,
+  "providerCalls": 0,
+  "samples": [
+    {
+      "delayMs": 25000,
+      "elapsedMs": 25016.614400000002,
+      "error": null,
+      "passed": true
+    },
+    {
+      "delayMs": 60000,
+      "elapsedMs": 45013.3242,
+      "error": "controller_transport_timeout",
+      "passed": true
+    }
+  ],
+  "limitation": "This explicit stdio driver only. Not the desktop default MCP transport, model latency, consent, or autonomous-worker authority."
+}

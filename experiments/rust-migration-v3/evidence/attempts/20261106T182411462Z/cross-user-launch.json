@@ -1,0 +1,76 @@
+{
+    "schema":  "deszo-v3-cross-user-launch/1",
+    "attempt_id":  "20261106T181513972Z",
+    "method":  "runas /user:.",
+    "source_account":  "LAPTOP-UT09MGNR\\jusse",
+    "source_process_id":  24988,
+    "target_account":  "LAPTOP-UT09MGNR\\deszo_poc",
+    "runner":  "C:\\my\\2026\\deszo_agent_orche\\experiments\\rust-migration-v3\\scripts\\run-poc.ps1",
+    "runner_arguments":  [
+                             "-SkipBuild"
+                         ],
+    "runas_command":  "runas.exe /user:\u0027.\\deszo_poc\u0027 \"powershell.exe -NoLogo -NoProfile -File C:\\my\\2026\\deszo_agent_orche\\experiments\\rust-migration-v3\\scripts\\run-poc.ps1 -SkipBuild\"",
+    "stage":  "launch_failed_or_incomplete",
+    "selected_binary_hashes":  [
+                                   {
+                                       "name":  "poc-host.exe",
+                                       "length":  755200,
+                                       "sha256":  "517b25def99fb45816098c168ab9abb02748c1b8324700a5a1b57222c365b321"
+                                   },
+                                   {
+                                       "name":  "poc-core.exe",
+                                       "length":  792576,
+                                       "sha256":  "ca054e0cefe50db8e834f2159f122211289294edabb5a50341cd93cbee114a65"
+                                   },
+                                   {
+                                       "name":  "poc-worker-a.exe",
+                                       "length":  515072,
+                                       "sha256":  "c07c41f2070e7e86ca89a2ce6ebcddfed398b5007b04bc781c3ed076b760b808"
+                                   },
+                                   {
+                                       "name":  "poc-worker-b.exe",
+                                       "length":  515072,
+                                       "sha256":  "0f9de6193d725df270f98473b4e862933189eef5f5b6a0b71c6819c48f7f8fd4"
+                                   },
+                                   {
+                                       "name":  "poc-worker-fault.exe",
+                                       "length":  403968,
+                                       "sha256":  "d518700f2019e920e70133c23dab2c6ce6f10acdc19962ca920a1e002ffcd131"
+                                   }
+                               ],
+    "binary_lock":  "FileShare.Read; write/delete sharing denied through runtime completion",
+    "runas_exit_code":  1,
+    "runner_process_id":  null,
+    "runner_exit_code":  null,
+    "actual_launcher_identity":  null,
+    "error":  "runas.exe returned exit code 1 without a deszo_poc runner identity record.",
+    "final_binary_hashes":  [
+                                {
+                                    "name":  "poc-host.exe",
+                                    "length":  755200,
+                                    "sha256":  "517b25def99fb45816098c168ab9abb02748c1b8324700a5a1b57222c365b321"
+                                },
+                                {
+                                    "name":  "poc-core.exe",
+                                    "length":  792576,
+                                    "sha256":  "ca054e0cefe50db8e834f2159f122211289294edabb5a50341cd93cbee114a65"
+                                },
+                                {
+                                    "name":  "poc-worker-a.exe",
+                                    "length":  515072,
+                                    "sha256":  "c07c41f2070e7e86ca89a2ce6ebcddfed398b5007b04bc781c3ed076b760b808"
+                                },
+                                {
+                                    "name":  "poc-worker-b.exe",
+                                    "length":  515072,
+                                    "sha256":  "0f9de6193d725df270f98473b4e862933189eef5f5b6a0b71c6819c48f7f8fd4"
+                                },
+                                {
+                                    "name":  "poc-worker-fault.exe",
+                                    "length":  403968,
+                                    "sha256":  "d518700f2019e920e70133c23dab2c6ce6f10acdc19962ca920a1e002ffcd131"
+                                }
+                            ],
+    "binary_hashes_unchanged":  true,
+    "final_exit_code":  1
+}

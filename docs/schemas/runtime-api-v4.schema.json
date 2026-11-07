@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deszo.local/documentation/runtime-api-v4.schema.json",
+  "title": "Draft and immutable workflow Publication API",
+  "$defs": {
+    "writeDraft": {
+      "type": "object",
+      "properties": {
+        "requestId": { "type": "string", "format": "uuid" },
+        "workflow": { "$ref": "workflow.schema.json" }
+      },
+      "required": ["requestId", "workflow"],
+      "additionalProperties": false
+    },
+    "publishDraft": {
+      "type": "object",
+      "properties": { "requestId": { "type": "string", "format": "uuid" } },
+      "required": ["requestId"],
+      "additionalProperties": false
+    },
+    "deriveDraft": {
+      "type": "object",
+      "properties": { "requestId": { "type": "string", "format": "uuid" } },
+      "required": ["requestId"],
+      "additionalProperties": false
+    },
+    "judgeQuestionAnswer": {
+      "type": "object",
+      "properties": {
+        "requestId": { "type": "string", "format": "uuid" },
+        "answer": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "type": { "const": "choice" },
+                "optionId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" }
+              },
+              "required": ["type", "optionId"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": { "const": "text" },
+                "value": { "type": "string", "maxLength": 2048 }
+              },
+              "required": ["type", "value"],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": ["requestId", "answer"],
+      "additionalProperties": false
+    }
+  }
+}

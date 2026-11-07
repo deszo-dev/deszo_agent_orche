@@ -1,0 +1,113 @@
+{
+  "experiment": "POC-02",
+  "title": "Isolated dedicated session",
+  "status": "PASS",
+  "checks": [
+    {
+      "name": "the app-server reports the requested isolated CODEX_HOME",
+      "pass": true,
+      "detail": "<POC_ROOT>\\home-poc02-isolated"
+    },
+    {
+      "name": "a dedicated session is created in the isolated home",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "the session is recorded under the isolated home",
+      "pass": true,
+      "detail": "<POC_ROOT>\\home-poc02-isolated\\sessions\\2026\\10\\21\\rollout-2026-10-21T14-24-53-01a15e34-fdb3-7120-b565-c7eeda26120d.jsonl"
+    },
+    {
+      "name": "context can be written to the session without a model invocation",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "the injected context is persisted in the rollout file",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "the session status is readable by its controlling process",
+      "pass": true,
+      "detail": "idle"
+    },
+    {
+      "name": "a new process resumes the same session identity after the controlling process exits",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "the resumed session still refers to the same rollout file",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "the persisted context survives the restart on disk",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "a scoped MCP server is registered in the isolated home",
+      "pass": true,
+      "detail": "Added global MCP server 'poc-echo'."
+    },
+    {
+      "name": "the registered MCP server is loaded in the isolated session",
+      "pass": true,
+      "detail": "{\"data\":[{\"name\":\"poc-echo\",\"runtimeStatus\":null,\"pluginId\":null,\"httpOrigin\":null,\"serverInfo\":{\"name\":\"deszo-adr7-poc-echo\",\"title\":null,\"version\":\"0.1.0\",\"description\":null,\"icons\":null,\"websiteUrl"
+    },
+    {
+      "name": "the scoped tool is listed for the resumed session",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "the session resumes with its scoped tools still registered",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "the other client profile does not list the dedicated session",
+      "pass": true,
+      "detail": "listed=0"
+    },
+    {
+      "name": "the other client profile cannot resume the dedicated session by its identifier",
+      "pass": true,
+      "detail": "no rollout found for thread id 01a15e34-fdb3-7120-b565-c7eeda26120d"
+    }
+  ],
+  "measurements": {
+    "reportedCodexHomeMatchesRequest": "<POC_ROOT>\\home-poc02-isolated",
+    "rolloutFileExistsAtCreation": false,
+    "rolloutPathAtStart": "<POC_ROOT>\\home-poc02-isolated\\sessions\\2026\\10\\21\\rollout-2026-10-21T14-24-53-01a15e34-fdb3-7120-b565-c7eeda26120d.jsonl",
+    "rolloutPathAtResume": "\\\\?\\<POC_ROOT>\\home-poc02-isolated\\sessions\\2026\\10\\21\\rollout-2026-10-21T14-24-53-01a15e34-fdb3-7120-b565-c7eeda26120d.jsonl",
+    "resumeDurationMs": 1387.4160000000002
+  },
+  "ids": {
+    "threadId": "01a15e34-fdb3-7120-b565-c7eeda26120d"
+  },
+  "trace": [
+    {
+      "step": "thread/start",
+      "threadId": "01a15e34-fdb3-7120-b565-c7eeda26120d",
+      "status": {
+        "type": "idle"
+      },
+      "durationMs": 252.50300000000016
+    },
+    {
+      "step": "process A exited",
+      "exit": {
+        "atMs": 2115.467,
+        "code": null,
+        "signal": "SIGTERM"
+      }
+    }
+  ],
+  "notes": [
+    "Resume by identifier across homes is refused. Path-based resume is tested separately in POC-05 and is not covered by this result."
+  ]
+}

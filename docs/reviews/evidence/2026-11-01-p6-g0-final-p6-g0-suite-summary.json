@@ -1,0 +1,156 @@
+{
+  "schemaVersion": 1,
+  "derivedFrom": "docs/reviews/evidence/2026-11-01-p6-g0-final-npm-test.tap.log",
+  "derivedBy": "TAP lines of the frozen full regression",
+  "suite": "P6-G0 packaged and in-process tests (names beginning P6-G0 or G0-C)",
+  "total": 29,
+  "passed": 29,
+  "failed": 0,
+  "tests": [
+    {
+      "number": 679,
+      "status": "pass",
+      "name": "P6-G0 barrier: a quiescing Engine refuses Run admission at its creation point and leaves no row, event or receipt"
+    },
+    {
+      "number": 680,
+      "status": "pass",
+      "name": "P6-G0 barrier: every executable Run is created by one INSERT, and that INSERT follows the barrier inside captureRun"
+    },
+    {
+      "number": 681,
+      "status": "pass",
+      "name": "P6-G0 barrier: the switch closes admission before the Host sees it, and an admission racing that closure is refused"
+    },
+    {
+      "number": 682,
+      "status": "pass",
+      "name": "P6-G0 barrier: a switch waits for a Run admitted before quiescence, settles it, and then proceeds without deadlock"
+    },
+    {
+      "number": 683,
+      "status": "pass",
+      "name": "P6-G0 barrier: a refused switch reopens admission, and a refused stage or switch admits Runs again"
+    },
+    {
+      "number": 684,
+      "status": "pass",
+      "name": "P6-G0 barrier: an internal linked Repair cannot be admitted while quiescing, and the same request is admitted once admission reopens"
+    },
+    {
+      "number": 685,
+      "status": "pass",
+      "name": "P6-G0 barrier: an unconfirmed switch reply keeps this Engine quiesced while the Host may have accepted, and reopens only on a pre-acceptance phase"
+    },
+    {
+      "number": 686,
+      "status": "pass",
+      "name": "P6-G0 barrier: a quiescing Engine lets admitted work settle: settling routes stay open, and an owner route that starts a Run is refused"
+    },
+    {
+      "number": 687,
+      "status": "pass",
+      "name": "P6-G0 admission: a quiescing Engine refuses owner mutations, and a refused switch reopens admission"
+    },
+    {
+      "number": 688,
+      "status": "pass",
+      "name": "P6-G0 C02 and C13: a Host killed mid-copy leaves real partial bytes that the restart discards, and a retry after commit starts nothing"
+    },
+    {
+      "number": 689,
+      "status": "pass",
+      "name": "P6-G0 C09: an unproven Engine A tree holds the switch with no second Engine, no commit and a durable process record"
+    },
+    {
+      "number": 690,
+      "status": "pass",
+      "name": "P6-G0 C09 restart: a restarted Host without fresh proof holds, and with fresh proof it abandons the switch and restarts exactly Engine A"
+    },
+    {
+      "number": 691,
+      "status": "pass",
+      "name": "P6-G0 C09 crash: a Host killed after the fence leaves an instance it cannot prove ended, and its restart holds with no Engine launched"
+    },
+    {
+      "number": 692,
+      "status": "pass",
+      "name": "P6-G0 Custody E2E: a live Job and its descendant hold a packaged switch, the fence refuses racing admissions, and the switch commits once after the Job ends"
+    },
+    {
+      "number": 693,
+      "status": "pass",
+      "name": "P6-G0 production bundles ignore environment fault hooks while source tests retain them"
+    },
+    {
+      "number": 694,
+      "status": "pass",
+      "name": "P6-G0 raw runtime and P5 support source close fault hooks in production packages"
+    },
+    {
+      "number": 695,
+      "status": "pass",
+      "name": "P6-G0 M1: unchanged Shell S runs Engine A and then Engine B; Shell and Host bytes are identical across both runs"
+    },
+    {
+      "number": 696,
+      "status": "pass",
+      "name": "P6-G0 legacy bypass: the installed Engine's own bridge is refused by the Host, with no staging, stop, selector, launch or receipt effect"
+    },
+    {
+      "number": 697,
+      "status": "pass",
+      "name": "G0-C04/C10 crash after the fenced switch or after Engine A stopped: the switch is abandoned and the committed Engine A restarts"
+    },
+    {
+      "number": 698,
+      "status": "pass",
+      "name": "G0-C07 crash while the candidate runs its preflight: the candidate ends with the Host and exact Engine A is restored once"
+    },
+    {
+      "number": 699,
+      "status": "pass",
+      "name": "G0-C07/C11 crash after the candidate reports its preflight, before the selector commit: exact Engine A is restored once"
+    },
+    {
+      "number": 700,
+      "status": "pass",
+      "name": "G0-C12/C13/C18 crash after the selector commit: the committed Engine B starts, survives repeated Host restarts, and is never replaced"
+    },
+    {
+      "number": 701,
+      "status": "pass",
+      "name": "G0-C15 crash during the single fallback: the restart completes the restore of exact Engine A without a second candidate"
+    },
+    {
+      "number": 702,
+      "status": "pass",
+      "name": "G0-C16 the production Store changes while the Host is down: the switch holds and no Engine starts"
+    },
+    {
+      "number": 703,
+      "status": "pass",
+      "name": "G0-C14 the candidate exits after its preflight report and before the decision: the Host restores exact Engine A"
+    },
+    {
+      "number": 704,
+      "status": "pass",
+      "name": "G0-C17: concurrent switch requests admit exactly one switch, which commits once"
+    },
+    {
+      "number": 705,
+      "status": "pass",
+      "name": "G0-C01/C02/C03: crashes inside staging leave a reconcilable stage; the restart discards partial bytes and the re-requested switch completes once"
+    },
+    {
+      "number": 706,
+      "status": "pass",
+      "name": "P6-G0 switch: Engine A stages B, the Host switches A to B, B serves, and A is not running afterwards"
+    },
+    {
+      "number": 707,
+      "status": "pass",
+      "name": "P6-G0 switch negative: a candidate that fails before its commit is stopped and the exact previous Engine is restored once"
+    }
+  ]
+}

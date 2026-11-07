@@ -1,0 +1,13 @@
+Reflection-to-Function demonstration, Node v22.20.0, 2026-11-05T15:48:13Z
+--- run 1: default flags
+reached: function Function
+evaluated: 42
+exit=0
+--- run 2: --disallow-code-generation-from-strings (control; this flag is NOT used by the Engine today)
+reached: function Function
+file:///C:/Users/jusse/AppData/Local/Temp/claude/C--my-2026-deszo-agent-orche/85caeb09-8735-4171-90cc-954c49565e9f/scratchpad/reflect-demo2.mjs:4
+console.log('evaluated:', F('return 6 * 7')());
+                          ^
+
+EvalError: Code generation from strings disallowed for this context
+exit=1

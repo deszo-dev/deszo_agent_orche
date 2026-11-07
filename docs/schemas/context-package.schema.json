@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deszo.local/documentation/context-package.schema.json",
+  "title": "Context Package (ADR-0004)",
+  "type": "object",
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "kind": { "const": "ContextPackage" },
+    "packageId": { "type": "string" },
+    "role": { "type": "string", "minLength": 1 },
+    "taskBinding": { "type": "string", "minLength": 1 },
+    "subjectDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "selectionPolicy": {
+      "type": "object",
+      "properties": {
+        "selector": { "type": "string" },
+        "selectorVersion": { "type": "integer", "minimum": 1 },
+        "declaredScope": { "type": "array", "items": { "type": "string" } },
+        "inclusionReasons": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["selector", "selectorVersion", "declaredScope", "inclusionReasons"],
+      "additionalProperties": false
+    },
+    "normativeContent": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "ref": { "type": "string" },
+          "digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        },
+        "required": ["ref", "digest"],
+        "additionalProperties": false
+      }
+    },
+    "sourceAndChanges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string" },
+          "digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "changeKind": { "enum": ["unchanged", "created", "modified", "deleted"] }
+        },
+        "required": ["path", "digest", "changeKind"],
+        "additionalProperties": false
+      }
+    },
+    "evidenceAndIssues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "ref": { "type": "string" },
+          "digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        },
+        "required": ["ref", "digest"],
+        "additionalProperties": false
+      }
+    },
+    "contextBinding": {
+      "type": "object",
+      "properties": {
+        "mode": { "enum": ["fresh", "continued"] },
+        "stepInstanceId": { "type": "string" }
+      },
+      "required": ["mode", "stepInstanceId"],
+      "additionalProperties": false
+    },
+    "semanticFingerprint": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "createdAt": { "type": "string", "format": "date-time" }
+  },
+  "required": [
+    "schemaVersion", "kind", "packageId", "role", "taskBinding", "subjectDigest",
+    "selectionPolicy", "normativeContent", "sourceAndChanges", "evidenceAndIssues",
+    "contextBinding", "semanticFingerprint", "createdAt"
+  ],
+  "additionalProperties": false
+}

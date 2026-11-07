@@ -1,0 +1,104 @@
+{
+  "observedBase": "9d25d91 plus reviewed local ADR-0003–0005 additions",
+  "revalidatedHead": "7178032a9c8b4ce1f7a97590e57ab10c7af05fcf plus the same uncommitted implementation",
+  "sourceConsistency": "The three runtime modules match the captured versions after normalizing line endings.",
+  "execution": "Pure-function probes and isolated temporary Git repositories. No live repository delivery.",
+  "results": [
+    {
+      "name": "smoke_mutation_commits_unreviewed_source",
+      "status": "READY_FOR_MERGE",
+      "ready": true,
+      "resultDigestStillEqualsApproved": true,
+      "committed": "UNREVIEWED",
+      "extraCommitted": "UNDECLARED"
+    },
+    {
+      "name": "candidate_path_escapes_clone",
+      "status": "READY_FOR_MERGE",
+      "outsideContent": "OVERWRITTEN",
+      "outsideIsBeyondClone": true
+    },
+    {
+      "name": "existing_clone_directory_is_deleted",
+      "status": "READY_FOR_MERGE",
+      "existingFilePreserved": false
+    },
+    {
+      "name": "configured_hook_is_not_installed_or_executed",
+      "status": "READY_FOR_MERGE",
+      "reportedHookExecution": "executed",
+      "requiredRejectingHookPresent": false
+    },
+    {
+      "name": "hook_mutation_is_not_compared_to_recorded_tree",
+      "status": "READY_FOR_MERGE",
+      "reportedHookExecution": "none",
+      "recordedTreeMatchesActual": false,
+      "committed": "HOOK-CHANGED"
+    },
+    {
+      "name": "existing_branch_can_be_rewound_to_older_base",
+      "status": "READY_FOR_MERGE",
+      "parentMatchesExpectedOld": false,
+      "previousHeadIsAncestor": false,
+      "existingFeatureStillInBranch": false
+    },
+    {
+      "name": "empty_acceptance_opens_gate",
+      "valid": true,
+      "canOpenGate": true,
+      "reason": "All criteria satisfied with typed evidence."
+    },
+    {
+      "name": "satisfied_without_evidence_opens_gate",
+      "valid": true,
+      "canOpenGate": true,
+      "reason": "All criteria satisfied with typed evidence."
+    },
+    {
+      "name": "package_expansion_hash_depends_on_attempt_identity",
+      "originalSemanticHashesEqual": true,
+      "expandedSemanticHashesEqual": false
+    },
+    {
+      "name": "partially_missing_context_request_is_treated_as_resumable",
+      "resumed": true,
+      "reportedMissing": null,
+      "containsRequiredMissingFile": false
+    },
+    {
+      "name": "missing_bindings_get_invented_model_defaults",
+      "models": [
+        "codex:analyst-v1:high",
+        "claude:dev-v1:high",
+        "antigravity:test-v1:medium",
+        "codex:review-v1:high",
+        "claude:review-v1:medium"
+      ]
+    },
+    {
+      "name": "equivalent_but_distinct_reviewer_objects_bypass_separation",
+      "accepted": true,
+      "codeRole": "reviewer",
+      "testRole": "reviewer"
+    },
+    {
+      "name": "plan_fingerprint_ignores_requirement_and_budget_changes",
+      "sameFingerprint": true,
+      "firstBounds": 5,
+      "secondBounds": 100
+    },
+    {
+      "name": "high_uncertainty_unverified_task_still_gets_compact_plan",
+      "classification": "local",
+      "stages": [
+        "define",
+        "implement",
+        "assemble_and_check",
+        "delivery_review",
+        "accept_outcome"
+      ],
+      "hasIndependentAccepter": false
+    }
+  ]
+}

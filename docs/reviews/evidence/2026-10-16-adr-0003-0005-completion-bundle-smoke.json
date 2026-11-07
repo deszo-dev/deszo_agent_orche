@@ -1,0 +1,28 @@
+{
+  "kind": "ManagedTaskBundleSmoke",
+  "root": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\bundle-0kM62n",
+  "runId": "ff5a7c68-ac9a-4ddd-aabd-9c1f9a68b7d8",
+  "runState": "succeeded",
+  "migration": 11,
+  "taskCapability": true,
+  "nodePublished": true,
+  "templatePublished": true,
+  "shimPresent": true,
+  "migrationDigestMatches": true,
+  "candidateFloorStatus": "passed",
+  "acceptanceRecords": 1,
+  "juniorAnalystRequestedEffort": "max",
+  "realProviderInvocations": 0,
+  "fixtureWork": {
+    "attempts": 10,
+    "processes": 10,
+    "outputBytes": 5813,
+    "processMilliseconds": 3216,
+    "elapsedMilliseconds": 4891,
+    "elapsedBasis": "terminal_observation",
+    "remainingMilliseconds": 3595109,
+    "repairs": 0
+  },
+  "shimSha256": "458cb6c732d83240e1a394c946e0606af5d8fc1572da23bfd1d8e40ddaf5f18d",
+  "runnerSha256": "43113bc43f6f7074578c3b0b592b9e1f5c4e2faa1d58d5481b1420e9a77d5bca"
+}

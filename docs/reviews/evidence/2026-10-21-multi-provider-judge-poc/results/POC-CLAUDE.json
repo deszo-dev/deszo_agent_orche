@@ -1,0 +1,96 @@
+{
+  "provider": "claude",
+  "version": "2.1.302 (Claude Code)",
+  "capabilities": {
+    "provider": "claude",
+    "exactClientVersion": "2.1.302 (Claude Code)",
+    "cliPath": "C:/Users/jusse/AppData/Local/Microsoft/WinGet/Links/claude.exe",
+    "binaryAvailable": true,
+    "authenticationModes": [
+      "claude.ai_subscription",
+      "anthropic_api_key"
+    ],
+    "permittedBillingModes": [
+      "subscription",
+      "api"
+    ],
+    "subscriptionEligibility": {
+      "supportedForInteractiveCli": true,
+      "supportedForThirdPartyOrchestrator": false,
+      "evidence": "DOCUMENTED",
+      "officialSource": "https://support.claude.com/en/articles/13189465-log-in-to-your-claude-account"
+    },
+    "sessionPersistence": {
+      "supported": true,
+      "format": "project transcripts and tasks (~/.claude/projects/)",
+      "evidence": "DOCUMENTED"
+    },
+    "sessionResumeSupport": {
+      "bySessionId": true,
+      "byContinueFlag": true,
+      "evidence": "DOCUMENTED"
+    },
+    "dedicatedSessionFeasibility": {
+      "supportedViaProjectId": true,
+      "evidence": "DOCUMENTED"
+    },
+    "exclusiveTurnAdmissionSupport": {
+      "nativeCliFileLock": false,
+      "hostLevelFencingRequired": true,
+      "evidence": "DOCUMENTED"
+    },
+    "structuredCompletionEvidence": {
+      "structuredJsonOutput": true,
+      "streamingNdjson": true,
+      "evidence": "DOCUMENTED"
+    },
+    "toolSupport": {
+      "scopedMcpRegistration": true,
+      "evidence": "DOCUMENTED"
+    },
+    "concurrencyHandling": {
+      "serializedTurnsRequired": true,
+      "evidence": "DOCUMENTED"
+    },
+    "policyGateStatus": {
+      "isPermittedForAutomatedJudge": false,
+      "classification": "POLICY_BLOCKED",
+      "reason": "Anthropic terms restrict Claude Pro subscription allowances to interactive use; non-interactive mode strictly requires ANTHROPIC_API_KEY (API billing).",
+      "evidence": "DOCUMENTED"
+    },
+    "knownUnsupportedCapabilities": [
+      "Automated third-party orchestrator inference under Claude Pro subscription",
+      "Headless subscription authorization without interactive terminal session",
+      "API key precedence without separate billing disclosure"
+    ]
+  },
+  "auth": {
+    "isLoggedIn": true,
+    "authMethod": "claude.ai",
+    "subscriptionType": "pro",
+    "apiProvider": "firstParty",
+    "status": "PASS",
+    "reason": null
+  },
+  "billing": {
+    "billingMode": "subscription",
+    "subscriptionType": "pro",
+    "eligible": false,
+    "status": "POLICY_BLOCKED",
+    "policyBlockReason": "Anthropic terms restrict Claude Pro/Team subscription allowances to interactive human use. Third-party automated orchestrators cannot use subscription credentials as an inference backend. Separately billed API key mode is available but forbidden by Deszo subscription_only policy.",
+    "officialSource": "https://support.claude.com/en/articles/13189465-log-in-to-your-claude-account",
+    "failClosedAction": "Inference calls blocked to prevent policy violation and silent API charges."
+  },
+  "executionGate": {
+    "status": "POLICY_BLOCKED",
+    "executed": false,
+    "reason": "Automated Judge turn refused under Anthropic policy gate."
+  },
+  "overallStatus": "POLICY_BLOCKED",
+  "policyFindings": {
+    "userSubscriptionVerified": true,
+    "policyRestriction": "Anthropic terms explicitly restrict Claude Pro subscription to personal interactive usage. Third-party automated orchestration is not permitted under subscription allowances.",
+    "apiAlternativeAvailable": "Anthropic Console API keys (ANTHROPIC_API_KEY) are officially supported for automated programmatic use, but constitute separately billed API usage, forbidden under Deszo subscription_only policy.",
+    "failClosedAction": "Automated inference blocked to comply with Anthropic policy and prevent unapproved billing."
+  }
+}

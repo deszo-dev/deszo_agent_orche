@@ -11,6 +11,116 @@ use std::{
 };
 use tauri::{Emitter, Manager};
 
+const COMPILED_DESKTOP_BUILD_ID: &str = env!("DESZO_DESKTOP_BUILD_ID");
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct LifecycleBootstrap {
+    host_address: String,
+    host_capability: Option<String>,
+    installation_id: String,
+    profile_root: PathBuf,
+    generation: String,
+    /// The selected Engine identity and its package root (always the Engine's own directory).
+    application_build_id: String,
+    application_root: PathBuf,
+    node_executable: PathBuf,
+    #[serde(default)]
+    test_duplicate_receipt_delivery: bool,
+    /// P6 installations only: the stable Shell identity and the directory holding this executable. Absent in a legacy
+    /// whole-release launch, where the Shell and the Engine share one directory and one identity.
+    #[serde(default)]
+    shell_build_id: Option<String>,
+    #[serde(default)]
+    shell_root: Option<PathBuf>,
+    /// P6 candidate preflight: start the Engine's maintenance entrypoint at bootstrap, against the Host's disposable copy only.
+    #[serde(default)]
+    maintenance: Option<MaintenanceBootstrap>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct MaintenanceBootstrap {
+    operation_id: String,
+    preflight_store: PathBuf,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct HostBootstrapLine {
+    command: String,
+    #[serde(flatten)]
+    bootstrap: LifecycleBootstrap,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct HostControlLine {
+    command: String,
+}
+
+impl LifecycleBootstrap {
+    fn validate(&self) -> Result<(), String> {
+        let (host, port) = self.host_address.split_once(':').ok_or("Lifecycle Host address is malformed")?;
+        if host != "127.0.0.1" || port.parse::<u16>().ok().filter(|value| *value > 0).is_none() {
+            return Err("Lifecycle Host endpoint must be loopback TCP".into());
+        }
+        let capability = self.host_capability.as_deref().ok_or("Lifecycle Host capability was already consumed")?;
+        if capability.len() != 64 || !capability.bytes().all(|value| value.is_ascii_hexdigit()) {
+            return Err("Lifecycle Host capability is malformed".into());
+        }
+        match self.shell_build_id.as_deref() {
+            // P6: the stable Shell keeps its compiled identity while the selected Engine has its own, which may not be the Shell's.
+            Some(shell) => {
+                if shell != COMPILED_DESKTOP_BUILD_ID {
+                    return Err("This desktop executable does not match the Host-selected Shell identity".into());
+                }
+                if self.shell_root.is_none() || shell == self.application_build_id {
+                    return Err("The Host-selected Shell and Engine identities are malformed".into());
+                }
+            }
+            // Legacy whole-release launch: the Engine identity is the compiled identity.
+            None => {
+                if self.application_build_id != COMPILED_DESKTOP_BUILD_ID {
+                    return Err("This desktop executable does not match the Host-selected build identity".into());
+                }
+            }
+        }
+        if !self.profile_root.is_absolute() || !self.profile_root.is_dir() {
+            return Err("Lifecycle Host profile is not an existing absolute directory".into());
+        }
+        if !self.node_executable.is_absolute() || !self.node_executable.is_file() {
+            return Err("Lifecycle Host Node executable is unavailable".into());
+        }
+        let executable = fs::canonicalize(std::env::current_exe().map_err(|error| error.to_string())?).map_err(|error| error.to_string())?;
+        let actual_root = node_path(executable.parent().ok_or("Desktop executable has no parent directory")?);
+        let shell_root = self.shell_root.as_ref().unwrap_or(&self.application_root);
+        let expected_root = node_path(&fs::canonicalize(shell_root).map_err(|error| error.to_string())?);
+        if actual_root != expected_root {
+            return Err("The running desktop executable is outside the Host-selected Shell directory".into());
+        }
+        if self.shell_build_id.is_some() {
+            // The Engine package is a separate directory: the Shell never runs code from the Shell directory as its Engine.
+            let engine_root = node_path(&fs::canonicalize(&self.application_root).map_err(|error| error.to_string())?);
+            if engine_root == expected_root {
+                return Err("The Engine root must be separate from the Shell root".into());
+            }
+        }
+        if let Some(maintenance) = self.maintenance.as_ref() {
+            if self.shell_build_id.is_none() || !maintenance.preflight_store.is_absolute() || !maintenance.preflight_store.is_file() {
+                return Err("The Host's maintenance preflight copy is unavailable".into());
+            }
+            if maintenance.operation_id.is_empty() || maintenance.operation_id.len() > 64 {
+                return Err("The Host's maintenance operation identity is malformed".into());
+            }
+        }
+        Ok(())
+    }
+}
+
+#[cfg(windows)]
+mod foreground_handoff;
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Connection {
@@ -25,6 +135,8 @@ struct Connection {
     api_versions: Vec<String>,
     store_id: String,
     runtime_instance_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    application_pid: Option<u32>,
     application_root: String,
     node_executable: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -194,8 +306,12 @@ impl Drop for Runner {
 struct Shared {
     runner: Option<Runner>,
     generation: u64,
+    /// Runtime starts attempted by this process, including failed ones. A consumed one-time host value must never be
+    /// offered again, even when the earlier attempt never produced a generation.
+    spawn_attempts: u64,
     /// Set when owned processes could not be confirmed terminated; no new runtime starts.
     uncertain: Option<String>,
+    lifecycle_bootstrap: Option<LifecycleBootstrap>,
 }
 
 struct RuntimeState(Arc<Mutex<Shared>>);
@@ -253,8 +369,15 @@ fn node_path(path: &std::path::Path) -> PathBuf {
     PathBuf::from(text.strip_prefix(r"\\?\").unwrap_or(&text).to_string())
 }
 
-fn storage_root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    let root = if cfg!(debug_assertions) {
+fn storage_root(app: &tauri::AppHandle, lifecycle: Option<&LifecycleBootstrap>) -> Result<PathBuf, String> {
+    let root = if let Some(bootstrap) = lifecycle {
+        bootstrap.profile_root.clone()
+    } else if std::env::var_os("DESZO_CONTROL_HOST_PIPE").is_some() {
+        let selected = std::env::var_os("DESZO_HOST_PROFILE_ROOT").ok_or("The host launch did not select a data profile")?;
+        let path = PathBuf::from(selected);
+        if !path.is_absolute() || !path.is_dir() { return Err("The host data profile is not an existing absolute directory".into()); }
+        path
+    } else if cfg!(debug_assertions) {
         let development = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
         if bundled_frontend_loaded(app) {
             development.join(".deszo")
@@ -275,26 +398,59 @@ fn bundled_frontend_loaded(app: &tauri::AppHandle) -> bool {
     let Ok(url) = window.url() else { return false; };
     let bundled_origin = (url.scheme() == "tauri" && url.host_str() == Some("localhost"))
         || ((url.scheme() == "http" || url.scheme() == "https") && url.host_str() == Some("tauri.localhost"));
-    bundled_origin && matches!(url.path(), "/" | "/index.html") && url.query().is_none() && url.fragment().is_none()
+    let development_origin = cfg!(debug_assertions) && url.scheme() == "http" && url.port() == Some(1420)
+        && matches!(url.host_str(), Some("localhost" | "127.0.0.1"));
+    let trusted_origin = bundled_origin || development_origin;
+    trusted_origin && matches!(url.path(), "/" | "/index.html") && url.query().is_none() && url.fragment().is_none()
 }
 
-fn connection_for_window(mut connection: Connection, app: &tauri::AppHandle) -> Connection {
-    if !bundled_frontend_loaded(app) {
-        connection.first_party_token = None;
+fn refresh_runner_connection(runner: &mut Runner) -> Result<(), String> {
+    let Some(path) = runner.connection.connection_file.as_ref() else { return Ok(()); };
+    let bytes = fs::read(path).map_err(|error| format!("The Runtime connection descriptor could not be refreshed: {error}"))?;
+    let latest: Connection = serde_json::from_slice(&bytes).map_err(|_| "The Runtime connection descriptor is invalid.".to_string())?;
+    if latest.port != runner.connection.port || latest.store_id != runner.connection.store_id
+        || latest.runtime_instance_id != runner.connection.runtime_instance_id
+        || latest.connection_file.as_deref() != Some(path.as_str())
+        || latest.token.len() != 64 || !latest.token.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err("The Runtime connection descriptor identity changed unexpectedly.".into());
     }
-    connection
+    if latest.token != runner.connection.token {
+        runner.connection.token = latest.token.clone();
+        if runner.connection.first_party_token.is_some() {
+            runner.connection.first_party_token = Some(latest.token);
+        }
+    }
+    Ok(())
+}
+
+fn connection_for_window(mut connection: Connection, app: &tauri::AppHandle) -> Result<Connection, String> {
+    if !bundled_frontend_loaded(app) {
+        return Err("The Runtime Owner Token is available only to the Deszo frontend.".into());
+    }
+    connection.first_party_token = Some(connection.token.clone());
+    Ok(connection)
 }
 
 #[tauri::command]
 fn get_runner_connection(app: tauri::AppHandle, state: tauri::State<RuntimeState>) -> Result<Connection, String> {
-    let shared = state.0.clone();
+    if !bundled_frontend_loaded(&app) {
+        return Err("The Runtime Owner Token is available only to the Deszo frontend.".into());
+    }
+    let connection = start_or_attach_runtime(&app, &state.0.clone())?;
+    connection_for_window(connection, &app)
+}
+
+/// The running runtime's connection, or the start of a new runtime generation. A P6 maintenance candidate starts here at
+/// bootstrap, before any window exists; its connection is returned to the first window that asks for it.
+fn start_or_attach_runtime(app: &tauri::AppHandle, shared: &Arc<Mutex<Shared>>) -> Result<Connection, String> {
     let mut guard = shared.lock().map_err(|e| e.to_string())?;
     if let Some(message) = &guard.uncertain {
         return Err(message.clone());
     }
     if let Some(runner) = guard.runner.as_mut() {
         if runner.child.try_wait().map_err(|e| e.to_string())?.is_none() {
-            return Ok(connection_for_window(runner.connection.clone(), &app));
+            refresh_runner_connection(runner)?;
+            return Ok(runner.connection.clone());
         }
         // Node exited unexpectedly: terminate its owned descendants before a new generation starts.
         if let Err(error) = runner.contain_exit() {
@@ -305,10 +461,18 @@ fn get_runner_connection(app: tauri::AppHandle, state: tauri::State<RuntimeState
         }
         guard.runner = None;
     }
+    // Keep only profile/resource identity after the one-use Host capability is sent to Node. A
+    // failed spawn cannot silently fall back to the user's default profile or replay this capability.
+    let lifecycle = guard.lifecycle_bootstrap.clone();
+    if let Some(bootstrap) = lifecycle.as_ref() {
+        bootstrap.validate()?;
+    }
     let development_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
     let dev_script = development_root.join("runtime/runner.mjs");
     let script = node_path(&if cfg!(debug_assertions) && dev_script.is_file() {
         dev_script
+    } else if let Some(bootstrap) = lifecycle.as_ref() {
+        bootstrap.application_root.join("runtime/runner.mjs")
     } else {
         app.path().resource_dir().map_err(|e| e.to_string())?.join("runtime").join("runner.mjs")
     });
@@ -318,13 +482,15 @@ fn get_runner_connection(app: tauri::AppHandle, state: tauri::State<RuntimeState
     let dev_bridge = development_root.join("mcp/bridge.mjs");
     let bridge_script = node_path(&if cfg!(debug_assertions) && dev_bridge.is_file() {
         dev_bridge
+    } else if let Some(bootstrap) = lifecycle.as_ref() {
+        bootstrap.application_root.join("runtime/bridge.mjs")
     } else {
         app.path().resource_dir().map_err(|e| e.to_string())?.join("runtime").join("bridge.mjs")
     });
     if !bridge_script.is_file() {
         return Err(format!("The bundled authoring bridge is missing at {}.", bridge_script.display()));
     }
-    let storage = storage_root(&app)?;
+    let storage = storage_root(&app, lifecycle.as_ref())?;
     let runtime_dir = storage.join("runtime");
     fs::create_dir_all(&runtime_dir).map_err(|e| e.to_string())?;
     let stderr = fs::OpenOptions::new()
@@ -332,7 +498,7 @@ fn get_runner_connection(app: tauri::AppHandle, state: tauri::State<RuntimeState
         .append(true)
         .open(runtime_dir.join("runner.log"))
         .map_err(|e| e.to_string())?;
-    let node = resolve_node_executable()?;
+    let node = resolve_node_executable(lifecycle.as_ref())?;
     let mut command = Command::new(&node);
     let connection_file = runtime_dir.join("connection.json");
     command
@@ -349,12 +515,37 @@ fn get_runner_connection(app: tauri::AppHandle, state: tauri::State<RuntimeState
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(stderr);
+    // A P6 maintenance candidate runs only its preflight until the Host decides; the decision keeps the same process.
+    let maintenance = lifecycle.as_ref().and_then(|bootstrap| bootstrap.maintenance.as_ref());
+    if let Some(spec) = maintenance {
+        command.arg("--p6-maintenance").env("DESZO_P6_OPERATION_ID", &spec.operation_id)
+            .env("DESZO_P6_PREFLIGHT_STORE", &spec.preflight_store);
+    }
+    if let Some(bootstrap) = lifecycle.as_ref() {
+        command
+            .arg("--host-contained")
+            .env("DESZO_LIFECYCLE_HOST_ADDRESS", &bootstrap.host_address)
+            .env("DESZO_LIFECYCLE_HOST_CAPABILITY", bootstrap.host_capability.as_deref().ok_or("Lifecycle Host capability was already consumed")?)
+            .env("DESZO_LIFECYCLE_INSTALLATION_ID", &bootstrap.installation_id)
+            .env("DESZO_LIFECYCLE_PROFILE_ROOT", &bootstrap.profile_root)
+            .env("DESZO_LIFECYCLE_GENERATION", &bootstrap.generation)
+            .env("DESZO_APPLICATION_BUILD_ID", &bootstrap.application_build_id)
+            .env("DESZO_LIFECYCLE_APPLICATION_PID", std::process::id().to_string())
+            .env(
+                "DESZO_TEST_DUPLICATE_LIFECYCLE_RECEIPT",
+                if bootstrap.test_duplicate_receipt_delivery { "1" } else { "0" },
+            );
+    }
+    // The Engine reports the Shell identity it was launched under; the Host rejects a readiness that names another Shell.
+    if let Some(shell) = lifecycle.as_ref().and_then(|bootstrap| bootstrap.shell_build_id.as_deref()) {
+        command.env("DESZO_SHELL_BUILD_ID", shell);
+    }
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
         command.arg("--supervised").creation_flags(0x08000000);
     }
-    if !bundled_frontend_loaded(&app) && cfg!(debug_assertions) {
+    if !bundled_frontend_loaded(&app) && cfg!(debug_assertions) && std::env::var_os("DESZO_CONTROL_HOST_PIPE").is_none() {
         command.arg("--dev-test-confirmation-off");
     }
     #[cfg(windows)]
@@ -365,23 +556,48 @@ fn get_runner_connection(app: tauri::AppHandle, state: tauri::State<RuntimeState
     #[cfg(windows)]
     {
         // Every supervised process launches through the shim. Refuse to start rather than fail each run later.
-        let shim = launch_shim(&app)?;
+        let shim = launch_shim(&app, lifecycle.as_ref())?;
         command.env("DESZO_SUPERVISOR_PIPE", &supervisor.pipe_name).env("DESZO_SUPERVISOR_TOKEN", &supervisor.token).env("DESZO_LAUNCH_SHIM", shim);
+    }
+    strip_one_time_host_env(&mut command, guard.spawn_attempts);
+    guard.spawn_attempts += 1;
+    if let Some(bootstrap) = guard.lifecycle_bootstrap.as_mut() {
+        bootstrap.host_capability = None;
     }
     let mut child = command.spawn().map_err(|e| format!("Node.js could not be started: {e}"))?;
     // Node waits for this confirmation before it initializes and can start any CLI.
     #[cfg(windows)]
     {
         if let Err(error) = job.assign(&child) {
+            // The runtime tree is terminated and waited for; kill-on-close ends any member that remains before a retry.
+            let _ = job.terminate_and_wait(Duration::from_secs(10));
             let _ = child.kill();
             let _ = child.wait();
             return Err(error);
         }
-        let stdin = child.stdin.as_mut().ok_or("Runtime stdin unavailable")?;
-        stdin.write_all(b"{\"command\":\"contained\"}\n").map_err(|e| e.to_string())?;
-        stdin.flush().map_err(|e| e.to_string())?;
+        let announced = (|| -> Result<(), String> {
+            let stdin = child.stdin.as_mut().ok_or("Runtime stdin unavailable")?;
+            stdin.write_all(b"{\"command\":\"contained\"}\n").map_err(|e| e.to_string())?;
+            stdin.flush().map_err(|e| e.to_string())
+        })();
+        if let Err(error) = announced {
+            // The runtime tree is terminated and waited for; kill-on-close ends any member that remains, as for every start failure.
+            let _ = job.terminate_and_wait(Duration::from_secs(10));
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(error);
+        }
     }
-    let stdout = child.stdout.take().ok_or("Runtime stdout unavailable")?;
+    let stdout = match child.stdout.take() {
+        Some(stdout) => stdout,
+        None => {
+            #[cfg(windows)]
+            let _ = job.terminate_and_wait(Duration::from_secs(10));
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err("Runtime stdout unavailable".into());
+        }
+    };
     let (sender, receiver) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
         let mut reader = BufReader::new(stdout);
@@ -389,22 +605,29 @@ fn get_runner_connection(app: tauri::AppHandle, state: tauri::State<RuntimeState
         let result = reader.read_line(&mut line).map(|_| line);
         let _ = sender.send(result);
     });
-    let line = match receiver.recv_timeout(Duration::from_secs(30)) {
+    // A maintenance candidate prints its startup line only after the Host's commit decision, so it waits as long as that takes.
+    let startup_wait = if maintenance.is_some() { Duration::from_secs(1200) } else { Duration::from_secs(30) };
+    let line = match receiver.recv_timeout(startup_wait) {
         Ok(Ok(line)) => line,
         _ => {
+            #[cfg(windows)]
+            let _ = job.terminate_and_wait(Duration::from_secs(10));
             let _ = child.kill();
             let _ = child.wait();
-            return Err("The runtime did not start within 30 seconds. See runtime/runner.log in the data folder.".into());
+            return Err("The runtime did not start within its startup window. See runtime/runner.log in the data folder.".into());
         }
     };
-    let connection: Connection = match serde_json::from_str(&line) {
+    let mut connection: Connection = match serde_json::from_str(&line) {
         Ok(connection) => connection,
         Err(e) => {
+            #[cfg(windows)]
+            let _ = job.terminate_and_wait(Duration::from_secs(10));
             let _ = child.kill();
             let _ = child.wait();
             return Err(format!("The runtime returned an invalid connection: {e}"));
         }
     };
+    connection.application_pid = lifecycle.as_ref().map(|_| std::process::id());
     guard.generation += 1;
     let generation = guard.generation;
     guard.runner = Some(Runner {
@@ -416,24 +639,57 @@ fn get_runner_connection(app: tauri::AppHandle, state: tauri::State<RuntimeState
         supervisor: Some(supervisor),
     });
     drop(guard);
-    supervise(app.clone(), shared, generation);
-    Ok(connection_for_window(connection, &app))
+    supervise(app.clone(), shared.clone(), generation);
+    Ok(connection)
 }
 
 /// The native launch shim: the development build output, or the copy bundled with the application's runtime.
 #[cfg(windows)]
-fn launch_shim(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+fn launch_shim(app: &tauri::AppHandle, lifecycle: Option<&LifecycleBootstrap>) -> Result<PathBuf, String> {
     let mut candidates = Vec::new();
     if cfg!(debug_assertions) {
         candidates.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target").join("debug").join("deszo-launch-shim.exe"));
     }
-    candidates.push(app.path().resource_dir().map_err(|e| e.to_string())?.join("runtime").join("deszo-launch-shim.exe"));
+    candidates.push(if let Some(bootstrap) = lifecycle {
+        bootstrap.application_root.join("runtime").join("deszo-launch-shim.exe")
+    } else {
+        app.path().resource_dir().map_err(|e| e.to_string())?.join("runtime").join("deszo-launch-shim.exe")
+    });
     candidates.into_iter().find(|path| path.is_file()).ok_or_else(|| {
         "The launch shim deszo-launch-shim.exe is missing, so no run could be contained. Run `npm run shim:dev` (development) or `npm run shim:build` (release), then restart Deszo.".to_string()
     })
 }
 
-fn resolve_node_executable() -> Result<PathBuf, String> {
+/// Host bootstrap values valid for one runtime registration (runtime/host/runtimeBinding.mjs). The first runtime of this
+/// process receives them; a later generation must not inherit a consumed launch proof or attach secret, because the host
+/// refuses a replay. Without them the new runtime fails closed with the host's bootstrap error instead of retrying with
+/// the same consumed values.
+const ONE_TIME_HOST_ENV: [&str; 5] = [
+    "DESZO_HOST_OPERATION_ID",
+    "DESZO_HOST_REGISTRATION_NONCE",
+    "DESZO_HOST_PROCESS_EVIDENCE",
+    "DESZO_HOST_RUNTIME_GENERATION",
+    "DESZO_HOST_ATTACH_SECRET",
+];
+
+fn strip_one_time_host_env(command: &mut Command, previous_spawn_attempts: u64) {
+    if previous_spawn_attempts == 0 {
+        return;
+    }
+    for name in ONE_TIME_HOST_ENV {
+        command.env_remove(name);
+    }
+}
+
+fn resolve_node_executable(lifecycle: Option<&LifecycleBootstrap>) -> Result<PathBuf, String> {
+    if let Some(bootstrap) = lifecycle {
+        return Ok(node_path(&bootstrap.node_executable));
+    }
+    if std::env::var_os("DESZO_CONTROL_HOST_PIPE").is_some() {
+        let node = PathBuf::from(std::env::var_os("DESZO_HOST_NODE_PATH").ok_or("The host launch did not select Node.js")?);
+        if !node.is_absolute() || !node.is_file() { return Err("The selected host Node.js executable is unavailable".into()); }
+        return Ok(node_path(&node));
+    }
     let output = Command::new("node").args(["-p", "process.execPath"]).output().map_err(|e| format!("Node.js could not be resolved: {e}"))?;
     if !output.status.success() { return Err("Node.js did not report its executable path.".into()); }
     let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
@@ -443,11 +699,66 @@ fn resolve_node_executable() -> Result<PathBuf, String> {
 }
 
 fn main() {
+    let managed_by_host = std::env::args().any(|argument| argument == "--host-managed");
+    let lifecycle_bootstrap = if managed_by_host {
+        let stdin = std::io::stdin();
+        let mut line = String::new();
+        stdin.lock().read_line(&mut line).expect("Could not read the private Host bootstrap pipe");
+        let message: HostBootstrapLine = serde_json::from_str(&line).expect("Host bootstrap was malformed");
+        assert_eq!(message.command, "bootstrap", "The first Host pipe message must be bootstrap");
+        message.bootstrap.validate().expect("Host bootstrap validation failed");
+        Some(message.bootstrap)
+    } else {
+        None
+    };
+    let shared = Arc::new(Mutex::new(Shared {
+        lifecycle_bootstrap,
+        ..Shared::default()
+    }));
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .manage(RuntimeState(Arc::new(Mutex::new(Shared::default()))))
+        .manage(RuntimeState(shared))
+        .setup(|app| {
+            if app.state::<RuntimeState>().0.lock().map_err(|error| error.to_string())?.lifecycle_bootstrap.is_some() {
+                let handle = app.handle().clone();
+                std::thread::Builder::new()
+                    .name("deszo-host-shutdown-pipe".into())
+                    .spawn(move || {
+                        let stdin = std::io::stdin();
+                        for line in stdin.lock().lines().map_while(Result::ok) {
+                            if serde_json::from_str::<HostControlLine>(&line).is_ok_and(|message| message.command == "shutdown") {
+                                handle.exit(0);
+                                break;
+                            }
+                        }
+                    })
+                    .map_err(|error| error.to_string())?;
+            }
+            // A P6 maintenance candidate starts at bootstrap, not on a window's request: no ordinary Engine work can precede the commit.
+            let maintenance = app.state::<RuntimeState>().0.lock().map_err(|error| error.to_string())?
+                .lifecycle_bootstrap.as_ref().is_some_and(|bootstrap| bootstrap.maintenance.is_some());
+            if maintenance {
+                let handle = app.handle().clone();
+                let shared = app.state::<RuntimeState>().0.clone();
+                std::thread::Builder::new()
+                    .name("deszo-p6-maintenance".into())
+                    .spawn(move || {
+                        if let Err(error) = start_or_attach_runtime(&handle, &shared) {
+                            // The Host watches this process: a candidate that cannot preflight ends the Shell at once, so the Host falls back.
+                            eprintln!("The P6 maintenance candidate did not start: {error}");
+                            handle.exit(1);
+                        }
+                    })
+                    .map_err(|error| error.to_string())?;
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![get_runner_connection])
         .on_window_event(|window, event| {
+            #[cfg(windows)]
+            if matches!(event, tauri::WindowEvent::CloseRequested { .. }) {
+                foreground_handoff::before_close();
+            }
             if matches!(event, tauri::WindowEvent::Destroyed) {
                 if let Ok(mut guard) = window.state::<RuntimeState>().0.lock() {
                     guard.generation += 1;
@@ -515,8 +826,10 @@ mod tests {
         }
         let probe = Job::duplicate_for_test(&job);
         let connection = Connection { port: 1, token: String::new(), first_party_token: None, root: String::new(), scratch_root: String::new(), process_containment: "tauri-job".into(),
-            descriptor_version: 1, api_versions: vec!["v2".into(), "v3".into()], store_id: String::new(), runtime_instance_id: String::new(), application_root: String::new(), node_executable: String::new(), bridge_script: None, connection_file: None };
-        let shared = Arc::new(Mutex::new(Shared { runner: Some(Runner { child, connection, job, supervisor: None }), generation: 7, uncertain: None }));
+            descriptor_version: 1, api_versions: vec!["v2".into(), "v3".into()], store_id: String::new(), runtime_instance_id: String::new(), application_pid: None,
+            application_root: String::new(), node_executable: String::new(), bridge_script: None, connection_file: None };
+        let shared = Arc::new(Mutex::new(Shared { runner: Some(Runner { child, connection, job, supervisor: None }), generation: 7, spawn_attempts: 1, uncertain: None,
+            lifecycle_bootstrap: None }));
         let (sender, receiver) = mpsc::channel();
         watch_generation(shared.clone(), 7, move |message| { let _ = sender.send(message); });
         let message = receiver.recv_timeout(Duration::from_secs(30)).expect("the supervisor reported the loss");
@@ -565,5 +878,38 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
         let connection: serde_json::Value = serde_json::from_str(&line).unwrap_or_else(|_| panic!("runner did not start: {line:?}"));
         assert!(connection["port"].as_u64().unwrap_or(0) > 0 && connection["token"].as_str().map_or(false, |token| token.len() >= 32));
+    }
+}
+
+#[cfg(test)]
+mod one_time_host_env_tests {
+    use super::{strip_one_time_host_env, ONE_TIME_HOST_ENV};
+    use std::process::Command;
+
+    fn inherited(command: &Command, name: &str) -> bool {
+        command.get_envs().any(|(key, value)| key.to_str() == Some(name) && value.is_some())
+    }
+
+    #[test]
+    fn first_runtime_keeps_its_bootstrap_and_later_generations_do_not_inherit_it() {
+        let mut first = Command::new("node");
+        for name in ONE_TIME_HOST_ENV {
+            first.env(name, "one-time");
+        }
+        strip_one_time_host_env(&mut first, 0);
+        for name in ONE_TIME_HOST_ENV {
+            assert!(inherited(&first, name), "{name} belongs to the first runtime");
+        }
+
+        let mut later = Command::new("node");
+        for name in ONE_TIME_HOST_ENV {
+            later.env(name, "consumed");
+        }
+        later.env("DESZO_HOST_POLICY_ID", "policy");
+        strip_one_time_host_env(&mut later, 1);
+        for name in ONE_TIME_HOST_ENV {
+            assert!(!inherited(&later, name), "{name} must not be inherited by a later generation");
+        }
+        assert!(inherited(&later, "DESZO_HOST_POLICY_ID"), "the policy binding is not a one-time value");
     }
 }

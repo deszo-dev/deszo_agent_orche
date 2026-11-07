@@ -1,0 +1,14 @@
+{
+  "requestId": "att-req-ddc0d1d1-d71b-41c4-af27-790881b77dcc",
+  "runId": "run-fixer-pilot-001",
+  "revision": 3,
+  "packageId": "pkg-fixer-rev3-001",
+  "evidenceDigest": "sha256:7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069",
+  "claimedObjective": "Fix off-by-one array boundary index in slideWindow generator",
+  "createdAt": "2026-10-21T13:19:37.807Z",
+  "status": "COMPLETED",
+  "turnStartedAt": "2026-10-21T13:19:37.809Z",
+  "turnCompletedAt": "2026-10-21T13:19:38.179Z",
+  "durationMs": 369,
+  "tokens": null
+}

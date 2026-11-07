@@ -11,6 +11,22 @@ export const VALUE_TYPES: ValueType[] = ['Text', 'JsonValue', 'ArtifactSet'];
 export type OutputContract = { format: 'text' } | { format: 'json'; schema?: Record<string, unknown> };
 export type FieldSource = { input: string; pointer?: string } | { literal: unknown };
 export type TextSource = { literal: string } | { pointer: string };
+export interface ManagedTaskConfig {
+  roles: Record<string, { role: string; provider: Provider; model: string; effort: Effort; timeoutSeconds: number }>;
+  scope: { production: string[]; tests: string[]; documentation: string[]; excludedOutputs: string[] };
+  projectPolicy: { criticalAreas: string[]; publicContracts: string[]; requireIndependentAcceptance: boolean; independentAcceptanceOnHighUncertainty?: boolean; independentAcceptanceOnHighConsequence?: boolean };
+  bounds: { maxAttempts: number; maxElapsedSeconds: number; maxContextTurns: number; maxRepairIterations: number; maxDiscoveryTurns: number };
+  checks: { id: string; command: string; args: string[]; expectedExitCode: number; timeoutMs: number; criteria: string[] }[];
+  delivery: { boundary: 'candidate' | 'verified_branch'; baseCommit?: string; targetBranchRef?: string; expectedOldValue?: string | null; commitPolicy?: { authorName: string; authorEmail: string; message: string }; installHooks?: boolean; hookSource?: string | null };
+}
+
+export interface ManagedTaskNavigator {
+  taskExecutionId: string; state: string; current: string | null; phase: string | null;
+  plan: { planRevisionId: string; classification: { winningClassification: string; reason: string }; selectedStages: string[] } | null;
+  work: { attempts: number; processes: number; outputBytes: number; elapsedMilliseconds: number; remainingMilliseconds: number; repairs: number };
+  incompleteReason: string | null; acceptanceRecordIds: string[]; delivery: { status: string; targetBranchRef: string; verifiedCommitId: string | null } | null;
+  deliveryOperation: { phase: string } | null; stateArtifact: ArtifactRef;
+}
 
 export interface LoopConfig {
   valueType: ValueType; stateSchema?: Record<string, unknown>; fixedInputs: { id: string; type: ValueType }[];
@@ -19,6 +35,7 @@ export interface LoopConfig {
 }
 
 export type WorkflowNode =
+  | { id: string; type: 'task'; config: ManagedTaskConfig }
   | { id: string; type: 'text'; config: { value: string } }
   | { id: string; type: 'prompt-template'; config: { template: string; slots: { id: string; description?: string }[] } }
   | { id: string; type: 'agent'; config: { provider: Provider; model: string; effort?: Effort; contextId?: string; timeoutSeconds: number; output: OutputContract; attachFiles?: boolean; captures?: string[] } }
@@ -33,7 +50,8 @@ export type WorkflowNode =
   | { id: string; type: 'loop'; config: LoopConfig }
   | { id: string; type: 'cache'; config: { valueType: ValueType; mode: 'live' | 'frozen' } }
   | { id: string; type: 'route'; config: { valueType: ValueType; selector: string; cases: { id: string; equals: unknown }[]; onUnmatched: 'error' | 'pause' } }
-  | { id: string; type: 'gate'; config: { mode: 'prepare' | 'evaluate' | 'verify'; policy: GatePolicy; carry?: boolean; subject?: 'specification' | 'delivery'; specificationPolicy?: GatePolicy; technicalPolicy?: GatePolicy } }
+  | { id: string; type: 'gate'; config: { mode: 'self-repair-verify'; verificationPolicy: ArtifactRef }
+      | { mode: 'prepare' | 'evaluate' | 'verify'; policy: GatePolicy; carry?: boolean; subject?: 'specification' | 'delivery'; specificationPolicy?: GatePolicy; technicalPolicy?: GatePolicy } }
   | { id: string; type: 'map'; config: MapConfig };
 export type MapRole =
   | { id: string; kind: 'agent'; provider: Provider; model: string; effort?: Effort; instructions: string; timeoutSeconds: number; context: 'task' | { contextId: string } }
@@ -45,24 +63,37 @@ export interface MapConfig {
 export interface GatePolicy { slots: { id: string; role: string; view: 'full' | 'public'; scopeRefs?: string[] }[] }
 export type NodeType = WorkflowNode['type'];
 
+export interface WorkflowJudgeRepairProfile {
+  profileId: string; repairWorkflowId: string; repairPublishedVersion: number; repairWorkflowSnapshotSha256: string;
+  repairWorkspaceId: string; failedNodeInstanceId: string; repairResultNodeInstanceId: string; verificationNodeInstanceIds: string[];
+  acceptanceMode: 'expected_digest' | 'judge_post_execution'; expectedRepairResultSha256?: string; failedNodeRetry: 'explicit_safe' | 'never'; selfRepair?: ArtifactRef;
+}
+export interface WorkflowJudgePolicy {
+  version: 'workflow-judge/1'; judgeNodeId: string; maxJudgeAttemptsPerRun: number; maxEvidenceExpansionsPerAttention: number;
+  repairProfiles: WorkflowJudgeRepairProfile[];
+}
+
 export interface WorkflowEdge { id: string; source: { nodeId: string; port: string }; target: { nodeId: string; port: string } }
-export type Capability = 'core-v1' | 'loops-v1' | 'cache-v1' | 'pipeline-v1' | 'delivery-v1' | 'revisions-v1';
+export type Capability = 'core-v1' | 'loops-v1' | 'cache-v1' | 'pipeline-v1' | 'delivery-v1' | 'revisions-v1' | 'task-planning-v1' | 'protected-self-repair-v1';
 export interface Workflow {
   schemaVersion: 1; workflowId: string; capabilities: Capability[];
   settings: { nativeConfiguration: 'restricted' | 'inherit' };
   nodes: WorkflowNode[]; edges: WorkflowEdge[]; after: { before: string; after: string }[];
+  judgePolicy?: WorkflowJudgePolicy;
   view?: Record<string, { x: number; y: number; label?: string }>;
 }
 
 export interface Issue { path: string; message: string }
-export interface SavedWorkflow { workflow: Workflow; snapshotSha256: string; executionHash: string; revision: number; etag: string; validation: { valid: boolean; issues: Issue[] } }
-export interface WorkflowSummary { workflowId: string; snapshotSha256: string; executionHash: string; revision: number; createdAt: string; updatedAt: string }
+export interface SavedWorkflow { workflow: Workflow; workflowId?: string; snapshotSha256: string; definitionDigest?: string; executionHash: string; revision: number; etag: string; sourcePublishedVersionId?: string | null; updatedAt?: string; validation: { valid: boolean; issues: Issue[] } }
+export interface PublishedWorkflow { workflowId: string; publishedVersionId: string; version: number; workflow: Workflow; definitionDigest: string; snapshotSha256: string; executionHash: string; authorityPolicyVersion: string; provenance: 'legacy-migration' | 'owner-publication'; runnable: boolean; validation: { valid: boolean; issues: Issue[] }; sourceDraftRevision: number | null; publishedAt: string; etag: string }
+export interface PublishedVersionSummary { workflowId: string; publishedVersionId: string; version: number; definitionDigest: string; snapshotSha256: string; executionHash: string; authorityPolicyVersion: string; provenance: 'legacy-migration' | 'owner-publication'; runnable: boolean; validation: { valid: boolean; issues: Issue[] }; sourceDraftRevision: number | null; publishedAt: string }
+export interface WorkflowSummary { workflowId: string; draftRevision: number | null; publishedVersionId: string | null; latestPublishedVersion: number | null; definitionDigest: string | null; runnable: boolean; createdAt: string; updatedAt: string }
 export interface Workspace { workspaceId: string; cwd: string; cwdIdentity: string; createdAt: string; updatedAt: string }
 
 export type RunState = 'queued' | 'running' | 'draining' | 'waiting_for_user' | 'stopping' | 'succeeded' | 'failed' | 'canceled' | 'interrupted';
 export type AttemptState = 'scheduled' | 'waiting' | 'running' | 'succeeded' | 'failed' | 'canceled' | 'blocked' | 'interrupted' | 'reused' | 'skipped';
 export const TERMINAL_RUN: RunState[] = ['succeeded', 'failed', 'canceled', 'interrupted'];
-export interface Run { runId: string; workflowId: string; workflowSnapshot: ArtifactRef; executionHash: string; state: RunState; lastSequence: number; createdAt: string; workspaceId: string; kind: 'workflow' | 'chat' }
+export interface Run { runId: string; workflowId: string; workflowSnapshot: ArtifactRef; executionHash: string; state: RunState; lastSequence: number; createdAt: string; workspaceId: string; kind: 'workflow' | 'chat'; publishedVersion: { publishedVersionId: string; version: number; definitionDigest: string; authorityPolicyVersion: string } | null; controlMode?: 'supervised' | 'unsupervised' }
 export interface CachePin { nodeId: string; value: { type: ValueType; artifact: ArtifactRef }; sourceRunId: string; sourceAttemptId: string; fingerprint: string; sourceChanged: boolean; orphaned?: boolean; pinnedAt: string }
 export interface LoopExecution { loopNodeId: string; state: 'running' | 'paused' | 'finished' | 'failed' | 'canceled' | 'interrupted'; iteration: number; maxIterations: number; maxActiveMinutes: number; activeMs: number; pauseReason: string | null }
 export interface RunSnapshot {
@@ -71,6 +102,14 @@ export interface RunSnapshot {
   contexts: { contextNodeId: string; mode: 'new' | 'continue'; bindingId: string }[];
   loops: LoopExecution[];
   maps?: MapExecution[];
+}
+export type WorkflowJudgeAnswerSpec =
+  | { type: 'choice'; options: { id: string; label: string }[] }
+  | { type: 'text'; maxLength: number };
+export interface WorkflowJudgeQuestion {
+  questionId: string; rootRunId: string; originatingRunId: string; linkId: string | null; incidentId: string | null;
+  status: 'pending' | 'answered' | 'canceled' | 'superseded'; question: string; answerSpec: WorkflowJudgeAnswerSpec;
+  answer: { type: 'choice'; optionId: string } | { type: 'text'; value: string } | null; createdAt: string; updatedAt: string;
 }
 export interface MapExecution { mapInstanceId: string; mapExecutionId: string; state: string; generation: number; failedVerificationCycles: number; maxFailedVerificationCycles: number; pauseReason: string | null; accepted: number; total: number }
 export interface MapNavigator {
@@ -108,4 +147,5 @@ export interface RunRequest {
   requestId: string; workflowId: string; workspaceId: string; workflowSnapshotSha256: string; clientLabel: string | null;
   state: 'pending' | 'approved' | 'denied' | 'expired'; createdAt: string; expiresAt: string; runId: string | null;
   problem: { code: string; message: string; details: { path: string; message: string }[] } | null;
+  controlGrantId?: string | null; controlModeRequested?: 'supervised' | 'unsupervised';
 }

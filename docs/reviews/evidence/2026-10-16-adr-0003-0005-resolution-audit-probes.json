@@ -1,0 +1,126 @@
+{
+  "capturedAt": "2026-10-16T15:49:06.132Z",
+  "checkout": "C:\\my\\2026\\deszo_agent_orche",
+  "head": "7178032a9c8b4ce1f7a97590e57ab10c7af05fcf",
+  "scratch": "C:\\Users\\jusse\\AppData\\Local\\Temp\\deszo-resolution-audit-dq44Iu",
+  "inputDigests": {
+    "runtime/core/branchDelivery.mjs": "1958b2fea69d1b8fbdc308e2ff737cee093818c04983e3f9d07b06d8b5edc522",
+    "runtime/core/contextPackage.mjs": "643a71d4717c443a067d01963f1290f861e06ecfacf176f6f43b2809ebdacd2c",
+    "runtime/core/taskAssessment.mjs": "4fec6e2a0c375d62eee2ae5cf038f435fa037b0c748ba5215a03de56d08a12ec",
+    "runtime/core/store.mjs": "5696bf5b4c74d4e27de22dea991f8b19325cc6f8b6a38a49a39e6f6d30e4d14e",
+    "docs/storage/m9.sql": "ab63c501e29ed3e8c1df858156f0f470693a044578618c626ec85c6a425f8cd0"
+  },
+  "changedInputs": [],
+  "summary": {
+    "total": 8,
+    "passed": 0,
+    "failed": 8
+  },
+  "results": [
+    {
+      "name": "control_callback_must_run_before_smoke_ends_and_ref_is_published",
+      "passed": false,
+      "observed": {
+        "status": "READY_FOR_MERGE",
+        "startedAt": 1792165738050,
+        "returnedAt": 1792165740145,
+        "smokeEndedAt": 1792165739316,
+        "callbackAt": 1792165740196,
+        "publishedAtCallback": true,
+        "refPublishedBeforeAwait": true,
+        "synchronousCallMs": 2095
+      },
+      "error": "AssertionError [ERR_ASSERTION]: Control resumed only after smoke, commit and target-ref publication; the thenable does not make delivery asynchronous.\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-resolution-audit-probes.mjs:76:10\n    at async probe (file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-resolution-audit-probes.mjs:55:9)\n    at async file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-resolution-audit-probes.mjs:59:1"
+    },
+    {
+      "name": "hooks_none_must_also_cover_host_ref_publication",
+      "passed": false,
+      "observed": {
+        "status": "READY_FOR_MERGE",
+        "hookExecution": {
+          "status": "none",
+          "journal": "Hooks policy: none"
+        },
+        "hostHookRan": true,
+        "marker": "HOST HOOK RAN\nHOST HOOK RAN\n"
+      },
+      "error": "AssertionError [ERR_ASSERTION]: The host reference-transaction hook executed while delivery reported hooks:none.\n\ntrue !== false\n\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-resolution-audit-probes.mjs:88:10\n    at async probe (file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-resolution-audit-probes.mjs:55:9)\n    at async file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-resolution-audit-probes.mjs:79:1"
+    },
+    {
+      "name": "checked_out_target_must_be_rechecked_after_smoke",
+      "passed": false,
+      "observed": {
+        "status": "READY_FOR_MERGE",
+        "beforeRef": "refs/heads/main",
+        "afterRef": "refs/heads/codex/audit",
+        "hostStatus": "D  approved.txt"
+      },
+      "error": "AssertionError [ERR_ASSERTION]: Preflight checkout protection became stale during smoke and publication dirtied the caller checkout.\n\ntrue !== false\n\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-resolution-audit-probes.mjs:100:10\n    at async probe (file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-resolution-audit-probes.mjs:55:9)\n    at async file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-resolution-audit-probes.mjs:91:1"
+    },
+    {
+      "name": "structural_validation_without_trusted_inputs_cannot_open_gate",
+      "passed": false,
+      "observed": {
+        "valid": true,
+        "canOpenGate": true,
+        "reason": "All criteria satisfied with typed evidence."
+      },
+      "error": "AssertionError [ERR_ASSERTION]: Default evaluation opened a Gate with no trusted criterion inventory or resolved evidence.\n\ntrue !== false\n\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-resolution-audit-probes.mjs:113:10\n    at probe (file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-resolution-audit-probes.mjs:55:15)\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-resolution-audit-probes.mjs:110:7"
+    },
+    {
+      "name": "evidence_id_membership_cannot_replace_digest_verification",
+      "passed": false,
+      "observed": {
+        "valid": true,
+        "canOpenGate": true,
+        "reason": "All criteria satisfied with typed evidence."
+      },
+      "error": "AssertionError [ERR_ASSERTION]: ID-only membership accepted a digest that was never verified.\n\ntrue !== false\n\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-resolution-audit-probes.mjs:118:10\n    at probe (file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-resolution-audit-probes.mjs:55:15)\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-resolution-audit-probes.mjs:115:7"
+    },
+    {
+      "name": "resolved_evidence_must_match_kind_source_and_success",
+      "passed": false,
+      "observed": {
+        "valid": true,
+        "canOpenGate": true,
+        "reason": "All criteria satisfied with typed evidence.",
+        "resolvedRecord": {
+          "id": "check-1",
+          "kind": "artifact",
+          "digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "subjectId": "OTHER-SUBJECT",
+          "candidateDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "exitCode": 7,
+          "status": "failed"
+        }
+      },
+      "error": "AssertionError [ERR_ASSERTION]: Matching ID/digest accepted evidence of the wrong type, source and execution status.\n\ntrue !== false\n\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-resolution-audit-probes.mjs:124:10\n    at probe (file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-resolution-audit-probes.mjs:55:15)\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-resolution-audit-probes.mjs:120:7"
+    },
+    {
+      "name": "failed_revision_retry_must_preserve_the_active_revision",
+      "passed": false,
+      "observed": {
+        "retryError": "UNIQUE constraint failed: execution_plans.id, execution_plans.plan_revision_id",
+        "revisions": [
+          {
+            "id": "PLAN-6f2570a7630c",
+            "plan_revision_id": "REV-2026-10-16T15-49-05-854Z",
+            "status": "superseded"
+          }
+        ]
+      },
+      "error": "AssertionError [ERR_ASSERTION]: A rejected retry superseded the only active revision without installing a replacement.\n\n0 !== 1\n\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-resolution-audit-probes.mjs:150:12\n    at probe (file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-resolution-audit-probes.mjs:55:15)\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-resolution-audit-probes.mjs:144:7"
+    },
+    {
+      "name": "opening_an_existing_m9_store_must_upgrade_the_plan_revision_key",
+      "passed": false,
+      "observed": {
+        "version": 9,
+        "primaryKeyColumns": [
+          "id"
+        ]
+      },
+      "error": "AssertionError [ERR_ASSERTION]: Editing m9 in place did not upgrade an already migrated store.\n+ actual - expected\n\n  [\n    'id',\n-   'plan_revision_id'\n  ]\n\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-resolution-audit-probes.mjs:165:12\n    at probe (file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-resolution-audit-probes.mjs:55:15)\n    at file:///C:/my/2026/deszo_agent_orche/docs/reviews/evidence/2026-10-16-adr-0003-0005-resolution-audit-probes.mjs:154:7"
+    }
+  ]
+}

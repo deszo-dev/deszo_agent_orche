@@ -1,0 +1,2832 @@
+{
+  "pids": {
+    "a": 7740,
+    "b": 18936,
+    "c": 19044
+  },
+  "harness": [
+    {
+      "at": "2026-10-22T17:56:07.066Z",
+      "origin": "HOST_HARNESS",
+      "what": "engine_a_started",
+      "pid": 7740
+    },
+    {
+      "at": "2026-10-22T17:56:08.247Z",
+      "origin": "TEST_HARNESS",
+      "what": "parent_run_requested",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "workspace": "main"
+    },
+    {
+      "at": "2026-10-22T17:56:09.132Z",
+      "origin": "TEST_HARNESS",
+      "what": "linked_repair_requested_through_engine_route",
+      "linkId": "abe190e8-d78f-4b77-b09a-f28507f0db7b",
+      "repairRunId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "note": "the Engine captures and starts the repair; the harness only names it"
+    },
+    {
+      "at": "2026-10-22T17:56:10.148Z",
+      "origin": "TEST_HARNESS",
+      "what": "conflicting_run_in_parent_workspace_refused",
+      "status": 409
+    },
+    {
+      "at": "2026-10-22T17:56:10.153Z",
+      "origin": "ENGINE",
+      "what": "judge_lifecycle_intent_recorded",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "operationId": "96201590-de6a-47b4-891b-5081e9a4469a",
+      "candidateDigest": "2e522a1f2c514893812c35a5c8673a49ae2b3a3026cc43006f404e261af30e58"
+    },
+    {
+      "at": "2026-10-22T17:56:10.247Z",
+      "origin": "HOST_HARNESS",
+      "what": "engine_a_stopped",
+      "pid": 7740
+    },
+    {
+      "at": "2026-10-22T17:56:11.284Z",
+      "origin": "HOST_HARNESS",
+      "what": "engine_b_started",
+      "pid": 18936
+    },
+    {
+      "at": "2026-10-22T17:56:14.462Z",
+      "origin": "ENGINE",
+      "what": "observation_before_receipt",
+      "parent": "waiting_for_user",
+      "repair": "waiting_for_user"
+    },
+    {
+      "at": "2026-10-22T17:56:14.510Z",
+      "origin": "HOST_HARNESS",
+      "what": "lifecycle_receipt_delivered",
+      "operationId": "96201590-de6a-47b4-891b-5081e9a4469a",
+      "receiptId": "3cb96b2c-3e78-44cf-a94a-0343159412c9",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:15.319Z",
+      "origin": "ENGINE",
+      "what": "repair_and_parent_observed_succeeded",
+      "repair": "succeeded",
+      "parent": "succeeded"
+    },
+    {
+      "at": "2026-10-22T17:56:15.416Z",
+      "origin": "HOST_HARNESS",
+      "what": "engine_b_stopped",
+      "pid": 18936
+    },
+    {
+      "at": "2026-10-22T17:56:15.817Z",
+      "origin": "HOST_HARNESS",
+      "what": "engine_c_started",
+      "pid": 19044
+    },
+    {
+      "at": "2026-10-22T17:56:18.845Z",
+      "origin": "ENGINE",
+      "what": "final_observation",
+      "parent": "succeeded",
+      "repair": "succeeded"
+    }
+  ],
+  "http": [
+    {
+      "at": "2026-10-22T17:56:07.141Z",
+      "pid": 7740,
+      "method": "PUT",
+      "path": "/api/v2/workspaces/main",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:07.154Z",
+      "pid": 7740,
+      "method": "PUT",
+      "path": "/api/v2/workspaces/main-repair",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:07.599Z",
+      "pid": 7740,
+      "method": "PUT",
+      "path": "/api/v3/workflows/parent-delivery",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:07.637Z",
+      "pid": 7740,
+      "method": "PUT",
+      "path": "/api/v3/workflows/deszo-self-repair",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:08.246Z",
+      "pid": 7740,
+      "method": "POST",
+      "path": "/api/v2/runs",
+      "status": 202
+    },
+    {
+      "at": "2026-10-22T17:56:08.336Z",
+      "pid": 7740,
+      "method": "GET",
+      "path": "/api/v2/runs/9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:08.446Z",
+      "pid": 7740,
+      "method": "GET",
+      "path": "/api/v2/runs/9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:08.698Z",
+      "pid": 7740,
+      "method": "GET",
+      "path": "/api/v2/runs/9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:08.818Z",
+      "pid": 7740,
+      "method": "GET",
+      "path": "/api/v2/runs/9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:09.029Z",
+      "pid": 7740,
+      "method": "GET",
+      "path": "/api/v2/runs/9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:09.132Z",
+      "pid": 7740,
+      "method": "POST",
+      "path": "/api/v2/runs/9d9e550b-a22c-4147-81f3-fe450ce449ad/linked-repair",
+      "status": 202
+    },
+    {
+      "at": "2026-10-22T17:56:09.174Z",
+      "pid": 7740,
+      "method": "GET",
+      "path": "/api/v2/runs/4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:09.278Z",
+      "pid": 7740,
+      "method": "GET",
+      "path": "/api/v2/runs/4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:09.485Z",
+      "pid": 7740,
+      "method": "GET",
+      "path": "/api/v2/runs/4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:09.590Z",
+      "pid": 7740,
+      "method": "GET",
+      "path": "/api/v2/runs/4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:09.838Z",
+      "pid": 7740,
+      "method": "GET",
+      "path": "/api/v2/runs/4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:09.945Z",
+      "pid": 7740,
+      "method": "GET",
+      "path": "/api/v2/runs/4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:10.143Z",
+      "pid": 7740,
+      "method": "GET",
+      "path": "/api/v2/runs/4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:10.145Z",
+      "pid": 7740,
+      "method": "GET",
+      "path": "/api/v2/runs/9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:10.148Z",
+      "pid": 7740,
+      "method": "POST",
+      "path": "/api/v2/runs",
+      "status": 409
+    },
+    {
+      "at": "2026-10-22T17:56:11.307Z",
+      "pid": 18936,
+      "method": "GET",
+      "path": "/api/v2/runs?limit=50",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:11.577Z",
+      "pid": 18936,
+      "method": "GET",
+      "path": "/api/v2/runs?limit=50",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:11.844Z",
+      "pid": 18936,
+      "method": "GET",
+      "path": "/api/v2/runs?limit=50",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:12.109Z",
+      "pid": 18936,
+      "method": "GET",
+      "path": "/api/v2/runs?limit=50",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:12.372Z",
+      "pid": 18936,
+      "method": "GET",
+      "path": "/api/v2/runs?limit=50",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:12.627Z",
+      "pid": 18936,
+      "method": "GET",
+      "path": "/api/v2/runs?limit=50",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:12.893Z",
+      "pid": 18936,
+      "method": "GET",
+      "path": "/api/v2/runs?limit=50",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:13.160Z",
+      "pid": 18936,
+      "method": "GET",
+      "path": "/api/v2/runs?limit=50",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:13.413Z",
+      "pid": 18936,
+      "method": "GET",
+      "path": "/api/v2/runs?limit=50",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:13.677Z",
+      "pid": 18936,
+      "method": "GET",
+      "path": "/api/v2/runs?limit=50",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:13.943Z",
+      "pid": 18936,
+      "method": "GET",
+      "path": "/api/v2/runs?limit=50",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:14.206Z",
+      "pid": 18936,
+      "method": "GET",
+      "path": "/api/v2/runs?limit=50",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:14.510Z",
+      "pid": 18936,
+      "method": "POST",
+      "path": "/api/v2/runs/4f15c7ad-697f-4935-abaa-684c2e40a292/lifecycle-receipt",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:14.583Z",
+      "pid": 18936,
+      "method": "GET",
+      "path": "/api/v2/runs/4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:14.882Z",
+      "pid": 18936,
+      "method": "GET",
+      "path": "/api/v2/runs/4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:14.884Z",
+      "pid": 18936,
+      "method": "GET",
+      "path": "/api/v2/runs/9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:15.103Z",
+      "pid": 18936,
+      "method": "GET",
+      "path": "/api/v2/runs/9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:15.315Z",
+      "pid": 18936,
+      "method": "GET",
+      "path": "/api/v2/runs/9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:18.841Z",
+      "pid": 19044,
+      "method": "GET",
+      "path": "/api/v2/runs/9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "status": 200
+    },
+    {
+      "at": "2026-10-22T17:56:18.845Z",
+      "pid": 19044,
+      "method": "GET",
+      "path": "/api/v2/runs/4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "status": 200
+    }
+  ],
+  "journal": [
+    {
+      "at": "2026-10-22T17:56:07.701Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 1,
+      "type": "run.created",
+      "nodeInstanceId": null,
+      "attemptId": null,
+      "origin": "ENGINE",
+      "payload": {
+        "executionHash": "7d11130825bb9f2857b89c84615dd0e7dee7d98e06fd1676977c145d5b2c5213",
+        "settingsSnapshot": {
+          "artifactId": "9614efe4-0015-4b65-ae67-b36a11548f6a",
+          "sha256": "c01ff7a25618ca200fd9b1ec14fd8f3aceee5ff9ac27ca0bcd3b5e525ab4e425"
+        },
+        "workflowSnapshot": {
+          "artifactId": "c25960fb-ccdd-4fa7-85fc-ef48c95a8a65",
+          "sha256": "7d11130825bb9f2857b89c84615dd0e7dee7d98e06fd1676977c145d5b2c5213"
+        }
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:08.085Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 2,
+      "type": "run.state_changed",
+      "nodeInstanceId": null,
+      "attemptId": null,
+      "origin": "ENGINE",
+      "payload": {
+        "from": null,
+        "reason": "Run captured.",
+        "to": "queued"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:08.087Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 3,
+      "type": "run.planned",
+      "nodeInstanceId": null,
+      "attemptId": null,
+      "origin": "ENGINE",
+      "payload": {
+        "mode": "workflow",
+        "plan": {
+          "artifactId": "21d6e729-a134-47eb-9f96-372a2095020b",
+          "sha256": "6053a75450fe12965375e53c6826aa74fabdffd52ec2d39265fc53a25e5b8694"
+        },
+        "targets": [
+          "result"
+        ]
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:08.088Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 4,
+      "type": "node.planned",
+      "nodeInstanceId": "request",
+      "attemptId": null,
+      "origin": "ENGINE",
+      "payload": {
+        "nodeId": "request",
+        "nodeType": "text",
+        "scope": null
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:08.089Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 5,
+      "type": "node.planned",
+      "nodeInstanceId": "developer",
+      "attemptId": null,
+      "origin": "ENGINE",
+      "payload": {
+        "nodeId": "developer",
+        "nodeType": "agent",
+        "scope": null
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:08.090Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 6,
+      "type": "node.planned",
+      "nodeInstanceId": "watcher",
+      "attemptId": null,
+      "origin": "ENGINE",
+      "payload": {
+        "nodeId": "watcher",
+        "nodeType": "agent",
+        "scope": null
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:08.093Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 7,
+      "type": "node.planned",
+      "nodeInstanceId": "judge",
+      "attemptId": null,
+      "origin": "ENGINE",
+      "payload": {
+        "nodeId": "judge",
+        "nodeType": "agent",
+        "scope": null
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:08.095Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 8,
+      "type": "node.planned",
+      "nodeInstanceId": "result",
+      "attemptId": null,
+      "origin": "ENGINE",
+      "payload": {
+        "nodeId": "result",
+        "nodeType": "result-viewer",
+        "scope": null
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:08.108Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 9,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "request",
+      "attemptId": "392698d0-5287-4699-abe4-62892ab1d2d8",
+      "origin": "ENGINE",
+      "payload": {
+        "from": null,
+        "ordinal": 1,
+        "process": null,
+        "reason": "Planned before dispatch.",
+        "to": "scheduled"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:08.111Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 10,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "developer",
+      "attemptId": "f3b890a2-4839-471b-95e0-6fc26ad5d364",
+      "origin": "ENGINE",
+      "payload": {
+        "from": null,
+        "ordinal": 1,
+        "process": null,
+        "reason": "Planned before dispatch.",
+        "to": "scheduled"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:08.112Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 11,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "watcher",
+      "attemptId": "b3692b6f-47f6-4f66-8489-1079943cd4d3",
+      "origin": "ENGINE",
+      "payload": {
+        "from": null,
+        "ordinal": 1,
+        "process": null,
+        "reason": "Planned before dispatch.",
+        "to": "scheduled"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:08.113Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 12,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "judge",
+      "attemptId": "1034b112-7b0d-400a-a910-85ccfee6adec",
+      "origin": "ENGINE",
+      "payload": {
+        "from": null,
+        "ordinal": 1,
+        "process": null,
+        "reason": "Planned before dispatch.",
+        "to": "scheduled"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:08.113Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 13,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "result",
+      "attemptId": "20732b94-9c65-44fd-9025-ebb5ce696d79",
+      "origin": "ENGINE",
+      "payload": {
+        "from": null,
+        "ordinal": 1,
+        "process": null,
+        "reason": "Planned before dispatch.",
+        "to": "scheduled"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:08.133Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 14,
+      "type": "run.state_changed",
+      "nodeInstanceId": null,
+      "attemptId": null,
+      "origin": "ENGINE",
+      "payload": {
+        "from": "queued",
+        "reason": "Scheduler started.",
+        "to": "running"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:08.227Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 15,
+      "type": "attempt.inputs_committed",
+      "nodeInstanceId": "request",
+      "attemptId": "392698d0-5287-4699-abe4-62892ab1d2d8",
+      "origin": "ENGINE",
+      "payload": {
+        "contextBindingId": null,
+        "manifest": {
+          "artifactId": "872cb2c1-1533-4605-a3b1-cc9174a25817",
+          "sha256": "2d33a458f8c9f3f20eba08b9e6475d89c9f80087d25c62a6ed3739fdaa9284dd"
+        },
+        "prompt": null
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:08.231Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 16,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "request",
+      "attemptId": "392698d0-5287-4699-abe4-62892ab1d2d8",
+      "origin": "ENGINE",
+      "payload": {
+        "from": "scheduled",
+        "process": null,
+        "reason": "Static node started.",
+        "to": "running"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:08.232Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 17,
+      "type": "attempt.outputs_committed",
+      "nodeInstanceId": "request",
+      "attemptId": "392698d0-5287-4699-abe4-62892ab1d2d8",
+      "origin": "ENGINE",
+      "payload": {
+        "manifest": {
+          "artifactId": "764983a6-e8f8-4b00-9e7f-0fba6635020c",
+          "sha256": "a9d1c8add45881aa49ac34e34d5098499103ed1ccc111d0b01223caedd9c4d06"
+        }
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:08.233Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 18,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "request",
+      "attemptId": "392698d0-5287-4699-abe4-62892ab1d2d8",
+      "origin": "ENGINE",
+      "payload": {
+        "from": "running",
+        "process": null,
+        "reason": "Static node committed its outputs.",
+        "to": "succeeded"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:08.297Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 19,
+      "type": "attempt.inputs_committed",
+      "nodeInstanceId": "developer",
+      "attemptId": "f3b890a2-4839-471b-95e0-6fc26ad5d364",
+      "origin": "ENGINE",
+      "payload": {
+        "contextBindingId": null,
+        "manifest": {
+          "artifactId": "68f1239d-6ae0-49c7-b9ec-c9d0a691d874",
+          "sha256": "79eaa9fd75daadf8d91367417c44a65004fa0d5678371477e0b4f15c5e819c83"
+        },
+        "prompt": {
+          "artifactId": "df1da75c-c924-49cf-a6fc-551e1b495e3d",
+          "sha256": "72c04beaf921a47c97a6cb912fce4c9c4f9a408f2ac7f10f9a649f965e300bb9"
+        }
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:08.298Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 20,
+      "type": "attempt.invocation_committed",
+      "nodeInstanceId": "developer",
+      "attemptId": "f3b890a2-4839-471b-95e0-6fc26ad5d364",
+      "origin": "ENGINE",
+      "payload": {
+        "manifest": {
+          "artifactId": "3c2bc9ff-b3b7-4b1b-be5c-b7d691eaf0b1",
+          "sha256": "384fb640f017b0836f1a1cb84b697cb8334f36d14787e074203f8c47259c1d34"
+        }
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:08.329Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 21,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "developer",
+      "attemptId": "f3b890a2-4839-471b-95e0-6fc26ad5d364",
+      "origin": "ENGINE",
+      "payload": {
+        "from": "scheduled",
+        "process": {
+          "pid": 32916,
+          "startIdentity": "32916@2026-10-22T17:56:08.323Z",
+          "supervisorGeneration": "2c12ee95-bde4-4761-93e7-67f0d710bb70"
+        },
+        "reason": "CLI process launched.",
+        "to": "running"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:08.503Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 22,
+      "type": "attempt.log_chunk",
+      "nodeInstanceId": "developer",
+      "attemptId": "f3b890a2-4839-471b-95e0-6fc26ad5d364",
+      "origin": "ENGINE",
+      "payload": {
+        "byteLength": 280,
+        "byteOffset": 0,
+        "chunk": {
+          "artifactId": "4a9b1596-187f-4549-af15-4e0e76ea11cf",
+          "sha256": "bba8989ee60bd467e5b5a5e07cdedb4dcf2caf623385387fc13dab44c9176a91"
+        },
+        "chunkIndex": 0,
+        "stream": "stdout"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:08.539Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 23,
+      "type": "attempt.log_stream_closed",
+      "nodeInstanceId": "developer",
+      "attemptId": "f3b890a2-4839-471b-95e0-6fc26ad5d364",
+      "origin": "ENGINE",
+      "payload": {
+        "chunkCount": 1,
+        "committedBytes": 280,
+        "complete": true,
+        "endingReason": "process exited with code 0",
+        "integrity": "complete",
+        "manifest": {
+          "artifactId": "285affe4-54c3-4c72-b1ee-9086897b3bc5",
+          "sha256": "b206d626931a151d819385e54a4c84891dee49522bb1a53914180330f28de74a"
+        },
+        "receivedBytes": 280,
+        "stream": "stdout"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:08.560Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 24,
+      "type": "attempt.log_stream_closed",
+      "nodeInstanceId": "developer",
+      "attemptId": "f3b890a2-4839-471b-95e0-6fc26ad5d364",
+      "origin": "ENGINE",
+      "payload": {
+        "chunkCount": 0,
+        "committedBytes": 0,
+        "complete": true,
+        "endingReason": "process exited with code 0",
+        "integrity": "complete",
+        "manifest": {
+          "artifactId": "7eeb48a3-8592-481b-8cdd-6c2ed7f48ecb",
+          "sha256": "be311c165bf8d810e0bd5984cdad2b44e1d87c0e20bd1fa2e4fe1743958c4b3c"
+        },
+        "receivedBytes": 0,
+        "stream": "stderr"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:08.575Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 25,
+      "type": "attempt.log_chunk",
+      "nodeInstanceId": "developer",
+      "attemptId": "f3b890a2-4839-471b-95e0-6fc26ad5d364",
+      "origin": "ENGINE",
+      "payload": {
+        "byteLength": 146,
+        "byteOffset": 0,
+        "chunk": {
+          "artifactId": "0692cad4-5dcc-42b5-a037-10d96ba59c9a",
+          "sha256": "5f135ca30205b6a9a58c3f8c9640a30b17904da888f1e298e4e4621846a04bb6"
+        },
+        "chunkIndex": 0,
+        "stream": "normalized"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:08.595Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 26,
+      "type": "attempt.log_stream_closed",
+      "nodeInstanceId": "developer",
+      "attemptId": "f3b890a2-4839-471b-95e0-6fc26ad5d364",
+      "origin": "ENGINE",
+      "payload": {
+        "chunkCount": 1,
+        "committedBytes": 146,
+        "complete": true,
+        "endingReason": "process exited with code 0",
+        "integrity": "complete",
+        "manifest": {
+          "artifactId": "a3b5a12d-8fa1-4e92-89d0-12bbe68a46fb",
+          "sha256": "91e26d40031282278cc6e1c33a9384d395dac07993d9bcc618953f012040e284"
+        },
+        "receivedBytes": 146,
+        "stream": "normalized"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:08.637Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 27,
+      "type": "attempt.outputs_committed",
+      "nodeInstanceId": "developer",
+      "attemptId": "f3b890a2-4839-471b-95e0-6fc26ad5d364",
+      "origin": "ENGINE",
+      "payload": {
+        "manifest": {
+          "artifactId": "9f3d0954-0b69-4e22-aed2-5469b326750f",
+          "sha256": "4d13bae58e808a35e66a089ea7a3d67c7a9fa53c645139727735dd1eefbf9726"
+        }
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:08.638Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 28,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "developer",
+      "attemptId": "f3b890a2-4839-471b-95e0-6fc26ad5d364",
+      "origin": "ENGINE",
+      "payload": {
+        "from": "running",
+        "process": null,
+        "reason": "Outputs committed after a successful terminal event and process exit.",
+        "to": "succeeded"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:08.671Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 29,
+      "type": "attempt.inputs_committed",
+      "nodeInstanceId": "watcher",
+      "attemptId": "b3692b6f-47f6-4f66-8489-1079943cd4d3",
+      "origin": "ENGINE",
+      "payload": {
+        "contextBindingId": null,
+        "manifest": {
+          "artifactId": "a573866e-9f58-42d5-8080-39f4c77e5c9e",
+          "sha256": "d1b0546da9dbd96787cebe4a29eb75cf1f03e70a589ef153bca12023d19456ed"
+        },
+        "prompt": {
+          "artifactId": "632fb47c-8706-47c7-ae50-79e405af5f9a",
+          "sha256": "66f008c843c5e76576b1b4bd24654fb62c86d7fca31d75272289961c01b96ed4"
+        }
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:08.672Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 30,
+      "type": "attempt.invocation_committed",
+      "nodeInstanceId": "watcher",
+      "attemptId": "b3692b6f-47f6-4f66-8489-1079943cd4d3",
+      "origin": "ENGINE",
+      "payload": {
+        "manifest": {
+          "artifactId": "6a606030-2333-4a68-92c5-18a674698314",
+          "sha256": "0a5bcc4679b0fdc8862279849a758584d5ded77857f16ad239802aa749f9493e"
+        }
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:08.695Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 31,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "watcher",
+      "attemptId": "b3692b6f-47f6-4f66-8489-1079943cd4d3",
+      "origin": "ENGINE",
+      "payload": {
+        "from": "scheduled",
+        "process": {
+          "pid": 12592,
+          "startIdentity": "12592@2026-10-22T17:56:08.692Z",
+          "supervisorGeneration": "2c12ee95-bde4-4761-93e7-67f0d710bb70"
+        },
+        "reason": "CLI process launched.",
+        "to": "running"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:08.914Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 32,
+      "type": "attempt.log_chunk",
+      "nodeInstanceId": "watcher",
+      "attemptId": "b3692b6f-47f6-4f66-8489-1079943cd4d3",
+      "origin": "ENGINE",
+      "payload": {
+        "byteLength": 143,
+        "byteOffset": 0,
+        "chunk": {
+          "artifactId": "9571c8ad-7128-47da-aa89-264d412d7c57",
+          "sha256": "5615e78ac78f759ec5bf2a2414b1c9dc9bc31935e87aab91b81a66bd48fc3edd"
+        },
+        "chunkIndex": 0,
+        "stream": "stdout"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:08.935Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 33,
+      "type": "attempt.log_stream_closed",
+      "nodeInstanceId": "watcher",
+      "attemptId": "b3692b6f-47f6-4f66-8489-1079943cd4d3",
+      "origin": "ENGINE",
+      "payload": {
+        "chunkCount": 1,
+        "committedBytes": 143,
+        "complete": true,
+        "endingReason": "process exited with code 1",
+        "integrity": "complete",
+        "manifest": {
+          "artifactId": "b1991466-7517-42f1-a40d-c0b029708cb4",
+          "sha256": "b154d5cac76f67b86c79211b550c9a3f7ba344d00ed29f5978201ce60c50618d"
+        },
+        "receivedBytes": 143,
+        "stream": "stdout"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:08.958Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 34,
+      "type": "attempt.log_stream_closed",
+      "nodeInstanceId": "watcher",
+      "attemptId": "b3692b6f-47f6-4f66-8489-1079943cd4d3",
+      "origin": "ENGINE",
+      "payload": {
+        "chunkCount": 0,
+        "committedBytes": 0,
+        "complete": true,
+        "endingReason": "process exited with code 1",
+        "integrity": "complete",
+        "manifest": {
+          "artifactId": "93a98b63-46d3-45fe-8fe1-11a0f0a8585d",
+          "sha256": "6e6f9d09c4784efbfeb8a040bc08326c583c8d85d069533c78a6b2316fa0afaa"
+        },
+        "receivedBytes": 0,
+        "stream": "stderr"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:08.972Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 35,
+      "type": "attempt.log_chunk",
+      "nodeInstanceId": "watcher",
+      "attemptId": "b3692b6f-47f6-4f66-8489-1079943cd4d3",
+      "origin": "ENGINE",
+      "payload": {
+        "byteLength": 102,
+        "byteOffset": 0,
+        "chunk": {
+          "artifactId": "d70e1af2-6c53-4e3d-b643-c23129a255dd",
+          "sha256": "ceb9112827f0777894a46772b0f96773e76938abd058b4cd4020f6337382e883"
+        },
+        "chunkIndex": 0,
+        "stream": "normalized"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:08.992Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 36,
+      "type": "attempt.log_stream_closed",
+      "nodeInstanceId": "watcher",
+      "attemptId": "b3692b6f-47f6-4f66-8489-1079943cd4d3",
+      "origin": "ENGINE",
+      "payload": {
+        "chunkCount": 1,
+        "committedBytes": 102,
+        "complete": true,
+        "endingReason": "process exited with code 1",
+        "integrity": "complete",
+        "manifest": {
+          "artifactId": "276cc072-52a9-4497-8688-6185a3448bb9",
+          "sha256": "b4651eed5f5d2d906426d39bc9e87995e55acd7840ad2f0b9ae3bd50d83e2216"
+        },
+        "receivedBytes": 102,
+        "stream": "normalized"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.017Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 37,
+      "type": "attempt.error",
+      "nodeInstanceId": "watcher",
+      "attemptId": "b3692b6f-47f6-4f66-8489-1079943cd4d3",
+      "origin": "ENGINE",
+      "payload": {
+        "code": "process",
+        "evidence": {
+          "artifactId": "20561f8c-f3f7-4acb-be7e-77c18c5a910e",
+          "sha256": "4fbd179b74557462f253441f970c6c28895744ad02f5a9017ddf5d48e528a473"
+        },
+        "message": "Simulated transient failure."
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.018Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 38,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "watcher",
+      "attemptId": "b3692b6f-47f6-4f66-8489-1079943cd4d3",
+      "origin": "ENGINE",
+      "payload": {
+        "from": "running",
+        "process": null,
+        "reason": "Simulated transient failure.",
+        "to": "failed"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.018Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 39,
+      "type": "run.state_changed",
+      "nodeInstanceId": null,
+      "attemptId": null,
+      "origin": "ENGINE",
+      "payload": {
+        "from": "running",
+        "reason": "An attempt failed; no new dispatch until recovery.",
+        "to": "draining"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.026Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 40,
+      "type": "run.state_changed",
+      "nodeInstanceId": null,
+      "attemptId": null,
+      "origin": "ENGINE",
+      "payload": {
+        "from": "draining",
+        "reason": "Running attempts finished after a failure; recovery is needed.",
+        "to": "waiting_for_user"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.061Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 1,
+      "type": "run.created",
+      "nodeInstanceId": null,
+      "attemptId": null,
+      "origin": "ENGINE",
+      "payload": {
+        "executionHash": "2924f5a2e9d93355bf4c11f2bc2f712f4a6d06ff9c7f82a297eca59af9fba856",
+        "settingsSnapshot": {
+          "artifactId": "841d07b8-6559-45b9-85a5-ebe102972280",
+          "sha256": "7e9a0b8196e872cff41c27fa28fe2edb7f9ea90c5489bf7f62c7225073d1235b"
+        },
+        "workflowSnapshot": {
+          "artifactId": "4e75c55e-48a8-43cf-9725-551108344d8f",
+          "sha256": "2924f5a2e9d93355bf4c11f2bc2f712f4a6d06ff9c7f82a297eca59af9fba856"
+        }
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.062Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 2,
+      "type": "run.state_changed",
+      "nodeInstanceId": null,
+      "attemptId": null,
+      "origin": "ENGINE",
+      "payload": {
+        "from": null,
+        "reason": "Run captured.",
+        "to": "queued"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.063Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 3,
+      "type": "run.planned",
+      "nodeInstanceId": null,
+      "attemptId": null,
+      "origin": "ENGINE",
+      "payload": {
+        "mode": "workflow",
+        "plan": {
+          "artifactId": "a8d2d0d9-21c2-437c-bd5a-3fc0fb0b0ce6",
+          "sha256": "571399b9bf4a155dc139592144d091c0701c1214e76fcbdaec46c7f9b69b7abf"
+        },
+        "targets": [
+          "result"
+        ]
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.063Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 4,
+      "type": "node.planned",
+      "nodeInstanceId": "request",
+      "attemptId": null,
+      "origin": "ENGINE",
+      "payload": {
+        "nodeId": "request",
+        "nodeType": "text",
+        "scope": null
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.064Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 5,
+      "type": "node.planned",
+      "nodeInstanceId": "developer",
+      "attemptId": null,
+      "origin": "ENGINE",
+      "payload": {
+        "nodeId": "developer",
+        "nodeType": "agent",
+        "scope": null
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.064Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 6,
+      "type": "node.planned",
+      "nodeInstanceId": "watcher",
+      "attemptId": null,
+      "origin": "ENGINE",
+      "payload": {
+        "nodeId": "watcher",
+        "nodeType": "agent",
+        "scope": null
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.065Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 7,
+      "type": "node.planned",
+      "nodeInstanceId": "judge",
+      "attemptId": null,
+      "origin": "ENGINE",
+      "payload": {
+        "nodeId": "judge",
+        "nodeType": "agent",
+        "scope": null
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.065Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 8,
+      "type": "node.planned",
+      "nodeInstanceId": "finalize",
+      "attemptId": null,
+      "origin": "ENGINE",
+      "payload": {
+        "nodeId": "finalize",
+        "nodeType": "agent",
+        "scope": null
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.065Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 9,
+      "type": "node.planned",
+      "nodeInstanceId": "result",
+      "attemptId": null,
+      "origin": "ENGINE",
+      "payload": {
+        "nodeId": "result",
+        "nodeType": "result-viewer",
+        "scope": null
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.065Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 10,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "request",
+      "attemptId": "ad81f185-9fd4-4f91-a724-72c5320bb01c",
+      "origin": "ENGINE",
+      "payload": {
+        "from": null,
+        "ordinal": 1,
+        "process": null,
+        "reason": "Planned before dispatch.",
+        "to": "scheduled"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.066Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 11,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "developer",
+      "attemptId": "202248bf-ee13-4aba-9aed-6c88073efc03",
+      "origin": "ENGINE",
+      "payload": {
+        "from": null,
+        "ordinal": 1,
+        "process": null,
+        "reason": "Planned before dispatch.",
+        "to": "scheduled"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.066Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 12,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "watcher",
+      "attemptId": "2fa7595e-3ca3-4654-ac6a-e04550a30bca",
+      "origin": "ENGINE",
+      "payload": {
+        "from": null,
+        "ordinal": 1,
+        "process": null,
+        "reason": "Planned before dispatch.",
+        "to": "scheduled"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.066Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 13,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "judge",
+      "attemptId": "14368a04-176d-4bb2-b496-c47a16530b7f",
+      "origin": "ENGINE",
+      "payload": {
+        "from": null,
+        "ordinal": 1,
+        "process": null,
+        "reason": "Planned before dispatch.",
+        "to": "scheduled"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.067Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 14,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "finalize",
+      "attemptId": "5e0113a6-3608-4a13-ba44-ed9651eb1981",
+      "origin": "ENGINE",
+      "payload": {
+        "from": null,
+        "ordinal": 1,
+        "process": null,
+        "reason": "Planned before dispatch.",
+        "to": "scheduled"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.067Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 15,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "result",
+      "attemptId": "7bf70ae0-eb83-41f0-a0f5-a3c39b091689",
+      "origin": "ENGINE",
+      "payload": {
+        "from": null,
+        "ordinal": 1,
+        "process": null,
+        "reason": "Planned before dispatch.",
+        "to": "scheduled"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.079Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 41,
+      "type": "continuation.linked_repair_opened",
+      "nodeInstanceId": null,
+      "attemptId": null,
+      "origin": "ENGINE",
+      "payload": {
+        "candidateDigest": "2e522a1f2c514893812c35a5c8673a49ae2b3a3026cc43006f404e261af30e58",
+        "checkpoint": "d64b7194-7d43-4e4b-a99d-7e3442e90570",
+        "linkId": "abe190e8-d78f-4b77-b09a-f28507f0db7b",
+        "origin": "ENGINE",
+        "repairRunId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+        "resumeNodeInstanceId": "watcher"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.080Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 16,
+      "type": "continuation.linked_repair_started",
+      "nodeInstanceId": null,
+      "attemptId": null,
+      "origin": "ENGINE",
+      "payload": {
+        "linkId": "abe190e8-d78f-4b77-b09a-f28507f0db7b",
+        "origin": "ENGINE",
+        "parentRunId": "9d9e550b-a22c-4147-81f3-fe450ce449ad"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.094Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 17,
+      "type": "run.state_changed",
+      "nodeInstanceId": null,
+      "attemptId": null,
+      "origin": "ENGINE",
+      "payload": {
+        "from": "queued",
+        "reason": "Scheduler started.",
+        "to": "running"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.125Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 18,
+      "type": "attempt.inputs_committed",
+      "nodeInstanceId": "request",
+      "attemptId": "ad81f185-9fd4-4f91-a724-72c5320bb01c",
+      "origin": "ENGINE",
+      "payload": {
+        "contextBindingId": null,
+        "manifest": {
+          "artifactId": "9a5c0d6b-c3b1-4ddf-a294-509a43b9d3af",
+          "sha256": "0e1bc4ef70f04d1c508a4bec2157a2e6d9f73574887fa7537df51a194a3035a9"
+        },
+        "prompt": null
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.125Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 19,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "request",
+      "attemptId": "ad81f185-9fd4-4f91-a724-72c5320bb01c",
+      "origin": "ENGINE",
+      "payload": {
+        "from": "scheduled",
+        "process": null,
+        "reason": "Static node started.",
+        "to": "running"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.126Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 20,
+      "type": "attempt.outputs_committed",
+      "nodeInstanceId": "request",
+      "attemptId": "ad81f185-9fd4-4f91-a724-72c5320bb01c",
+      "origin": "ENGINE",
+      "payload": {
+        "manifest": {
+          "artifactId": "b06a95dd-29e3-4640-bfe0-8194a972a784",
+          "sha256": "e0e102980236a9b5aac7c3040bb84e65f305930fec5827543e1ee4264830443b"
+        }
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.126Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 21,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "request",
+      "attemptId": "ad81f185-9fd4-4f91-a724-72c5320bb01c",
+      "origin": "ENGINE",
+      "payload": {
+        "from": "running",
+        "process": null,
+        "reason": "Static node committed its outputs.",
+        "to": "succeeded"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.152Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 22,
+      "type": "attempt.inputs_committed",
+      "nodeInstanceId": "developer",
+      "attemptId": "202248bf-ee13-4aba-9aed-6c88073efc03",
+      "origin": "ENGINE",
+      "payload": {
+        "contextBindingId": null,
+        "manifest": {
+          "artifactId": "e985c42f-93f1-4bb5-94a1-4e4b9574c381",
+          "sha256": "d9579d9efa3c6920b147296e63428a4cabdf3918b9a76ae18447c1253cc83369"
+        },
+        "prompt": {
+          "artifactId": "757ab2f5-a8e0-4d4d-81d0-0cb2cc200e0d",
+          "sha256": "3251ee64c21fd6aae750b536c02cc0f3744a1758735b647f0dca1eda344febb9"
+        }
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.153Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 23,
+      "type": "attempt.invocation_committed",
+      "nodeInstanceId": "developer",
+      "attemptId": "202248bf-ee13-4aba-9aed-6c88073efc03",
+      "origin": "ENGINE",
+      "payload": {
+        "manifest": {
+          "artifactId": "403bef3e-c601-4b53-a58d-c7a8a54578a2",
+          "sha256": "0f6cfd0cb7b4144de13b77148f0976bff24e941f98ad108489e471bc82cb3f81"
+        }
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.172Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 24,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "developer",
+      "attemptId": "202248bf-ee13-4aba-9aed-6c88073efc03",
+      "origin": "ENGINE",
+      "payload": {
+        "from": "scheduled",
+        "process": {
+          "pid": 31276,
+          "startIdentity": "31276@2026-10-22T17:56:09.169Z",
+          "supervisorGeneration": "2c12ee95-bde4-4761-93e7-67f0d710bb70"
+        },
+        "reason": "CLI process launched.",
+        "to": "running"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.322Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 25,
+      "type": "attempt.log_chunk",
+      "nodeInstanceId": "developer",
+      "attemptId": "202248bf-ee13-4aba-9aed-6c88073efc03",
+      "origin": "ENGINE",
+      "payload": {
+        "byteLength": 282,
+        "byteOffset": 0,
+        "chunk": {
+          "artifactId": "7b9bf643-e8b6-4b92-9b06-2e113bee5fdb",
+          "sha256": "935aaffc32bde65f932e128bfc2e9fbffce5ad912847ebbcb436732a24270ea1"
+        },
+        "chunkIndex": 0,
+        "stream": "stdout"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.344Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 26,
+      "type": "attempt.log_stream_closed",
+      "nodeInstanceId": "developer",
+      "attemptId": "202248bf-ee13-4aba-9aed-6c88073efc03",
+      "origin": "ENGINE",
+      "payload": {
+        "chunkCount": 1,
+        "committedBytes": 282,
+        "complete": true,
+        "endingReason": "process exited with code 0",
+        "integrity": "complete",
+        "manifest": {
+          "artifactId": "5e5cee25-06a9-4f57-a89f-2864d124f8e6",
+          "sha256": "d8083768ec3bfa5005821a6fd4ca30cd342b661193978fda8cb39d2039c15279"
+        },
+        "receivedBytes": 282,
+        "stream": "stdout"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.349Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 27,
+      "type": "attempt.log_stream_closed",
+      "nodeInstanceId": "developer",
+      "attemptId": "202248bf-ee13-4aba-9aed-6c88073efc03",
+      "origin": "ENGINE",
+      "payload": {
+        "chunkCount": 0,
+        "committedBytes": 0,
+        "complete": true,
+        "endingReason": "process exited with code 0",
+        "integrity": "complete",
+        "manifest": {
+          "artifactId": "7eeb48a3-8592-481b-8cdd-6c2ed7f48ecb",
+          "sha256": "be311c165bf8d810e0bd5984cdad2b44e1d87c0e20bd1fa2e4fe1743958c4b3c"
+        },
+        "receivedBytes": 0,
+        "stream": "stderr"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.369Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 28,
+      "type": "attempt.log_chunk",
+      "nodeInstanceId": "developer",
+      "attemptId": "202248bf-ee13-4aba-9aed-6c88073efc03",
+      "origin": "ENGINE",
+      "payload": {
+        "byteLength": 148,
+        "byteOffset": 0,
+        "chunk": {
+          "artifactId": "fba2184a-f4ed-4791-b27b-464497c2acc8",
+          "sha256": "bae74e79dc72857f274b35b37246801ce9f6266fd99172e402933c005bf1c127"
+        },
+        "chunkIndex": 0,
+        "stream": "normalized"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.393Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 29,
+      "type": "attempt.log_stream_closed",
+      "nodeInstanceId": "developer",
+      "attemptId": "202248bf-ee13-4aba-9aed-6c88073efc03",
+      "origin": "ENGINE",
+      "payload": {
+        "chunkCount": 1,
+        "committedBytes": 148,
+        "complete": true,
+        "endingReason": "process exited with code 0",
+        "integrity": "complete",
+        "manifest": {
+          "artifactId": "32667dd3-ee49-4604-82e8-bd626ebfc6f4",
+          "sha256": "728ee729d6cf5ac77741499d1fc59f2bc983df5ce2b8a413f6ef0c61bf2041e5"
+        },
+        "receivedBytes": 148,
+        "stream": "normalized"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.432Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 30,
+      "type": "attempt.outputs_committed",
+      "nodeInstanceId": "developer",
+      "attemptId": "202248bf-ee13-4aba-9aed-6c88073efc03",
+      "origin": "ENGINE",
+      "payload": {
+        "manifest": {
+          "artifactId": "68f878a2-f17e-4623-8ad1-bc7dd951ddbd",
+          "sha256": "d35e6e69e0d21cfb033287bc0e0a6244cfa581114bbb19917a62b86af2aac478"
+        }
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.433Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 31,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "developer",
+      "attemptId": "202248bf-ee13-4aba-9aed-6c88073efc03",
+      "origin": "ENGINE",
+      "payload": {
+        "from": "running",
+        "process": null,
+        "reason": "Outputs committed after a successful terminal event and process exit.",
+        "to": "succeeded"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.464Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 32,
+      "type": "attempt.inputs_committed",
+      "nodeInstanceId": "watcher",
+      "attemptId": "2fa7595e-3ca3-4654-ac6a-e04550a30bca",
+      "origin": "ENGINE",
+      "payload": {
+        "contextBindingId": null,
+        "manifest": {
+          "artifactId": "df789188-c8cb-4a2e-af8d-039121613300",
+          "sha256": "b42e4af7aca02e8910f299123ab4ae94e478809704be6e659240f1a06adeb1e2"
+        },
+        "prompt": {
+          "artifactId": "f5026ec0-cea2-485e-ac0a-1c2078983eea",
+          "sha256": "bc8288d305868818b84dd2467a2843ec6554bb1f89d7524262f46ca777ef12eb"
+        }
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.465Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 33,
+      "type": "attempt.invocation_committed",
+      "nodeInstanceId": "watcher",
+      "attemptId": "2fa7595e-3ca3-4654-ac6a-e04550a30bca",
+      "origin": "ENGINE",
+      "payload": {
+        "manifest": {
+          "artifactId": "358068f1-da4e-491f-ba32-07e36e4b643f",
+          "sha256": "a5d53cba17b6ebdcc1c79383b1a739f9663422ae2c25d2668e60e769e6c7f9bb"
+        }
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.484Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 34,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "watcher",
+      "attemptId": "2fa7595e-3ca3-4654-ac6a-e04550a30bca",
+      "origin": "ENGINE",
+      "payload": {
+        "from": "scheduled",
+        "process": {
+          "pid": 29860,
+          "startIdentity": "29860@2026-10-22T17:56:09.480Z",
+          "supervisorGeneration": "2c12ee95-bde4-4761-93e7-67f0d710bb70"
+        },
+        "reason": "CLI process launched.",
+        "to": "running"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.651Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 35,
+      "type": "attempt.log_chunk",
+      "nodeInstanceId": "watcher",
+      "attemptId": "2fa7595e-3ca3-4654-ac6a-e04550a30bca",
+      "origin": "ENGINE",
+      "payload": {
+        "byteLength": 323,
+        "byteOffset": 0,
+        "chunk": {
+          "artifactId": "557ec852-b1c2-4a05-81e0-b7f1fd5c06a2",
+          "sha256": "7e8a0a91cd4d32380bc7a74488e2f63efbb9db3bb533f7b4d940b4b7b20c91e4"
+        },
+        "chunkIndex": 0,
+        "stream": "stdout"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.670Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 36,
+      "type": "attempt.log_stream_closed",
+      "nodeInstanceId": "watcher",
+      "attemptId": "2fa7595e-3ca3-4654-ac6a-e04550a30bca",
+      "origin": "ENGINE",
+      "payload": {
+        "chunkCount": 1,
+        "committedBytes": 323,
+        "complete": true,
+        "endingReason": "process exited with code 0",
+        "integrity": "complete",
+        "manifest": {
+          "artifactId": "512aa663-2130-457f-bc1d-ae9e4f65a937",
+          "sha256": "872abde6e688ed74b5edc0a96408c6e17597a731979c14cec8e09b4da872ec91"
+        },
+        "receivedBytes": 323,
+        "stream": "stdout"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.675Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 37,
+      "type": "attempt.log_stream_closed",
+      "nodeInstanceId": "watcher",
+      "attemptId": "2fa7595e-3ca3-4654-ac6a-e04550a30bca",
+      "origin": "ENGINE",
+      "payload": {
+        "chunkCount": 0,
+        "committedBytes": 0,
+        "complete": true,
+        "endingReason": "process exited with code 0",
+        "integrity": "complete",
+        "manifest": {
+          "artifactId": "7eeb48a3-8592-481b-8cdd-6c2ed7f48ecb",
+          "sha256": "be311c165bf8d810e0bd5984cdad2b44e1d87c0e20bd1fa2e4fe1743958c4b3c"
+        },
+        "receivedBytes": 0,
+        "stream": "stderr"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.691Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 38,
+      "type": "attempt.log_chunk",
+      "nodeInstanceId": "watcher",
+      "attemptId": "2fa7595e-3ca3-4654-ac6a-e04550a30bca",
+      "origin": "ENGINE",
+      "payload": {
+        "byteLength": 189,
+        "byteOffset": 0,
+        "chunk": {
+          "artifactId": "271ccb6c-5602-4279-b20a-99cd8a8b7fef",
+          "sha256": "325c61e8bb454fc08f6e33fc73407c35c0c3674fd4d24857c0366fade81d3d52"
+        },
+        "chunkIndex": 0,
+        "stream": "normalized"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.711Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 39,
+      "type": "attempt.log_stream_closed",
+      "nodeInstanceId": "watcher",
+      "attemptId": "2fa7595e-3ca3-4654-ac6a-e04550a30bca",
+      "origin": "ENGINE",
+      "payload": {
+        "chunkCount": 1,
+        "committedBytes": 189,
+        "complete": true,
+        "endingReason": "process exited with code 0",
+        "integrity": "complete",
+        "manifest": {
+          "artifactId": "67fdd8f9-4253-4612-931c-e3297fc7818c",
+          "sha256": "d742a056f38e67a29aa1bda020f74e79d68cb81d9f6f5a23d2f29434126f7769"
+        },
+        "receivedBytes": 189,
+        "stream": "normalized"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.752Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 40,
+      "type": "attempt.outputs_committed",
+      "nodeInstanceId": "watcher",
+      "attemptId": "2fa7595e-3ca3-4654-ac6a-e04550a30bca",
+      "origin": "ENGINE",
+      "payload": {
+        "manifest": {
+          "artifactId": "8e562aea-c13f-4dd2-98b4-43dd70a5e103",
+          "sha256": "03d0a70326c84f3cc4e5d9fcf763d23a07d94d62bc0ba24a1c70a975644a0cbd"
+        }
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.753Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 41,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "watcher",
+      "attemptId": "2fa7595e-3ca3-4654-ac6a-e04550a30bca",
+      "origin": "ENGINE",
+      "payload": {
+        "from": "running",
+        "process": null,
+        "reason": "Outputs committed after a successful terminal event and process exit.",
+        "to": "succeeded"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.796Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 42,
+      "type": "attempt.inputs_committed",
+      "nodeInstanceId": "judge",
+      "attemptId": "14368a04-176d-4bb2-b496-c47a16530b7f",
+      "origin": "ENGINE",
+      "payload": {
+        "contextBindingId": null,
+        "manifest": {
+          "artifactId": "f0fb0c55-a6e6-4a0b-bd41-790080517073",
+          "sha256": "71ef189c7a96c27d60645b6d9fe5c256e35ac702de8aa6ad42dd38fbeb934e99"
+        },
+        "prompt": {
+          "artifactId": "a71493e5-859e-461f-a4e3-4a1e4cca84d1",
+          "sha256": "845f799981542a754886e1cb70c4f365f5f8a40abcd7038655b1d29f1fb2bda4"
+        }
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.796Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 43,
+      "type": "attempt.invocation_committed",
+      "nodeInstanceId": "judge",
+      "attemptId": "14368a04-176d-4bb2-b496-c47a16530b7f",
+      "origin": "ENGINE",
+      "payload": {
+        "manifest": {
+          "artifactId": "8ebba7c6-afe3-4eff-af00-331f9db34d13",
+          "sha256": "1427c3629f47f4a43114037bd1824b8fdcc7b348ddcea63998ce2da7da0459fa"
+        }
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:09.836Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 44,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "judge",
+      "attemptId": "14368a04-176d-4bb2-b496-c47a16530b7f",
+      "origin": "ENGINE",
+      "payload": {
+        "from": "scheduled",
+        "process": {
+          "pid": 18812,
+          "startIdentity": "18812@2026-10-22T17:56:09.833Z",
+          "supervisorGeneration": "2c12ee95-bde4-4761-93e7-67f0d710bb70"
+        },
+        "reason": "CLI process launched.",
+        "to": "running"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:10.033Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 45,
+      "type": "attempt.log_chunk",
+      "nodeInstanceId": "judge",
+      "attemptId": "14368a04-176d-4bb2-b496-c47a16530b7f",
+      "origin": "ENGINE",
+      "payload": {
+        "byteLength": 522,
+        "byteOffset": 0,
+        "chunk": {
+          "artifactId": "4be0a5d8-ca88-446c-98a1-d64a83dff923",
+          "sha256": "402c5e6cf872cc91d17ac57c87ae1fb66ce6e78b08569df18d2bf3fa9dd5bece"
+        },
+        "chunkIndex": 0,
+        "stream": "stdout"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:10.055Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 46,
+      "type": "attempt.log_stream_closed",
+      "nodeInstanceId": "judge",
+      "attemptId": "14368a04-176d-4bb2-b496-c47a16530b7f",
+      "origin": "ENGINE",
+      "payload": {
+        "chunkCount": 1,
+        "committedBytes": 522,
+        "complete": true,
+        "endingReason": "process exited with code 0",
+        "integrity": "complete",
+        "manifest": {
+          "artifactId": "e9b11c1a-ea8a-42a4-9113-243ce9e57c85",
+          "sha256": "5b3354a622fb1d6144a798a6ab77e7ce14d63b2d2ea3ca4c2660d91915ed6e98"
+        },
+        "receivedBytes": 522,
+        "stream": "stdout"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:10.059Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 47,
+      "type": "attempt.log_stream_closed",
+      "nodeInstanceId": "judge",
+      "attemptId": "14368a04-176d-4bb2-b496-c47a16530b7f",
+      "origin": "ENGINE",
+      "payload": {
+        "chunkCount": 0,
+        "committedBytes": 0,
+        "complete": true,
+        "endingReason": "process exited with code 0",
+        "integrity": "complete",
+        "manifest": {
+          "artifactId": "7eeb48a3-8592-481b-8cdd-6c2ed7f48ecb",
+          "sha256": "be311c165bf8d810e0bd5984cdad2b44e1d87c0e20bd1fa2e4fe1743958c4b3c"
+        },
+        "receivedBytes": 0,
+        "stream": "stderr"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:10.071Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 48,
+      "type": "attempt.log_chunk",
+      "nodeInstanceId": "judge",
+      "attemptId": "14368a04-176d-4bb2-b496-c47a16530b7f",
+      "origin": "ENGINE",
+      "payload": {
+        "byteLength": 388,
+        "byteOffset": 0,
+        "chunk": {
+          "artifactId": "c7db0c0f-f7fa-478c-8e7e-1a7f7b3948c2",
+          "sha256": "b7577d47d96a329cf8d3884d9ec12ada17f23415449e96d4c5004cadacdfa070"
+        },
+        "chunkIndex": 0,
+        "stream": "normalized"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:10.088Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 49,
+      "type": "attempt.log_stream_closed",
+      "nodeInstanceId": "judge",
+      "attemptId": "14368a04-176d-4bb2-b496-c47a16530b7f",
+      "origin": "ENGINE",
+      "payload": {
+        "chunkCount": 1,
+        "committedBytes": 388,
+        "complete": true,
+        "endingReason": "process exited with code 0",
+        "integrity": "complete",
+        "manifest": {
+          "artifactId": "c88988d4-cbfe-49aa-82fb-92b0221e7788",
+          "sha256": "a6f5482872a24111f4fb089c16a630fd661da77613474b32580e80b622e5754e"
+        },
+        "receivedBytes": 388,
+        "stream": "normalized"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:10.135Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 50,
+      "type": "attempt.outputs_committed",
+      "nodeInstanceId": "judge",
+      "attemptId": "14368a04-176d-4bb2-b496-c47a16530b7f",
+      "origin": "ENGINE",
+      "payload": {
+        "manifest": {
+          "artifactId": "573ccc35-c23b-4168-bd4c-22ee574d2265",
+          "sha256": "19fc9763f3be8c5db495cc718c567607f4e0a109e0b3efbebf86d9730b90756e"
+        }
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:10.136Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 51,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "judge",
+      "attemptId": "14368a04-176d-4bb2-b496-c47a16530b7f",
+      "origin": "ENGINE",
+      "payload": {
+        "from": "running",
+        "process": null,
+        "reason": "Outputs committed after a successful terminal event and process exit.",
+        "to": "succeeded"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:10.136Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 52,
+      "type": "continuation.lifecycle_intent",
+      "nodeInstanceId": null,
+      "attemptId": null,
+      "origin": "ENGINE",
+      "payload": {
+        "action": "application.activate_candidate",
+        "candidateDigest": "2e522a1f2c514893812c35a5c8673a49ae2b3a3026cc43006f404e261af30e58",
+        "operationId": "96201590-de6a-47b4-891b-5081e9a4469a",
+        "origin": "ENGINE",
+        "proposal": "811c8c25-1720-4679-9b57-2502f8d0a83d",
+        "targetVersion": "0.2.1-repair.1"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:10.137Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 53,
+      "type": "run.state_changed",
+      "nodeInstanceId": null,
+      "attemptId": null,
+      "origin": "ENGINE",
+      "payload": {
+        "from": "running",
+        "reason": "Lifecycle proposal accepted; the repair waits for a verified lifecycle receipt.",
+        "to": "waiting_for_user"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:10.892Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 42,
+      "type": "continuation.reconciled",
+      "nodeInstanceId": null,
+      "attemptId": null,
+      "origin": "ENGINE",
+      "payload": {
+        "origin": "ENGINE",
+        "pass": "startup",
+        "scheduler": "rebuilt"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:11.247Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 54,
+      "type": "continuation.reconciled",
+      "nodeInstanceId": null,
+      "attemptId": null,
+      "origin": "ENGINE",
+      "payload": {
+        "origin": "ENGINE",
+        "pass": "startup",
+        "scheduler": "rebuilt"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:14.488Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 55,
+      "type": "continuation.lifecycle_verified",
+      "nodeInstanceId": null,
+      "attemptId": null,
+      "origin": "HOST_RECEIPT",
+      "payload": {
+        "operationId": "96201590-de6a-47b4-891b-5081e9a4469a",
+        "origin": "HOST_RECEIPT",
+        "receiptId": "3cb96b2c-3e78-44cf-a94a-0343159412c9"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:14.490Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 56,
+      "type": "run.state_changed",
+      "nodeInstanceId": null,
+      "attemptId": null,
+      "origin": "ENGINE",
+      "payload": {
+        "from": "waiting_for_user",
+        "reason": "Verified lifecycle receipt; the repair resumes its remaining work.",
+        "to": "running"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:14.556Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 57,
+      "type": "attempt.inputs_committed",
+      "nodeInstanceId": "finalize",
+      "attemptId": "5e0113a6-3608-4a13-ba44-ed9651eb1981",
+      "origin": "ENGINE",
+      "payload": {
+        "contextBindingId": null,
+        "manifest": {
+          "artifactId": "8fc396bc-2351-4c06-bdfd-6be63ed954e4",
+          "sha256": "16627447b12a679e957d5a6a4432659fa7203f5fd7898c4a0fa5b53d0a4dae2f"
+        },
+        "prompt": {
+          "artifactId": "bef6cce5-0547-4e31-8b90-c3ad9c056c4b",
+          "sha256": "c5b9746972ccce385af3a517cf0b8df538788df9a3242ddf001db709f6c200cb"
+        }
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:14.557Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 58,
+      "type": "attempt.invocation_committed",
+      "nodeInstanceId": "finalize",
+      "attemptId": "5e0113a6-3608-4a13-ba44-ed9651eb1981",
+      "origin": "ENGINE",
+      "payload": {
+        "manifest": {
+          "artifactId": "c60c4439-76a1-4ea4-958e-6a63f6bc2711",
+          "sha256": "3030e47f5b48aec79a80e59c4b7a3d61f6d3a14ccd6094a1d53f703981724633"
+        }
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:14.579Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 59,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "finalize",
+      "attemptId": "5e0113a6-3608-4a13-ba44-ed9651eb1981",
+      "origin": "ENGINE",
+      "payload": {
+        "from": "scheduled",
+        "process": {
+          "pid": 29172,
+          "startIdentity": "29172@2026-10-22T17:56:14.575Z",
+          "supervisorGeneration": "9afd00be-fd6b-4cc5-a485-5d949b0c93f9"
+        },
+        "reason": "CLI process launched.",
+        "to": "running"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:14.678Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 60,
+      "type": "attempt.log_chunk",
+      "nodeInstanceId": "finalize",
+      "attemptId": "5e0113a6-3608-4a13-ba44-ed9651eb1981",
+      "origin": "ENGINE",
+      "payload": {
+        "byteLength": 301,
+        "byteOffset": 0,
+        "chunk": {
+          "artifactId": "48f97bee-b8ea-44b7-a984-54ca8568b3e0",
+          "sha256": "74edb71047928e4ae0328508539458e99f6f012b641b95f9db28222c58132fd2"
+        },
+        "chunkIndex": 0,
+        "stream": "stdout"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:14.715Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 61,
+      "type": "attempt.log_stream_closed",
+      "nodeInstanceId": "finalize",
+      "attemptId": "5e0113a6-3608-4a13-ba44-ed9651eb1981",
+      "origin": "ENGINE",
+      "payload": {
+        "chunkCount": 1,
+        "committedBytes": 301,
+        "complete": true,
+        "endingReason": "process exited with code 0",
+        "integrity": "complete",
+        "manifest": {
+          "artifactId": "d40ce5a0-9d8f-4461-ba57-abfc3eed23bc",
+          "sha256": "b368026ee9d4ed1581785ba14e6a5531705886a0b550e1f86045800a8addcb6c"
+        },
+        "receivedBytes": 301,
+        "stream": "stdout"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:14.720Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 62,
+      "type": "attempt.log_stream_closed",
+      "nodeInstanceId": "finalize",
+      "attemptId": "5e0113a6-3608-4a13-ba44-ed9651eb1981",
+      "origin": "ENGINE",
+      "payload": {
+        "chunkCount": 0,
+        "committedBytes": 0,
+        "complete": true,
+        "endingReason": "process exited with code 0",
+        "integrity": "complete",
+        "manifest": {
+          "artifactId": "7eeb48a3-8592-481b-8cdd-6c2ed7f48ecb",
+          "sha256": "be311c165bf8d810e0bd5984cdad2b44e1d87c0e20bd1fa2e4fe1743958c4b3c"
+        },
+        "receivedBytes": 0,
+        "stream": "stderr"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:14.735Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 63,
+      "type": "attempt.log_chunk",
+      "nodeInstanceId": "finalize",
+      "attemptId": "5e0113a6-3608-4a13-ba44-ed9651eb1981",
+      "origin": "ENGINE",
+      "payload": {
+        "byteLength": 166,
+        "byteOffset": 0,
+        "chunk": {
+          "artifactId": "5231b651-e76f-4530-83a4-65bbb78de6b2",
+          "sha256": "cd90d1d371138679d3b731e5f8ff5ef9da2805cfcde205da7e33eacfff7bd46a"
+        },
+        "chunkIndex": 0,
+        "stream": "normalized"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:14.756Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 64,
+      "type": "attempt.log_stream_closed",
+      "nodeInstanceId": "finalize",
+      "attemptId": "5e0113a6-3608-4a13-ba44-ed9651eb1981",
+      "origin": "ENGINE",
+      "payload": {
+        "chunkCount": 1,
+        "committedBytes": 166,
+        "complete": true,
+        "endingReason": "process exited with code 0",
+        "integrity": "complete",
+        "manifest": {
+          "artifactId": "6c81d2e5-af8e-4b76-8276-f9854add3666",
+          "sha256": "4f532141472f4d7ed01e4331ee144dc5a2fbbea9ca307da0b01591447989b806"
+        },
+        "receivedBytes": 166,
+        "stream": "normalized"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:14.798Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 65,
+      "type": "attempt.outputs_committed",
+      "nodeInstanceId": "finalize",
+      "attemptId": "5e0113a6-3608-4a13-ba44-ed9651eb1981",
+      "origin": "ENGINE",
+      "payload": {
+        "manifest": {
+          "artifactId": "62b4a9da-4dcd-4c04-b534-126816644ae8",
+          "sha256": "0ccb864d440e0d510f746a394706443460be0f8b86d588b9ec0a3c6865403c58"
+        }
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:14.799Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 66,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "finalize",
+      "attemptId": "5e0113a6-3608-4a13-ba44-ed9651eb1981",
+      "origin": "ENGINE",
+      "payload": {
+        "from": "running",
+        "process": null,
+        "reason": "Outputs committed after a successful terminal event and process exit.",
+        "to": "succeeded"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:14.828Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 67,
+      "type": "attempt.inputs_committed",
+      "nodeInstanceId": "result",
+      "attemptId": "7bf70ae0-eb83-41f0-a0f5-a3c39b091689",
+      "origin": "ENGINE",
+      "payload": {
+        "contextBindingId": null,
+        "manifest": {
+          "artifactId": "7d03d96a-399f-40d2-842f-e10f80a5e0bd",
+          "sha256": "f72d024c9289399a3b833274514f750732584ee83b5d84d3898bfe595bf2ce27"
+        },
+        "prompt": null
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:14.829Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 68,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "result",
+      "attemptId": "7bf70ae0-eb83-41f0-a0f5-a3c39b091689",
+      "origin": "ENGINE",
+      "payload": {
+        "from": "scheduled",
+        "process": null,
+        "reason": "Static node started.",
+        "to": "running"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:14.829Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 69,
+      "type": "attempt.outputs_committed",
+      "nodeInstanceId": "result",
+      "attemptId": "7bf70ae0-eb83-41f0-a0f5-a3c39b091689",
+      "origin": "ENGINE",
+      "payload": {
+        "manifest": {
+          "artifactId": "ac5330f1-2cef-4e83-926f-86d70a826794",
+          "sha256": "f717605d3bf7853ad5da21fbc81524c1848ce570a1f2bf6ee95311dadce92555"
+        }
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:14.829Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 70,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "result",
+      "attemptId": "7bf70ae0-eb83-41f0-a0f5-a3c39b091689",
+      "origin": "ENGINE",
+      "payload": {
+        "from": "running",
+        "process": null,
+        "reason": "Static node committed its outputs.",
+        "to": "succeeded"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:14.833Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 71,
+      "type": "run.state_changed",
+      "nodeInstanceId": null,
+      "attemptId": null,
+      "origin": "ENGINE",
+      "payload": {
+        "from": "running",
+        "reason": "Every planned node succeeded, was reused, or was skipped by a Route.",
+        "to": "succeeded"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:14.834Z",
+      "runId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+      "sequence": 72,
+      "type": "continuation.repair_completed",
+      "nodeInstanceId": null,
+      "attemptId": null,
+      "origin": "ENGINE",
+      "payload": {
+        "linkId": "abe190e8-d78f-4b77-b09a-f28507f0db7b",
+        "origin": "ENGINE",
+        "parentRunId": "9d9e550b-a22c-4147-81f3-fe450ce449ad"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:14.840Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 43,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "watcher",
+      "attemptId": "415914c5-3bc4-4f96-93e4-fd9152e1b33e",
+      "origin": "ENGINE",
+      "payload": {
+        "from": null,
+        "ordinal": 2,
+        "process": null,
+        "reason": "Resumed in place after the linked repair completed.",
+        "to": "scheduled"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:14.841Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 44,
+      "type": "continuation.parent_resumed",
+      "nodeInstanceId": null,
+      "attemptId": null,
+      "origin": "ENGINE",
+      "payload": {
+        "linkId": "abe190e8-d78f-4b77-b09a-f28507f0db7b",
+        "origin": "ENGINE",
+        "repairRunId": "4f15c7ad-697f-4935-abaa-684c2e40a292",
+        "resumeNodeInstanceId": "watcher"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:14.841Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 45,
+      "type": "run.state_changed",
+      "nodeInstanceId": null,
+      "attemptId": null,
+      "origin": "ENGINE",
+      "payload": {
+        "from": "waiting_for_user",
+        "reason": "Resumed after the linked repair completed.",
+        "to": "running"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:14.864Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 46,
+      "type": "attempt.inputs_committed",
+      "nodeInstanceId": "watcher",
+      "attemptId": "415914c5-3bc4-4f96-93e4-fd9152e1b33e",
+      "origin": "ENGINE",
+      "payload": {
+        "contextBindingId": null,
+        "manifest": {
+          "artifactId": "693f0da5-504f-4295-8d7c-b8405e20143f",
+          "sha256": "4adc731a751f888f30033ad0df494cb5c9d82c08ab0ba47fc0aa7c4e77eb2e45"
+        },
+        "prompt": {
+          "artifactId": "632fb47c-8706-47c7-ae50-79e405af5f9a",
+          "sha256": "66f008c843c5e76576b1b4bd24654fb62c86d7fca31d75272289961c01b96ed4"
+        }
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:14.865Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 47,
+      "type": "attempt.invocation_committed",
+      "nodeInstanceId": "watcher",
+      "attemptId": "415914c5-3bc4-4f96-93e4-fd9152e1b33e",
+      "origin": "ENGINE",
+      "payload": {
+        "manifest": {
+          "artifactId": "7831e645-0085-47a6-8415-7235c8e2f483",
+          "sha256": "7280bc684af9a6ec299fa1ca6f2a692854464e34d1300c403b01a6b89c74fb8e"
+        }
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:14.882Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 48,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "watcher",
+      "attemptId": "415914c5-3bc4-4f96-93e4-fd9152e1b33e",
+      "origin": "ENGINE",
+      "payload": {
+        "from": "scheduled",
+        "process": {
+          "pid": 16104,
+          "startIdentity": "16104@2026-10-22T17:56:14.879Z",
+          "supervisorGeneration": "9afd00be-fd6b-4cc5-a485-5d949b0c93f9"
+        },
+        "reason": "CLI process launched.",
+        "to": "running"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:14.975Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 49,
+      "type": "attempt.log_chunk",
+      "nodeInstanceId": "watcher",
+      "attemptId": "415914c5-3bc4-4f96-93e4-fd9152e1b33e",
+      "origin": "ENGINE",
+      "payload": {
+        "byteLength": 321,
+        "byteOffset": 0,
+        "chunk": {
+          "artifactId": "ea29a98a-515d-424a-9896-403065f83af2",
+          "sha256": "445f0709cfa9ec25e98d2c4f8694941708d665389326aad290e1b82f596fc80b"
+        },
+        "chunkIndex": 0,
+        "stream": "stdout"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:14.992Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 50,
+      "type": "attempt.log_stream_closed",
+      "nodeInstanceId": "watcher",
+      "attemptId": "415914c5-3bc4-4f96-93e4-fd9152e1b33e",
+      "origin": "ENGINE",
+      "payload": {
+        "chunkCount": 1,
+        "committedBytes": 321,
+        "complete": true,
+        "endingReason": "process exited with code 0",
+        "integrity": "complete",
+        "manifest": {
+          "artifactId": "0d394537-fda0-4786-a66a-b88d55975ca1",
+          "sha256": "0ffb2c0f7a15a5bbce84b70b5b73d0ae08f6c35661bc42f3f5ccb7e153dceb55"
+        },
+        "receivedBytes": 321,
+        "stream": "stdout"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:14.997Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 51,
+      "type": "attempt.log_stream_closed",
+      "nodeInstanceId": "watcher",
+      "attemptId": "415914c5-3bc4-4f96-93e4-fd9152e1b33e",
+      "origin": "ENGINE",
+      "payload": {
+        "chunkCount": 0,
+        "committedBytes": 0,
+        "complete": true,
+        "endingReason": "process exited with code 0",
+        "integrity": "complete",
+        "manifest": {
+          "artifactId": "7eeb48a3-8592-481b-8cdd-6c2ed7f48ecb",
+          "sha256": "be311c165bf8d810e0bd5984cdad2b44e1d87c0e20bd1fa2e4fe1743958c4b3c"
+        },
+        "receivedBytes": 0,
+        "stream": "stderr"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:15.007Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 52,
+      "type": "attempt.log_chunk",
+      "nodeInstanceId": "watcher",
+      "attemptId": "415914c5-3bc4-4f96-93e4-fd9152e1b33e",
+      "origin": "ENGINE",
+      "payload": {
+        "byteLength": 187,
+        "byteOffset": 0,
+        "chunk": {
+          "artifactId": "bacc68ca-f58b-4bf7-9f75-ef53ddf64963",
+          "sha256": "ec1d76708dd1279a3fac50ea66865da4f0b1838217a1ab82ca4005cc84376c3b"
+        },
+        "chunkIndex": 0,
+        "stream": "normalized"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:15.026Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 53,
+      "type": "attempt.log_stream_closed",
+      "nodeInstanceId": "watcher",
+      "attemptId": "415914c5-3bc4-4f96-93e4-fd9152e1b33e",
+      "origin": "ENGINE",
+      "payload": {
+        "chunkCount": 1,
+        "committedBytes": 187,
+        "complete": true,
+        "endingReason": "process exited with code 0",
+        "integrity": "complete",
+        "manifest": {
+          "artifactId": "d5af4ac4-a64f-459c-ad27-0d1f6be23ef6",
+          "sha256": "406707237cefe0ce653a4929bf1a2089693e221e914c5affa0923526fb97d53e"
+        },
+        "receivedBytes": 187,
+        "stream": "normalized"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:15.060Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 54,
+      "type": "attempt.outputs_committed",
+      "nodeInstanceId": "watcher",
+      "attemptId": "415914c5-3bc4-4f96-93e4-fd9152e1b33e",
+      "origin": "ENGINE",
+      "payload": {
+        "manifest": {
+          "artifactId": "8c340666-25da-44bc-b819-f99203709e58",
+          "sha256": "18f0ea1a8b924c29cdd41b6ad7659a2d0a2533bd3f1e4a9423656c3d951347e5"
+        }
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:15.061Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 55,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "watcher",
+      "attemptId": "415914c5-3bc4-4f96-93e4-fd9152e1b33e",
+      "origin": "ENGINE",
+      "payload": {
+        "from": "running",
+        "process": null,
+        "reason": "Outputs committed after a successful terminal event and process exit.",
+        "to": "succeeded"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:15.082Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 56,
+      "type": "attempt.inputs_committed",
+      "nodeInstanceId": "judge",
+      "attemptId": "1034b112-7b0d-400a-a910-85ccfee6adec",
+      "origin": "ENGINE",
+      "payload": {
+        "contextBindingId": null,
+        "manifest": {
+          "artifactId": "d2282a50-c7b5-437d-a0a5-eddb85e00895",
+          "sha256": "53e2cda88a2471b10ae16793a1ea0a12e6393cc03b77853185b012af183363fc"
+        },
+        "prompt": {
+          "artifactId": "53c3435d-8355-481c-93f2-788e2e932c11",
+          "sha256": "35635bc1435f37513e1770ded5da43a0479e88d35dae071868d071e5c25edcfc"
+        }
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:15.083Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 57,
+      "type": "attempt.invocation_committed",
+      "nodeInstanceId": "judge",
+      "attemptId": "1034b112-7b0d-400a-a910-85ccfee6adec",
+      "origin": "ENGINE",
+      "payload": {
+        "manifest": {
+          "artifactId": "0986ec38-4dfb-4e07-8088-6369cf611557",
+          "sha256": "11a1f7ef85c845d9dc258e3c73e6e6c4e8d37dc28527a056efa011889744cdea"
+        }
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:15.101Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 58,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "judge",
+      "attemptId": "1034b112-7b0d-400a-a910-85ccfee6adec",
+      "origin": "ENGINE",
+      "payload": {
+        "from": "scheduled",
+        "process": {
+          "pid": 2764,
+          "startIdentity": "2764@2026-10-22T17:56:15.098Z",
+          "supervisorGeneration": "9afd00be-fd6b-4cc5-a485-5d949b0c93f9"
+        },
+        "reason": "CLI process launched.",
+        "to": "running"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:15.195Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 59,
+      "type": "attempt.log_chunk",
+      "nodeInstanceId": "judge",
+      "attemptId": "1034b112-7b0d-400a-a910-85ccfee6adec",
+      "origin": "ENGINE",
+      "payload": {
+        "byteLength": 367,
+        "byteOffset": 0,
+        "chunk": {
+          "artifactId": "9f7d80b9-5af9-4989-ad4d-d11109b4e843",
+          "sha256": "47ac638d81770e97040009d4e43ea719427ac1e3a744e7bf70da4eb7342d9e4a"
+        },
+        "chunkIndex": 0,
+        "stream": "stdout"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:15.212Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 60,
+      "type": "attempt.log_stream_closed",
+      "nodeInstanceId": "judge",
+      "attemptId": "1034b112-7b0d-400a-a910-85ccfee6adec",
+      "origin": "ENGINE",
+      "payload": {
+        "chunkCount": 1,
+        "committedBytes": 367,
+        "complete": true,
+        "endingReason": "process exited with code 0",
+        "integrity": "complete",
+        "manifest": {
+          "artifactId": "8ecdd9f6-9eaf-470b-ab6b-2192bf1671e7",
+          "sha256": "9ce35c068524658d7902356178aa838bd240d4d7a8a5f3851d4e0911b154aaf1"
+        },
+        "receivedBytes": 367,
+        "stream": "stdout"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:15.218Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 61,
+      "type": "attempt.log_stream_closed",
+      "nodeInstanceId": "judge",
+      "attemptId": "1034b112-7b0d-400a-a910-85ccfee6adec",
+      "origin": "ENGINE",
+      "payload": {
+        "chunkCount": 0,
+        "committedBytes": 0,
+        "complete": true,
+        "endingReason": "process exited with code 0",
+        "integrity": "complete",
+        "manifest": {
+          "artifactId": "7eeb48a3-8592-481b-8cdd-6c2ed7f48ecb",
+          "sha256": "be311c165bf8d810e0bd5984cdad2b44e1d87c0e20bd1fa2e4fe1743958c4b3c"
+        },
+        "receivedBytes": 0,
+        "stream": "stderr"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:15.231Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 62,
+      "type": "attempt.log_chunk",
+      "nodeInstanceId": "judge",
+      "attemptId": "1034b112-7b0d-400a-a910-85ccfee6adec",
+      "origin": "ENGINE",
+      "payload": {
+        "byteLength": 233,
+        "byteOffset": 0,
+        "chunk": {
+          "artifactId": "57efe548-3163-406e-8e8c-cda504d63b48",
+          "sha256": "7a6628947600801088e8d9fa5709b2a8323629c7c41e927adcd632ce1667961f"
+        },
+        "chunkIndex": 0,
+        "stream": "normalized"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:15.249Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 63,
+      "type": "attempt.log_stream_closed",
+      "nodeInstanceId": "judge",
+      "attemptId": "1034b112-7b0d-400a-a910-85ccfee6adec",
+      "origin": "ENGINE",
+      "payload": {
+        "chunkCount": 1,
+        "committedBytes": 233,
+        "complete": true,
+        "endingReason": "process exited with code 0",
+        "integrity": "complete",
+        "manifest": {
+          "artifactId": "5894fe49-e2a4-4c2b-91ec-dd9eefce357d",
+          "sha256": "2afd8be4b8341307d9b963d3ff64d266056c859adf452f1b344417093e5ef96d"
+        },
+        "receivedBytes": 233,
+        "stream": "normalized"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:15.282Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 64,
+      "type": "attempt.outputs_committed",
+      "nodeInstanceId": "judge",
+      "attemptId": "1034b112-7b0d-400a-a910-85ccfee6adec",
+      "origin": "ENGINE",
+      "payload": {
+        "manifest": {
+          "artifactId": "dd5b4e85-7efb-4431-9579-b3b90f251521",
+          "sha256": "94c47f7d073813bccdad9ce6cc8a928a2247d8b724efbede252ae9cfcfd6dd8e"
+        }
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:15.282Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 65,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "judge",
+      "attemptId": "1034b112-7b0d-400a-a910-85ccfee6adec",
+      "origin": "ENGINE",
+      "payload": {
+        "from": "running",
+        "process": null,
+        "reason": "Outputs committed after a successful terminal event and process exit.",
+        "to": "succeeded"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:15.308Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 66,
+      "type": "attempt.inputs_committed",
+      "nodeInstanceId": "result",
+      "attemptId": "20732b94-9c65-44fd-9025-ebb5ce696d79",
+      "origin": "ENGINE",
+      "payload": {
+        "contextBindingId": null,
+        "manifest": {
+          "artifactId": "0d3d378b-45f3-4387-a619-b97d9227d18b",
+          "sha256": "8d314e6a5bdd25ee1e5bb84186fb3d46a2e38f3107b3224392ebc48e55a01afd"
+        },
+        "prompt": null
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:15.308Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 67,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "result",
+      "attemptId": "20732b94-9c65-44fd-9025-ebb5ce696d79",
+      "origin": "ENGINE",
+      "payload": {
+        "from": "scheduled",
+        "process": null,
+        "reason": "Static node started.",
+        "to": "running"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:15.309Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 68,
+      "type": "attempt.outputs_committed",
+      "nodeInstanceId": "result",
+      "attemptId": "20732b94-9c65-44fd-9025-ebb5ce696d79",
+      "origin": "ENGINE",
+      "payload": {
+        "manifest": {
+          "artifactId": "15ef40ab-7273-41ac-8837-982b0277685b",
+          "sha256": "359e3b6fc0c42136213af24d99e0fabd24f8056526a50b7006b2285a1bd97d49"
+        }
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:15.309Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 69,
+      "type": "attempt.state_changed",
+      "nodeInstanceId": "result",
+      "attemptId": "20732b94-9c65-44fd-9025-ebb5ce696d79",
+      "origin": "ENGINE",
+      "payload": {
+        "from": "running",
+        "process": null,
+        "reason": "Static node committed its outputs.",
+        "to": "succeeded"
+      }
+    },
+    {
+      "at": "2026-10-22T17:56:15.315Z",
+      "runId": "9d9e550b-a22c-4147-81f3-fe450ce449ad",
+      "sequence": 70,
+      "type": "run.state_changed",
+      "nodeInstanceId": null,
+      "attemptId": null,
+      "origin": "ENGINE",
+      "payload": {
+        "from": "running",
+        "reason": "Every planned node succeeded, was reused, or was skipped by a Route.",
+        "to": "succeeded"
+      }
+    }
+  ]
+}

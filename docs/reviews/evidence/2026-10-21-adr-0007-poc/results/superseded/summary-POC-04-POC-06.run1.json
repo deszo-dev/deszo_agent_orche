@@ -1,0 +1,23 @@
+{
+  "runRoot": "<POC_ROOT>",
+  "generatedBy": "run-poc.mjs",
+  "experiments": [
+    {
+      "id": "POC-04",
+      "status": "PASS",
+      "failedChecks": [],
+      "elapsedMs": 158793,
+      "exitCode": 0
+    },
+    {
+      "id": "POC-06",
+      "status": "FAIL",
+      "failedChecks": [
+        "a takeover cannot move the session file out from under a live owner",
+        "a live owner cannot write the session after its file was moved away"
+      ],
+      "elapsedMs": 21945,
+      "exitCode": 0
+    }
+  ]
+}

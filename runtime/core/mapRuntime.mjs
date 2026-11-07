@@ -417,7 +417,8 @@ export function installMapRuntime(Engine, { ApiError, UNSTARTED }) {
   P.cancelMapSteps = function cancelMapSteps(state, exec, events, reason) {
     const prefix = `${exec.row.map_instance_id}/${exec.plan.seq}/`;
     for (const attempt of this.latestAttempts(state.id).filter(item => item.node_instance_id.startsWith(prefix) && UNSTARTED.has(item.state)))
-      events.push(...this.attemptTransition(attempt, 'canceled', reason));
+      events.push(...this.attemptTransition(attempt, 'canceled', reason, null,
+        { source: 'workflow', code: 'interrupted', causeKnowledge: 'direct_fact', executionCertainty: 'not_started', sideEffectCertainty: 'none_proven' }));
   };
 
   P.taskInputs = function taskInputs(exec, def, task) {
@@ -837,11 +838,16 @@ export function installMapRuntime(Engine, { ApiError, UNSTARTED }) {
     const failWithEvidence = (kind, reason, code, message) => {
       const ev = evidence(kind, reason);
       if (ev.events.length) this.store.transaction(() => this.store.appendEvents(state.id, ev.events));
-      this.failAttempt(state, current, code, message, { evidence: ev.ref });
+      const neverStarted = kind === 'spawn_failed';
+      this.failAttempt(state, current, code, message, { evidence: ev.ref,
+        source: neverStarted || kind === 'capture_failed' ? 'engine' : 'workflow',
+        causeKnowledge: 'direct_fact', executionCertainty: neverStarted ? 'not_started' : kind === 'capture_failed' ? 'unknown' : 'completed',
+        sideEffectCertainty: neverStarted ? 'none_proven' : 'unknown' });
     };
     if (record.stopRequested) {
       const ev = evidence('canceled', 'The check was stopped by Stop.');
-      return this.store.transaction(() => this.store.appendEvents(state.id, [...ev.events, ...this.attemptTransition(current, 'canceled', 'Stopped by the user.')]));
+      return this.store.transaction(() => this.store.appendEvents(state.id, [...ev.events, ...this.attemptTransition(current, 'canceled', 'Stopped by the user.', null,
+        { source: 'external_control', code: 'interrupted', causeKnowledge: 'direct_fact', executionCertainty: 'completed', sideEffectCertainty: 'unknown' })]));
     }
     if (record.captureError) {
       const code = record.captureError.code === 'capture_limit' ? 'capture_limit' : 'capture_failed';
@@ -868,6 +874,12 @@ export function installMapRuntime(Engine, { ApiError, UNSTARTED }) {
       events.push(this.commitOutputs(state, current, { report: jsonValue(this.store.putJson(report)) }));
       events.push(...ev.events);
       events.push(...this.attemptTransition(current, 'succeeded', passed ? `${criterion.checkId} passed (exit ${outcome.code}).` : `${criterion.checkId} failed: exit ${outcome.code}, required ${command.requiredExitCode}.`));
+      if (!passed) {
+        const checkOutcome = this.failureOutcomeEvent(current, { source: 'workflow', code: 'process', attemptState: 'succeeded',
+          causeKnowledge: 'direct_fact', executionCertainty: 'completed', sideEffectCertainty: 'unknown',
+          observedState: { exitCode: outcome.code }, evidence: ev.ref });
+        if (checkOutcome) events.push(checkOutcome);
+      }
       if (source.kind === 'candidate') { if (task.data.cycle?.candidate?.recordId === source.recordId) task.data.cycle.checks[criterion.id] = { ref: report, outcome: passed ? 'passed' : 'failed' }; }
       else if (task.data.currentResultId === source.recordId && task.data.criteria[criterion.id]) {
         task.data.criteria[criterion.id] = { verdict: passed ? 'passed' : 'failed', recordId: report.recordId,
@@ -884,7 +896,10 @@ export function installMapRuntime(Engine, { ApiError, UNSTARTED }) {
     for (const row of this.store.all(`SELECT * FROM map_executions WHERE run_id = ? AND state IN ('running','paused','finishing')`, runId)) {
       this.store.run(`UPDATE map_executions SET state = 'canceled', pause_reason = NULL WHERE id = ?`, row.id);
       const attempt = this.store.get('SELECT * FROM attempts WHERE id = ?', row.attempt_id);
-      if (['running', 'waiting', 'scheduled'].includes(attempt.state)) events.push(...this.attemptTransition(attempt, 'canceled', reason));
+      if (['running', 'waiting', 'scheduled'].includes(attempt.state)) events.push(...this.attemptTransition(attempt, 'canceled', reason, null,
+        { source: 'external_control', code: 'interrupted', causeKnowledge: 'direct_fact',
+          executionCertainty: UNSTARTED.has(attempt.state) ? 'not_started' : 'unknown',
+          sideEffectCertainty: UNSTARTED.has(attempt.state) ? 'none_proven' : 'unknown' }));
     }
   };
   P.mapAttemptIds = function mapAttemptIds(runId) {

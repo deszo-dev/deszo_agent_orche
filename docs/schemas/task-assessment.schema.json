@@ -1,0 +1,300 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deszo.local/documentation/task-assessment.schema.json",
+  "title": "Task Assessment (ADR-0003)",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "kind": {
+      "const": "TaskAssessment"
+    },
+    "assessmentId": {
+      "type": "string"
+    },
+    "assessmentRunId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "businessRequestId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "authorRole": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sourceSnapshotHash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "intendedOutcome": {
+      "type": "string",
+      "minLength": 1
+    },
+    "constraints": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "exclusions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "requirements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string"
+          },
+          "acceptanceCriteria": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "requiredEvidence": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "evidenceProducer": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "id",
+                "description",
+                "requiredEvidence",
+                "evidenceProducer"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "acceptanceCriteria"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "scope": {
+      "type": "object",
+      "properties": {
+        "affectedComponents": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "affectedInterfaces": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "affectedData": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "executionEnvironments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "anticipatedDependencies": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "affectedComponents"
+      ],
+      "additionalProperties": false
+    },
+    "sourceDerivedFacts": {
+      "type": "object",
+      "properties": {
+        "criticalPaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "publicContracts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "dependencyFanOut": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "criticalPaths",
+        "publicContracts",
+        "dependencyFanOut"
+      ],
+      "additionalProperties": false
+    },
+    "assessmentAxes": {
+      "type": "object",
+      "properties": {
+        "scopeCoupling": {
+          "enum": [
+            "local",
+            "modular",
+            "cross_component",
+            "architectural"
+          ]
+        },
+        "technicalDifficulty": {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "failureImpact": {
+          "enum": [
+            "limited",
+            "persistent_data",
+            "security_process",
+            "critical"
+          ]
+        },
+        "uncertainty": {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "verifiability": {
+          "enum": [
+            "clear",
+            "indirect",
+            "unverified"
+          ]
+        }
+      },
+      "required": [
+        "scopeCoupling",
+        "technicalDifficulty",
+        "failureImpact",
+        "uncertainty",
+        "verifiability"
+      ],
+      "additionalProperties": false
+    },
+    "grounds": {
+      "type": "object",
+      "properties": {
+        "references": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "assumptions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "unresolvedQuestions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "disputedSemantics": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "references",
+        "assumptions",
+        "confidence",
+        "unresolvedQuestions"
+      ],
+      "additionalProperties": false
+    },
+    "planningAdvice": {
+      "type": "object",
+      "properties": {
+        "recommendedStages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "suggestedDecomposition": {
+          "type": "string"
+        },
+        "riskNotes": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "recommendedStages"
+      ],
+      "additionalProperties": false
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "kind",
+    "assessmentId",
+    "assessmentRunId",
+    "businessRequestId",
+    "authorRole",
+    "sourceSnapshotHash",
+    "intendedOutcome",
+    "requirements",
+    "scope",
+    "sourceDerivedFacts",
+    "assessmentAxes",
+    "grounds",
+    "planningAdvice",
+    "createdAt"
+  ],
+  "additionalProperties": false
+}

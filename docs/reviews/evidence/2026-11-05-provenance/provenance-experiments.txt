@@ -1,0 +1,24 @@
+Launch-shim provenance experiments, 2026-11-05 (local time +0300 unless marked Z)
+
+Shim binaries (sha256, size 201728 bytes each):
+shim-dist-shimbuild.exe
+shim-feature-custom-protocol.exe
+shim-same-config-1.exe
+shim-same-config-2.exe
+shim-same-config-taurienv.exe
+shim-target-tauri-build.exe
+
+Byte differences (cmp -l | wc -l) between shim builds:
+  same-config build 1 vs same-config build 2 (identical inputs, two links): 20
+  same-config build 1 vs build with TAURI_CONFIG set:                    19
+  shim:build copy in dist-runtime vs same-config build 1:                 24
+  shim from tauri build (target copy) vs same-config build 1:             25051
+  shim with --features tauri/custom-protocol vs tauri build copy:         24
+  shim with --features tauri/custom-protocol vs same-config build 1:      25047
+
+Where the same-config differences lie (0-based offsets, cmp -l minus 1; 20 bytes in total):
+  240            PE TimeDateStamp (COFF header)
+  171060, 171088, 171116  TimeDateStamp of three entries of the debug directory (.rdata)
+  171908-171923  CodeView RSDS GUID (16 bytes)
+
+Conclusion: identical inputs give bytes that differ only in the linker timestamp fields and the CodeView GUID (legitimate nondeterminism of MSVC linking without /Brepro). The shim compiled by 'tauri build' (which passes --features tauri/custom-protocol) differs by about 25 kB of code and data from the standalone 'shim:build' compilation. Both were published to different paths before this change: the runtime received the standalone copy, the receipt bound that copy, and src-tauri/target/release held the tauri copy. That is a two-producer defect, not nondeterminism. Single-producer fix: build-finish publishes the tauri-compiled copy and verifies it.

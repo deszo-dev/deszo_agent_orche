@@ -161,3 +161,5 @@ All judgments, certificates, selected snapshots, issue updates, candidates/confl
 Scoped Map/Task/Loop commands, nested resource events, role/template serialization, Gate policies and check/triage/certificate schemas must be supplied before their milestones. M1's API/schema does not already support these actions. [MILESTONES.md](MILESTONES.md#contracts-required-before-each-milestone) is the readiness checklist.
 
 The reference pipeline produces inspectable accepted delivery artifacts; promotion/deployment and automatic Git operations are outside scope.
+
+The optional stage beyond candidate acceptance is proposed in [ADR-0005](adr/0005-verified-feature-branch-delivery.md). It does not change this reference pipeline's current output or authorize Git operations.

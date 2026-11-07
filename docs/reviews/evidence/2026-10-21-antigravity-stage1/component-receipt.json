@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "kind": "Stage1ProductionComponentFixtureReceipt",
+  "recordedAt": "2026-10-22T02:35:14.742Z",
+  "assurance": "SOFTWARE_CONSENT_AND_NATIVE_PROVIDER_FIXTURES",
+  "actualComponents": [
+    "Engine",
+    "SQLite Store and m13",
+    "authenticated runner HTTP",
+    "MCP Bridge",
+    "ControlHost shared ledger and audit",
+    "ControllerQueue lease",
+    "judge.review service action"
+  ],
+  "providerCalls": 0,
+  "nativeLaunches": 0,
+  "softwareFixtureTurns": 3,
+  "workflowId": "judge-stage1-3ac9e259",
+  "runId": "4a8a6a45-16eb-4528-9ae3-88a89a67e6e4",
+  "runStateBefore": "waiting_for_user",
+  "runStateAfter": "waiting_for_user",
+  "decisionCount": 3,
+  "receiptIds": [
+    "2b57a4aa-0ba5-4528-b3f0-328a1c971c1e",
+    "825aad57-8c3b-4c7d-8453-8608b0a69dfd",
+    "97308703-847e-4eb4-8449-b86fc2eda681"
+  ],
+  "sharedBudget": {
+    "providerInvocations": 3,
+    "workerModelCalls": 3
+  },
+  "hostAuditIntact": true,
+  "candidateAccepted": false,
+  "readyForMerge": false,
+  "productionPathE2E": "BLOCKED",
+  "why": "No protected native Judge launcher/custody or current consumer-subscription inspector is installed."
+}

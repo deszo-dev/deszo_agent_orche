@@ -1,0 +1,115 @@
+{
+  "experiment": "POC-04",
+  "title": "Concurrent escalations and serialization",
+  "status": "FAIL",
+  "checks": [
+    {
+      "name": "[default-capabilities] turn A is admitted and emits turn/started",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "[default-capabilities] at most one autonomous turn runs per session",
+      "pass": true,
+      "detail": "max=1"
+    },
+    {
+      "name": "[default-capabilities] turn B is not started while A is active",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "[default-capabilities] a second request during an active turn is refused explicitly or runs later as its own turn (not merged into A)",
+      "pass": false,
+      "detail": "merged: turn B returned turn A's id 01a15e53-a84e-7372-88fd-489ac48153aa"
+    },
+    {
+      "name": "[default-capabilities] the second request content is recorded in the session, not dropped",
+      "pass": false,
+      "detail": "no item/started carried its text"
+    },
+    {
+      "name": "[experimental-native-queue] the native queue accepts a request while turn A is active",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "[experimental-native-queue] a queued request is started by the App Server after turn A completes (serialized, not concurrent)",
+      "pass": true,
+      "detail": "started after A"
+    },
+    {
+      "name": "[interrupt-bound] an active turn can be bounded by turn/interrupt and reaches a terminal status",
+      "pass": true,
+      "detail": null
+    }
+  ],
+  "measurements": {
+    "default-capabilities": {
+      "turnA": {
+        "admissionAckMs": 32.222,
+        "turnStartedAfterSendMs": 129.258,
+        "turnId": "01a15e53-a84e-7372-88fd-489ac48153aa",
+        "completedStatus": "failed",
+        "completedAtMs": 34758,
+        "endedOnItsOwn": true
+      },
+      "turnB": {
+        "acceptedWhileAActive": true,
+        "error": null,
+        "initialStatus": "inProgress",
+        "turnId": "01a15e53-a84e-7372-88fd-489ac48153aa",
+        "mergedIntoActiveTurnA": true,
+        "contentRecordedAsItem": false,
+        "notificationsWhileAActive": [],
+        "recordAfterA": {
+          "id": "01a15e53-a84e-7372-88fd-489ac48153aa",
+          "status": "failed"
+        }
+      },
+      "steerIntoActiveTurnAccepted": true,
+      "afterTurnA": {
+        "startedTurnId": null,
+        "startedWithinSeconds": "none within 90 s"
+      },
+      "turnListingAfterA": [
+        {
+          "id": "01a15e53-a84e-7372-88fd-489ac48153aa",
+          "status": "failed"
+        }
+      ],
+      "maxConcurrentTurnsObserved": 1
+    },
+    "experimental-native-queue": {
+      "initialize": "ok",
+      "nativeQueue": {
+        "addOk": true,
+        "addError": null,
+        "listOk": true,
+        "listSummary": "{\"data\":[{\"id\":\"01a15e55-86f7-7931-bbd6-0c04da9778f5\",\"input\":[{\"type\":\"text\",\"text\":\"ADR7 POC queued C 43de8bb5-39bf-4ada-9053-f6b2d24b96b6\",\"text_elements\":[]}],\"clientUserMessageId\":\"47150fea-acde-4df2-8d94-d56fc6dc34f5\"}],\"nextCursor\":null}"
+      },
+      "turnA": {
+        "endedOnItsOwn": true,
+        "completedStatus": "failed"
+      },
+      "queuedRequestStarted": {
+        "startedAtMs": 31216,
+        "wallClockFromQueueMs": 31212
+      },
+      "queueChangedNotifications": 3
+    },
+    "interrupt-bound": {
+      "interrupt": {
+        "startedTurn": true,
+        "acknowledged": true,
+        "error": null,
+        "completedStatus": "interrupted",
+        "interruptToCompletionMs": 57.44
+      }
+    }
+  },
+  "notes": [
+    "Each arm starts its own App Server in an isolated home. The active turns end through Codex retries of unauthenticated model requests, not through a model answer, so timings are control-path measurements only.",
+    "The default arm does not declare experimentalApi, so thread/queue/* is not available there; the queue arm declares it. Experimental methods are a capability to be justified, not assumed safe."
+  ]
+}

@@ -35,10 +35,13 @@ try {
   const workflow = JSON.parse(await readFile(resolve(import.meta.dirname, '../docs/examples/m1-context-chain/workflow.json'), 'utf8'));
   workflow.workflowId = 'smoke-context-chain';
   for (const node of workflow.nodes) if (node.type === 'agent') node.config.model = models[node.config.provider];
-  const saved = await call('PUT', `/api/v3/workflows/${workflow.workflowId}`, { requestId: randomUUID(), expectedEtag: null, workflow }, { 'If-None-Match': '*' });
-  if (!saved.validation.valid) throw new Error(`Workflow invalid: ${JSON.stringify(saved.validation.issues)}`);
-  const accepted = await call('POST', '/runs', { workflowId: workflow.workflowId, workflowSnapshotSha256: saved.snapshotSha256, workspaceId: 'smoke', requestId: randomUUID() });
-  if (accepted.outcome === 'confirmation_pending') throw new Error(`Run request ${accepted.requestId} is pending; this isolated smoke launcher expected first-party direct execution.`);
+  const draftPath = `/api/v4/workflows/${workflow.workflowId}/draft`;
+  const draft = await call('PUT', draftPath, { requestId: randomUUID(), workflow }, { 'If-None-Match': '*' });
+  const validation = await call('POST', `${draftPath}/validate`, {}, { 'If-Match': draft.etag });
+  if (!validation.validation.valid) throw new Error(`Workflow invalid: ${JSON.stringify(validation.validation.issues)}`);
+  const published = await call('POST', `/api/v4/workflows/${workflow.workflowId}/publish`, { requestId: randomUUID() }, { 'If-Match': draft.etag });
+  const accepted = await call('POST', '/runs', { workflowId: workflow.workflowId, publishedVersionId: published.publishedVersionId,
+    definitionDigest: published.definitionDigest, workflowSnapshotSha256: published.snapshotSha256, workspaceId: 'smoke', requestId: randomUUID() });
   if (accepted.outcome !== 'created' || !accepted.run?.runId) throw new Error('The runtime returned an unsupported run outcome.');
   const runId = accepted.run.runId;
   console.log(`Run ${runId} started; waiting for completion…`);

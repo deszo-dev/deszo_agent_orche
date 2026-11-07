@@ -5,6 +5,7 @@ export interface ReplayInstance {
   inputs: ArtifactRef | null; prompt?: ArtifactRef | null; outputs: ArtifactRef | null; invocation: ArtifactRef | null;
   error: { code: string; message: string } | null; logs: { stream: string; chunk: ArtifactRef; index: number }[];
   reusedFrom?: string; routeCase?: string | null; carried?: { slot: string; priorSubjectId: string; recordId: string }[]; gate?: { mode: string; status: string | null; subjectId: string; recordId: string | null };
+  taskRecord?: { kind: string; record: ArtifactRef };
 }
 export interface ReplayIteration { iteration: number; value: any; feedback: any; candidate: any; decision: any; continue: boolean | null; reason: string | null; restart: boolean; outcome: string | null }
 export interface ReplayLoop { state: string; iteration: number; pauseReason: string | null; message?: string | null; maxIterations: number; maxActiveMinutes: number; iterations: ReplayIteration[]; result?: any }

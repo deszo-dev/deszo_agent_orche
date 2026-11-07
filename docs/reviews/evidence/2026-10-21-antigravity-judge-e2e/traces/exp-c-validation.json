@@ -1,0 +1,84 @@
+{
+  "positiveValidation": {
+    "ok": true,
+    "code": "DECISION_VALIDATED_AND_APPLIED",
+    "duplicate": false,
+    "applied": true,
+    "receipt": {
+      "receipt_id": "rcpt-judge-1792589261121-a4ih12",
+      "request_id": "att-req-76ae113e-c7c7-4a80-8cf8-097d91025060",
+      "controller_id": "judge.antigravity.cli",
+      "session_id": "judge-session-agy-001",
+      "workflow_run_id": "run-fixer-pilot-001",
+      "workflow_revision": 3,
+      "verdict": "APPROVE",
+      "confidence": 1,
+      "evidence_digest": "sha256:7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069",
+      "findings_count": 4,
+      "validated_at": "2026-10-21T13:27:41.121Z",
+      "authorized_state_transition": {
+        "from": "IN_REVIEW",
+        "to": "COMPLETED",
+        "action": "promote_to_release"
+      },
+      "decision_hash": "5883c6dc4eed5bc02bed97f00d52e44661e0a0af7b3a03af6816c1f62587b327"
+    }
+  },
+  "negativeChecks": [
+    {
+      "name": "Wrong Request ID",
+      "expected": "INVALID_REQUEST_ID",
+      "got": "INVALID_REQUEST_ID",
+      "pass": true
+    },
+    {
+      "name": "Wrong Controller ID",
+      "expected": "INVALID_CONTROLLER_ID",
+      "got": "INVALID_CONTROLLER_ID",
+      "pass": true
+    },
+    {
+      "name": "Stale Revision",
+      "expected": "STALE_WORKFLOW_REVISION",
+      "got": "STALE_WORKFLOW_REVISION",
+      "pass": true
+    },
+    {
+      "name": "Session ID Mismatch",
+      "expected": "INVALID_SESSION_ID",
+      "got": "INVALID_SESSION_ID",
+      "pass": true
+    },
+    {
+      "name": "Duplicate Delivery",
+      "expected": "DUPLICATE_DECISION_IGNORED",
+      "got": "DUPLICATE_DECISION_IGNORED",
+      "pass": true
+    },
+    {
+      "name": "Expired Session Auth",
+      "expected": "SESSION_AUTHORIZATION_EXPIRED",
+      "got": "SESSION_AUTHORIZATION_EXPIRED",
+      "pass": true
+    },
+    {
+      "name": "Unauthorized Budget Extension",
+      "expected": "UNAUTHORIZED_BUDGET_ADJUSTMENT",
+      "got": "UNAUTHORIZED_BUDGET_ADJUSTMENT",
+      "pass": true
+    },
+    {
+      "name": "Evidence Digest Mismatch",
+      "expected": "EVIDENCE_DIGEST_MISMATCH",
+      "got": "EVIDENCE_DIGEST_MISMATCH",
+      "pass": true
+    },
+    {
+      "name": "Decision After Stop",
+      "expected": "DECISION_AFTER_STOP",
+      "got": "DECISION_AFTER_STOP",
+      "pass": true
+    }
+  ],
+  "status": "PASS"
+}

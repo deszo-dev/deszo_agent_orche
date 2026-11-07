@@ -44,6 +44,7 @@ export function project(events, upToIndex) {
       case 'attempt.inputs_committed': instance(event.nodeInstanceId).inputs = p.manifest; instance(event.nodeInstanceId).prompt = p.prompt; break;
       case 'attempt.invocation_committed': instance(event.nodeInstanceId).invocation = p.manifest; break;
       case 'attempt.outputs_committed': instance(event.nodeInstanceId).outputs = p.manifest; break;
+      case 'task.recorded': instance(event.nodeInstanceId).taskRecord = { kind: p.kind, record: p.record }; break;
       case 'attempt.reused': Object.assign(instance(event.nodeInstanceId), { outputs: p.outputs, reusedFrom: p.sourceRunId }); break;
       case 'route.selected': instance(event.nodeInstanceId).routeCase = p.caseId; break;
       case 'gate.evaluated': instance(event.nodeInstanceId).gate = { mode: p.mode, status: p.status, subjectId: p.subjectId, recordId: p.recordId }; break;
@@ -94,6 +95,7 @@ const LABELS = {
   'attempt.outputs_committed': (_, e) => `${e.nodeInstanceId}: outputs committed`,
   'attempt.error': (p, e) => `${e.nodeInstanceId}: ${p.code}`,
   'attempt.log_chunk': (p, e) => `${e.nodeInstanceId}: ${p.stream} batch ${p.chunkIndex}`,
+  'task.recorded': (p, e) => `${e.nodeInstanceId}: task ${p.kind} captured`,
   'context.state_changed': p => `Context ${p.from} → ${p.to}`,
   'context.bound': p => `${p.provider} native session captured`,
   'context.remapped': p => `${p.contextNodeId} remapped to a fresh binding`,

@@ -63,15 +63,21 @@ export function installSupervision(Engine, { ApiError }) {
     return this.store.get("SELECT * FROM control_grants WHERE run_id = ? AND state = 'active'", runId) ?? null;
   };
 
+  P.boundGrant = function boundGrant(runId) {
+    return this.activeGrant(runId) ?? this.store.get('SELECT * FROM control_grants WHERE run_id = ? ORDER BY bound_at DESC LIMIT 1', runId) ?? null;
+  };
+
   P.controlModeOf = function controlModeOf(runId) {
-    return this.supervisor && this.activeGrant(runId) ? 'supervised' : 'unsupervised';
+    // Execution mode is historical: ending/revoking a bound grant cannot rewrite a captured run or its proof.
+    return this.store.get('SELECT 1 FROM control_grants WHERE run_id = ? LIMIT 1', runId) ? 'supervised' : 'unsupervised';
   };
 
   P.controllerHealth = function controllerHealth(runId) {
-    const grant = this.activeGrant(runId);
+    const grant = this.boundGrant(runId);
     if (!grant) return null;
     const since = grant.last_ack_at ?? grant.bound_at;
-    return { grantId: grant.id, state: grant.state, ackCursor: grant.ack_cursor, lastAckAt: grant.last_ack_at, pausedAt: grant.paused_at,
+    return { grantId: grant.id, controllerSessionId: grant.controller_session_id, state: grant.state, boundAt: grant.bound_at,
+      ackCursor: grant.ack_cursor, lastAckAt: grant.last_ack_at, pausedAt: grant.paused_at,
       observationDeadlineMs: grant.observation_deadline_ms, escalationDeadlineMs: grant.escalation_deadline_ms,
       millisecondsSinceAcknowledgement: since ? Date.now() - Date.parse(since) : null };
   };
@@ -114,11 +120,15 @@ export function installSupervision(Engine, { ApiError }) {
       if (!this.supervisor) throw new ApiError(409, 'supervision_unavailable', 'This runtime has no Tauri supervisor, so it cannot grant supervision. Ordinary runs stay unsupervised and report controlMode "unsupervised".');
       const client = clientStatus(body.clientProvider);
       if (client.status !== 'verified') throw new ApiError(409, 'supervision_unavailable', `The ${body.clientProvider} tool-timeout matrix is unverified, so supervised observation cannot be guaranteed for this client.`);
+      if (client.testedVersion && body.clientVersion !== client.testedVersion) throw new ApiError(409, 'supervision_unavailable', 'The controller version does not match the measured tool-timeout matrix.');
       if (!this.store.get('SELECT id FROM controller_sessions WHERE id = ?', body.controllerSessionId)) throw new ApiError(404, 'not_found', 'Controller session not found.');
       this.requireControllerCredential(controllerToken, body.controllerSessionId);
-      const workflow = this.store.get('SELECT w.id, a.sha256 AS sha FROM workflows w JOIN artifacts a ON a.id = w.snapshot_artifact_id WHERE w.id = ?', body.workflowId);
-      if (!workflow) throw new ApiError(404, 'not_found', 'Workflow not found.');
-      if (workflow.sha !== body.workflowSnapshotSha256) throw new ApiError(409, 'conflict', 'The saved workflow changed; request supervision for its current revision.');
+      if (!this.store.get('SELECT id FROM workflows WHERE id = ?', body.workflowId)) throw new ApiError(404, 'not_found', 'Workflow not found.');
+      // A grant names a definition that can run, so it must match an exact Runnable Published Version. The mutable Draft
+      // pointer is not an execution identity: an unpublished edit neither grants nor revokes supervision of a published version.
+      if (!this.store.get(`SELECT p.id FROM workflow_publications p JOIN artifacts a ON a.id = p.snapshot_artifact_id
+        WHERE p.workflow_id = ? AND a.sha256 = ? AND p.runnable = 1 LIMIT 1`, body.workflowId, body.workflowSnapshotSha256))
+        throw new ApiError(409, 'conflict', 'The supervised definition is not a Runnable Published Version of this workflow; publish it before requesting supervision.');
       if (!this.store.get('SELECT id FROM workspaces WHERE id = ?', body.workspaceId)) throw new ApiError(404, 'not_found', 'Workspace not found.');
       const grant = { schemaVersion: 1, kind: 'ControlGrant', controllerSessionId: body.controllerSessionId, workflowId: body.workflowId, workflowSnapshotSha256: body.workflowSnapshotSha256,
         workspaceId: body.workspaceId, clientProvider: body.clientProvider, clientVersion: body.clientVersion ?? null, requestedActions: body.requestedActions,
@@ -132,8 +142,8 @@ export function installSupervision(Engine, { ApiError }) {
     });
   };
 
-  // First-party only (enforced by the route table). Approval makes the grant available to one new run.
-  P.decideControlGrant = function decideControlGrant(grantId, body) {
+  // Public Owner Token authority makes the grant available to one new run.
+  P.decideControlGrant = function decideControlGrant(grantId, body, { hostAdmission = null } = {}) {
     contract('controlGrantDecision', body);
     return this.idempotent(`POST /control-grants/${grantId}/decision`, body.requestId, { grantId, ...body }, () => {
       const grant = this.grantRow(grantId);
@@ -152,18 +162,39 @@ export function installSupervision(Engine, { ApiError }) {
 
   P.getControlGrant = function getControlGrant(grantId) {
     const grant = this.grantRow(grantId);
+    const record = this.store.readJson(grant.grant_artifact_id);
+    const session = this.store.get('SELECT client_label FROM controller_sessions WHERE id = ?', grant.controller_session_id);
     return { grantId, state: grant.state, runId: grant.run_id, workflowId: grant.workflow_id, workspaceId: grant.workspace_id, controllerSessionId: grant.controller_session_id,
+      workflowSnapshotSha256: grant.workflow_snapshot_sha256, clientLabel: session?.client_label ?? null,
+      clientProvider: record.clientProvider, clientVersion: record.clientVersion, requestedActions: record.requestedActions,
       observationDeadlineMs: grant.observation_deadline_ms, escalationDeadlineMs: grant.escalation_deadline_ms, requestedAt: grant.requested_at, decidedAt: grant.decided_at, boundAt: grant.bound_at };
   };
 
-  // Called inside createRun, before the run's first dispatch: the observer is armed before any launch.
-  P.bindControlGrant = function bindControlGrant(grantId, { runId, workflowId, workspaceId, snapshotSha256, controllerToken = null }) {
+  P.listControlGrants = function listControlGrants({state = 'pending', limit = 50} = {}) {
+    if (!['pending', 'approved', 'active', 'denied', 'revoked', 'ended', 'all'].includes(state) || !Number.isInteger(limit) || limit < 1 || limit > 100)
+      throw new ApiError(400, 'invalid_request', 'Invalid control-grant list state or limit.');
+    const rows = state === 'all' ? this.store.all('SELECT id FROM control_grants ORDER BY requested_at DESC LIMIT ?', limit)
+      : this.store.all('SELECT id FROM control_grants WHERE state = ? ORDER BY requested_at DESC LIMIT ?', state, limit);
+    return {items: rows.map(row => this.getControlGrant(row.id)), nextCursor: null};
+  };
+
+  P.assertControlGrantForRun = function assertControlGrantForRun(grantId, {workflowId, workspaceId, snapshotSha256, controllerToken = null, approvedRequestId = null}) {
     const grant = this.grantRow(grantId);
     if (grant.state !== 'approved') throw new ApiError(409, 'conflict', `The control grant is ${grant.state}; only an approved, unused grant can start a supervised run.`);
-    if (grant.workflow_id !== workflowId || grant.workspace_id !== workspaceId) throw new ApiError(409, 'conflict', 'The control grant does not match this workflow and workspace.');
-    if (grant.workflow_snapshot_sha256 !== snapshotSha256) throw new ApiError(409, 'conflict', 'The control grant was approved for a different workflow revision.');
-    this.requireControllerCredential(controllerToken, grant.controller_session_id);
+    if (grant.workflow_id !== workflowId || grant.workspace_id !== workspaceId || grant.workflow_snapshot_sha256 !== snapshotSha256)
+      throw new ApiError(409, 'conflict', 'The control grant does not match this workflow snapshot and workspace.');
+    if (approvedRequestId) {
+      const proof = this.store.get('SELECT c.*, r.state FROM run_request_controls c JOIN external_run_requests r ON r.request_id = c.request_id WHERE c.request_id = ?', approvedRequestId);
+      if (!proof || proof.state !== 'pending' || proof.grant_id !== grantId || proof.controller_session_id !== grant.controller_session_id)
+        throw new ApiError(403, 'controller_credential_required', 'The pending run has no matching authenticated controller binding.');
+    } else this.requireControllerCredential(controllerToken, grant.controller_session_id);
     if (!this.supervisor) throw new ApiError(409, 'supervision_unavailable', 'This runtime has no Tauri supervisor, so it cannot start a supervised run.');
+    return grant;
+  };
+
+  // Called inside createRun, before the run's first dispatch: the observer is armed before any launch.
+  P.bindControlGrant = function bindControlGrant(grantId, { runId, workflowId, workspaceId, snapshotSha256, controllerToken = null, approvedRequestId = null }) {
+    const grant = this.assertControlGrantForRun(grantId, {workflowId, workspaceId, snapshotSha256, controllerToken, approvedRequestId});
     // The only arm is the awaited one below; a refusal reaches failArm instead of an unhandled rejection.
     const at = nowIso();
     // The run may not launch anything until the supervisor confirms the arm (pumpRun honours awaitingArm).
@@ -229,7 +260,7 @@ export function installSupervision(Engine, { ApiError }) {
     if (!this.stopRequests.has(runId)) void Promise.resolve().then(() => this.supervisor?.releaseRun?.(runId)).catch(() => {});
   };
 
-  // First-party only (route table). The supervisor confirms the new deadline before the runtime reports success, and the
+  // Public Owner Token authority may request a deadline extension. The supervisor confirms the new deadline before the runtime reports success, and the
   // extension is journaled with its request so a retry replays the same answer.
   P.extendEscalation = async function extendEscalation(runId, body) {
     contract('controlExtensionRequest', body);
@@ -326,17 +357,20 @@ export function installSupervision(Engine, { ApiError }) {
       const event = body.cursor ? this.store.get('SELECT timestamp FROM journal_events WHERE run_id = ? AND sequence = ?', runId, body.cursor) : null;
       const at = nowIso();
       const lagMs = event ? Date.parse(at) - Date.parse(event.timestamp) : null;
-      const grant = this.activeGrant(runId);
+      const grant = this.boundGrant(runId);
       if (grant) this.requireControllerCredential(controllerToken, grant.controller_session_id);
       this.store.run('INSERT INTO observation_acks(id, run_id, controller_session_id, cursor, event_timestamp, acknowledged_at, lag_ms) VALUES (?, ?, ?, ?, ?, ?, ?)',
         randomUUID(), runId, grant?.controller_session_id ?? null, body.cursor, event?.timestamp ?? null, at, lagMs);
-      const resumed = Boolean(grant?.paused_at);
-      if (grant) this.store.run('UPDATE control_grants SET last_ack_at = ?, ack_cursor = ?, paused_at = NULL WHERE id = ?', at, Math.max(grant.ack_cursor, body.cursor), grant.id);
+      const active = grant?.state === 'active';
+      const resumed = Boolean(active && grant.paused_at);
+      if (grant) this.store.run('UPDATE control_grants SET last_ack_at = ?, ack_cursor = ?, paused_at = ? WHERE id = ?', at, Math.max(grant.ack_cursor, body.cursor), active ? null : grant.paused_at, grant.id);
       return { status: 200, body: { runId, cursor: body.cursor, acknowledgedAt: at, lagMs, controlMode: grant ? 'supervised' : 'unsupervised', resumedDispatch: resumed } };
     }, () => {
-      if (this.activeGrant(runId)) void Promise.resolve().then(() => this.supervisor?.heartbeat?.(runId)).catch(() => { /* A missed heartbeat is logged by the supervisor. */ });
-      this.dispatchPaused.delete(runId);
-      queueMicrotask(() => this.pump());
+      if (this.activeGrant(runId)) {
+        void Promise.resolve().then(() => this.supervisor?.heartbeat?.(runId)).catch(() => { /* A missed heartbeat is logged by the supervisor. */ });
+        this.dispatchPaused.delete(runId);
+        queueMicrotask(() => this.pump());
+      }
     });
   };
 
@@ -400,8 +434,8 @@ export function installSupervision(Engine, { ApiError }) {
 
   P.runProcesses = function runProcesses(runId) {
     this.requireRun(runId);
-    return [...this.processes.entries()].filter(([, record]) => record.runId === runId).map(([attemptId, record]) => ({
-      attemptId, pid: record.child?.pid ?? null, launched: Boolean(record.launched), stopRequested: Boolean(record.stopRequested),
+    return [...this.processes.entries()].filter(([, record]) => record.runId === runId).map(([key, record]) => ({
+      attemptId: record.attemptId ?? key, pid: record.child?.pid ?? null, launched: Boolean(record.launched), stopRequested: Boolean(record.stopRequested),
       alive: record.child?.pid ? isAlive(record.child.pid) : false }));
   };
 
@@ -425,17 +459,34 @@ export function installSupervision(Engine, { ApiError }) {
   P.recordTerminationProof = async function recordTerminationProof(runId) {
     const request = this.stopRequests.get(runId) ?? { requestedAt: nowIso(), pids: [], observed: false };
     this.stopRequests.delete(runId);
-    const members = request.pids.map(({ attemptId, pid }) => ({ attemptId, pid, state: isAlive(pid) ? 'running' : 'exited' }));
-    const containment = await this.containmentFor(runId, request);
-    const ownedAttempts = request.pids.length;
-    let outcome, reason, proofContainment = containment.containment;
+    // A Host-owned CLI is in the Host's own Job, not in the run Job: the run Job proves only the members it owns, and each Host-owned tree is
+    // proven by its Host (processTreeEnded). A stop is recorded as stopped only when both proofs hold.
+    // Every Host-owned invocation of the run counts, not only the ones this Stop snapshot saw: an invocation admitted or launched after the snapshot
+    // is part of the run until its Host proves its tree ended.
+    // Only invocations whose hold is still held: a hold released on the Host's proof has already been proven ended.
+    const bound = this.store.all("SELECT b.attempt_id AS attemptId, b.custody_id AS custodyId FROM attempt_custody b JOIN custody_workspace_holds h ON h.custody_id = b.custody_id WHERE b.run_id = ? AND h.state = 'held'", runId);
+    const boundOnly = bound.filter(item => !request.pids.some(pid => pid.attemptId === item.attemptId));
+    const hostOwned = [...request.pids.filter(item => item.custodyId), ...boundOnly.map(item => ({ attemptId: item.attemptId, pid: null, custodyId: item.custodyId }))];
+    const members = [...request.pids.map(({ attemptId, pid }) => ({ attemptId, pid, state: isAlive(pid) ? 'running' : 'exited' })),
+      ...boundOnly.map(item => ({ attemptId: item.attemptId, pid: null, state: 'unknown' }))];
+    const jobOwned = request.pids.filter(item => !item.custodyId);
+    let jobProof;
+    try { jobProof = await this.runJobProof(runId, { ...request, pids: jobOwned }, jobOwned.length); }
+    catch (error) { jobProof = { containment: 'windows-job', confirmed: false, remainingMembers: null, reason: `The supervisor could not prove the run Job state: ${error.message}` }; }
+    const hostProof = await this.hostTreeProof(hostOwned);
+    const ownedAttempts = new Set([...request.pids.map(item => item.attemptId), ...hostOwned.map(item => item.attemptId)]).size;
+    const confirmed = jobProof.confirmed && hostProof.confirmed;
+    let outcome, reason, proofContainment = jobProof.containment;
+    // A stop that only Host-owned trees made is contained by the Host's Job (a Windows Job); it is not a stop with no containment.
+    if (confirmed && hostOwned.length) proofContainment = 'windows-job';
+    // A proof that did not confirm names no containment: the label says what was proven.
+    if (!confirmed) proofContainment = 'none';
     if (!request.observed) { outcome = 'termination_unconfirmed'; reason = 'This runtime instance did not observe the Stop request, so termination cannot be proven.'; proofContainment = 'none'; }
-    else if (!ownedAttempts) { outcome = 'stopped'; reason = 'No process was launched for this run, so no owned member can remain.'; proofContainment = 'none'; }
-    else if (containment.confirmed) { outcome = 'stopped'; reason = containment.reason; }
-    else { outcome = 'termination_unconfirmed'; reason = containment.reason; }
+    else if (confirmed) { outcome = 'stopped'; reason = [jobProof.reason, hostProof.reason].filter(Boolean).join(' ').slice(0, 1000); }
+    else { outcome = 'termination_unconfirmed'; reason = [jobProof.reason, hostProof.reason].filter(Boolean).join(' ').slice(0, 1000); }
     const proof = { schemaVersion: 1, kind: 'TerminationProof', runId, outcome, containment: proofContainment, controlMode: this.controlModeOf(runId),
       requestedAt: request.requestedAt, confirmedAt: outcome === 'stopped' ? nowIso() : null, ownedAttempts,
-      remainingMembers: containment.remainingMembers ?? (outcome === 'stopped' ? 0 : null), members, reason };
+      remainingMembers: hostProof.confirmed ? (jobProof.remainingMembers ?? (outcome === 'stopped' ? 0 : null)) : null, members, reason };
     assertValid('execution-evidence.schema.json', 'terminationProof', proof, 'Termination proof');
     const artifact = this.store.putJson(proof);
     this.store.transaction(() => {
@@ -447,6 +498,38 @@ export function installSupervision(Engine, { ApiError }) {
     // Only a confirmed stop drops the run Job; an unconfirmed one keeps it so kill-on-close still reaps the members.
     if (outcome === 'stopped') await Promise.resolve().then(() => this.supervisor?.releaseRun?.(runId)).catch(() => {});
     return proof;
+  };
+
+  // The run Job's proof. Without owned members it proves that the run Job has no member left (a run Job the supervisor never created has none);
+  // without any supervisor, nothing else can own a member and the proof is the runtime's own record.
+  P.runJobProof = async function runJobProof(runId, request, owned) {
+    if (owned) return this.containmentFor(runId, request);
+    if (!this.supervisor?.proveStopped) return { containment: 'none', confirmed: true, remainingMembers: 0, reason: 'The runtime owned no active process when Root Stop was requested; no owned member remains.' };
+    // With no owned member there is no launch set, so the proof never claims native containment (containment 'none'). The run Job is still asked:
+    // a member left in it (for example a grandchild of a finished command) keeps the Stop unconfirmed.
+    const probe = await this.supervisor.proveStopped(runId, []);
+    if (probe.remainingMembers === 0) return { containment: 'none', confirmed: true, remainingMembers: 0, reason: 'The runtime owned no active process when Root Stop was requested, and the run Job has no member left.' };
+    if (probe.remainingMembers !== null) return { containment: 'none', confirmed: false, remainingMembers: probe.remainingMembers, reason: probe.reason };
+    // The supervisor has no run Job for this run. That is a proof only when no process of this run was ever launched into a run Job; a run Job the
+    // supervisor has lost is not a proof, so the Stop stays unconfirmed.
+    const launched = this.store.get("SELECT 1 AS n FROM attempts a WHERE a.run_id = ? AND a.process_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM attempt_custody c WHERE c.attempt_id = a.id) LIMIT 1", runId);
+    // Nothing was launched, so nothing is claimed about native containment: the proof is the runtime's own record, as for an empty launch set.
+    if (!launched) return { containment: 'none', confirmed: true, remainingMembers: 0, reason: 'No process of this run was launched into a run Job, so no run Job member can remain.' };
+    return { containment: 'none', confirmed: false, remainingMembers: null, reason: 'The supervisor holds no run Job for this run, so nothing proves that its members stopped.' };
+  };
+
+  // Host-owned process trees are proven by their Host: the custody record reports processTreeEnded only when the Job is drained.
+  P.hostTreeProof = async function hostTreeProof(hostOwned) {
+    for (const item of hostOwned) {
+      let status = null;
+      try {
+        status = await this.custodyCall('custody.status', { custodyId: item.custodyId });
+        // An invocation admitted but never launched is withdrawn, so that the Host can no longer turn it into a process; its tree is then ended.
+        if (status?.state === 'admitted') status = await this.custodyCall('custody.cancel', { custodyId: item.custodyId });
+      } catch { status = null; }
+      if (status?.processTreeEnded !== true) return { confirmed: false, reason: `The Host has not proven that the process tree of attempt ${item.attemptId} ended.` };
+    }
+    return { confirmed: true, reason: hostOwned.length ? 'Every Host-owned process tree is proven ended by its Host.' : null };
   };
 
   P.containmentFor = async function containmentFor(runId, request) {
@@ -499,7 +582,7 @@ export function installSupervision(Engine, { ApiError }) {
     });
   };
 
-  P.triageIncident = function triageIncident(incidentId, body) {
+  P.triageIncident = function triageIncident(incidentId, body, { authority = 'external' } = {}) {
     contract('incidentTriageRequest', body);
     return this.idempotent(`POST /incidents/${incidentId}/triage`, body.requestId, { incidentId, ...body }, () => {
       const incident = this.store.get('SELECT * FROM incidents WHERE id = ?', incidentId);
@@ -508,7 +591,7 @@ export function installSupervision(Engine, { ApiError }) {
       const causeStatus = body.causeStatus ?? incident.cause_status;
       this.store.run('UPDATE incidents SET state = ?, cause_status = ?, updated_at = ? WHERE id = ?', state, causeStatus, nowIso(), incidentId);
       const kind = body.state === 'closed' ? 'closure' : body.causeStatus ? 'cause' : 'triage';
-      const seq = this.appendIncidentUpdate(incidentId, { kind, authority: 'first-party', body: { state, causeStatus, note: body.note ?? null } });
+      const seq = this.appendIncidentUpdate(incidentId, { kind, authority, body: { state, causeStatus, note: body.note ?? null } });
       return { status: 200, body: { incidentId, state, causeStatus, seq } };
     });
   };
@@ -665,16 +748,34 @@ export function installSupervision(Engine, { ApiError }) {
     for (const incident of this.store.all('SELECT * FROM incidents WHERE run_id = ?', row.id)) refs.set(incident.initial_artifact_id, null);
     for (const update of this.store.all('SELECT u.body_artifact_id FROM incident_updates u JOIN incidents i ON i.id = u.incident_id WHERE i.run_id = ?', row.id)) refs.set(update.body_artifact_id, null);
 
-    const omittedCategories = new Set();
+    const taskRecords = {
+      tasks: this.store.all('SELECT * FROM managed_tasks WHERE run_id=? ORDER BY created_at', row.id),
+      assessments: this.store.all('SELECT * FROM task_assessments WHERE assessment_run_id=? ORDER BY created_at', row.id),
+      plans: this.store.all('SELECT * FROM execution_plans WHERE execution_run_id=? ORDER BY created_at', row.id),
+      acceptance: this.store.all('SELECT * FROM acceptance_records WHERE run_id=? ORDER BY created_at', row.id),
+      deliveries: this.store.all('SELECT * FROM branch_deliveries WHERE run_id=? ORDER BY created_at', row.id),
+      operations: this.store.all('SELECT * FROM delivery_operations WHERE run_id=? ORDER BY updated_at', row.id),
+      work: this.store.all('SELECT w.* FROM task_work w JOIN managed_tasks t ON t.id=w.task_execution_id WHERE t.run_id=? ORDER BY w.started_at', row.id),
+      evidence: this.store.all('SELECT e.* FROM task_evidence e JOIN managed_tasks t ON t.id=e.task_execution_id WHERE t.run_id=? ORDER BY e.created_at', row.id),
+    };
+    if (taskRecords.tasks.length) {
+      for (const records of Object.values(taskRecords)) for (const record of records) for (const [key, id] of Object.entries(record)) if (key.endsWith('_artifact_id') && id) refs.set(id, null);
+      await write('tasks.json', canonicalBytes(taskRecords), 'evidence', terminal ? 'complete' : 'partial');
+    }
+
+    const omittedCategories = new Set(); let artifactGaps = false;
     for (const artifactId of refs.keys()) {
       const artifact = this.store.artifactRow(artifactId);
-      if (!artifact) { omissions.push({ category: `artifact ${artifactId}`, reason: 'The referenced object is missing from the store.' }); continue; }
+      if (!artifact) { artifactGaps = true; omissions.push({ category: `artifact ${artifactId}`, reason: 'The referenced object is missing from the store.' }); continue; }
+      if (refs.get(artifactId) && refs.get(artifactId) !== artifact.sha256) { artifactGaps = true; omissions.push({ category: `artifact ${artifactId}`, reason: 'The reference digest differs from the stored object identity.' }); continue; }
       if (profile === 'shareable' && artifact.media_type === 'application/octet-stream') { omittedCategories.add('raw-process-streams'); continue; }
       const path = `objects/${artifact.sha256}`;
       if (written.has(path)) continue;
       const source = join(this.store.storeDir, artifact.relative_path);
       // The stored object is verified and copied as a stream, so a large object never blocks the event loop.
-      if (await digestOfFile(source) !== artifact.sha256) { omissions.push({ category: `artifact ${artifactId}`, reason: 'The stored object failed its digest check and was not exported.' }); continue; }
+      if (await digestOfFile(source) !== artifact.sha256) { artifactGaps = true; omissions.push({ category: `artifact ${artifactId}`, reason: 'The stored object failed its digest check and was not exported.' }); continue; }
+      // Follow immutable JSON manifests transitively, including candidate files and check evidence.
+      if (artifact.media_type === 'application/json') collectRefs(this.store.readJson(artifactId), refs);
       await copyFile(source, join(directory, ...path.split('/')));
       members.push({ path, sha256: artifact.sha256, byteSize: artifact.byte_size, role: 'object', completeness: 'complete' });
       written.add(path);
@@ -690,9 +791,10 @@ export function installSupervision(Engine, { ApiError }) {
     const openStreams = this.store.get(`SELECT COUNT(*) AS n FROM (SELECT DISTINCT attempt_id, json_extract(envelope_json, '$.payload.stream') AS stream FROM journal_events
       WHERE run_id = ? AND event_type = 'attempt.log_chunk' AND sequence <= ?) c WHERE NOT EXISTS (SELECT 1 FROM journal_events e WHERE e.run_id = ? AND e.event_type = 'attempt.log_stream_closed'
       AND e.attempt_id = c.attempt_id AND json_extract(e.envelope_json, '$.payload.stream') = c.stream)`, row.id, pinned, row.id).n;
-    const verdict = terminal && openStreams === 0 ? 'complete' : 'partial';
+    const incompleteCaptures = this.store.get("SELECT COUNT(*) AS n FROM journal_events WHERE run_id=? AND sequence<=? AND event_type='attempt.log_stream_closed' AND json_extract(envelope_json,'$.payload.integrity')<>'complete'", row.id, pinned).n;
+    const verdict = terminal && openStreams === 0 && incompleteCaptures === 0 && !artifactGaps ? 'complete' : 'partial';
     const generatedAt = nowIso();
-    const verdictText = verdict === 'complete' ? 'complete' : `partial (${openStreams} open stream(s), run ${row.state})`;
+    const verdictText = verdict === 'complete' ? 'complete' : `partial (${openStreams} open stream(s), ${incompleteCaptures} incomplete capture(s), artifact gaps ${artifactGaps}, run ${row.state})`;
     await write('index.md', Buffer.from([`# Audit bundle ${exportId}`, '', `Run ${row.id}, state ${row.state}, pinned to journal sequence ${pinned}.`,
       `Profile: ${profile}. Verdict: ${verdictText}.`, `Journal events: ${journal.length}. Incidents: ${incidents.length}. Termination proofs: ${proofs.length}.`,
       '', 'Known omissions:', ...(omissions.length ? omissions.map(item => `- ${item.category}: ${item.reason}`) : ['- none']), ''].join('\n'), 'utf8'), 'index', 'complete');

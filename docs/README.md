@@ -1,8 +1,8 @@
 # Deszo Orchestrator Documentation
 
-Version: 0.17
-Status: confirmed requirements, verified ADR-0001, accepted ADR-0002, and staged proposed contracts
-Updated: 2026-10-16
+Version: 0.30
+Status: confirmed requirements, verified ADR-0001, accepted ADR-0002 through ADR-0005 and ADR-0006 Windows direction, proposed ADR-0006 through ADR-0009 and 2026-10-23 amendments, and staged contracts
+Updated: 2026-10-23
 
 Deszo is a personal Tauri/React/React Flow desktop application with an Orange-inspired node workspace. Milestones M1–M6 and the reference delivery pipeline are implemented. ADR-0001 external authoring passed its ordered acceptance campaign with the listed Windows Codex, Claude Code, and Antigravity versions.
 
@@ -16,12 +16,22 @@ Version 0.8 resolves [the third review](reviews/2026-10-13-third-review.md): M1'
 4. [Decision register](DECISIONS.md): confirmed requirements and proposal status.
 5. [Product specification](PRODUCT_SPEC.md) and [architecture](ARCHITECTURE.md): UX and component/data flow.
 6. [Project README](../README.md): current prototype commands and recorded checks.
-7. [Architecture decision records](adr/README.md): accepted external authoring and execution audit, supervision and incident reporting.
+7. [Architecture decision records](adr/README.md): accepted external authoring, audit/supervision, task assessment/workflow planning, agent communication/context contracts, and verified branch delivery.
 8. [Authoring bridge setup](authoring/README.md): generated client configuration and local setup for Codex, Claude Code, and Antigravity.
 9. [ADR-0001 implementation status](adr/0001-implementation-status.md): implemented code paths and remaining release evidence.
 10. [External authoring acceptance test plan](authoring/ACCEPTANCE_TEST_PLAN.md): ordered release gates, native compatibility probes, pilot rerun, policy/cutover checks, and installed-client acceptance.
 11. [Authoring acceptance report](pilots/2026-10-15-authoring-acceptance.md) and [migration note](authoring/MIGRATION_V3.md): executed G0–G5 results, supported versions/scopes, v2 retirement, and confirmation settings.
 12. [Accepted ADR-0002](adr/0002-execution-audit-and-supervised-control.md): complete available execution evidence, assistant control, verified root Stop, local bugs and audit export before the shadcn/ui pilot.
+13. [Accepted ADR-0003](adr/0003-task-assessment-and-workflow-planning.md): general development workflow, task assessment, explainable plan selection and comparative evaluation across task classes.
+14. [Accepted ADR-0004](adr/0004-agent-communication-and-context-contracts.md): structured results, controlled technical prose, context packages, feedback on changes and measured efficiency with full available audit.
+15. [Accepted ADR-0005](adr/0005-verified-feature-branch-delivery.md): exact candidate application, environment verification and verified commit evidence for a local feature branch.
+16. [Managed tasks](MANAGED_TASKS.md): executable `task-planning-v1` node, reference role bindings, engine dispatch, Context/evidence retrieval, shared limits, Stop/recovery and verified branch delivery.
+17. [Proposed ADR-0006](adr/0006-time-bounded-autonomy-and-application-lifecycle.md): restart-persistent approval and unattended lifecycle, with accepted Windows service/launcher direction, scoped authority/bootstrap, mutual IPC and recovery contracts.
+18. [ADR-0006 implementation status](adr/0006-implementation-status.md): documentation-only scope, branch context and mandatory Windows gates; [historical first review/addendum](reviews/2026-10-20-adr-0006-review.md), [second review](reviews/2026-10-20-adr-0006-second-review.md) and separate [S01–S04 resolution](reviews/2026-10-20-adr-0006-second-review-resolution.md).
+19. [Proposed ADR-0007](adr/0007-event-driven-judge-attention-and-compact-evidence.md): dedicated/interactive Judge ownership, ADR-0006 worker candidate and safety gates, deterministic stagnation versus budget checkpoints, actual-start deadlines and compact evidence; [final resolution](reviews/2026-10-21-adr-0007-second-review-resolution.md) and [unchanged reproducible baseline](reviews/evidence/2026-10-21-adr-0007-baseline.json).
+20. [Antigravity Stage 1 contract](authoring/JUDGE_STAGE1.md) and [implementation report](reviews/2026-10-21-antigravity-stage1-report.md): opt-in Engine/Bridge/Host component integration; native Judge launch, trusted registration and subscription proof remain blocked. No global activation or ADR acceptance.
+21. [Proposed ADR-0008](adr/0008-portable-ephemeral-lifecycle-host.md) and [ADR-0009](adr/0009-workflow-native-judge-and-exclusive-external-input.md): portable Lifecycle Host, linked continuation, workflow-native Judge and external-input proposals. [Engine continuation](reviews/2026-10-22-engine-native-continuation-implementation.md), [Rust Host Proof A](reviews/2026-10-22-rust-host-lifecycle-integration.md) and [Desktop Proof B](reviews/2026-10-23-desktop-host-proof-b.md) are separate implementation evidence.
+22. [2026-10-23 proposed amendment index](adr/README.md): Owner Token, Draft/Publication, protected System Self-Repair, invocation health, decision budgets and conditional Custody. Current accepted rules remain effective until explicit replacement decisions.
 
 ## Rule ownership and precedence
 
@@ -44,12 +54,20 @@ Confirmed user requirements in [DECISIONS.md](DECISIONS.md) take precedence over
 | ADR-0001 code delivery and outstanding verification | [ADR-0001 implementation status](adr/0001-implementation-status.md) |
 | ADR-0001 verification sequence and evidence requirements | [Acceptance test plan](authoring/ACCEPTANCE_TEST_PLAN.md) |
 | Accepted audit/supervision/incident architecture; current runtime behavior stays unchanged until implementation | [ADR-0002](adr/0002-execution-audit-and-supervised-control.md) |
+| Managed task node/configuration, compiler and run-level contracts | [Managed tasks](MANAGED_TASKS.md) |
+| Proposed autonomous session and accepted Windows direction: trusted authority, scoped bootstrap, IPC, lifecycle and recovery | [ADR-0006](adr/0006-time-bounded-autonomy-and-application-lifecycle.md) |
+| Proposed event-driven Judge attention, delivery, decision waiting and compact evidence | [ADR-0007](adr/0007-event-driven-judge-attention-and-compact-evidence.md) |
+| Proposed portable Lifecycle Host, protected System Self-Repair and continuation | [ADR-0008](adr/0008-portable-ephemeral-lifecycle-host.md) |
+| Proposed workflow-native Judge, external-input and decision-authority amendment | [ADR-0009](adr/0009-workflow-native-judge-and-exclusive-external-input.md) |
+| Status of 2026-10-23 Owner Token, Publication, monitoring, arbiter, Stage 1B and Custody proposals | [Decision register](DECISIONS.md#proposed-resolutions) and [ADR index](adr/README.md) |
 
 Product specification describes interactions; architecture describes components. [Proposed baseline](PROPOSED_BASELINE.md) preserves Q01–Q22 navigation without duplicating rules. [Open questions](OPEN_QUESTIONS.md) redirects to the decision register and staged contract prerequisites.
 
 Edit a rule in its home and update affected examples/schemas/links. Do not copy its full wording into four other documents.
 
 ## Schemas and examples
+
+Managed task execution: [task schema](schemas/managed-task.schema.json), [reference workflow](examples/managed-task/workflow.json), [migration 11](storage/m11.sql), and [execution contract](MANAGED_TASKS.md). The engine advertises `task-planning-v1` through API v3; no existing workflow is rewritten.
 
 M1: [application settings](schemas/application-settings.schema.json), [workflow](schemas/workflow.schema.json), [values](schemas/value.schema.json), [attempt manifests](schemas/attempt-record.schema.json), [journal](schemas/journal-event.schema.json), [API definitions](schemas/runtime-api.schema.json), [reference SQL](storage/m1.sql), and [Context-chain fixture](examples/m1-context-chain/workflow.json).
 
@@ -73,6 +91,17 @@ ADR-0001 is implemented and verified within its documented Windows support bound
 
 | Date | Version | Change |
 | --- | --- | --- |
+| 2026-10-21 | 0.28 | Refined proposed ADR-0007 after the second review: dedicated/interactive ownership and takeover, confirmed-start delivery deadline, policy-specific quiesce, separate budget checkpoints, concurrent/unknown-turn safety and performance invariants; baseline unchanged, documentation only |
+| 2026-10-21 | 0.27 | Incorporated ADR7-R01–R05: existing-worker delivery candidate, registered-session/tool/concurrency/budget gates, deterministic no-progress triggers, exact baseline evidence, deadline outcomes and incremental latency bounds; ADR-0007 remains Proposed, documentation only |
+| 2026-10-21 | 0.26 | Added D29/P30 and proposed ADR-0007 for event-driven external Judge attention, verified delivery, bounded decision waits and compact evidence with full audit retention; documentation only |
+| 2026-10-20 | 0.25 | Refined ADR6-S01–S04: protected decision-bound user verification/key enrollment, service-owned fail-stop and last-handle gate, initial post-reboot dispatch block, retained task budgets and separate resolution history; runtime mechanisms remain unverified and complete ADR-0006 Proposed, documentation only |
+| 2026-10-20 | 0.24 | Incorporated ADR6-R01–R06 and Windows trust/recovery contracts: accepted narrow D28/P29 service/launcher direction, independent authority, scoped bootstrap, protected TCB, IPC/native ownership, worker limits, compatible rollback/UI and mandatory negative tests; added status and historical review addendum, documentation only |
+| 2026-10-20 | 0.23 | Added proposed ADR-0006 and D26–D27/P28 for restart-persistent time-bounded automatic operational approval, independent application lifecycle control and unattended development continuation in the ADR-0003–0005 completion branch; documentation only |
+| 2026-10-16 | 0.22 | Wired managed tasks into the ordinary engine lifecycle: assessment/plans, isolated role Contexts, evidence retrieval, bounded repair, acceptance resolver, contained Git/check children, durable delivery reconciliation, UI/MCP inspection and offline reference closure; real-provider evaluation remains separate |
+| 2026-10-16 | 0.21 | Implemented ADR-0003, ADR-0004, and ADR-0005 through Stage 3: task assessment, source-derived floors, candidate-time floor checks, structured results, deterministic context packages, fingerprint v2 invalidation, REVIEW_INCOMPLETE loop rules, criterion-to-evidence acceptance, isolated separate-clone branch delivery, environment smoke and verified READY_FOR_MERGE commits; migration m9 and schemas added |
+| 2026-10-16 | 0.20 | Resolved review findings for ADR-0003–0005: source-derived risk floors, lifecycle linkage, evaluation cost estimate, mid-run request-and-resume context, package determinism/invalidation, REVIEW_INCOMPLETE loop rules, separate-clone delivery model, aggregate delivery budget linkage, and pilot branch base clarity; documentation only |
+| 2026-10-16 | 0.19 | Refined ADR-0003/ADR-0004 with acceptance independence, deterministic selection, typed criterion evidence, incomplete review and baseline-first experiments; added D25/P27 and proposed ADR-0005 for verified local branch delivery; documentation only |
+| 2026-10-16 | 0.18 | Added D23–D24 and proposed ADR-0003/ADR-0004 for general workflow planning/evaluation and agent communication/context contracts; no runtime, schema, saved-workflow or provider changes |
 | 2026-10-16 | 0.17 | Accepted ADR-0002 after the second review; recorded P24 and Stage 1/2 contract requirements; no implementation or pilot execution |
 | 2026-10-16 | 0.16 | Added D20–D22 and proposed ADR-0002 for execution audit, supervised control, verified root Stop, local incidents and audit bundles; no new runtime behavior or pilot execution |
 | 2026-10-15 | 0.15 | Completed ADR-0001 G0–G5 for listed Windows clients/scopes, verified native isolation and the real-provider pilot, enabled default confirmation, retired v2 saves, and published migration and installed-client evidence |

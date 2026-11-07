@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "evidence": "failed-b",
+  "capturedAt": "2026-11-02T12:38:12.565Z",
+  "node": "v22.20.0",
+  "platform": "win32 x64",
+  "operationId": "a69a08be-30dc-429e-8281-5443e384c1ea",
+  "packageSha256": "934f48b227e04da5b64c378a4d514ce6c0cd151dadd50c439996571f1188c1e9",
+  "selector": {
+    "buildId": "engine-a",
+    "committedOperationId": null
+  },
+  "operation": {
+    "phase": "rolled_back",
+    "fallbackAttempted": true
+  },
+  "launches": [
+    "engine-a",
+    "engine-b",
+    "engine-a"
+  ],
+  "restoredBuildId": "engine-a",
+  "hostSha256": {
+    "before": "c7015bf60ec67628c29d7ec290507e6588c5a4e282f8334df07468e463287ac2",
+    "after": "c7015bf60ec67628c29d7ec290507e6588c5a4e282f8334df07468e463287ac2"
+  }
+}

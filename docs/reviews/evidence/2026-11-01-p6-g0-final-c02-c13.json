@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "evidence": "c02-c13",
+  "capturedAt": "2026-11-02T12:00:16.488Z",
+  "node": "v22.20.0",
+  "platform": "win32 x64",
+  "operationId": "5e4acf79-7283-41fc-96ec-e7b0d016bf62",
+  "packageSha256": "fdc36fe943c07d52dac8f9daf953b498188b9249fbb406b934b1fbf8747c64ee",
+  "crash": {
+    "point": "mid_stage_copy",
+    "partialFiles": 1,
+    "packageFiles": 722,
+    "durablePhase": "staging"
+  },
+  "restart": {
+    "committedCount": 1,
+    "selector": {
+      "buildId": "engine-b",
+      "committedOperationId": "5e4acf79-7283-41fc-96ec-e7b0d016bf62"
+    }
+  },
+  "retry": {
+    "status": 200,
+    "duplicate": true,
+    "committed": true,
+    "phase": "verified",
+    "launchesAdded": 0,
+    "commitsAdded": 0
+  },
+  "admissionOpenAfterRetry": true,
+  "hostSha256": {
+    "before": "c7015bf60ec67628c29d7ec290507e6588c5a4e282f8334df07468e463287ac2",
+    "after": "c7015bf60ec67628c29d7ec290507e6588c5a4e282f8334df07468e463287ac2"
+  }
+}

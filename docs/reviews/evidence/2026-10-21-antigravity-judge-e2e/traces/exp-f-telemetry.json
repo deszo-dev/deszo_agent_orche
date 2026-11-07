@@ -1,0 +1,13 @@
+{
+  "turns_executed": 6,
+  "total_duration_seconds": "199.66",
+  "token_accounting": {
+    "total_input_tokens": 475283,
+    "total_output_tokens": 48912,
+    "total_thinking_tokens": 40262,
+    "total_tokens_consumed": 524195
+  },
+  "metered_cloud_cost_usd": "0.00",
+  "billing_mechanism": "Google account subscription allowance (authMethod=consumer, quotaProject=none)",
+  "status": "PASS"
+}

@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-27T05:10:13.8526336Z",
+  "repository": "deszo_agent_orche",
+  "purpose": "P2-E2E-06 D25 real Engine A-to-B Parent Stop callback-loss recovery candidate",
+  "branch": "codex/adr-0003-0005-completion",
+  "baseCommit": "abb7295e6339912b5be16fc4db2a8e244e0c1bfc",
+  "workingTree": {
+    "dirty": true,
+    "stagedChanges": false,
+    "observedStatus": [
+      " M docs/schemas/journal-event-v2.schema.json",
+      " M docs/schemas/runtime-api-v2.schema.json",
+      " M mcp/bridge.mjs",
+      " M runtime/core/custody.mjs",
+      " M runtime/core/engine.mjs",
+      " M runtime/core/linkedRepair.mjs",
+      " M runtime/core/mapRuntime.mjs",
+      " M runtime/core/migrations.mjs",
+      " M runtime/core/schemas.mjs",
+      " M runtime/core/store.mjs",
+      " M runtime/core/taskProcesses.mjs",
+      " M runtime/core/taskRuntime.mjs",
+      " M runtime/runner.mjs",
+      " M runtime/tests/amd19-authorization.test.mjs",
+      " M runtime/tests/custody-support.mjs",
+      " M runtime/tests/custody-terminal-settlement.test.mjs",
+      " M runtime/tests/custody-unresolved.test.mjs",
+      " M runtime/tests/fixtures/custody-cli.rs",
+      " M runtime/tests/integrity.test.mjs",
+      " M runtime/tests/loops.test.mjs",
+      " M runtime/tests/map.test.mjs",
+      " M runtime/tests/p2-migration.test.mjs",
+      " M runtime/tests/parent-repair-coordination.test.mjs",
+      " M runtime/tests/parent-repair-custody-e2e.test.mjs",
+      " M runtime/tests/workflow-continuation-negative.test.mjs",
+      " M runtime/tests/workflow-p1-continuation.test.mjs",
+      "?? docs/reviews/evidence/2026-10-27-p2-d25-engine-replacement.json",
+      "?? docs/reviews/evidence/2026-10-27-p2-d25-source-manifest.json",
+      "?? docs/reviews/evidence/2026-10-27-p3-typed-failure-outcomes-source-manifest.json",
+      "?? docs/schemas/failure-outcome.schema.json",
+      "?? docs/storage/m20.sql",
+      "?? runtime/core/failureOutcomes.mjs",
+      "?? runtime/tests/failure-outcomes.test.mjs",
+      "?? runtime/tests/fixtures/p2-d25-stop-commit-barrier.mjs"
+    ]
+  },
+  "hashAlgorithm": "SHA-256",
+  "manifestExcludesItself": true,
+  "reportAndEvidenceExcludedToAvoidCircularHashes": true,
+  "files": [
+    {
+      "path": "docs/schemas/failure-outcome.schema.json",
+      "role": "pending-contract-input",
+      "sha256": "99489e9072c05acb0c09fc809a30a62a5f1fd77a841073bda9b0407be6285173"
+    },
+    {
+      "path": "docs/schemas/journal-event-v2.schema.json",
+      "role": "pending-contract-input",
+      "sha256": "06635035ad443e2ccf7504b76015e0e7730e4cdc9bd243541c582eed3e0d65c0"
+    },
+    {
+      "path": "docs/schemas/runtime-api-v2.schema.json",
+      "role": "pending-contract-input",
+      "sha256": "54bf8f1d330b56de5bdcd7ffe3cce4ec2fcbd7fbf7d6532ac91c97651a06a11a"
+    },
+    {
+      "path": "docs/storage/m20.sql",
+      "role": "pending-migration-input",
+      "sha256": "cc7dc2941e7ce3e28a029232369ea6b36e10810e31ec1149ed5acc13a2474d66"
+    },
+    {
+      "path": "mcp/bridge.mjs",
+      "role": "pending-runtime-input",
+      "sha256": "17904de7058163ca5df0b6c698570d41258fe888067b7729204b6eecc0be7606"
+    },
+    {
+      "path": "runtime/core/custody.mjs",
+      "role": "production",
+      "sha256": "ffc0c15fa58eff81c0b6358cc932ab8aa89272bbf503f93dcd2d9bf0bea2fe20"
+    },
+    {
+      "path": "runtime/core/engine.mjs",
+      "role": "production",
+      "sha256": "b5cf42ecd997a621dede340fc43103b43f70bf3bec01e72eda1097f5dc4f34fb"
+    },
+    {
+      "path": "runtime/core/failureOutcomes.mjs",
+      "role": "pending-production-input",
+      "sha256": "c4fbd838ebc168f6335a72cee5a6a3a822c87cf22f249ae4a9fecb97db569ffc"
+    },
+    {
+      "path": "runtime/core/linkedRepair.mjs",
+      "role": "production",
+      "sha256": "5274151be8c4f79e0a889f27463d67e1d8caf77ce05cb0661e302dfe4d13713a"
+    },
+    {
+      "path": "runtime/core/migrations.mjs",
+      "role": "pending-production-input",
+      "sha256": "709de5d9c11c7e10b383b6fbc3f097df16146bda802f94caa2e6b5be4a5ea115"
+    },
+    {
+      "path": "runtime/core/schemas.mjs",
+      "role": "pending-production-input",
+      "sha256": "a8e6e3fb816b6be6b6198115becc1799743895bbe8709c309c794e7f71bc39e6"
+    },
+    {
+      "path": "runtime/core/supervision.mjs",
+      "role": "production",
+      "sha256": "09eb5ba4593cb2da930d8a23964ecec869d18bd113845efd188d108a5e2a4874"
+    },
+    {
+      "path": "runtime/runner.mjs",
+      "role": "pending-production-input",
+      "sha256": "2af9dcec4d70a879b9f342f23b3c764d7bfbd67b737ab31814507614549bf70c"
+    },
+    {
+      "path": "runtime/tests/custody-support.mjs",
+      "role": "test-support",
+      "sha256": "ef26244ee2c9e13c0739adc9ed4c0011bcbd644417df8a85c2c509a453e1ac36"
+    },
+    {
+      "path": "runtime/tests/fixtures/custody-cli.rs",
+      "role": "host-backed-fixture",
+      "sha256": "5c282bccee9d91c8089fb6a3d4f1292173a8679cf8ee49b536b50a8eb5cb133f"
+    },
+    {
+      "path": "runtime/tests/fixtures/p2-d25-stop-commit-barrier.mjs",
+      "role": "test-only-crash-barrier",
+      "sha256": "3d8aa49afcde0e63cba420a535040297c24a2803dc48c14c12b6a007093b1849"
+    },
+    {
+      "path": "runtime/tests/p2-migration.test.mjs",
+      "role": "focused-regression-input",
+      "sha256": "50f4864feca2cba5f709d516efdad139ccea0556ca6190c8dc20f4b2ad8c09aa"
+    },
+    {
+      "path": "runtime/tests/parent-repair-coordination.test.mjs",
+      "role": "focused-regression-input",
+      "sha256": "78bb43b124c6c19fa538b3c8a20042130a24ef4ce64f9f391b1b8d0251a703ca"
+    },
+    {
+      "path": "runtime/tests/parent-repair-custody-e2e.test.mjs",
+      "role": "host-backed-e2e-test",
+      "sha256": "f1a4919fb8788a53d2885b1fec50d76611df35264673735a3d3addbcbddf287c"
+    },
+    {
+      "path": "lifecycle-host/Cargo.toml",
+      "role": "host-build-input",
+      "sha256": "fff566d1e49b98d87183353ec664749a43e790b8c6234fdfd46da1d72af41ea2"
+    },
+    {
+      "path": "lifecycle-host/src/custody.rs",
+      "role": "host-process-tree-proof",
+      "sha256": "4ee05b852278cc2021b0efce15b33e1542255fbc94f0cbb28f0e2b60e0267d27"
+    }
+  ]
+}

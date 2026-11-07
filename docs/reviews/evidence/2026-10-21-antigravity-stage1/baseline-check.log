@@ -1,0 +1,17 @@
+{
+  "status": "verified",
+  "runId": "bed47786-bb0b-4550-add6-ec83a64af8ba",
+  "frontier": 781,
+  "legacyAttentionIntervalMs": 180000,
+  "metrics": {
+    "journalEvents": 781,
+    "logEvents": 689,
+    "semanticAndLifecycleEvents": 92,
+    "logEventPercent": 88.2,
+    "capturedStdoutBytes": 1651551,
+    "capturedNormalizedBytes": 162565,
+    "savedObservationBatches": 21
+  },
+  "originalObservationFilesVerified": false,
+  "judgeTokenUsage": null
+}

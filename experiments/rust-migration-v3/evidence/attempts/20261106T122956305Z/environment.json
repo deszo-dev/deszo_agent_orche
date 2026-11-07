@@ -1,0 +1,24 @@
+{
+  "os": {
+    "version": "10.0.26300.0",
+    "edition": "Windows 10 Home Single Language",
+    "build": "26300.9711",
+    "display_version": "26H2"
+  },
+  "toolchain": {
+    "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "active_toolchain": "stable-x86_64-pc-windows-msvc (default)",
+    "target": "x86_64-pc-windows-msvc"
+  },
+  "machine": {
+    "processor": "Intel64 Family 6 Model 142 Stepping 12, GenuineIntel",
+    "architecture": "AMD64"
+  },
+  "repository": {
+    "branch": "codex/adr-0003-0005-completion",
+    "head": "1f54c47fe265c6b47bf36695be56214056fc3af1",
+    "dirty_paths_at_snapshot": 1066,
+    "experiment_source_sha256": "d3e1a75d3f1ba166dacf21ba2626d4498425b9e9ad2cb94af1534def18cdf796"
+  }
+}

@@ -1,0 +1,210 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-26T13:39:02.881Z",
+  "candidate": {
+    "head": "4165707f2099006af41c4f0d32170f613abde7fb",
+    "branch": "codex/adr-0003-0005-completion",
+    "state": "uncommitted working-tree candidate"
+  },
+  "sourceManifest": {
+    "path": "docs/reviews/evidence/2026-10-26-p1.5-recovery-coverage-source-manifest.json",
+    "sha256": "6ddfd2e65b59af7ccaf69320ef65b8f516ae171028d6c798a44ccd7e1f375f0b"
+  },
+  "confirmedCorrections": [
+    {
+      "source": "runtime/core/engine.mjs",
+      "behavior": "Queued Runs now apply the unsupported Loop/Map/Task exclusion through restartGatesPass.",
+      "testFirstEvidence": "P1C-07 Loop, Map, and Managed Task cases initially recovered as running; all three are interrupted after the correction."
+    },
+    {
+      "source": "runtime/core/engine.mjs",
+      "behavior": "Active Custody reattachment now requires the same restartGatesPass checks as queued and ordinary continuation.",
+      "testFirstEvidence": "P1C-12 active supervised Custody and P1C-13 active Custody in a Loop workflow initially reattached; both are interrupted and stopped through the Host after the correction."
+    }
+  ],
+  "coverage": {
+    "cases": {
+      "P1C-01": "Queued supervised Run interrupted; existing grant ended; no duplicate Attempt or provider invocation.",
+      "P1C-02": "Queued chat Run interrupted as chat; no duplicate request or assistant invocation.",
+      "P1C-03": "Host-bound replacement interrupted; stale Host ownership was not accepted.",
+      "P1C-04": "recoveryBlocked prevented continuation and dependent dispatch; a clean later startup cleared the startup block but did not reopen the Run. Survivor evidence is supplied at the recoverSurvivors boundary.",
+      "P1C-05": "Persisted history converted to schema-valid journal v1 envelopes; sequence, canonical JSON, SHA-256, byte size, and Engine B appended events validated; accepted records preserved and dependent Attempt not dispatched.",
+      "P1C-06": "Real persisted running-to-draining failure transition; ready C remained behind the workspace lock and stayed waiting after Engine B applied draining-to-waiting_for_user; no downstream dispatch; Host tree proof and hold release verified.",
+      "P1C-07": "Queued Loop, Map, and Managed Task Runs remained excluded and dispatched no providers.",
+      "P1C-08/P1C-11": "A-to-B-to-C side-effect workflow across two real Engine replacements; A external counter, each provider launch, and each settlement equal one; B identity/PID and Host record retained; C started after B; F3 tree proof and hold release verified.",
+      "P1C-10/P1-04": "Real Rust Host-owned B completed while Engine A was absent; Engine A exit explicitly observed first; original Attempt reused, stdout/stderr spool bytes replayed exactly, B/C settled once, F3 proof and safe hold release verified.",
+      "P1C-12": "Active supervised Custody with active grant stopped through Host; Run interrupted, grant ended, no Attempt replacement or relaunch.",
+      "P1C-13": "Active Custody in workflow containing Loop stopped through Host; Run interrupted; Loop not started and no Attempt recreated."
+    },
+    "generatedFixtureEvidence": {
+      "schemaVersion": 1,
+      "generatedAt": "2026-10-26T13:33:10.118Z",
+      "cases": {
+        "P1C-05": {
+          "runId": "2e79da37-55a8-4e46-9fa5-b070d7b4a7ed",
+          "publishedVersionId": "4ffef955-e3f4-4d56-8e35-40821f3ac9ca",
+          "journalVersion": 1,
+          "acceptedAttemptId": "83255cc9-9c7e-4463-9434-6340399fcdee",
+          "dependentAttemptId": "3c7b3706-5696-465a-a93f-cce13445bb64",
+          "sideEffectLines": 1,
+          "finalRunState": "interrupted",
+          "historicalEventsPreserved": 26,
+          "v2EventsDropped": [
+            "attempt.log_stream_closed",
+            "run.planned"
+          ]
+        },
+        "P1C-06": {
+          "runId": "f3a424e8-f12d-439b-9acf-f926e276d83c",
+          "engineA": "e075c633-240f-40f4-a516-2d21dcda3cf5",
+          "engineB": "cebfe2a0-ecf4-4684-a7a3-eb4f676e27fe",
+          "hostPid": 33244,
+          "acceptedAttemptId": "ff2d2125-1011-4ec1-abc2-bed36321d794",
+          "failedAttemptId": "a1ac7a7d-f53c-45a7-9ddc-88c677561a54",
+          "failedProcessId": 22024,
+          "drainingEventSequence": 44,
+          "cAttemptId": "5b50be9c-beb5-4363-8573-dc9dcba56240",
+          "cWaitingBehindLockBeforeFailure": true,
+          "acceptedOutputArtifactId": "a45ae703-2b54-4494-94dc-58dba3e56967",
+          "downstreamDispatches": 0,
+          "processTreeEnded": true,
+          "workspaceHold": "released",
+          "finalRunState": "waiting_for_user"
+        },
+        "P1C-08/P1C-11": {
+          "runId": "c4fb6e1d-e57f-41fd-a80a-7a72b4f15301",
+          "publishedVersionId": "29acb6d2-b87e-470b-bdbf-bb52b800e728",
+          "engineA": 27404,
+          "engineB": 27160,
+          "engineC": 21296,
+          "hostPid": 26388,
+          "sideEffectNode": "a",
+          "sideEffectAttemptId": "19c90584-fc11-4847-be7a-b6b4c48685d4",
+          "sideEffectCounter": 1,
+          "custodyAttemptId": "4311141b-cbbd-4ee0-854c-4891866812bb",
+          "custodyId": "f9cb5b5d-8ba9-4ff7-9529-7411faf98a33",
+          "providerLaunches": {
+            "a": 1,
+            "b": 1,
+            "c": 1
+          },
+          "settlements": {
+            "a": 1,
+            "b": 1,
+            "c": 1
+          },
+          "recoveryPasses": 2,
+          "downstreamCStartedAfterB": true,
+          "treeProof": true,
+          "hold": "released",
+          "finalRunState": "succeeded"
+        }
+      }
+    }
+  },
+  "verification": {
+    "focusedBeforeFinalP1_04Assertion": {
+      "command": "node --disable-warning=ExperimentalWarning --test --test-concurrency=1 runtime/tests/workflow-p1-recovery-boundaries.test.mjs runtime/tests/workflow-p1-coverage-closure.test.mjs runtime/tests/workflow-p1-continuation.test.mjs runtime/tests/workflow-p1-published-and-ordinary.test.mjs runtime/tests/linked-repair-isolation.test.mjs",
+      "total": 35,
+      "passed": 35,
+      "failed": 0,
+      "exitCode": 0
+    },
+    "finalP1_04Targeted": {
+      "command": "node --disable-warning=ExperimentalWarning --test --test-concurrency=1 --test-name-pattern=\"P1-04\" runtime/tests/workflow-p1-continuation.test.mjs",
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "exitCode": 0
+    },
+    "npmTest": {
+      "command": "npm test",
+      "topLevelTests": 806,
+      "totalTests": 815,
+      "passed": 815,
+      "failed": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "exitCode": 0,
+      "durationMs": 3665274.0296
+    },
+    "cargoTest": {
+      "command": "cargo test --manifest-path lifecycle-host/Cargo.toml",
+      "passed": 23,
+      "failed": 0,
+      "exitCode": 0
+    },
+    "docsCheck": {
+      "command": "npm run docs:check",
+      "exitCode": 0,
+      "errors": 0,
+      "schemas": 31,
+      "positiveSchemaCases": 141,
+      "negativeSchemaCases": 82,
+      "negativeSemanticCases": 42,
+      "markdownFiles": 136,
+      "localLinks": 1242,
+      "mermaidDiagrams": 15,
+      "jsonFences": 8,
+      "sections": 14,
+      "tasks": 5,
+      "decisionCases": 50,
+      "sqlTables": 13,
+      "sqlCases": 67,
+      "strictJsonRejections": 2
+    },
+    "build": {
+      "command": "npm run build",
+      "exitCode": 0,
+      "viteVersion": "6.4.4",
+      "modulesTransformed": 1763,
+      "advisory": "Main minified JavaScript chunk exceeds 500 kB; build succeeded."
+    },
+    "diffCheck": {
+      "command": "git diff --check",
+      "exitCode": 0,
+      "warnings": "LF-to-CRLF working-copy notices only."
+    }
+  },
+  "independentReview": {
+    "firstPassFindings": [
+      {
+        "severity": "High",
+        "finding": "Active Custody recovery bypassed restart eligibility gates.",
+        "disposition": "Fixed and covered by P1C-12/P1C-13."
+      },
+      {
+        "severity": "Medium",
+        "finding": "P1C-06 did not persist draining or establish C readiness.",
+        "disposition": "Fixed; production transition is persisted while C is lock-blocked."
+      },
+      {
+        "severity": "Medium",
+        "finding": "P1C-05 changed metadata without v1-shaped journal events.",
+        "disposition": "Fixed; persisted schema-valid v1 envelopes and hashes are verified."
+      },
+      {
+        "severity": "Low",
+        "finding": "P1-04 did not explicitly assert Engine A exited before B completed.",
+        "disposition": "Fixed in P1-04 itself; final reviewer confirmed the assertion."
+      },
+      {
+        "severity": "Low",
+        "finding": "Recovery-boundary tests lacked test-level deadlines.",
+        "disposition": "Fixed with bounded test timeouts."
+      }
+    ],
+    "followUp": "After focused verification, the reviewer confirmed the prior High and Medium findings resolved and found no remaining Critical, High, or contract-breaking Medium issue. The final P1-04 assertion was separately confirmed. Reviewers made no edits and ran no tests."
+  },
+  "historicalRealCodexProof": {
+    "rerun": false,
+    "reference": "docs/reviews/evidence/2026-10-26-p1-codex-continuation-real.json",
+    "note": "Historical P1 evidence remains unchanged; P1.5 makes no new live Codex claim."
+  },
+  "limitations": [
+    "P1C-04 uses a deterministic recoverSurvivors test seam, not a real unkillable process.",
+    "P1C-06 pauses final Run settlement after the real draining transition; its Host-owned failure process has already ended at Engine replacement. Active Host reattachment and completion while Engine is absent are separately covered by P1-01/P1C-11 and P1-04/P1C-10.",
+    "The previously documented unknown-process window between OS spawn and durable identity remains unresolved and outside P1.5."
+  ]
+}

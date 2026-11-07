@@ -8,6 +8,17 @@ if (scenario.startsWith('antigravity-')) {
   // A later text turn whose CLI result still carries an earlier turn's structured output.
   const conversation_id = `stream-${randomUUID()}`;
   line({ event: 'init', init: { conversation_id } });
+  if (scenario.startsWith('antigravity-finish-')) {
+    const rejected = { outcome: 'READY_FOR_REVIEW', issueSummary: null, attemptedApproaches: null };
+    if (scenario !== 'antigravity-finish-invalid-result') {
+      line({ event: 'step_update', step_update: { step_index: 2, step_type: 'tool', state: 'ERROR', tool_name: 'finish',
+        tool_info: { error: { type: 'TOOL_ERROR', message: "invalid arguments:\n- at '/attemptedApproaches': got null, want array\n- at '/issueSummary': got null, want string" } } } });
+    }
+    if (scenario === 'antigravity-finish-timeout') { await new Promise(done => setTimeout(done, 60_000)); process.exit(1); }
+    const result = scenario === 'antigravity-finish-invalid-result' ? rejected : { outcome: 'READY_FOR_REVIEW', issueSummary: '', attemptedApproaches: [] };
+    line({ event: 'result', result: { conversation_id, status: 'SUCCESS', response: JSON.stringify(result), structured_output: result } });
+    process.exit(0);
+  }
   const response = scenario === 'antigravity-json-current' ? '{"message":"CURRENT"}' : 'ORBIT\n';
   line({ event: 'result', result: { conversation_id, status: 'SUCCESS', response, structured_output: { message: 'STALE FROM PREVIOUS TURN' } } });
   process.exit(0);

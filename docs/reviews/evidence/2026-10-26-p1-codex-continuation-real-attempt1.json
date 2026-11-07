@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-26T07:57:40.842Z",
+  "verdict": "P1 NOT VERIFIED",
+  "model": "gpt-6-luna",
+  "provider": {
+    "cliPath": "C:\\Users\\jusse\\AppData\\Local\\OpenAI\\Codex\\bin\\2993767bd1dfb009\\codex.exe",
+    "cliVersion": "codex-cli 0.164.0-alpha.11.1",
+    "executableSha256": "1103e9e09c71fa2cd0afd6d8f3b9a2d63174fe8efd7cb5bd09f1cb14ef58a098"
+  },
+  "host": {
+    "pid": 32964,
+    "executableSha256": "671835698a0d24c9dc739aef742fc0173d04beb87dfa10d635f17f7f7e237919"
+  },
+  "engineA": {
+    "pid": 28948,
+    "identity": "2026-10-26T07:57:39.2994730Z",
+    "epoch": 1
+  },
+  "workspace": "C:\\my\\2026\\deszo-p1-codex-workspace-43H6r8",
+  "timeline": [
+    {
+      "at": "2026-10-26T07:57:42.201Z",
+      "event": "run-admitted",
+      "runId": "99b38f32-c0cd-4c5f-a463-449f311d07bc",
+      "publishedVersionId": "1dcd49d1-07b0-4617-80ad-355fcdbb5908"
+    },
+    {
+      "at": "2026-10-26T07:59:07.924Z",
+      "event": "codex-ready",
+      "codexPid": 34140,
+      "codexIdentity": "2026-10-26T07:58:54.0925958Z",
+      "gatePid": 26208
+    },
+    {
+      "at": "2026-10-26T07:59:08.460Z",
+      "event": "engine-a-terminated",
+      "hostAlive": true,
+      "codexAlive": true
+    },
+    {
+      "at": "2026-10-26T07:59:09.926Z",
+      "event": "engine-b-reattached",
+      "engineBPid": 17796,
+      "epochB": 2,
+      "codexPid": 34140
+    },
+    {
+      "at": "2026-10-26T07:59:09.928Z",
+      "event": "gate-released"
+    },
+    {
+      "at": "2026-10-26T08:00:01.473Z",
+      "event": "run-final",
+      "state": "succeeded"
+    }
+  ],
+  "error": "Node C is scheduled only after Node B is accepted",
+  "attempt": 1,
+  "note": "First live run. Node C reached succeeded under Engine B (run-final succeeded, gate released after Engine B reattached). The run then stopped at a harness assertion that compared Node C planning event instead of acceptance (harness defect, fixed in the next attempt). The Engine store was deleted by the first harness version, so the journal of this attempt is not available; the workspace was kept."
+}

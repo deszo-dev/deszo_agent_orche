@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deszo.local/documentation/delivery-result.schema.json",
+  "title": "Branch Delivery Result (ADR-0005)",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "kind": {
+      "const": "DeliveryResult"
+    },
+    "deliveryResultId": {
+      "type": "string"
+    },
+    "deliveryPlanId": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "READY_FOR_MERGE",
+        "delivery_failed",
+        "precondition_failed",
+        "verification_failed",
+        "ref_conflict",
+        "stopped",
+        "publication_uncertain"
+      ]
+    },
+    "sourceCommit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "verifiedCommitId": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "treeId": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "parentCommitId": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "targetBranchRef": {
+      "type": "string",
+      "minLength": 1
+    },
+    "refUpdated": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "canonicalManifestDigest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "environmentSmokeReport": {
+      "type": "object",
+      "properties": {
+        "passed": {
+          "type": "boolean"
+        },
+        "exitCode": {
+          "type": "integer"
+        },
+        "diagnostics": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "passed",
+        "exitCode",
+        "diagnostics"
+      ],
+      "additionalProperties": false
+    },
+    "hookExecution": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "enum": [
+            "none",
+            "executed",
+            "skipped"
+          ]
+        },
+        "journal": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "journal"
+      ],
+      "additionalProperties": false
+    },
+    "readyForMerge": {
+      "type": "boolean"
+    },
+    "completedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "commandEvidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "artifactId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "artifactId",
+          "sha256"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "kind",
+    "deliveryResultId",
+    "deliveryPlanId",
+    "status",
+    "sourceCommit",
+    "verifiedCommitId",
+    "treeId",
+    "parentCommitId",
+    "targetBranchRef",
+    "refUpdated",
+    "canonicalManifestDigest",
+    "environmentSmokeReport",
+    "hookExecution",
+    "readyForMerge",
+    "completedAt"
+  ],
+  "additionalProperties": false
+}

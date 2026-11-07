@@ -6,7 +6,7 @@ import { NODE_LABELS, loopOf, toFlow } from './model';
 import { nodeTypes, STATE_LABELS } from './nodes';
 import { AttemptView, loadAttempt } from './Inspector';
 import type { Client } from './transport';
-import type { JournalEvent, RunSnapshot, Workflow } from './types';
+import type { ArtifactRef, JournalEvent, RunSnapshot, Workflow } from './types';
 
 // Read-only projection of a saved run: no commands, provider calls or file restoration.
 export function Replay({ client, runId, onExit }: { client: Client; runId: string; onExit: () => void }) {
@@ -147,8 +147,19 @@ function ProjectedAttempt({ client, instance }: { client: Client; instance: NonN
     {instance.reusedFrom && <small className="muted">Outputs reused from run {instance.reusedFrom.slice(0, 8)}.</small>}
     {instance.routeCase !== undefined && <small className="muted">Route selected: {instance.routeCase ?? 'no case'}</small>}
     {instance.gate && <small className="muted">Gate {instance.gate.mode}: {instance.gate.status || 'prepared'} · {instance.gate.subjectId}{instance.gate.recordId ? ` · ${instance.gate.recordId}` : ''}</small>}
+    {instance.taskRecord && <CapturedTaskRecord client={client} record={instance.taskRecord.record} kind={instance.taskRecord.kind} />}
     <AttemptView detail={detail} loadError={loadError} error={instance.error} state={instance.state} />
   </div>;
+}
+
+function CapturedTaskRecord({ client, record, kind }: { client: Client; record: ArtifactRef; kind: string }) {
+  const [text, setText] = useState('');
+  useEffect(() => {
+    let canceled = false; setText('');
+    client.artifactJson(record.artifactId).then(value => { if (!canceled) setText(JSON.stringify(value, null, 2)); }).catch(error => { if (!canceled) setText((error as Error).message); });
+    return () => { canceled = true; };
+  }, [client, record.artifactId]);
+  return <details className="result-section"><summary>Captured task {kind}</summary><pre>{text || 'Loading captured record…'}</pre></details>;
 }
 
 // Generated Map scopes as of this step: tasks, verification counter and engine records.

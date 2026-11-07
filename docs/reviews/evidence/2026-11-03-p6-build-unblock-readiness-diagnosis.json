@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "evidence": "p6-build-unblock-readiness-diagnosis",
+  "capturedAt": "2026-11-03",
+  "method": "Read-only analysis of two retained failing packaged roots (.deszo/tests/p6-build-e2e-6t3Zwi and p6-build-e2e-VoajN1), their Host journals (installation/.deszo-host/operations.ndjson, millisecond epoch 'at' values from one Host clock), durable lifecycle.json, active.json, runner.log and failure records, against lifecycle-host/src/lib.rs, lifecycle-host/src/engine_switch.rs, runtime/runner.mjs, runtime/host/p6Maintenance.mjs and runtime/tests/p6-g0-support.mjs. No production logging was added.",
+  "runs": [
+    {
+      "root": "p6-build-e2e-6t3Zwi",
+      "failureRecord": "failures/2026-11-03T09-32-21-309Z-...-c65387c1/failure.json",
+      "testError": "Timed out waiting for the committed Engine B to become ready via autonomous P6 pipeline.",
+      "concurrentWith": "p6-build-e2e-VoajN1 (started about 55 s earlier; both packaged runs shared the machine)",
+      "hostPid": 12808,
+      "engineA": { "shellPid": 30088, "enginePid": 9208, "generation": "6f82a7b7-6291-4b5d-9b39-47e13957961f" },
+      "engineB": { "buildId": "engine-f50c8f655524", "shellPid": 18776, "enginePid": 36616, "generation": "82989ce1-9d7b-4ea6-b7fd-848b2f46ba92",
+        "packageSha256": "3e6cc9dd54bad26b65e782a2802d60547faeb81520bd99fd42cc924553fe4084" },
+      "operationId": "e5e51d04-240c-46bb-90d8-26e822f15391",
+      "timeline": [
+        { "seq": 1, "at": 1793698148959, "event": "engine_ready", "detail": "Engine A ready (enginePid 9208, Shell 30088); the test then POSTs the test-only p6-activate route and starts a fixed 180000 ms eventually() wait" },
+        { "seq": 2, "at": 1793698287223, "event": "engine_staged", "detail": "B staged; trigger to staged about 138 s" },
+        { "seq": 3, "at": 1793698306999, "event": "engine_switch_accepted" },
+        { "seq": 4, "at": 1793698309413, "event": "managed_process_tree_stopped", "detail": "Engine A tree (Shell 30088, Engine 9208) ended by the switch" },
+        { "seq": 5, "at": 1793698317523, "event": "application_spawned", "detail": "B maintenance candidate: Shell 18776; state.managed inserted under the state lock in spawn_build_with (lib.rs:1638)" },
+        { "seq": 6, "at": 1793698320942, "event": "engine_preflight_passed", "detail": "maintenance_ready accepted from Engine pid 36616, a child of Shell 18776 (engine_switch.rs:522-531 requires state.managed)" },
+        { "seq": 7, "at": 1793698321516, "event": "engine_store_boundary_verified", "detail": "then candidate_alive check reads state.managed (engine_switch.rs:738-746): present and running" },
+        { "seq": 8, "at": "between 1793698321516 and 1793698337026; the 180 s deadline fell at about 1793698329200", "event": "test deadline and Host stop", "detail": "the 180 s window expired; the test's finally block called host.stop(), which writes 'shutdown' to the Host stdin (p6-g0-support.mjs:199); Host::run breaks its loop, ends custody, then shutdown_managed() takes state.managed (lib.rs:863 -> 2583) and asks the candidate tree to stop" },
+        { "seq": 9, "at": 1793698337014, "event": "engine_switch_committed", "detail": "the switch worker thread finished the 15.5 s package re-verification and committed active.json = B; it does not re-check state.managed or the Host stop request" },
+        { "seq": 10, "at": 1793698337026, "event": "engine_switch_held", "detail": "wait_for_candidate_ready (engine_switch.rs:886-907) found state.managed = None: 'the candidate is not running'; the durable phase stays 'committed' (hold annotates, engine_switch.rs:576-589)" },
+        { "seq": 11, "at": "between 1793698337014 and 1793698340307", "event": "B ordinary startup", "detail": "B received maintenance_wait = commit and called engine.source_release: refused 'Lifecycle Host has no managed application' (lib.rs:1890) -> runner.log 'enrollment was refused: source_release_unavailable'" },
+        { "seq": 12, "at": 1793698340307, "event": "engine_readiness_refused", "detail": "B (pid 36616, same process as the preflight) sent engine.ready; accept_ready found no managed record (lib.rs:2142-2152); the unhandled refusal ended the runner (runner.log stack at runner.mjs ready())" },
+        { "seq": 13, "at": 1793698341169, "event": "managed_process_tree_stopped", "detail": "logged at the end of the Host's own shutdown_managed for Shell 18776 (lib.rs:2647)" },
+        { "seq": 14, "at": 1793698341211, "event": "host_stopped" }
+      ],
+      "durableAfter": { "activeSelector": "engine-f50c8f655524 / committedOperationId e5e51d04-240c-46bb-90d8-26e822f15391", "phase": "committed", "fallbackAttempted": false }
+    },
+    {
+      "root": "p6-build-e2e-VoajN1",
+      "testError": "Timed out waiting for the committed Engine B to become ready via autonomous P6 pipeline.",
+      "hostPid": 35216,
+      "engineB": { "buildId": "engine-d8b95b92dc5c", "shellPid": 33080, "enginePid": 33856, "generation": "fb3b41a7-0340-4a19-aa39-87c8469ae06b",
+        "packageSha256": "74bd7bf8818c21df03c9594832f0249fbaf42e3d8e3f370bcea3aacf85b69506" },
+      "operationId": "3561ad5a-fbd7-4245-b60a-2dbba2d5e58d",
+      "keyTimes": { "engineAReady": 1793698106324, "staged": 1793698251558, "storeBoundaryVerified": 1793698281097, "committed": 1793698300168,
+        "held": 1793698300178, "candidateTreeStopped": 1793698302097, "hostStopped": 1793698302109 },
+      "note": "Same chain: commit about 194 s after Engine A became ready; hold 10 ms after commit; B's tree stopped by the Host's own shutdown."
+    }
+  ],
+  "earlierRetainedRuns": "p6-build-e2e-3Fd8Vy, 6sggr4, O5w11q, j9CtHN reached engine_switch_verified 116-144 s after Engine A readiness; their test failures were later C-stage fixture errors. The two failing runs needed 188-194 s to commit because the continuity pass added pre-switch source checks and the two runs were concurrent.",
+  "answers": {
+    "1_managedAfterMaintenanceSpawn": "Yes. spawn_build_with records state.managed before writing the bootstrap; application_spawned names Shell 18776.",
+    "2_managedAtPreflightSuccess": "Yes. maintenance_ready refuses without state.managed and verified Shell 18776 / Engine child 36616.",
+    "3_managedAtSelectorCommit": "Present at the candidate_alive check after the Store boundary; commit() does not consult it; it was absent 12 ms after the commit.",
+    "4_removedBeforeNormalStartup": "Yes, by the Host's graceful stop, not by a candidate exit.",
+    "5_removingCodePath": "Host::run (lib.rs:765-863): stdin 'shutdown' -> loop break -> custody.shutdown() -> shutdown_managed() -> shutdown_managed_inner state.managed.take() (lib.rs:2583).",
+    "6_bExitedBeforeRemoval": "No. Engine B (pid 36616) was alive 3.3 s after the removal and sent readiness.",
+    "7_firstFatalError": "None before the removal. Afterwards the readiness refusal ended the runner.",
+    "8_runningSourceBeforeRegistration": "No. The managed record existed from 317.5 s; B's queries came after the 337.0 s commit.",
+    "9_sameProcessReused": "Yes. Preflight and readiness came from the same Engine pid 36616 under Shell 18776.",
+    "10_identityChanged": "No. Operation, build, generation and package digest were constant.",
+    "11_fixtureLackedStartupData": "No for readiness: with only the harness wait corrected (P6-BUILD-UNBLOCK run 1) the same layout reached engine_switch_verified and loaded its enrollment.",
+    "12_continuationVsProcessLoss": "Process-record loss (from the test-initiated Host stop) caused source_release_unavailable; the readiness refusal, not continuation, ended B."
+  },
+  "firstCausalFailure": "The packaged test's fixed 180 s readiness wait, measured from the trigger, was shorter than the real trigger-to-commit time (188-194 s under concurrent load). Its timeout ran the finally block, which stopped the Host while the switch worker was between its candidate check and readiness.",
+  "rootCause": "Test-harness deadline and teardown, not a Rust Host, Shell or Engine startup defect. The Host's 'no managed application' messages are consequences of the test's own Host stop.",
+  "hostObservationForReview": "The switch worker checks candidate liveness before a 15-19 s package re-verification and does not re-check it, or a pending Host stop, before the commit write. A stop or candidate exit inside that window yields a committed selection whose readiness cannot complete in this Host lifetime. The Store stays guarded until the commit, the candidate never opened the production Store, the durable phase is committed and a restart starts the committed Engine, so no G0 safety invariant is broken. Not changed in this stage."
+}

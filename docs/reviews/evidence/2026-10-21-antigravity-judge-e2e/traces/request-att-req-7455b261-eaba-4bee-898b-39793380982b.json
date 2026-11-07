@@ -1,0 +1,20 @@
+{
+  "requestId": "att-req-7455b261-eaba-4bee-898b-39793380982b",
+  "runId": "run-fixer-pilot-001",
+  "revision": 3,
+  "packageId": "unpermitted-probe",
+  "evidenceDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "claimedObjective": "Denial boundary probe",
+  "createdAt": "2026-10-21T13:22:32.635Z",
+  "status": "COMPLETED",
+  "turnStartedAt": "2026-10-21T13:22:32.639Z",
+  "turnCompletedAt": "2026-10-21T13:22:57.681Z",
+  "durationMs": 25040,
+  "tokens": {
+    "input_tokens": 39639,
+    "output_tokens": 5044,
+    "thinking_tokens": 3766,
+    "cache_read_tokens": 0,
+    "total_tokens": 44683
+  }
+}

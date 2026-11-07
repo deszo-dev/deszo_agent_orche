@@ -1,0 +1,124 @@
+// A narrowly scoped, authenticated channel from the Engine process to its independent Rust lifecycle Host.
+// The one-generation capability is read once and removed before any provider CLI can be launched.
+import net from 'node:net';
+import { testFaultHooksEnabled } from '../core/testFaultPolicy.mjs';
+
+const TEST_FAULTS_ENABLED = testFaultHooksEnabled(import.meta.url);
+
+const ENV = [
+  'DESZO_LIFECYCLE_HOST_ADDRESS', 'DESZO_LIFECYCLE_HOST_CAPABILITY', 'DESZO_LIFECYCLE_INSTALLATION_ID',
+  'DESZO_LIFECYCLE_PROFILE_ROOT', 'DESZO_LIFECYCLE_GENERATION', 'DESZO_APPLICATION_BUILD_ID',
+  'DESZO_LIFECYCLE_APPLICATION_PID', 'DESZO_TEST_DUPLICATE_LIFECYCLE_RECEIPT',
+];
+// Set only by a P6 Shell. Legacy whole-release launches omit it, so it is optional and read-once like the rest.
+const OPTIONAL_ENV = ['DESZO_SHELL_BUILD_ID'];
+// Process Custody reads its own bootstrap, for an Engine started beside a custody service rather than a managed Host.
+const CUSTODY_ENV = ['DESZO_CUSTODY_ADDRESS', 'DESZO_CUSTODY_CAPABILITY', 'DESZO_CUSTODY_GENERATION'];
+// Custody admission and launch verify the complete allowlisted executable on the Host. A large native CLI can take tens of
+// seconds to hash in an unoptimized Host build, so these two bounded commands need a longer window than ordinary IPC.
+const CUSTODY_FILE_VERIFY_TIMEOUT_MS = 120_000;
+// P6 staging copies and verifies a whole Engine package; the switch admission and the candidate's readiness report are bounded too.
+const LONG_HOST_COMMANDS = new Set(['engine.source_release', 'engine.source_inventory', 'custody.reserve', 'custody.launch',
+  'custody.source_identity', 'custody.tool_identity', 'engine.stage', 'engine.switch']);
+
+function loopbackPort(address, label) {
+  const match = /^127\.0\.0\.1:(\d+)$/.exec(address ?? '');
+  if (!match || Number(match[1]) < 1 || Number(match[1]) > 65535) throw new Error(`${label} endpoint is not a loopback endpoint.`);
+  return Number(match[1]);
+}
+
+// One authenticated request: a JSON line with the capability, answered by one JSON line, on a fresh loopback connection.
+function hostCall(port, capability) {
+  return (command, payload = {}) => new Promise((resolve, reject) => {
+    const socket = net.createConnection({ host: '127.0.0.1', port });
+    let data = '';
+    let settled = false;
+    const finish = (error, value) => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      error ? reject(error) : resolve(value);
+    };
+    const timeoutMs = LONG_HOST_COMMANDS.has(command) ? CUSTODY_FILE_VERIFY_TIMEOUT_MS : 5_000;
+    socket.setTimeout(timeoutMs, () => finish(new Error('Lifecycle Host IPC timed out.')));
+    socket.once('error', error => finish(new Error(`Lifecycle Host IPC failed: ${error.message}`)));
+    socket.once('connect', () => socket.write(`${JSON.stringify({ capability, command, payload })}\n`));
+    socket.on('data', chunk => {
+      data += chunk.toString('utf8');
+      if (data.length > 128 * 1024) return finish(new Error('Lifecycle Host IPC response exceeded its limit.'));
+      const newline = data.indexOf('\n');
+      if (newline < 0) return;
+      let response;
+      try { response = JSON.parse(data.slice(0, newline)); } catch { return finish(new Error('Lifecycle Host returned malformed IPC data.')); }
+      if (!response.ok) return finish(Object.assign(new Error(response.error || 'Lifecycle Host refused the request.'), { code: response.code || 'host_refused' }));
+      finish(null, response.result);
+    });
+  });
+}
+
+export function lifecycleBridgeFromEnvironment(env = process.env) {
+  const values = Object.fromEntries([...ENV, ...OPTIONAL_ENV].map(name => [name, env[name]]));
+  for (const name of [...ENV, ...OPTIONAL_ENV]) delete env[name];
+  if (ENV.every(name => !values[name])) return null;
+  if (ENV.some(name => !values[name])) throw new Error('Lifecycle Host bootstrap is incomplete.');
+  if (!/^[a-f0-9]{64}$/i.test(values.DESZO_LIFECYCLE_HOST_CAPABILITY)) throw new Error('Lifecycle Host capability is malformed.');
+  if (values.DESZO_LIFECYCLE_APPLICATION_PID !== 'self'
+    && (!/^\d+$/.test(values.DESZO_LIFECYCLE_APPLICATION_PID) || Number(values.DESZO_LIFECYCLE_APPLICATION_PID) < 1)) throw new Error('Lifecycle application PID is malformed.');
+  const port = loopbackPort(values.DESZO_LIFECYCLE_HOST_ADDRESS, 'Lifecycle Host');
+  const context = Object.freeze({
+    installationId: values.DESZO_LIFECYCLE_INSTALLATION_ID,
+    profileRoot: values.DESZO_LIFECYCLE_PROFILE_ROOT,
+    generation: values.DESZO_LIFECYCLE_GENERATION,
+    buildId: values.DESZO_APPLICATION_BUILD_ID,
+    // Present only when a P6 Shell launched this Engine; the Host requires it to name the installed Shell.
+    shellBuildId: values.DESZO_SHELL_BUILD_ID || null,
+    applicationPid: values.DESZO_LIFECYCLE_APPLICATION_PID === 'self' ? process.pid : Number(values.DESZO_LIFECYCLE_APPLICATION_PID),
+    testDuplicateReceiptDelivery: TEST_FAULTS_ENABLED && values.DESZO_TEST_DUPLICATE_LIFECYCLE_RECEIPT === '1',
+  });
+  const call = hostCall(port, values.DESZO_LIFECYCLE_HOST_CAPABILITY);
+
+  return Object.freeze({
+    context,
+    async ready({ pid, storeId, runtimeInstanceId }) {
+      return call('engine.ready', { pid, storeId, runtimeInstanceId, applicationPid: context.applicationPid, applicationBuildId: context.buildId,
+        installationId: context.installationId, profileRoot: context.profileRoot, generation: context.generation,
+        shellBuildId: context.shellBuildId });
+    },
+    activateCandidate(request) { return call('lifecycle.activate_candidate', request); },
+    acknowledgeReceipt(receiptId) { return call('lifecycle.receipt_ack', { receiptId }); },
+    // The Host re-hashes the active managed package and returns its trusted build source fields. The Engine
+    // compares this exact identity with the installation-owned P5 enrollment; it never labels local HEAD as
+    // the source of the running application.
+    runningSourceRelease({ pid = process.pid } = {}) {
+      if (!Number.isSafeInteger(pid) || pid < 1) throw new Error('Source release request PID is malformed.');
+      return call('engine.source_release', { generation: context.generation, pid });
+    },
+    runningSourceInventory({ pid = process.pid, paths } = {}) {
+      if (!Number.isSafeInteger(pid) || pid < 1) throw new Error('Source inventory request PID is malformed.');
+      if (!Array.isArray(paths) || paths.length < 1 || paths.length > 32) throw new Error('Source inventory request batch is malformed.');
+      return call('engine.source_inventory', { generation: context.generation, pid, paths });
+    },
+    // Process Custody commands (custody.*). The same lifecycle capability authenticates them; the Host fences them by epoch.
+    custody(command, payload) { return call(command, payload); },
+    // P6 Engine-only operations (engine.stage, engine.switch, engine.maintenance_*). The Host decides every one of them.
+    p6Call(command, payload = {}) {
+      if (!/^engine\.(stage|switch|switch_status|maintenance_ready|maintenance_wait)$/.test(command)) throw new Error('Unsupported P6 Host command.');
+      return call(command, payload);
+    },
+  });
+}
+
+// The custody-only bridge: the same authenticated channel for an Engine started beside a custody service. Its bootstrap is
+// removed from the environment on read, like the lifecycle bootstrap, so no provider can inherit it.
+export function custodyBridgeFromEnvironment(env = process.env) {
+  const values = Object.fromEntries(CUSTODY_ENV.map(name => [name, env[name]]));
+  for (const name of CUSTODY_ENV) delete env[name];
+  if (CUSTODY_ENV.every(name => !values[name])) return null;
+  if (CUSTODY_ENV.some(name => !values[name])) throw new Error('Process Custody bootstrap is incomplete.');
+  if (!/^[a-f0-9]{64}$/i.test(values.DESZO_CUSTODY_CAPABILITY)) throw new Error('Process Custody capability is malformed.');
+  const port = loopbackPort(values.DESZO_CUSTODY_ADDRESS, 'Process Custody');
+  return Object.freeze({
+    context: Object.freeze({ generation: values.DESZO_CUSTODY_GENERATION }),
+    custody: hostCall(port, values.DESZO_CUSTODY_CAPABILITY),
+  });
+}

@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 1,
+  "kind": "P3RegressionRecoveryClosure",
+  "verifiedAtLocal": "2026-10-27T12:16:37+03:00",
+  "verdict": "P3 TYPED FAILURE OUTCOMES VERIFIED — READY FOR P4",
+  "repository": {
+    "branch": "codex/adr-0003-0005-completion",
+    "head": "abb7295e6339912b5be16fc4db2a8e244e0c1bfc"
+  },
+  "historicalRuns": [
+    {
+      "name": "original full-suite attempt",
+      "result": "interrupted",
+      "exitCode": 1,
+      "aggregateFooterPresent": false,
+      "topLevelResultsObserved": 791,
+      "failures": [
+        "SP-04 Engine exit timeout at after_ack",
+        "SP-06 Engine exit timeout at after_settle",
+        "SP-07 Host exit timeout during spool write",
+        "P2-E2E-05 Parent A side-effect marker absent",
+        "P2-E2E-06 Parent A side-effect marker absent"
+      ],
+      "p2FailureCause": "unresolved",
+      "note": "Preserved from initial regression record; no causal attribution claimed."
+    },
+    {
+      "name": "overlapped full-suite attempt",
+      "result": "diagnostic-excluded",
+      "exitCode": 1,
+      "tests": 847,
+      "passed": 802,
+      "failed": 45,
+      "log": "docs/reviews/evidence/2026-10-27-p3-final-npm-test.tap.log",
+      "sha256": "c3aa4bbc5106a0182178adaa2a1e2fe9090963f48b9734db340cf7a827f2aeae",
+      "overlapConfirmed": true,
+      "symptoms": [
+        "A second concurrent npm test process was observed",
+        "Rust linker LNK1104 while both runs used the same build targets",
+        "Additional Host, custody, and fetch failures during the overlap"
+      ]
+    }
+  ],
+  "focusedRecoveryRuns": [
+    {
+      "name": "SP-02/03/04/06/07 custody focused selector",
+      "result": "passed",
+      "passed": 5,
+      "failed": 0,
+      "log": "docs/reviews/evidence/2026-10-27-p3-recovery-custody-focused.tap.log",
+      "sha256": "b6d3358cc34ce75a2d07d36444f75a61547408f0fb354871f4e1f4a021c320e4"
+    },
+    {
+      "name": "P2-E2E-02 isolated",
+      "result": "passed",
+      "passed": 1,
+      "failed": 0,
+      "log": "docs/reviews/evidence/2026-10-27-p3-recovery-p2-e2e02.tap.log",
+      "sha256": "7ed153d104308771e752de64afb26cad590246274da45227dbd81f8a19482671"
+    },
+    {
+      "name": "P2-E2E-03 isolated",
+      "result": "passed",
+      "passed": 1,
+      "failed": 0,
+      "log": "docs/reviews/evidence/2026-10-27-p3-recovery-p2-e2e03.tap.log",
+      "sha256": "80b682190e74f4adcac02516855b6bc0d1392ca0f12914c0c638828bd4b40986"
+    },
+    {
+      "name": "P2-E2E-01..06 recovery rerun",
+      "result": "passed",
+      "passed": 6,
+      "failed": 0,
+      "log": "docs/reviews/evidence/2026-10-27-p3-recovery-p2-focused-rerun.tap.log",
+      "sha256": "5d583c7be1227a0259aa2665221ab67bb8c1ce5292b0c7e43f35c485da03bb3b"
+    }
+  ],
+  "independentReview": {
+    "context": "fresh-context, read-only recovery review",
+    "filesChangedByReviewer": false,
+    "findings": [
+      "Recovery changes are bounded to test diagnostics and READY-versus-durable-state polling",
+      "No P3 invariant issue found",
+      "Earlier sequence failure remains unclassified",
+      "No blocker to final full-suite run"
+    ]
+  },
+  "finalNpmTest": {
+    "command": "npm test",
+    "result": "passed",
+    "exitCode": 0,
+    "launchPreflightActiveTestRunners": 0,
+    "tap": {
+      "numberedResults": 838,
+      "tests": 847,
+      "passed": 847,
+      "failed": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 2941878.097
+    },
+    "log": "docs/reviews/evidence/2026-10-27-p3-clean-final-npm-test.tap.log",
+    "sha256": "35bf2d28b9aaf6d0695007afad523223b224b806a10c989b2a7d14ef4add3e4a"
+  },
+  "checks": [
+    {
+      "name": "cargo test --manifest-path lifecycle-host/Cargo.toml",
+      "result": "passed",
+      "exitCode": 0,
+      "passed": 23,
+      "failed": 0,
+      "log": "docs/reviews/evidence/2026-10-27-p3-final-cargo-test.log",
+      "sha256": "018f572e83a9ef43c3baa98c2c02f09d975a1a0cac2265d17559d264cc36b4c7"
+    },
+    {
+      "name": "npm run docs:check",
+      "result": "passed",
+      "exitCode": 0,
+      "metrics": {
+        "schemas": 32,
+        "positiveSchemaCases": 141,
+        "negativeSchemaCases": 82,
+        "negativeSemanticCases": 42,
+        "markdownFiles": 138,
+        "localLinks": 1250,
+        "mermaidDiagrams": 15,
+        "errors": 0
+      },
+      "log": "docs/reviews/evidence/2026-10-27-p3-final-docs-check.log",
+      "sha256": "c3529a6e5a5751d0fdca68d91126ffc3a511b1e37eff316f2ff3bf89e5e94c0e"
+    },
+    {
+      "name": "npm run build",
+      "result": "passed",
+      "exitCode": 0,
+      "advisory": "Vite reported the existing >500 kB chunk-size advisory",
+      "log": "docs/reviews/evidence/2026-10-27-p3-final-build.log",
+      "sha256": "b28693c355a32fcaa5100656e7668e83c33b976c70e38725301d9b52a8e50114"
+    },
+    {
+      "name": "git diff --check",
+      "result": "passed",
+      "exitCode": 0,
+      "whitespaceErrors": 0,
+      "log": "docs/reviews/evidence/2026-10-27-p3-final-diff-check.log",
+      "sha256": "b70c52bf41be20ccf653befbbd5002be80e278717c31e2fa3e0856df31adff9d"
+    }
+  ],
+  "sourceManifest": {
+    "path": "docs/reviews/evidence/2026-10-27-p3-regression-recovery-source-manifest.json",
+    "sha256": "2e1f43fc01281a6b91e610a5b43ce7493063a75c1d9eb0964d0da7ca362825d9",
+    "listedFiles": 32,
+    "verifiedFiles": 32,
+    "mismatchCount": 0,
+    "mismatches": [],
+    "branch": "codex/adr-0003-0005-completion",
+    "head": "abb7295e6339912b5be16fc4db2a8e244e0c1bfc",
+    "stagedFiles": []
+  },
+  "report": {
+    "path": "docs/reviews/2026-10-27-p3-typed-failure-outcomes.md",
+    "sha256": "85d49a0de8036ffe71799761778603cd8243c1fa17dbcb0d8449be628774a486"
+  },
+  "gitState": {
+    "branch": "codex/adr-0003-0005-completion",
+    "head": "abb7295e6339912b5be16fc4db2a8e244e0c1bfc",
+    "indexEmpty": true,
+    "stagedFiles": [],
+    "workingTreeHasPreservedUncommittedWork": true,
+    "committed": false,
+    "pushed": false,
+    "merged": false,
+    "rebased": false,
+    "reset": false,
+    "cleaned": false
+  },
+  "initialP2Selector": {
+    "name": "first P2-E2E-01..06 recovery selector",
+    "result": "failed; cause unresolved",
+    "tests": 6,
+    "passed": 1,
+    "failed": 5,
+    "observations": [
+      "P2-E2E-02 timed out before Repair READY",
+      "P2-E2E-03..06 then lacked the Parent A side-effect marker"
+    ],
+    "log": "docs/reviews/evidence/2026-10-27-p3-recovery-p2-focused.tap.log",
+    "sha256": "8e2c9f4e2ab36d53db06568188f16f6e99ff17d0b35ea31d6ced0babfc81718a"
+  }
+}

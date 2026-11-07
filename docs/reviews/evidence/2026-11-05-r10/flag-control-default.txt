@@ -1,0 +1,5 @@
+Node v22.20.0 flags: (default)
+R10 Function route: 2
+vm.runInThisContext: 42
+require(esm) same instance: true; ping=pong
+createRequire available: function

@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "derivedFrom": "docs/reviews/evidence/2026-11-01-p6-g0-final-npm-test.tap.log",
+  "derivedBy": "TAP lines of the frozen full regression",
+  "suite": "P6-G0 admission barrier",
+  "total": 8,
+  "passed": 8,
+  "failed": 0,
+  "tests": [
+    {
+      "number": 679,
+      "status": "pass",
+      "name": "P6-G0 barrier: a quiescing Engine refuses Run admission at its creation point and leaves no row, event or receipt"
+    },
+    {
+      "number": 680,
+      "status": "pass",
+      "name": "P6-G0 barrier: every executable Run is created by one INSERT, and that INSERT follows the barrier inside captureRun"
+    },
+    {
+      "number": 681,
+      "status": "pass",
+      "name": "P6-G0 barrier: the switch closes admission before the Host sees it, and an admission racing that closure is refused"
+    },
+    {
+      "number": 682,
+      "status": "pass",
+      "name": "P6-G0 barrier: a switch waits for a Run admitted before quiescence, settles it, and then proceeds without deadlock"
+    },
+    {
+      "number": 683,
+      "status": "pass",
+      "name": "P6-G0 barrier: a refused switch reopens admission, and a refused stage or switch admits Runs again"
+    },
+    {
+      "number": 684,
+      "status": "pass",
+      "name": "P6-G0 barrier: an internal linked Repair cannot be admitted while quiescing, and the same request is admitted once admission reopens"
+    },
+    {
+      "number": 685,
+      "status": "pass",
+      "name": "P6-G0 barrier: an unconfirmed switch reply keeps this Engine quiesced while the Host may have accepted, and reopens only on a pre-acceptance phase"
+    },
+    {
+      "number": 686,
+      "status": "pass",
+      "name": "P6-G0 barrier: a quiescing Engine lets admitted work settle: settling routes stay open, and an owner route that starts a Run is refused"
+    }
+  ]
+}

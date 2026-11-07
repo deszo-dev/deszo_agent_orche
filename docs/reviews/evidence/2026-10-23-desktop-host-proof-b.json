@@ -1,0 +1,485 @@
+{
+  "platform": "win32",
+  "artifacts": [
+    {
+      "label": "a",
+      "buildId": "build-a",
+      "packageRoot": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\desktop-host-proof-b-artifacts\\desktop-build-a",
+      "executable": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\desktop-host-proof-b-artifacts\\desktop-build-a\\deszo.exe",
+      "runtime": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\desktop-host-proof-b-artifacts\\desktop-build-a\\runtime",
+      "exeSha256": "4301fc9202a49ead9b4b90a943b2af296b301e56df6e92d54109cbb3ea425ffa",
+      "packageDigest": "fe80e4275fde9a43d0bcc1bea71d52890b8c99092e7f5f735ed18f1e09561e5b"
+    },
+    {
+      "label": "b",
+      "buildId": "build-b",
+      "packageRoot": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\desktop-host-proof-b-artifacts\\desktop-build-b",
+      "executable": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\desktop-host-proof-b-artifacts\\desktop-build-b\\deszo.exe",
+      "runtime": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\desktop-host-proof-b-artifacts\\desktop-build-b\\runtime",
+      "exeSha256": "aa76593076ab890863cc2082858fa53d5d40cc5c6a8eaed8fe4d1c556ea390cc",
+      "packageDigest": "e13049ff8a75b711818ca9610e8464b3a15ab2d8a13d6122d66592d5f1c087a5"
+    }
+  ],
+  "runs": [
+    {
+      "iteration": 1,
+      "hostPid": 24260,
+      "installationId": "314c2cfc72222a30f022f382b0a37816",
+      "profileRoot": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\desktop-host-proof-b-run-1-TqXmB3\\profile-a",
+      "applicationPids": [
+        31144,
+        32340
+      ],
+      "enginePids": [
+        7236,
+        32984
+      ],
+      "buildIds": [
+        "build-a",
+        "build-b"
+      ],
+      "builds": [
+        {
+          "buildId": "build-a",
+          "executable": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\desktop-host-proof-b-artifacts\\desktop-build-a\\deszo.exe",
+          "runtime": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\desktop-host-proof-b-artifacts\\desktop-build-a\\runtime",
+          "executableSha256": "4301fc9202a49ead9b4b90a943b2af296b301e56df6e92d54109cbb3ea425ffa",
+          "packageDigest": "fe80e4275fde9a43d0bcc1bea71d52890b8c99092e7f5f735ed18f1e09561e5b"
+        },
+        {
+          "buildId": "build-b",
+          "executable": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\desktop-host-proof-b-artifacts\\desktop-build-b\\deszo.exe",
+          "runtime": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\desktop-host-proof-b-artifacts\\desktop-build-b\\runtime",
+          "executableSha256": "aa76593076ab890863cc2082858fa53d5d40cc5c6a8eaed8fe4d1c556ea390cc",
+          "packageDigest": "e13049ff8a75b711818ca9610e8464b3a15ab2d8a13d6122d66592d5f1c087a5"
+        }
+      ],
+      "candidateDigest": "e13049ff8a75b711818ca9610e8464b3a15ab2d8a13d6122d66592d5f1c087a5",
+      "activatedGeneration": "c3e20b4b-4f45-44dc-81eb-d1beeb947014",
+      "operationId": "ad3bc154-4e9f-453b-ac58-4cfc04dd72bd",
+      "judgeAuthorization": {
+        "kind": "LifecycleProposal",
+        "engineValidatedRole": "judge",
+        "workflowId": "repair-host-proof-b",
+        "nodeInstanceId": "judge",
+        "attemptId": "1ecb1869-2fe3-4292-a850-19296e9b425e",
+        "proposalArtifactId": "48a3da26-589d-4aa4-bf00-1ab0aff5db70",
+        "action": "application.activate_candidate",
+        "targetVersion": "build-b",
+        "candidateDigest": "e13049ff8a75b711818ca9610e8464b3a15ab2d8a13d6122d66592d5f1c087a5",
+        "continuationCheckpointId": "chk-desktop-host-proof-b"
+      },
+      "receipt": {
+        "operationId": "ad3bc154-4e9f-453b-ac58-4cfc04dd72bd",
+        "receiptId": "692a8569-c4b5-4a6a-bbd6-dd86b38ff554",
+        "installationId": "314c2cfc72222a30f022f382b0a37816",
+        "profileRoot": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\desktop-host-proof-b-run-1-TqXmB3\\profile-a",
+        "candidateId": "build-b",
+        "candidateDigest": "e13049ff8a75b711818ca9610e8464b3a15ab2d8a13d6122d66592d5f1c087a5",
+        "previousGeneration": "e3adf861-d2fc-4922-bc4e-a75663714c91",
+        "activatedGeneration": "c3e20b4b-4f45-44dc-81eb-d1beeb947014",
+        "storeId": "6d735e80-a98a-46c3-9e78-90a96a5d7618",
+        "hostPid": 24260,
+        "applicationPid": 32340,
+        "enginePid": 32984,
+        "applicationBuildId": "build-b",
+        "runtimeInstanceId": "bbf3c3ff-8a71-4e66-a5f9-beb694c94a27",
+        "actualActivation": true,
+        "applicationResponsive": true,
+        "engineReady": true
+      },
+      "parentRunId": "b3b81a7c-ef43-4d53-afec-652239deda83",
+      "repairRunId": "d5e87fd6-3eee-4ac6-bb9e-1d3f3bd4aa65",
+      "storeId": "6d735e80-a98a-46c3-9e78-90a96a5d7618",
+      "providerPid": 32936,
+      "providerDescendantPid": 14320,
+      "continuation": {
+        "repair": "succeeded",
+        "parent": "succeeded"
+      },
+      "hostTrace": [
+        {
+          "at": "1792732710848",
+          "hostPid": 24260,
+          "payload": {
+            "hostPid": 24260,
+            "installationId": "314c2cfc72222a30f022f382b0a37816",
+            "profileRoot": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\desktop-host-proof-b-run-1-TqXmB3\\profile-a"
+          },
+          "type": "host_started"
+        },
+        {
+          "at": "1792732715104",
+          "hostPid": 24260,
+          "payload": {
+            "applicationPid": 31144,
+            "arguments": [
+              "--host-managed"
+            ],
+            "bootstrap": "tauri",
+            "buildId": "build-a",
+            "executable": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\desktop-host-proof-b-run-1-TqXmB3\\installation\\versions\\build-a\\deszo.exe",
+            "generation": "e3adf861-d2fc-4922-bc4e-a75663714c91",
+            "pid": 31144,
+            "profileRoot": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\desktop-host-proof-b-run-1-TqXmB3\\profile-a"
+          },
+          "type": "application_spawned"
+        },
+        {
+          "at": "1792732720969",
+          "hostPid": 24260,
+          "payload": {
+            "applicationPid": 31144,
+            "buildId": "build-a",
+            "enginePid": 7236,
+            "generation": "e3adf861-d2fc-4922-bc4e-a75663714c91",
+            "pid": 7236,
+            "receiptId": null,
+            "runtimeInstanceId": "f7cc5fff-1ba8-400c-93d7-548e5d7cb295",
+            "storeId": "6d735e80-a98a-46c3-9e78-90a96a5d7618"
+          },
+          "type": "engine_ready"
+        },
+        {
+          "at": "1792732731680",
+          "hostPid": 24260,
+          "payload": {
+            "candidateDigest": "e13049ff8a75b711818ca9610e8464b3a15ab2d8a13d6122d66592d5f1c087a5",
+            "candidateId": "build-b",
+            "expectedGeneration": "e3adf861-d2fc-4922-bc4e-a75663714c91",
+            "nodeInstanceId": "judge",
+            "operationId": "ad3bc154-4e9f-453b-ac58-4cfc04dd72bd",
+            "runId": "d5e87fd6-3eee-4ac6-bb9e-1d3f3bd4aa65"
+          },
+          "type": "activation_accepted"
+        },
+        {
+          "at": "1792732736040",
+          "hostPid": 24260,
+          "payload": {
+            "operationId": "ad3bc154-4e9f-453b-ac58-4cfc04dd72bd",
+            "reason": "managed_restart"
+          },
+          "type": "shutdown_requested"
+        },
+        {
+          "at": "1792732736479",
+          "hostPid": 24260,
+          "payload": {
+            "applicationPid": 31144,
+            "bootstrap": "tauri",
+            "buildId": "build-a",
+            "enginePid": 7236,
+            "generation": "e3adf861-d2fc-4922-bc4e-a75663714c91",
+            "pid": 31144
+          },
+          "type": "managed_process_tree_stopped"
+        },
+        {
+          "at": "1792732736491",
+          "hostPid": 24260,
+          "payload": {
+            "operationId": "ad3bc154-4e9f-453b-ac58-4cfc04dd72bd"
+          },
+          "type": "old_process_stopped"
+        },
+        {
+          "at": "1792732743716",
+          "hostPid": 24260,
+          "payload": {
+            "candidateDigest": "e13049ff8a75b711818ca9610e8464b3a15ab2d8a13d6122d66592d5f1c087a5",
+            "candidateId": "build-b",
+            "generation": "c3e20b4b-4f45-44dc-81eb-d1beeb947014",
+            "operationId": "ad3bc154-4e9f-453b-ac58-4cfc04dd72bd"
+          },
+          "type": "candidate_activated"
+        },
+        {
+          "at": "1792732744287",
+          "hostPid": 24260,
+          "payload": {
+            "applicationPid": 32340,
+            "arguments": [
+              "--host-managed"
+            ],
+            "bootstrap": "tauri",
+            "buildId": "build-b",
+            "executable": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\desktop-host-proof-b-run-1-TqXmB3\\installation\\versions\\build-b\\deszo.exe",
+            "generation": "c3e20b4b-4f45-44dc-81eb-d1beeb947014",
+            "pid": 32340,
+            "profileRoot": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\desktop-host-proof-b-run-1-TqXmB3\\profile-a"
+          },
+          "type": "application_spawned"
+        },
+        {
+          "at": "1792732749324",
+          "hostPid": 24260,
+          "payload": {
+            "applicationPid": 32340,
+            "buildId": "build-b",
+            "enginePid": 32984,
+            "generation": "c3e20b4b-4f45-44dc-81eb-d1beeb947014",
+            "pid": 32984,
+            "receiptId": "692a8569-c4b5-4a6a-bbd6-dd86b38ff554",
+            "runtimeInstanceId": "bbf3c3ff-8a71-4e66-a5f9-beb694c94a27",
+            "storeId": "6d735e80-a98a-46c3-9e78-90a96a5d7618"
+          },
+          "type": "engine_ready"
+        },
+        {
+          "at": "1792732749431",
+          "hostPid": 24260,
+          "payload": {
+            "applicationPid": 32340,
+            "buildId": "build-b",
+            "enginePid": 32984,
+            "generation": "c3e20b4b-4f45-44dc-81eb-d1beeb947014",
+            "pid": 32984,
+            "receiptId": "692a8569-c4b5-4a6a-bbd6-dd86b38ff554",
+            "runtimeInstanceId": "bbf3c3ff-8a71-4e66-a5f9-beb694c94a27",
+            "storeId": "6d735e80-a98a-46c3-9e78-90a96a5d7618"
+          },
+          "type": "engine_ready"
+        },
+        {
+          "at": "1792732749447",
+          "hostPid": 24260,
+          "payload": {
+            "receiptId": "692a8569-c4b5-4a6a-bbd6-dd86b38ff554"
+          },
+          "type": "receipt_acknowledged"
+        }
+      ]
+    },
+    {
+      "iteration": 2,
+      "hostPid": 28592,
+      "installationId": "ed247128bc6ecf73c1a386f41492a419",
+      "profileRoot": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\desktop-host-proof-b-run-2-9eYvcq\\profile-a",
+      "applicationPids": [
+        26856,
+        16396
+      ],
+      "enginePids": [
+        30364,
+        25060
+      ],
+      "buildIds": [
+        "build-a",
+        "build-b"
+      ],
+      "builds": [
+        {
+          "buildId": "build-a",
+          "executable": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\desktop-host-proof-b-artifacts\\desktop-build-a\\deszo.exe",
+          "runtime": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\desktop-host-proof-b-artifacts\\desktop-build-a\\runtime",
+          "executableSha256": "4301fc9202a49ead9b4b90a943b2af296b301e56df6e92d54109cbb3ea425ffa",
+          "packageDigest": "fe80e4275fde9a43d0bcc1bea71d52890b8c99092e7f5f735ed18f1e09561e5b"
+        },
+        {
+          "buildId": "build-b",
+          "executable": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\desktop-host-proof-b-artifacts\\desktop-build-b\\deszo.exe",
+          "runtime": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\desktop-host-proof-b-artifacts\\desktop-build-b\\runtime",
+          "executableSha256": "aa76593076ab890863cc2082858fa53d5d40cc5c6a8eaed8fe4d1c556ea390cc",
+          "packageDigest": "e13049ff8a75b711818ca9610e8464b3a15ab2d8a13d6122d66592d5f1c087a5"
+        }
+      ],
+      "candidateDigest": "e13049ff8a75b711818ca9610e8464b3a15ab2d8a13d6122d66592d5f1c087a5",
+      "activatedGeneration": "4ceb9ec1-284f-4298-a1be-39b3d902caa6",
+      "operationId": "8a01e41a-b769-44fc-8cc6-dd87d678de8d",
+      "judgeAuthorization": {
+        "kind": "LifecycleProposal",
+        "engineValidatedRole": "judge",
+        "workflowId": "repair-host-proof-b",
+        "nodeInstanceId": "judge",
+        "attemptId": "01bc7fb4-ee26-48ce-bdf2-4510fec6a42b",
+        "proposalArtifactId": "f94de001-5021-43ed-81f8-aba80728a3f4",
+        "action": "application.activate_candidate",
+        "targetVersion": "build-b",
+        "candidateDigest": "e13049ff8a75b711818ca9610e8464b3a15ab2d8a13d6122d66592d5f1c087a5",
+        "continuationCheckpointId": "chk-desktop-host-proof-b"
+      },
+      "receipt": {
+        "operationId": "8a01e41a-b769-44fc-8cc6-dd87d678de8d",
+        "receiptId": "d54882dd-c4e9-4fa2-9570-0a015ca9751e",
+        "installationId": "ed247128bc6ecf73c1a386f41492a419",
+        "profileRoot": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\desktop-host-proof-b-run-2-9eYvcq\\profile-a",
+        "candidateId": "build-b",
+        "candidateDigest": "e13049ff8a75b711818ca9610e8464b3a15ab2d8a13d6122d66592d5f1c087a5",
+        "previousGeneration": "c2c1718e-7f0c-4a6f-9db9-16a425f9a7a0",
+        "activatedGeneration": "4ceb9ec1-284f-4298-a1be-39b3d902caa6",
+        "storeId": "04e7c89e-511b-478e-b719-04b3b24f0690",
+        "hostPid": 28592,
+        "applicationPid": 16396,
+        "enginePid": 25060,
+        "applicationBuildId": "build-b",
+        "runtimeInstanceId": "702cd674-a132-4d11-bf95-2fa3b1ff82be",
+        "actualActivation": true,
+        "applicationResponsive": true,
+        "engineReady": true
+      },
+      "parentRunId": "e560005f-1e92-4a76-bee5-1d3af5b00088",
+      "repairRunId": "609e0461-ad9e-404e-8b92-f234ae171b19",
+      "storeId": "04e7c89e-511b-478e-b719-04b3b24f0690",
+      "providerPid": 30752,
+      "providerDescendantPid": 20616,
+      "continuation": {
+        "repair": "succeeded",
+        "parent": "succeeded"
+      },
+      "hostTrace": [
+        {
+          "at": "1792732762821",
+          "hostPid": 28592,
+          "payload": {
+            "hostPid": 28592,
+            "installationId": "ed247128bc6ecf73c1a386f41492a419",
+            "profileRoot": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\desktop-host-proof-b-run-2-9eYvcq\\profile-a"
+          },
+          "type": "host_started"
+        },
+        {
+          "at": "1792732767003",
+          "hostPid": 28592,
+          "payload": {
+            "applicationPid": 26856,
+            "arguments": [
+              "--host-managed"
+            ],
+            "bootstrap": "tauri",
+            "buildId": "build-a",
+            "executable": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\desktop-host-proof-b-run-2-9eYvcq\\installation\\versions\\build-a\\deszo.exe",
+            "generation": "c2c1718e-7f0c-4a6f-9db9-16a425f9a7a0",
+            "pid": 26856,
+            "profileRoot": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\desktop-host-proof-b-run-2-9eYvcq\\profile-a"
+          },
+          "type": "application_spawned"
+        },
+        {
+          "at": "1792732772028",
+          "hostPid": 28592,
+          "payload": {
+            "applicationPid": 26856,
+            "buildId": "build-a",
+            "enginePid": 30364,
+            "generation": "c2c1718e-7f0c-4a6f-9db9-16a425f9a7a0",
+            "pid": 30364,
+            "receiptId": null,
+            "runtimeInstanceId": "1c020087-ee8f-4a32-9ab1-b1b1761a8799",
+            "storeId": "04e7c89e-511b-478e-b719-04b3b24f0690"
+          },
+          "type": "engine_ready"
+        },
+        {
+          "at": "1792732782601",
+          "hostPid": 28592,
+          "payload": {
+            "candidateDigest": "e13049ff8a75b711818ca9610e8464b3a15ab2d8a13d6122d66592d5f1c087a5",
+            "candidateId": "build-b",
+            "expectedGeneration": "c2c1718e-7f0c-4a6f-9db9-16a425f9a7a0",
+            "nodeInstanceId": "judge",
+            "operationId": "8a01e41a-b769-44fc-8cc6-dd87d678de8d",
+            "runId": "609e0461-ad9e-404e-8b92-f234ae171b19"
+          },
+          "type": "activation_accepted"
+        },
+        {
+          "at": "1792732786694",
+          "hostPid": 28592,
+          "payload": {
+            "operationId": "8a01e41a-b769-44fc-8cc6-dd87d678de8d",
+            "reason": "managed_restart"
+          },
+          "type": "shutdown_requested"
+        },
+        {
+          "at": "1792732788784",
+          "hostPid": 28592,
+          "payload": {
+            "applicationPid": 26856,
+            "bootstrap": "tauri",
+            "buildId": "build-a",
+            "enginePid": 30364,
+            "generation": "c2c1718e-7f0c-4a6f-9db9-16a425f9a7a0",
+            "pid": 26856
+          },
+          "type": "managed_process_tree_stopped"
+        },
+        {
+          "at": "1792732788796",
+          "hostPid": 28592,
+          "payload": {
+            "operationId": "8a01e41a-b769-44fc-8cc6-dd87d678de8d"
+          },
+          "type": "old_process_stopped"
+        },
+        {
+          "at": "1792732795694",
+          "hostPid": 28592,
+          "payload": {
+            "candidateDigest": "e13049ff8a75b711818ca9610e8464b3a15ab2d8a13d6122d66592d5f1c087a5",
+            "candidateId": "build-b",
+            "generation": "4ceb9ec1-284f-4298-a1be-39b3d902caa6",
+            "operationId": "8a01e41a-b769-44fc-8cc6-dd87d678de8d"
+          },
+          "type": "candidate_activated"
+        },
+        {
+          "at": "1792732796435",
+          "hostPid": 28592,
+          "payload": {
+            "applicationPid": 16396,
+            "arguments": [
+              "--host-managed"
+            ],
+            "bootstrap": "tauri",
+            "buildId": "build-b",
+            "executable": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\desktop-host-proof-b-run-2-9eYvcq\\installation\\versions\\build-b\\deszo.exe",
+            "generation": "4ceb9ec1-284f-4298-a1be-39b3d902caa6",
+            "pid": 16396,
+            "profileRoot": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\desktop-host-proof-b-run-2-9eYvcq\\profile-a"
+          },
+          "type": "application_spawned"
+        },
+        {
+          "at": "1792732802152",
+          "hostPid": 28592,
+          "payload": {
+            "applicationPid": 16396,
+            "buildId": "build-b",
+            "enginePid": 25060,
+            "generation": "4ceb9ec1-284f-4298-a1be-39b3d902caa6",
+            "pid": 25060,
+            "receiptId": "d54882dd-c4e9-4fa2-9570-0a015ca9751e",
+            "runtimeInstanceId": "702cd674-a132-4d11-bf95-2fa3b1ff82be",
+            "storeId": "04e7c89e-511b-478e-b719-04b3b24f0690"
+          },
+          "type": "engine_ready"
+        },
+        {
+          "at": "1792732802362",
+          "hostPid": 28592,
+          "payload": {
+            "applicationPid": 16396,
+            "buildId": "build-b",
+            "enginePid": 25060,
+            "generation": "4ceb9ec1-284f-4298-a1be-39b3d902caa6",
+            "pid": 25060,
+            "receiptId": "d54882dd-c4e9-4fa2-9570-0a015ca9751e",
+            "runtimeInstanceId": "702cd674-a132-4d11-bf95-2fa3b1ff82be",
+            "storeId": "04e7c89e-511b-478e-b719-04b3b24f0690"
+          },
+          "type": "engine_ready"
+        },
+        {
+          "at": "1792732802441",
+          "hostPid": 28592,
+          "payload": {
+            "receiptId": "d54882dd-c4e9-4fa2-9570-0a015ca9751e"
+          },
+          "type": "receipt_acknowledged"
+        }
+      ]
+    }
+  ]
+}

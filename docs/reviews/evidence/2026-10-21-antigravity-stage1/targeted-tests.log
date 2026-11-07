@@ -1,0 +1,160 @@
+TAP version 13
+# Subtest: Antigravity Judge refuses real launch without an installed trusted launcher and cannot convert a managed role
+ok 1 - Antigravity Judge refuses real launch without an installed trusted launcher and cannot convert a managed role
+  ---
+  duration_ms: 3.5181
+  type: 'test'
+  ...
+# Subtest: Antigravity Judge preserves explicit model/effort/session, stdin and native JSON schema without bypass flags
+ok 2 - Antigravity Judge preserves explicit model/effort/session, stdin and native JSON schema without bypass flags
+  ---
+  duration_ms: 0.4307
+  type: 'test'
+  ...
+# Subtest: Antigravity subscription gate rejects API keys, credits, custom quota and malformed/BOM configuration
+ok 3 - Antigravity subscription gate rejects API keys, credits, custom quota and malformed/BOM configuration
+  ---
+  duration_ms: 16.7598
+  type: 'test'
+  ...
+# Subtest: Antigravity historical configuration is not authoritative current entitlement or a zero-cost proof
+ok 4 - Antigravity historical configuration is not authoritative current entitlement or a zero-cost proof
+  ---
+  duration_ms: 3.2455
+  type: 'test'
+  ...
+# Subtest: Antigravity successful-looking denied tool result, missing evidence and wrong conversation are rejected
+ok 5 - Antigravity successful-looking denied tool result, missing evidence and wrong conversation are rejected
+  ---
+  duration_ms: 12.1365
+  type: 'test'
+  ...
+# Subtest: Antigravity schema and execution completeness are checked beyond exit/status/JSON parsing
+ok 6 - Antigravity schema and execution completeness are checked beyond exit/status/JSON parsing
+  ---
+  duration_ms: 1.4225
+  type: 'test'
+  ...
+# Subtest: Judge real Engine commits a bounded review idempotently without accepting code or rewriting the run
+ok 7 - Judge real Engine commits a bounded review idempotently without accepting code or rewriting the run
+  ---
+  duration_ms: 1777.8083
+  type: 'test'
+  ...
+# Subtest: Judge authenticated Engine refuses identity, revision, candidate, evidence and budget forgeries
+ok 8 - Judge authenticated Engine refuses identity, revision, candidate, evidence and budget forgeries
+  ---
+  duration_ms: 1314.6204
+  type: 'test'
+  ...
+# Subtest: Judge scope cannot be registered by external token or used without its separate credentials
+ok 9 - Judge scope cannot be registered by external token or used without its separate credentials
+  ---
+  duration_ms: 825.1068
+  type: 'test'
+  ...
+# Subtest: Judge finite Engine invocation cap cannot be extended by available shared Host budget
+ok 10 - Judge finite Engine invocation cap cannot be extended by available shared Host budget
+  ---
+  duration_ms: 901.1577
+  type: 'test'
+  ...
+# Subtest: Judge registration is disabled by default even for the first-party HTTP owner
+ok 11 - Judge registration is disabled by default even for the first-party HTTP owner
+  ---
+  duration_ms: 305.5747
+  type: 'test'
+  ...
+# Subtest: Judge superseded workflow revision is refused before admission and cannot spend a new model turn
+ok 12 - Judge superseded workflow revision is refused before admission and cannot spend a new model turn
+  ---
+  duration_ms: 915.5585
+  type: 'test'
+  ...
+# Subtest: Judge real Bridge exposes scoped evidence tools and worker-only authenticated decision submission
+ok 13 - Judge real Bridge exposes scoped evidence tools and worker-only authenticated decision submission
+  ---
+  duration_ms: 1738.0752
+  type: 'test'
+  ...
+# Subtest: Judge queue persists the second request and never charges or launches it behind an active turn
+ok 14 - Judge queue persists the second request and never charges or launches it behind an active turn
+  ---
+  duration_ms: 1217.2371
+  type: 'test'
+  ...
+# Subtest: Judge Stop, host revocation and authorization expiry reject otherwise valid decisions
+ok 15 - Judge Stop, host revocation and authorization expiry reject otherwise valid decisions
+  ---
+  duration_ms: 3233.8019
+  type: 'test'
+  ...
+# Subtest: Judge terminal handoff review and timeout never change the terminal run state
+ok 16 - Judge terminal handoff review and timeout never change the terminal run state
+  ---
+  duration_ms: 1154.8294
+  type: 'test'
+  ...
+# Subtest: Judge unknown turn retains its charge and prevents blind replay or owner transfer
+ok 17 - Judge unknown turn retains its charge and prevents blind replay or owner transfer
+  ---
+  duration_ms: 969.8631
+  type: 'test'
+  ...
+# Subtest: Judge durable pending requests survive runtime crash/restart; uncertain turns are never re-dispatched
+ok 18 - Judge durable pending requests survive runtime crash/restart; uncertain turns are never re-dispatched
+  ---
+  duration_ms: 6399.6214
+  type: 'test'
+  ...
+# Subtest: Judge concurrent admission race consumes only one Engine slot and retains correct shared charges
+ok 19 - Judge concurrent admission race consumes only one Engine slot and retains correct shared charges
+  ---
+  duration_ms: 867.8235
+  type: 'test'
+  ...
+# Subtest: Judge scoped Bridge retains the managed-invocation refusal for evidence and decisions
+ok 20 - Judge scoped Bridge retains the managed-invocation refusal for evidence and decisions
+  ---
+  duration_ms: 1052.0212
+  type: 'test'
+  ...
+# Subtest: Judge queue and response expiry preserve barriers and refuse delayed starts without changing terminal history
+ok 21 - Judge queue and response expiry preserve barriers and refuse delayed starts without changing terminal history
+  ---
+  duration_ms: 1878.6532
+  type: 'test'
+  ...
+# Subtest: Existing Host queue + actual Engine/Bridge commit review under real shared ledger; provider/native are explicit fixtures
+ok 22 - Existing Host queue + actual Engine/Bridge commit review under real shared ledger; provider/native are explicit fixtures
+  ---
+  duration_ms: 3589.0092
+  type: 'test'
+  ...
+# Subtest: Existing Host queue fences a crashed worker and preserves unknown invocation charges without replay
+ok 23 - Existing Host queue fences a crashed worker and preserves unknown invocation charges without replay
+  ---
+  duration_ms: 998.6292
+  type: 'test'
+  ...
+# Subtest: Existing worker refuses missing Judge runtime before charging or calling any provider
+ok 24 - Existing worker refuses missing Judge runtime before charging or calling any provider
+  ---
+  duration_ms: 743.5975
+  type: 'test'
+  ...
+# Subtest: Non-fixture Host refuses Judge delivery without independent native custody before any charge
+ok 25 - Non-fixture Host refuses Judge delivery without independent native custody before any charge
+  ---
+  duration_ms: 698.9076
+  type: 'test'
+  ...
+1..25
+# tests 25
+# suites 0
+# pass 25
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 32134.6782

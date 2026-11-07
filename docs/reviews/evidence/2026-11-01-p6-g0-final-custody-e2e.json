@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "evidence": "custody-e2e",
+  "capturedAt": "2026-11-02T12:07:58.567Z",
+  "node": "v22.20.0",
+  "platform": "win32 x64",
+  "operationId": "21bcacc3-e6eb-4884-8557-dee2ff21ce8c",
+  "custodyId": "194f2c3a-f893-44cc-8696-8b74b1f5bbe2",
+  "jobProcesses": {
+    "parent": 32888,
+    "child": 9308
+  },
+  "liveStatus": "running",
+  "refusal": {
+    "status": 409,
+    "code": "custody_jobs_active"
+  },
+  "racingAdmission": {
+    "ok": false,
+    "code": "custody_fenced"
+  },
+  "reopenedAdmission": true,
+  "withdrawnAdmission": true,
+  "stop": {
+    "processTreeEnded": true,
+    "terminal": true
+  },
+  "committedRetry": {
+    "fenceAdmission": {
+      "ok": false,
+      "code": "custody_fenced"
+    },
+    "status": 202
+  },
+  "commits": 1,
+  "selector": {
+    "buildId": "engine-b",
+    "committedOperationId": "21bcacc3-e6eb-4884-8557-dee2ff21ce8c"
+  },
+  "shellSha256": {
+    "before": "60cd2526f37c649d444aeeee74f150a62b32fe53d649cac8e2607f1ddbd72dbe",
+    "after": "60cd2526f37c649d444aeeee74f150a62b32fe53d649cac8e2607f1ddbd72dbe"
+  },
+  "hostSha256": {
+    "before": "c7015bf60ec67628c29d7ec290507e6588c5a4e282f8334df07468e463287ac2",
+    "after": "c7015bf60ec67628c29d7ec290507e6588c5a4e282f8334df07468e463287ac2"
+  }
+}

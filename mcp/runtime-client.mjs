@@ -17,7 +17,7 @@ async function readDescriptor(connectionFile) {
   let value;
   try { value = JSON.parse(bytes.toString('utf8')); }
   catch { throw new BridgeError(400, 'invalid_descriptor', 'The selected connection descriptor is not valid JSON.'); }
-  if (!value || value.descriptorVersion !== 1 || !Array.isArray(value.apiVersions) || !value.apiVersions.includes('v3') ||
+  if (!value || value.descriptorVersion !== 1 || !Array.isArray(value.apiVersions) || !value.apiVersions.includes('v4') ||
       typeof value.token !== 'string' || !/^[0-9a-f]{64}$/i.test(value.token) ||
       !Number.isInteger(value.port) || value.port < 1 || value.port > 65535 ||
       typeof value.storeId !== 'string' || typeof value.runtimeInstanceId !== 'string' ||
@@ -89,7 +89,7 @@ export async function createRuntimeClient({ connectionFile, handshake, marker })
   };
   const api = async (method, path, body, options = {}) => {
     if (managedInvocation) throw new BridgeError(403, managedInvocation.code, managedInvocation.message, managedInvocation.details);
-    if (!path.startsWith('/api/v2/') && !path.startsWith('/api/v3/')) throw new BridgeError(400, 'invalid_request', 'The bridge only forwards versioned Deszo API routes.');
+    if (!path.startsWith('/api/v2/') && !path.startsWith('/api/v3/') && !path.startsWith('/api/v4/')) throw new BridgeError(400, 'invalid_request', 'The bridge only forwards versioned Deszo API routes.');
     const attempted = descriptor;
     try { return await request(attempted, method, path, body, options); }
     catch (error) {

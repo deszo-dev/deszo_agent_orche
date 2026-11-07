@@ -14,11 +14,14 @@ import { nodeTypes, STATE_LABELS } from './nodes';
 import { EffortField, Inspector } from './Inspector';
 import { DEFAULT_EFFORT, type Effort } from '../shared/effort.mjs';
 import { Replay } from './Replay';
+import { AutonomyModal } from './Autonomy';
+import { RunControlPanel, type ControlGrant } from './Supervision';
 import { contextChainTemplate, deliveryTemplate, referenceDeliveryTemplate, reviewLoopTemplate, selectiveDeliveryTemplate, specificationLoopTemplate } from './templates';
 import {
   PROVIDERS, PROVIDER_NAMES, TERMINAL_RUN,
-  type AppSettings, type CachePin, type Capabilities, type ContextBinding, type JournalEvent, type NodeType, type Provider, type Run, type RunSnapshot,
-  type RunRequest, type SavedWorkflow, type Workflow, type WorkflowNode, type WorkflowSummary, type Workspace,
+  type AppSettings, type CachePin, type Capabilities, type ContextBinding, type JournalEvent, type NodeType, type Provider, type Run, type RunSnapshot, type WorkflowJudgeQuestion,
+  type PublishedWorkflow, type RunRequest, type SavedWorkflow, type Workflow, type WorkflowNode, type WorkflowSummary, type Workspace,
+  type PublishedVersionSummary,
 } from './types';
 
 const stored = (key: string) => { try { return localStorage.getItem(key) || ''; } catch { return ''; } };
@@ -42,6 +45,10 @@ function Workspace() {
   const [base, setBase] = useState<Workflow>(() => emptyWorkflow('untitled'));
   const [scope, setScope] = useState<string | null>(null);
   const [saved, setSaved] = useState<SavedWorkflow | null>(null);
+  const [published, setPublished] = useState<PublishedWorkflow | null>(null);
+  const [publishedVersions, setPublishedVersions] = useState<PublishedVersionSummary[]>([]);
+  const [selectedPublishedVersion, setSelectedPublishedVersion] = useState<number | null>(null);
+  const [publishedSelectionLoading, setPublishedSelectionLoading] = useState(false);
   const [externalWorkflow, setExternalWorkflow] = useState<SavedWorkflow | null>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -52,24 +59,26 @@ function Workspace() {
   const [run, setRun] = useState<RunSnapshot | null>(null);
   const [events, setEvents] = useState<JournalEvent[]>([]);
   const [panel, setPanel] = useState<Panel>('problems');
-  const [modal, setModal] = useState<'settings' | 'workspace' | 'workflow' | 'approvals' | null>(null);
+  const [modal, setModal] = useState<'settings' | 'workspace' | 'workflow' | 'approvals' | 'autonomy' | 'control' | null>(null);
   const [chatBinding, setChatBinding] = useState<ContextBinding | null>(null);
   const [pins, setPins] = useState<CachePin[]>([]);
   const [replayRunId, setReplayRunId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [pendingRunRequests, setPendingRunRequests] = useState<RunRequest[]>([]);
+  const [pendingControlGrants, setPendingControlGrants] = useState<ControlGrant[]>([]);
   const [authoringChange, setAuthoringChange] = useState(0);
   const flow = useReactFlow();
   const streamAbort = useRef<AbortController | null>(null);
   const workflowStreamAbort = useRef<AbortController | null>(null);
   const editRevision = useRef(0);
   const selectionRevision = useRef(0);
+  const publishedSelectionSequence = useRef(0);
   const ownSaveRequestId = useRef<string | null>(null);
   const pendingAuthoringEvents = useRef(new Map<string, { sequence: number; eventId: string; workflowId: string; revision: number; requestId: string }>());
   const currentSaved = useRef<SavedWorkflow | null>(null);
   const currentDirty = useRef(false);
   const currentWorkflowId = useRef('');
-  const loadWorkflowRef = useRef<((workflow: Workflow, saved: SavedWorkflow | null, preserveView?: boolean) => void) | null>(null);
+  const loadWorkflowRef = useRef<((workflow: Workflow, saved: SavedWorkflow | null, preserveView?: boolean, published?: PublishedWorkflow | null) => void) | null>(null);
 
   const report = useCallback((error: unknown, prefix = '') => {
     if (error instanceof ApiProblem) setNotice({ kind: 'error', text: `${prefix}${error.message}`, details: error.details.map(item => `${item.path} ${item.message}`) });
@@ -98,7 +107,7 @@ function Workspace() {
 
   const refreshLists = useCallback(async () => {
     if (!client) return;
-    const [ws, wf] = await Promise.all([client.get<{ items: Workspace[] }>('/workspaces?limit=200'), client.getV3<{ items: WorkflowSummary[] }>('/workflows?limit=200')]);
+    const [ws, wf] = await Promise.all([client.get<{ items: Workspace[] }>('/workspaces?limit=200'), client.getV4<{ items: WorkflowSummary[] }>('/workflows?limit=200')]);
     setWorkspaces(ws.items); setWorkflows(wf.items);
     if (!ws.items.length) {
       setWorkspaceId('');
@@ -122,16 +131,40 @@ function Workspace() {
     setBase(next); setScope(nextScope); setNodes(converted.nodes); setEdges(converted.edges); setSelected(null);
     setTimeout(() => flow.fitView({ padding: 0.2, duration: 200 }), 50);
   }, [flow, setEdges, setNodes]);
-  const loadWorkflow = useCallback((next: Workflow, savedWorkflow: SavedWorkflow | null, preserveView = false) => {
+  const loadWorkflow = useCallback((next: Workflow, savedWorkflow: SavedWorkflow | null, preserveView = false, publishedWorkflow: PublishedWorkflow | null = null) => {
+    publishedSelectionSequence.current += 1;
     const selectedBefore = selected;
     const nextScope = preserveView && scope && loopOf(next, scope) ? scope : null;
     const viewport = preserveView ? flow.getViewport() : null;
     showScope(next, nextScope);
     setSelected(preserveView && selectedBefore && graphOf(next, nextScope).nodes.some(node => node.id === selectedBefore) ? selectedBefore : null);
-    setSaved(savedWorkflow); setExternalWorkflow(null); setDirty(!savedWorkflow); selectionRevision.current += 1; remember('deszo.workflow', next.workflowId);
+    setSaved(savedWorkflow); setPublished(publishedWorkflow); setPublishedSelectionLoading(false); setSelectedPublishedVersion(publishedWorkflow?.version ?? null);
+    setExternalWorkflow(null); setDirty(!savedWorkflow); selectionRevision.current += 1; remember('deszo.workflow', next.workflowId);
     if (viewport) setTimeout(() => flow.setViewport(viewport, { duration: 0 }), 80);
   }, [flow, scope, selected, showScope]);
   loadWorkflowRef.current = loadWorkflow;
+
+  const openWorkflow = useCallback(async (workflowId: string, preserveView = false) => {
+    if (!client) return;
+    const [latest, versions] = await Promise.all([
+      client.getV4<PublishedWorkflow>(`/workflows/${workflowId}/versions/latest`).catch(error => {
+        if (error instanceof ApiProblem && error.status === 404) return null;
+        throw error;
+      }),
+      client.listPublishedVersions<PublishedVersionSummary>(workflowId).catch(error => {
+        if (error instanceof ApiProblem && error.status === 404) return [];
+        throw error;
+      }),
+    ]);
+    setPublishedVersions(versions);
+    let draft: SavedWorkflow;
+    try { draft = await client.getV4<SavedWorkflow>(`/workflows/${workflowId}/draft`); }
+    catch (error) {
+      if (!(error instanceof ApiProblem && error.status === 404) || !latest) throw error;
+      draft = await client.deriveDraft<SavedWorkflow>(workflowId, latest.version, crypto.randomUUID(), null);
+    }
+    loadWorkflow(draft.workflow, draft, preserveView, latest);
+  }, [client, loadWorkflow]);
 
   useEffect(() => {
     if (!client) return;
@@ -168,8 +201,13 @@ function Workspace() {
             await refreshLists();
             const activeId = currentWorkflowId.current;
             if (activeId && !currentDirty.current) {
-              const latest = await client.getV3<SavedWorkflow>(`/workflows/${activeId}`).catch(() => null);
-              if (latest && latest.revision > (currentSaved.current?.revision || 0)) loadWorkflowRef.current?.(latest.workflow, latest, true);
+              const latest = await client.getV4<SavedWorkflow>(`/workflows/${activeId}/draft`).catch(() => null);
+              const [publication, versions] = await Promise.all([
+                client.getV4<PublishedWorkflow>(`/workflows/${activeId}/versions/latest`).catch(() => null),
+                client.listPublishedVersions<PublishedVersionSummary>(activeId).catch(() => []),
+              ]);
+              setPublishedVersions(versions);
+              if (latest && latest.revision > (currentSaved.current?.revision || 0)) loadWorkflowRef.current?.(latest.workflow, latest, true, publication);
             }
           }
         } catch (error) {
@@ -188,21 +226,29 @@ function Workspace() {
     const event = pendingAuthoringEvents.current.get(workflow.workflowId);
     if (!event) return;
     let active = true;
-    client.getV3<SavedWorkflow>(`/workflows/${event.workflowId}`).then(latest => {
+    client.getV4<SavedWorkflow>(`/workflows/${event.workflowId}/draft`).then(async latest => {
+      const [publication, versions] = await Promise.all([
+        client.getV4<PublishedWorkflow>(`/workflows/${event.workflowId}/versions/latest`).catch(() => null),
+        client.listPublishedVersions<PublishedVersionSummary>(event.workflowId).catch(() => []),
+      ]);
+      setPublishedVersions(versions);
       if (!active || latest.revision <= (currentSaved.current?.revision || 0)) {
         pendingAuthoringEvents.current.delete(event.workflowId);
         return;
       }
       pendingAuthoringEvents.current.delete(event.workflowId);
       if (currentDirty.current) setExternalWorkflow(latest);
-      else loadWorkflowRef.current?.(latest.workflow, latest, true);
+      else loadWorkflowRef.current?.(latest.workflow, latest, true, publication);
     }).catch(error => { if (active) report(error, 'External workflow update: '); });
     return () => { active = false; };
   }, [authoringChange, client, dirty, report, saved?.revision, workflow.workflowId]);
 
   const refreshRunRequests = useCallback(async () => {
-    if (!client?.hasFirstParty) { setPendingRunRequests([]); return; }
-    try { setPendingRunRequests((await client.get<{ items: RunRequest[] }>('/run-requests?state=pending&limit=100')).items); }
+    if (!client?.hasFirstParty) { setPendingRunRequests([]); setPendingControlGrants([]); return; }
+    try {
+      const [requests, grants] = await Promise.all([client.get<{ items: RunRequest[] }>('/run-requests?state=pending&limit=100'), client.get<{ items: ControlGrant[] }>('/control-grants?state=pending&limit=100')]);
+      setPendingRunRequests(requests.items); setPendingControlGrants(grants.items);
+    }
     catch (error) { report(error, 'Approval queue: '); }
   }, [client, report]);
   useEffect(() => {
@@ -218,9 +264,9 @@ function Workspace() {
   useEffect(() => {
     if (!client) return;
     const last = stored('deszo.workflow');
-    if (!last) { loadWorkflow(contextChainTemplate(), null); return; }
-    client.getV3<SavedWorkflow>(`/workflows/${last}`).then(result => loadWorkflow(result.workflow, result)).catch(() => loadWorkflow(contextChainTemplate(), null));
-  }, [client]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!last) { setPublishedVersions([]); loadWorkflow(contextChainTemplate(), null); return; }
+    openWorkflow(last).catch(() => { setPublishedVersions([]); loadWorkflow(contextChainTemplate(), null); });
+  }, [client, openWorkflow]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!client) return;
@@ -343,11 +389,11 @@ function Workspace() {
         else setDirty(true);
         remember('deszo.workflow', workflowId);
       }
-      setWorkflows((await client.getV3<{ items: WorkflowSummary[] }>('/workflows?limit=200')).items);
+      setWorkflows((await client.getV4<{ items: WorkflowSummary[] }>('/workflows?limit=200')).items);
       return result;
     } catch (error) {
       if (error instanceof ApiProblem && error.status === 412) {
-        const remote = await client.getV3<SavedWorkflow>(`/workflows/${workflowId}`).catch(() => null);
+        const remote = await client.getV4<SavedWorkflow>(`/workflows/${workflowId}/draft`).catch(() => null);
         if (remote && selectionRevision.current === selectionAtStart && currentWorkflowId.current === workflowId) {
           setExternalWorkflow(remote);
           setNotice({ kind: 'error', text: `Save conflict: ${workflowId} changed in another editor. Your draft is still here.` });
@@ -357,6 +403,58 @@ function Workspace() {
       report(error, 'Save failed: '); return null;
     } finally { if (ownSaveRequestId.current === requestId) ownSaveRequestId.current = null; }
   }, [client, edges, nodes, report, saved, scope, workflow]);
+
+  const validateDraft = async () => {
+    if (!client) return false;
+    const current = dirty || !saved ? await save() : saved;
+    if (!current) return false;
+    try {
+      const result = await client.validateDraft<{ workflowId: string; revision: number; etag: string; validation: { valid: boolean; issues: { path: string; message: string }[] } }>(workflow.workflowId, current.etag);
+      setIssues(result.validation.issues);
+      setNotice(result.validation.valid ? { kind: 'info', text: `Draft revision ${result.revision} is valid and ready to publish.` } : { kind: 'error', text: `Draft revision ${result.revision} has validation issues.` , details: result.validation.issues.map(issue => `${issue.path} ${issue.message}`) });
+      return result.validation.valid;
+    } catch (error) { report(error, 'Draft validation failed: '); return false; }
+  };
+
+  const publish = async () => {
+    if (!client) return;
+    setBusy(true);
+    try {
+      const current = dirty || !saved ? await save() : saved;
+      if (!current) return;
+      const validation = await client.validateDraft<{ validation: { valid: boolean; issues: { path: string; message: string }[] } }>(workflow.workflowId, current.etag);
+      setIssues(validation.validation.issues);
+      if (!validation.validation.valid) {
+        setPanel('problems'); setNotice({ kind: 'error', text: 'The Draft has validation issues and cannot be published.', details: validation.validation.issues.map(issue => `${issue.path} ${issue.message}`) }); return;
+      }
+      const result = await client.publishDraft<PublishedWorkflow>(workflow.workflowId, crypto.randomUUID(), current.etag);
+      setPublished(result); setSelectedPublishedVersion(result.version);
+      setPublishedVersions(await client.listPublishedVersions<PublishedVersionSummary>(workflow.workflowId));
+      setNotice({ kind: 'info', text: `Published Version ${result.version} (${result.definitionDigest.slice(0, 12)}).` });
+      setWorkflows((await client.getV4<{ items: WorkflowSummary[] }>('/workflows?limit=200')).items);
+    } catch (error) { report(error, 'Publication failed: '); }
+    finally { setBusy(false); }
+  };
+
+  const selectPublishedVersion = async (version: number) => {
+    if (!client) return;
+    const workflowId = workflow.workflowId;
+    const selection = ++publishedSelectionSequence.current;
+    setSelectedPublishedVersion(version);
+    setPublishedSelectionLoading(true);
+    try {
+      const selectedVersion = await client.getV4<PublishedWorkflow>(`/workflows/${workflowId}/versions/${version}`);
+      if (selection !== publishedSelectionSequence.current || currentWorkflowId.current !== workflowId) return;
+      setPublished(selectedVersion);
+      setIssues(selectedVersion.runnable ? [] : selectedVersion.validation.issues);
+    } catch (error) {
+      if (selection !== publishedSelectionSequence.current || currentWorkflowId.current !== workflowId) return;
+      setSelectedPublishedVersion(published?.version ?? null);
+      report(error, 'Published Version could not be loaded: ');
+    } finally {
+      if (selection === publishedSelectionSequence.current && currentWorkflowId.current === workflowId) setPublishedSelectionLoading(false);
+    }
+  };
 
   const refreshRun = useCallback(async (runId: string) => {
     if (!client) return;
@@ -391,23 +489,28 @@ function Workspace() {
 
   const start = async (plan: { mode?: 'branch' | 'node'; targets?: string[]; refreshCaches?: string[] } = {}) => {
     if (!client) return;
+    if (publishedSelectionLoading) return;
     if (!workspaceId) { setModal('workspace'); return; }
     setBusy(true); setNotice(null);
     try {
-      const current = dirty || !saved ? await save() : saved;
-      if (!current) return;
-      if (!current.validation.valid) { setPanel('problems'); setNotice({ kind: 'error', text: 'Fix the listed problems before running.' }); return; }
+      if (dirty) { setNotice({ kind: 'error', text: 'Save and publish the current Draft before running it. Run uses the selected immutable Published Version.' }); return; }
+      if (!published || published.workflowId !== workflow.workflowId) { setNotice({ kind: 'error', text: 'Publish this workflow before starting a Run.' }); return; }
+      if (!published.runnable) { setPanel('problems'); setIssues(published.validation.issues); setNotice({ kind: 'error', text: `Published Version ${published.version} is not Runnable. Derive a Draft, correct it, and publish a new version.`, details: published.validation.issues.map(issue => `${issue.path} ${issue.message}`) }); return; }
       const waiting = (await client.get<{ items: Run[] }>(`/runs?workspaceId=${workspaceId}&state=waiting_for_user&limit=1`)).items[0];
       if (waiting) {
         if (!window.confirm(`Run ${waiting.runId.slice(0, 8)} (${waiting.workflowId}) is waiting for a recovery decision and holds this workspace. Close it as failed and start a new run?`)) return;
         await client.post(`/runs/${waiting.runId}/recovery`, { requestId: crypto.randomUUID(), action: 'close' });
       }
-      const accepted = await client.post<{ outcome: 'created'; run: Run } | { outcome: 'confirmation_pending'; requestId: string; statusPath: string }>('/runs', { workflowId: current.workflow.workflowId, workflowSnapshotSha256: current.snapshotSha256, workspaceId, requestId: crypto.randomUUID(), ...plan });
+      const accepted = await client.post<{ outcome: 'created'; run: Run } | { outcome: 'confirmation_pending'; requestId: string; statusPath: string }>('/runs', {
+        workflowId: published.workflowId, workflowSnapshotSha256: published.snapshotSha256, publishedVersionId: published.publishedVersionId,
+        definitionDigest: published.definitionDigest, workspaceId, requestId: crypto.randomUUID(), ...plan,
+      });
       if (accepted.outcome === 'confirmation_pending') {
         setNotice({ kind: 'info', text: `Run request ${accepted.requestId.slice(0, 8)} is waiting for approval in Deszo.` });
         if (client.hasFirstParty) setModal('approvals');
         return;
       }
+      setNotice({ kind: 'info', text: `Run started from Published Version ${published.version}.` });
       setPanel('run');
       attach(await client.get<RunSnapshot>(`/runs/${accepted.run.runId}`));
     } catch (error) { report(error, 'Run was not started: '); }
@@ -518,7 +621,7 @@ function Workspace() {
       <div className="brand">de<span>s</span>zo</div>
       <button className="chip-button" onClick={() => setModal('workspace')} title="Workspace and working directory"><FolderOpen size={14} />{workspaceId || 'Choose workspace'}</button>
       <button className="chip-button" onClick={() => setModal('workflow')} title="Open or create a workflow"><WorkflowIcon size={14} />{workflow.workflowId}{dirty && <i className="dirty-dot" title="Unsaved changes" />}</button>
-      {client?.hasFirstParty && <button className="chip-button" onClick={() => setModal('approvals')} title="Review external run requests"><ShieldCheck size={14} />Approvals{pendingRunRequests.length > 0 && <span className="approval-count">{pendingRunRequests.length}</span>}</button>}
+      {client?.hasFirstParty && <button className="chip-button" onClick={() => setModal('approvals')} title="Review external run requests and supervision grants"><ShieldCheck size={14} />Approvals{pendingRunRequests.length + pendingControlGrants.length > 0 && <span className="approval-count">{pendingRunRequests.length + pendingControlGrants.length}</span>}</button>}
       {scope && <span className="crumbs"><button className="chip-button" onClick={() => enterScope(null)}><ArrowLeft size={13} />Workflow</button>
         {path.map((id, index) => <span key={id} className="crumbs">
           <span className="muted">›</span>
@@ -526,10 +629,22 @@ function Workspace() {
         </span>)}</span>}
       <div className="spacer" />
       {run && <span className={`run-pill ${run.run.state}`}>{RUN_LABELS[run.run.state]}</span>}
-      <button className="button secondary" onClick={() => save()} disabled={!client}><Save size={14} />Save</button>
+      {run && <button className="chip-button" onClick={() => setModal('control')}><ShieldCheck size={14} />{run.run.controlMode === 'supervised' ? 'Supervised' : 'Run control'}</button>}
+      {publishedVersions.length > 0 && <label className="published-version-picker">
+        <span>Published</span>
+        <select aria-label="Published Version" value={selectedPublishedVersion ?? ''} onChange={event => void selectPublishedVersion(Number(event.target.value))}>
+          {publishedVersions.map(version => <option key={version.publishedVersionId} value={version.version}>
+            v{version.version}{version.runnable ? '' : ' · not Runnable'}
+          </option>)}
+        </select>
+      </label>}
+      <button className="button ghost" onClick={() => void validateDraft()} disabled={!client || busy || (!dirty && !saved)}><ListChecks size={14} />Validate Draft</button>
+      <button className="button secondary" onClick={() => save()} disabled={!client || busy}><Save size={14} />Save Draft</button>
+      <button className="button secondary" onClick={() => void publish()} disabled={!client || busy}><ListChecks size={14} />Publish</button>
       {active && run.run.state !== 'waiting_for_user' ? <button className="button danger" onClick={stop} disabled={run.run.state === 'stopping'}><Square size={14} />Stop run</button>
-        : <button className="button primary" onClick={() => start()} disabled={!client || busy}><Play size={14} />Run workflow</button>}
+        : <button className="button primary" onClick={() => start()} disabled={!client || busy || publishedSelectionLoading}><Play size={14} />Run workflow</button>}
       <button className="icon-button" onClick={() => setModal('settings')} title="Settings and providers"><Settings size={16} /></button>
+      <button className="chip-button" onClick={() => setModal('autonomy')} title="Time-bounded development autonomy"><ShieldCheck size={14} />Autonomy</button>
     </header>
     {notice && <div className={`notice ${notice.kind}`}><div><strong>{notice.text}</strong>{notice.details?.length ? <ul>{notice.details.slice(0, 8).map(item => <li key={item}>{item}</li>)}</ul> : null}</div><button onClick={() => setNotice(null)}>×</button></div>}
     <div className="main-grid">
@@ -549,6 +664,7 @@ function Workspace() {
         <PaletteItem icon={<Repeat size={14} />} label="Loop" hint={scope ? 'Nested loop (pipeline)' : 'Repeat a body until done'} onClick={() => addNode('loop')} />
         <PaletteItem icon={<Database size={14} />} label="Cache" hint="Checkpoint; freeze to skip its producer" onClick={() => addNode('cache')} />
         <h4>Pipeline</h4>
+        <PaletteItem icon={<ListChecks size={14} />} label="Managed Task" hint="Assess, plan, implement and verify" onClick={() => addNode('task')} />
         <PaletteItem icon={<Split size={14} />} label="Route" hint="Pick one branch by a JSON value" onClick={() => addNode('route')} />
         <PaletteItem icon={<ShieldCheck size={14} />} label="Gate" hint="Prepare, evaluate or verify reviews" onClick={() => addNode('gate')} />
         <PaletteItem icon={<ListChecks size={14} />} label="Implementation Map" hint="Run approved tasks with checks" onClick={() => addNode('map')} />
@@ -570,7 +686,7 @@ function Workspace() {
           <span>Saved revision {externalWorkflow.revision} is newer. Your draft is preserved.</span>
           <button className="button small ghost" onClick={() => {
             if (dirty && !window.confirm('Replace the unsaved draft with the newer saved workflow?')) return;
-            loadWorkflow(externalWorkflow.workflow, externalWorkflow, true);
+            openWorkflow(externalWorkflow.workflow.workflowId, true).catch(error => report(error, 'Reload Draft failed: '));
           }}>Reload revision</button>
           <button className="button small secondary" onClick={async () => {
             if (!client) return;
@@ -585,7 +701,7 @@ function Workspace() {
             ownSaveRequestId.current = requestId;
             try {
               const result = await client.saveWorkflow<SavedWorkflow>(id, requestId, null, copy);
-              setWorkflows((await client.getV3<{ items: WorkflowSummary[] }>('/workflows?limit=200')).items);
+              setWorkflows((await client.getV4<{ items: WorkflowSummary[] }>('/workflows?limit=200')).items);
               if (selectionRevision.current === selectionAtStart && editRevision.current === editAtStart && currentWorkflowId.current === workflow.workflowId) {
                 loadWorkflow(result.workflow, result, true);
                 setNotice({ kind: 'info', text: `Saved your draft as ${id}.` });
@@ -623,6 +739,7 @@ function Workspace() {
       onLoadCaptured={async snapshot => {
         if (!client) return;
         if (dirty && !window.confirm('Replace the unsaved editor draft with the captured workflow of this run?')) return;
+        setPublishedVersions([]);
         loadWorkflow(await client.artifactJson<Workflow>(snapshot.run.workflowSnapshot.artifactId), null);
       }} report={report} onSelectNode={id => {
         const parts = id.split('/');
@@ -631,18 +748,21 @@ function Workspace() {
         setTimeout(() => setSelected(nodeId), 80);
       }} />
     {chatBinding && client && <ChatModal client={client} binding={chatBinding} workspaceId={workspaceId} onClose={() => { setChatBinding(null); refreshBindings().catch(() => {}); }} report={report} />}
-    {modal === 'approvals' && client?.hasFirstParty && <ApprovalModal client={client} requests={pendingRunRequests} onClose={() => setModal(null)} onChanged={refreshRunRequests} report={report} />}
+    {modal === 'approvals' && client?.hasFirstParty && <ApprovalModal client={client} requests={pendingRunRequests} grants={pendingControlGrants} onClose={() => setModal(null)} onChanged={refreshRunRequests} report={report} />}
     {modal === 'settings' && client && <SettingsModal client={client} capabilities={capabilities} onCapabilities={setCapabilities} onClose={() => setModal(null)} report={report} />}
+    {modal === 'control' && client && run && <Modal title="Run control" onClose={() => setModal(null)}><RunControlPanel client={client} runId={run.run.runId} report={report} /></Modal>}
+    {modal === 'autonomy' && client && <AutonomyModal client={client} workspace={workspaces.find(item => item.workspaceId === workspaceId)} saved={dirty ? null : saved} onClose={() => setModal(null)} report={report} />}
     {modal === 'workspace' && client && <WorkspaceModal client={client} workspaces={workspaces} current={workspaceId} onSelect={id => { setWorkspaceId(id); setModal(null); }}
       onCreated={async id => { await refreshLists(); setWorkspaceId(id); setModal(null); }} onClose={() => setModal(null)} report={report} />}
     {modal === 'workflow' && client && <WorkflowModal workflows={workflows} onClose={() => setModal(null)} report={report}
       onOpen={async id => {
         if (dirty && !window.confirm('Discard unsaved changes in the current workflow?')) return;
-        const result = await client.getV3<SavedWorkflow>(`/workflows/${id}`); loadWorkflow(result.workflow, result); setModal(null);
+        try { await openWorkflow(id); setModal(null); } catch (error) { report(error, 'Could not open workflow: '); }
       }}
       onCreate={(id, template) => {
         if (dirty && !window.confirm('Discard unsaved changes in the current workflow?')) return;
         const source = template === 'chain' ? contextChainTemplate() : template === 'loop' ? reviewLoopTemplate() : template === 'spec' ? specificationLoopTemplate() : template === 'delivery' ? deliveryTemplate() : template === 'selective' ? selectiveDeliveryTemplate() : template === 'reference' ? referenceDeliveryTemplate() : emptyWorkflow(id);
+        setPublishedVersions([]);
         loadWorkflow({ ...source, workflowId: id }, null); setModal(null);
       }} />}
   </div>;
@@ -702,6 +822,8 @@ function BottomPanel({ panel, setPanel, issues, run, events, client, workspaceId
   const [history, setHistory] = useState<Run[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [showLogs, setShowLogs] = useState(false);
+  const [workflowJudgeEnabled, setWorkflowJudgeEnabled] = useState(Boolean(workflow.judgePolicy));
+  const onWorkflowJudgeState = useCallback((enabled: boolean) => setWorkflowJudgeEnabled(enabled), []);
   const loadHistory = useCallback(async (more = false) => {
     if (!client || !workspaceId) return;
     try {
@@ -729,7 +851,10 @@ function BottomPanel({ panel, setPanel, issues, run, events, client, workspaceId
           <button className="button small ghost" onClick={() => onReplay(run.run.runId)}><History size={12} />Replay</button>
           <button className="button small ghost" onClick={() => onLoadCaptured(run)}>Load captured workflow</button>
         </div>
-        {run.run.state === 'waiting_for_user' && client?.hasFirstParty && <RecoveryPanel run={run} workflow={workflow} onRecovery={onRecovery} />}
+        <WorkflowJudgePanel runId={run.run.runId} runState={run.run.state} client={client} eventsCursor={events.at(-1)?.sequence ?? 0}
+          report={report} onRecovery={onRecovery} onState={onWorkflowJudgeState} />
+        {run.run.state === 'waiting_for_user' && client?.hasFirstParty && !workflowJudgeEnabled && !workflow.judgePolicy
+          && <RecoveryPanel run={run} workflow={workflow} onRecovery={onRecovery} />}
         <table><tbody>{visible.map(event => <tr key={event.sequence} onClick={() => event.nodeInstanceId && onSelectNode(event.nodeInstanceId)}>
           <td className="seq">#{event.sequence}</td><td className="time">{new Date(event.timestamp).toLocaleTimeString()}</td>
           <td className="type">{event.type}</td><td className="node">{event.nodeInstanceId || ''}</td><td className="payload">{describe(event)}</td>
@@ -754,6 +879,61 @@ function BottomPanel({ panel, setPanel, issues, run, events, client, workspaceId
           }}>Accept current state</button>}</td></tr>)}</tbody></table>}
       </div>}
     </div>
+  </section>;
+}
+
+function WorkflowJudgePanel({ runId, runState, client, eventsCursor, report, onRecovery, onState }: {
+  runId: string; runState: RunSnapshot['run']['state']; client: Client | null; eventsCursor: number;
+  report: (error: unknown, prefix?: string) => void; onRecovery: (body: Record<string, unknown>) => void; onState: (enabled: boolean) => void;
+}) {
+  const [data, setData] = useState<{ enabled: boolean; barrier: boolean; items: WorkflowJudgeQuestion[] }>({ enabled: false, barrier: false, items: [] });
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState<string | null>(null);
+  const refresh = useCallback(async () => {
+    if (!client) return;
+    try {
+      const next = await client.get<{ enabled: boolean; barrier: boolean; items: WorkflowJudgeQuestion[] }>(`/runs/${runId}/judge-questions`);
+      setData(next); onState(next.enabled);
+    } catch (error) { report(error, 'Judge questions could not be loaded: '); }
+  }, [client, onState, report, runId]);
+  useEffect(() => { refresh(); }, [refresh, eventsCursor]);
+  if (!data.enabled && data.items.length === 0) return null;
+  const pending = data.items.filter(item => item.status === 'pending');
+  const closeRun = () => {
+    if (window.confirm('Close this Run as failed? This supersedes any pending Judge question and linked continuation.')) onRecovery({ action: 'close' });
+  };
+  const answer = async (question: WorkflowJudgeQuestion) => {
+    if (!client || !client.hasFirstParty) return;
+    const value = values[question.questionId] || '';
+    const typedAnswer = question.answerSpec.type === 'choice'
+      ? { type: 'choice' as const, optionId: value }
+      : { type: 'text' as const, value };
+    setSubmitting(question.questionId);
+    try {
+      await client.post(`/judge-questions/${question.questionId}/answers`, { requestId: crypto.randomUUID(), answer: typedAnswer });
+      await refresh();
+    } catch (error) { report(error, 'Judge answer was not accepted: '); }
+    finally { setSubmitting(null); }
+  };
+  return <section className="judge-questions" aria-label="Workflow Judge questions">
+    <div className="judge-questions-head"><h4>Workflow Judge</h4><span className="muted small">{data.barrier ? 'Run held at a Judge decision boundary' : 'No unresolved Judge barrier'}</span></div>
+    {pending.length === 0 && <p className="muted small">{data.enabled ? 'There is no open typed question. The Judge may be waiting for meaningful evidence progress.' : 'No open questions.'}</p>}
+    {data.items.map(question => <article className="judge-question" key={question.questionId}>
+      <div className="judge-question-title"><strong>{question.status === 'pending' ? 'Owner input requested' : `Question ${question.status}`}</strong>
+        {question.originatingRunId !== runId && <span className="muted small">Linked Repair</span>}</div>
+      <p>{question.question}</p>
+      {question.status === 'pending' && (question.answerSpec.type === 'choice'
+        ? <label className="field"><span>Your answer</span><select value={values[question.questionId] || ''} onChange={event => setValues(current => ({ ...current, [question.questionId]: event.target.value }))}>
+          <option value="">Choose an answer</option>{question.answerSpec.options.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
+        </select></label>
+        : <label className="field"><span>Your answer</span><textarea maxLength={question.answerSpec.maxLength} value={values[question.questionId] || ''}
+          onChange={event => setValues(current => ({ ...current, [question.questionId]: event.target.value }))} /></label>)}
+      {question.status === 'pending' && <button className="button small secondary" disabled={!client?.hasFirstParty || submitting === question.questionId
+        || (question.answerSpec.type === 'choice' && !values[question.questionId])} onClick={() => answer(question)}>
+        {submitting === question.questionId ? 'Submitting…' : 'Submit answer'}
+      </button>}
+    </article>)}
+    {data.enabled && runState === 'waiting_for_user' && client?.hasFirstParty && <button className="button small ghost" onClick={closeRun}>Close Run</button>}
   </section>;
 }
 
@@ -889,7 +1069,7 @@ function WorkflowModal({ workflows, onOpen, onCreate, onClose, report }: { workf
   const create = (template: Template) => validId(id) ? onCreate(id, template) : report(new Error('Use lowercase letters, digits and hyphens, starting with a letter.'));
   return <Modal title="Workflows" onClose={onClose}>
     <div className="list">{workflows.length === 0 ? <p className="muted">No saved workflows yet.</p> : workflows.map(item => <button key={item.workflowId} className="list-item" onClick={() => onOpen(item.workflowId)}>
-      <strong>{item.workflowId}</strong><small>Updated {new Date(item.updatedAt).toLocaleString()} · {item.snapshotSha256.slice(0, 10)}</small></button>)}</div>
+      <strong>{item.workflowId}</strong><small>Updated {new Date(item.updatedAt).toLocaleString()} · {item.draftRevision === null ? 'no Draft' : `Draft r${item.draftRevision}`} · {item.latestPublishedVersion === null ? 'unpublished' : `Published v${item.latestPublishedVersion}${item.runnable ? '' : ' · not Runnable'}`}</small></button>)}</div>
     <h4 className="section-title">New workflow</h4>
     <label className="field"><span>Workflow ID</span><input value={id} onChange={event => setId(event.target.value.toLowerCase())} placeholder="review-chain" /></label>
     <div className="modal-actions">
@@ -904,22 +1084,38 @@ function WorkflowModal({ workflows, onOpen, onCreate, onClose, report }: { workf
   </Modal>;
 }
 
-function ApprovalModal({ client, requests, onClose, onChanged, report }: { client: Client; requests: RunRequest[]; onClose: () => void; onChanged: () => Promise<void>; report: (error: unknown, prefix?: string) => void }) {
+function ApprovalModal({ client, requests, grants, onClose, onChanged, report }: { client: Client; requests: RunRequest[]; grants: ControlGrant[]; onClose: () => void; onChanged: () => Promise<void>; report: (error: unknown, prefix?: string) => void }) {
   const [busyRequest, setBusyRequest] = useState<string | null>(null);
-  const decide = async (requestId: string, decision: 'approve' | 'deny') => {
+  const decide = async (requestId: string, decision: 'approve' | 'deny', kind: 'run-requests' | 'control-grants' = 'run-requests') => {
     setBusyRequest(requestId);
     try {
-      await client.post(`/run-requests/${requestId}/decision`, { requestId: crypto.randomUUID(), decision });
+      await client.post(`/${kind}/${requestId}/decision`, { requestId: crypto.randomUUID(), decision });
     } catch (error) { report(error, `Could not ${decision} run request: `); }
     finally { await onChanged(); setBusyRequest(null); }
   };
-  return <Modal title={`External run requests · ${requests.length} pending`} onClose={onClose}>
+  return <Modal title={`Approvals · ${requests.length + grants.length} pending`} onClose={onClose}>
+    {grants.map(item => <article className="approval-item" key={item.grantId}>
+      <div className="approval-heading"><strong>Supervision · {item.workflowId}</strong><span className="state-chip waiting_for_user">Pending</span></div>
+      <dl className="approval-facts">
+        <div><dt>Workspace</dt><dd>{item.workspaceId}</dd></div>
+        <div><dt>Controller</dt><dd>{item.clientLabel || item.clientProvider} <em>(unverified client claim)</em></dd></div>
+        <div><dt>Client version</dt><dd>{item.clientVersion || 'Not supplied'}</dd></div>
+        <div><dt>Snapshot</dt><dd><code>{item.workflowSnapshotSha256.slice(0, 16)}…</code></dd></div>
+        <div><dt>Actions</dt><dd>{item.requestedActions.join(', ')}</dd></div>
+        <div><dt>Observation / Stop</dt><dd>{item.observationDeadlineMs / 1000}s / {item.escalationDeadlineMs / 1000}s</dd></div>
+      </dl>
+      <div className="modal-actions">
+        <button className="button secondary" disabled={busyRequest === item.grantId} onClick={() => decide(item.grantId, 'deny', 'control-grants')}>Deny supervision</button>
+        <button className="button primary" disabled={busyRequest === item.grantId} onClick={() => decide(item.grantId, 'approve', 'control-grants')}>Approve supervision</button>
+      </div>
+    </article>)}
     {requests.length === 0 ? <div className="empty">No pending run requests.</div> : <div className="approval-list">{requests.map(item => <article className="approval-item" key={item.requestId}>
       <div className="approval-heading"><strong>{item.workflowId}</strong><span className="state-chip waiting_for_user">Pending</span></div>
       <dl className="approval-facts">
         <div><dt>Workspace</dt><dd>{item.workspaceId}</dd></div>
         <div><dt>Requested by</dt><dd>{item.clientLabel || 'Unlabelled client'} <em>(unverified client claim)</em></dd></div>
         <div><dt>Snapshot</dt><dd><code>{item.workflowSnapshotSha256.slice(0, 16)}…</code></dd></div>
+        <div><dt>Control</dt><dd>{item.controlModeRequested || 'unsupervised'}</dd></div>
         <div><dt>Expires</dt><dd>{new Date(item.expiresAt).toLocaleString()}</dd></div>
       </dl>
       <div className="modal-actions">

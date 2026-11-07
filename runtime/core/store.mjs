@@ -10,25 +10,9 @@ export class CorruptionError extends Error {
   constructor(message) { super(message); this.code = 'corruption'; }
 }
 
-// The bundled release ships m1.sql next to the runtime; development reads the documented DDL.
-const BUNDLED_DDL = new URL('./m1.sql', import.meta.url);
-const DDL_PATH = process.env.DESZO_DDL_PATH || (existsSync(BUNDLED_DDL) ? BUNDLED_DDL : new URL('../../docs/storage/m1.sql', import.meta.url));
-const BUNDLED_M2 = new URL('./m2.sql', import.meta.url);
-const M2_PATH = existsSync(BUNDLED_M2) ? BUNDLED_M2 : new URL('../../docs/storage/m2.sql', import.meta.url);
-const BUNDLED_M3 = new URL('./m3.sql', import.meta.url);
-const M3_PATH = existsSync(BUNDLED_M3) ? BUNDLED_M3 : new URL('../../docs/storage/m3.sql', import.meta.url);
-const BUNDLED_M4 = new URL('./m4.sql', import.meta.url);
-const M4_PATH = existsSync(BUNDLED_M4) ? BUNDLED_M4 : new URL('../../docs/storage/m4.sql', import.meta.url);
-const BUNDLED_M5 = new URL('./m5.sql', import.meta.url);
-const M5_PATH = existsSync(BUNDLED_M5) ? BUNDLED_M5 : new URL('../../docs/storage/m5.sql', import.meta.url);
-const BUNDLED_M6 = new URL('./m6.sql', import.meta.url);
-const M6_PATH = existsSync(BUNDLED_M6) ? BUNDLED_M6 : new URL('../../docs/storage/m6.sql', import.meta.url);
-const BUNDLED_M7 = new URL('./m7.sql', import.meta.url);
-const M7_PATH = existsSync(BUNDLED_M7) ? BUNDLED_M7 : new URL('../../docs/storage/m7.sql', import.meta.url);
-const BUNDLED_M8 = new URL('./m8.sql', import.meta.url);
-const M8_PATH = existsSync(BUNDLED_M8) ? BUNDLED_M8 : new URL('../../docs/storage/m8.sql', import.meta.url);
+import { MIGRATION_PATHS } from './migrations.mjs';
+export { MIGRATION_PATHS } from './migrations.mjs';
 export const nowIso = () => new Date().toISOString();
-export const MIGRATION_PATHS = [DDL_PATH, M2_PATH, M3_PATH, M4_PATH, M5_PATH, M6_PATH, M7_PATH, M8_PATH];
 
 // A reference script's transaction and pragma lines are applied by the runtime around it, so the
 // schema change and its schema_migrations row commit together.
@@ -202,16 +186,50 @@ export class Store extends EventEmitter {
       const written = [];
       for (const event of events) {
         sequence += 1;
+        let payload = event.payload;
+        if (['attempt.failure_outcome', 'attempt.failure_outcome_updated', 'run.failure_outcome', 'run.failure_outcome_updated'].includes(event.type)) {
+          const matchingEvents = [...written].filter(item => item.attemptId === (event.attemptId ?? null));
+          const relatedEvidence = [...matchingEvents].reverse().find(item => item.type === 'attempt.error')
+            || [...matchingEvents].reverse().find(item => item.type === 'attempt.execution_evidence')
+            || [...matchingEvents].reverse().find(item => item.type === 'attempt.state_changed')
+            || (!event.attemptId ? [...matchingEvents].reverse().find(item => item.type === 'run.state_changed') : null);
+          if (relatedEvidence && event.payload?.outcome) {
+            const refs = event.payload.outcome.evidenceReferences || [];
+            if (!refs.some(item => item.type === 'journal_event' && item.id === relatedEvidence.id))
+              payload = { outcome: { ...event.payload.outcome, evidenceReferences: [...refs, { type: 'journal_event', id: relatedEvidence.id }] } };
+          }
+        }
         const envelope = {
           schemaVersion: version, id: randomUUID(), runId, sequence, timestamp: event.timestamp || nowIso(),
           nodeInstanceId: event.nodeInstanceId ?? null, attemptId: event.attemptId ?? null,
-          type: event.type, payload: event.payload,
+          type: event.type, payload,
         };
         assertValid(version === 1 ? 'journal-event.schema.json' : 'journal-event-v2.schema.json', null, envelope, `Journal event ${event.type}`);
         const json = canonicalize(envelope);
         const bytes = Buffer.from(json, 'utf8');
         this.run(`INSERT INTO journal_events(run_id, sequence, id, event_type, node_instance_id, attempt_id, envelope_json, envelope_sha256, envelope_byte_size, timestamp)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, runId, sequence, envelope.id, envelope.type, envelope.nodeInstanceId, envelope.attemptId, json, sha256(bytes), bytes.length, envelope.timestamp);
+        if (['attempt.failure_outcome', 'run.failure_outcome'].includes(event.type)) {
+          const outcome = envelope.payload.outcome;
+          if ((outcome.attemptId ?? null) !== envelope.attemptId || (outcome.nodeInstanceId ?? null) !== envelope.nodeInstanceId)
+            throw new Error(`Failure outcome ${outcome.outcomeId} does not match its journal event identity.`);
+          if (outcome.attemptId && outcome.outcomeId !== outcome.attemptId)
+            throw new Error(`Attempt failure outcome ${outcome.outcomeId} must use its stable Attempt identity.`);
+          if (this.get('SELECT outcome_id FROM failure_outcomes WHERE outcome_id = ?', outcome.outcomeId))
+            throw new Error(`Failure outcome ${outcome.outcomeId} already exists.`);
+          this.run(`INSERT INTO failure_outcomes(outcome_id,run_id,attempt_id,node_instance_id,first_sequence,latest_sequence,revision,outcome_json,recorded_at,updated_at)
+            VALUES(?,?,?,?,?,?,?,?,?,?)`, outcome.outcomeId, runId, outcome.attemptId ?? null, outcome.nodeInstanceId ?? null, sequence, sequence,
+          outcome.revision, canonicalize(outcome), outcome.recordedAt, outcome.updatedAt || outcome.recordedAt);
+        } else if (['attempt.failure_outcome_updated', 'run.failure_outcome_updated'].includes(event.type)) {
+          const outcome = envelope.payload.outcome;
+          if ((outcome.attemptId ?? null) !== envelope.attemptId || (outcome.nodeInstanceId ?? null) !== envelope.nodeInstanceId)
+            throw new Error(`Failure outcome ${outcome.outcomeId} does not match its journal event identity.`);
+          if (outcome.attemptId && outcome.outcomeId !== outcome.attemptId)
+            throw new Error(`Attempt failure outcome ${outcome.outcomeId} must use its stable Attempt identity.`);
+          const updated = this.run(`UPDATE failure_outcomes SET latest_sequence = ?, revision = ?, outcome_json = ?, updated_at = ? WHERE outcome_id = ? AND run_id = ?`,
+            sequence, outcome.revision, canonicalize(outcome), outcome.updatedAt || outcome.recordedAt, outcome.outcomeId, runId);
+          if (!updated.changes) throw new Error(`Failure outcome ${outcome.outcomeId} cannot be updated before its initial record.`);
+        }
         written.push(envelope);
       }
       this.run('UPDATE runs SET last_sequence = ? WHERE id = ?', sequence, runId);
@@ -236,6 +254,88 @@ export class Store extends EventEmitter {
         if (bytes.length !== row.envelope_byte_size || sha256(bytes) !== row.envelope_sha256) throw new CorruptionError(`Journal event of run ${runId} failed digest verification.`);
         return parseStrictJson(row.envelope_json);
       });
+  }
+
+  recordTaskAssessment(assessment) {
+    const { artifactId } = this.putJson(assessment);
+    this.run(
+      `INSERT INTO task_assessments(id, assessment_run_id, business_request_id, source_snapshot_hash, assessment_artifact_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      assessment.assessmentId,
+      assessment.assessmentRunId,
+      assessment.businessRequestId,
+      assessment.sourceSnapshotHash,
+      artifactId,
+      assessment.createdAt || nowIso()
+    );
+    return { assessmentId: assessment.assessmentId, artifactId };
+  }
+
+  // Supersession and insertion commit together (A4). An identical retry of a stored revision returns its original
+  // receipt; a different document under an existing revision id is refused and leaves the active revision in place.
+  recordExecutionPlan(plan, assessmentId, status = 'active') {
+    return this.transaction(() => {
+      const { artifactId } = this.putJson(plan);
+      const stored = this.get('SELECT plan_artifact_id FROM execution_plans WHERE id = ? AND plan_revision_id = ?', plan.planId, plan.planRevisionId);
+      if (stored) {
+        if (stored.plan_artifact_id !== artifactId) {
+          throw new Error(`Execution plan revision ${plan.planRevisionId} is already stored with different content.`);
+        }
+        return { planId: plan.planId, planRevisionId: plan.planRevisionId, artifactId, replayed: true };
+      }
+      if (status === 'active') {
+        this.run(`UPDATE execution_plans SET status = 'superseded' WHERE id = ? AND status = 'active' AND plan_revision_id <> ?`, plan.planId, plan.planRevisionId);
+      }
+      this.run(
+        `INSERT INTO execution_plans(id, plan_revision_id, assessment_id, execution_run_id, policy_version, delivery_boundary, plan_fingerprint, plan_artifact_id, status, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        plan.planId,
+        plan.planRevisionId,
+        assessmentId,
+        plan.executionRunId ?? null,
+        plan.policyVersion,
+        plan.deliveryBoundary,
+        plan.planFingerprint,
+        artifactId,
+        status,
+        plan.createdAt || nowIso()
+      );
+      return { planId: plan.planId, planRevisionId: plan.planRevisionId, artifactId, replayed: false };
+    });
+  }
+
+  recordAcceptanceRecord(record, runId) {
+    const { artifactId } = this.putJson(record);
+    this.run(
+      `INSERT INTO acceptance_records(id, run_id, boundary, subject_id, candidate_digest, overall_status, record_artifact_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      record.recordId,
+      runId,
+      record.deliveryBoundary,
+      record.subjectId,
+      record.candidateDigest,
+      record.overallStatus,
+      artifactId,
+      record.evaluatedAt || nowIso()
+    );
+    return { recordId: record.recordId, artifactId };
+  }
+
+  recordBranchDelivery(result, runId) {
+    const { artifactId } = this.putJson(result);
+    this.run(
+      `INSERT INTO branch_deliveries(id, run_id, delivery_plan_id, target_branch_ref, commit_id, status, result_artifact_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      result.deliveryResultId,
+      runId,
+      result.deliveryPlanId,
+      result.targetBranchRef,
+      result.verifiedCommitId ?? null,
+      result.status,
+      artifactId,
+      result.completedAt || nowIso()
+    );
+    return { deliveryResultId: result.deliveryResultId, artifactId };
   }
 
   close() { this.db.close(); }

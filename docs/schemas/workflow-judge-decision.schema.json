@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deszo.local/documentation/workflow-judge-decision.schema.json",
+  "title": "Workflow Judge typed decision",
+  "type": "object",
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "kind": { "const": "JudgeDecision" },
+    "reasonCode": { "enum": ["awaiting_progress", "evidence_insufficient", "repair_required", "repair_acceptable", "repair_rejected", "owner_decision_required"] },
+    "rationale": { "type": "string", "minLength": 1, "maxLength": 1200 },
+    "evidenceRefs": { "type": "array", "items": { "type": "string", "format": "uuid" }, "maxItems": 8, "uniqueItems": true },
+    "action": {
+      "oneOf": [
+        { "type": "object", "properties": { "type": { "const": "wait" } }, "required": ["type"], "additionalProperties": false },
+        { "type": "object", "properties": { "type": { "const": "request_evidence" }, "evidenceRefs": { "type": "array", "items": { "type": "string", "format": "uuid" }, "minItems": 1, "maxItems": 4, "uniqueItems": true } }, "required": ["type", "evidenceRefs"], "additionalProperties": false },
+        { "type": "object", "properties": { "type": { "const": "request_repair" }, "repairProfileId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" } }, "required": ["type", "repairProfileId"], "additionalProperties": false },
+        { "type": "object", "properties": { "type": { "const": "accept_repair" } }, "required": ["type"], "additionalProperties": false },
+        { "type": "object", "properties": { "type": { "const": "reject_repair" }, "reasonCode": { "enum": ["repair_rejected", "verification_failed", "result_unacceptable", "lineage_mismatch"] } }, "required": ["type", "reasonCode"], "additionalProperties": false },
+        { "type": "object", "properties": { "type": { "const": "request_human_input" }, "question": { "type": "string", "minLength": 1, "maxLength": 1024 }, "answerSpec": { "oneOf": [
+          { "type": "object", "properties": { "type": { "const": "choice" }, "options": { "type": "array", "minItems": 2, "maxItems": 8, "items": { "type": "object", "properties": { "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" }, "label": { "type": "string", "minLength": 1, "maxLength": 128 } }, "required": ["id", "label"], "additionalProperties": false }, "uniqueItems": true } }, "required": ["type", "options"], "additionalProperties": false },
+          { "type": "object", "properties": { "type": { "const": "text" }, "maxLength": { "type": "integer", "minimum": 1, "maximum": 2048 } }, "required": ["type", "maxLength"], "additionalProperties": false }
+        ] } }, "required": ["type", "question", "answerSpec"], "additionalProperties": false }
+      ]
+    }
+  },
+  "required": ["schemaVersion", "kind", "reasonCode", "rationale", "evidenceRefs", "action"],
+  "additionalProperties": false
+}

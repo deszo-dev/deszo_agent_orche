@@ -1,0 +1,105 @@
+{
+  "provider": "codex",
+  "version": "0.163.0-alpha.10.2",
+  "capabilities": {
+    "provider": "codex",
+    "exactClientVersion": "0.163.0-alpha.10.2",
+    "cliPath": "C:/Users/jusse/AppData/Local/OpenAI/Codex/bin/896a0166b774037a/codex.exe",
+    "binaryAvailable": true,
+    "authenticationModes": [
+      "chatgpt_subscription",
+      "api_key",
+      "access_token"
+    ],
+    "permittedBillingModes": [
+      "subscription",
+      "api"
+    ],
+    "subscriptionEligibility": {
+      "supportedForNativeCli": true,
+      "supportedForThirdPartyOrchestrator": false,
+      "evidence": "DOCUMENTED",
+      "officialSource": "https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations"
+    },
+    "sessionPersistence": {
+      "supported": true,
+      "format": "rollout jsonl",
+      "evidence": "VERIFIED"
+    },
+    "sessionResumeSupport": {
+      "byThreadIdInSameHome": true,
+      "byPathAcrossHomes": false,
+      "evidence": "VERIFIED"
+    },
+    "dedicatedSessionFeasibility": {
+      "supportedViaIsolatedHome": true,
+      "evidence": "VERIFIED"
+    },
+    "exclusiveTurnAdmissionSupport": {
+      "nativeThreadLockSameHome": true,
+      "nativeOwnerGenerationFencing": false,
+      "hostLevelFencingRequired": true,
+      "evidence": "VERIFIED"
+    },
+    "structuredCompletionEvidence": {
+      "nativeTurnCompletedEvent": true,
+      "turnStartedBeforeAuthVerification": true,
+      "evidence": "VERIFIED"
+    },
+    "toolSupport": {
+      "scopedMcpRegistration": true,
+      "evidence": "VERIFIED"
+    },
+    "concurrencyHandling": {
+      "maxConcurrentTurnsObserved": 1,
+      "nativeQueueAddRequiresExperimentalApi": true,
+      "turnBDroppedIfTurnAFails": true,
+      "evidence": "VERIFIED"
+    },
+    "knownUnsupportedCapabilities": [
+      "Native owner-generation fencing (Codex accepts writes from stale owners)",
+      "Cross-home session resume by thread ID without experimentalApi",
+      "Automatic serialization of turn B when preceding turn A fails with 401",
+      "Headless programmatic subscription consumption without registered OAuth client"
+    ]
+  },
+  "authDefaultProfile": {
+    "home": "C:\\Users\\jusse\\.codex",
+    "isLoggedIn": true,
+    "statusText": "Logged in using ChatGPT",
+    "authMethod": "chatgpt_subscription",
+    "status": "PASS",
+    "reason": null
+  },
+  "authIsolatedHome": {
+    "home": "C:/DeszoPoC/isolated-home",
+    "isLoggedIn": false,
+    "statusText": "WARNING: proceeding, even though we could not create PATH aliases: CODEX_HOME points to \"C:/DeszoPoC/isolated-home\", but that path does not exist\nError loading configuration: CODEX_HOME points to \"C:/DeszoPoC/isolated-home\", but that path does not exist",
+    "authMethod": "none",
+    "status": "BLOCKED",
+    "reason": "Isolated CODEX_HOME is unauthenticated. Interactive device sign-in or OAuth credential required."
+  },
+  "billingDefaultProfile": {
+    "billingMode": "subscription",
+    "eligible": true,
+    "thirdPartyOrchestrationPolicy": "RESTRICTED",
+    "previewLimitationsApplies": true,
+    "officialSource": "https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations",
+    "failClosedOnApiFallback": true,
+    "status": "PASS"
+  },
+  "billingIsolatedHome": {
+    "billingMode": "unknown",
+    "eligible": false,
+    "status": "BLOCKED",
+    "reason": "No ChatGPT subscription login found in active profile."
+  },
+  "reconciledFindings": {
+    "http401RootCause": "The Codex App Server in an isolated CODEX_HOME has no user auth token (account/read returns no account). The App Server emits turn/started upon local task admission before dispatching to OpenAI; the backend request then fails with HTTP 401 Unauthorized.",
+    "tokenSharingPolicy": "OpenAI Sign in with ChatGPT (SIWC) and Token Sharing for Open Source imposes preview limitations: third-party orchestrators cannot extract or reuse user tokens without registered OAuth client credentials and user consent.",
+    "sessionLocking": "Codex enforces thread-writer file locks in the same CODEX_HOME, but has no owner-generation fencing (POC-05 S2: stale owner writes are accepted). Deszo trusted host must enforce single-writer admission and fencing.",
+    "nativeQueueStatus": "thread/queue/add is locked behind experimentalApi capability. In default mode, turn B accepted during active turn A is dropped/not started if turn A fails (POC-04 FAIL). Deszo must maintain serialized queueing on the host."
+  },
+  "overallStatus": "BLOCKED",
+  "statusReason": "Codex App Server requires authorized user credentials in the working profile. In isolated profiles, model execution fails with 401. Third-party subscription use is subject to SIWC preview limitations."
+}

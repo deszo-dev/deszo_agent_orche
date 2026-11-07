@@ -14,35 +14,80 @@ export async function getConnection(): Promise<Connection> {
 }
 
 export class Client {
-  private readonly token: string;
+  private token: string;
   readonly hasFirstParty: boolean;
   constructor(public connection: Connection) {
     this.hasFirstParty = Boolean(connection.firstPartyToken);
     this.token = connection.firstPartyToken || connection.token;
   }
   private url(path: string) {
-    return `http://127.0.0.1:${this.connection.port}${path.startsWith('/api/v3/') ? path : `/api/v2${path}`}`;
+    return `http://127.0.0.1:${this.connection.port}${path.startsWith('/api/v3/') || path.startsWith('/api/v4/') ? path : `/api/v2${path}`}`;
   }
   private headers(extra: Record<string, string> = {}) { return { Authorization: `Bearer ${this.token}`, ...extra }; }
 
   async request<T>(method: string, path: string, body?: unknown, extraHeaders: Record<string, string> = {}): Promise<T> {
-    const response = await fetch(this.url(path), {
+    const send = () => fetch(this.url(path), {
       method, headers: this.headers({ ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...extraHeaders }),
       body: body === undefined ? undefined : JSON.stringify(body),
     });
+    let response = await send();
+    if (response.status === 401) {
+      const refreshed = await getConnection().catch(() => null);
+      const refreshedToken = refreshed?.firstPartyToken || refreshed?.token;
+      if (refreshed && refreshed.port === this.connection.port && refreshed.runtimeInstanceId === this.connection.runtimeInstanceId &&
+          refreshed.storeId === this.connection.storeId && refreshedToken && refreshedToken !== this.token) {
+        this.connection = refreshed;
+        this.token = refreshedToken;
+        response = await send();
+      }
+    }
     const text = await response.text();
     const data = text ? JSON.parse(text) : null;
     if (!response.ok) throw new ApiProblem(response.status, data?.code || 'internal_error', data?.message || `HTTP ${response.status}`, data?.details || []);
     return data as T;
+  }
+  async rotateOwnerToken(): Promise<{ rotated: boolean }> {
+    const result = await this.request<{ rotated: boolean; token: string }>('POST', '/owner-token/rotate', {});
+    this.token = result.token;
+    this.connection.token = result.token;
+    this.connection.firstPartyToken = result.token;
+    return { rotated: result.rotated };
   }
   get<T>(path: string) { return this.request<T>('GET', path); }
   put<T>(path: string, body: unknown) { return this.request<T>('PUT', path, body); }
   post<T>(path: string, body: unknown) { return this.request<T>('POST', path, body); }
   getV3<T>(path: string) { return this.get<T>(`/api/v3${path}`); }
   postV3<T>(path: string, body: unknown) { return this.post<T>(`/api/v3${path}`, body); }
+  getV4<T>(path: string) { return this.get<T>(`/api/v4${path}`); }
+  postV4<T>(path: string, body: unknown, headers: Record<string, string> = {}) { return this.request<T>('POST', `/api/v4${path}`, body, headers); }
   async saveWorkflow<T>(workflowId: string, requestId: string, expectedEtag: string | null, workflow: unknown): Promise<T> {
     const conditional: Record<string, string> = expectedEtag === null ? { 'If-None-Match': '*' } : { 'If-Match': expectedEtag };
-    return this.request<T>('PUT', `/api/v3/workflows/${encodeURIComponent(workflowId)}`, { requestId, expectedEtag, workflow }, conditional);
+    return this.request<T>('PUT', `/api/v4/workflows/${encodeURIComponent(workflowId)}/draft`, { requestId, workflow }, conditional);
+  }
+  async deriveDraft<T>(workflowId: string, version: number, requestId: string, expectedEtag: string | null): Promise<T> {
+    const conditional: Record<string, string> = expectedEtag === null ? { 'If-None-Match': '*' } : { 'If-Match': expectedEtag };
+    return this.postV4<T>(`/workflows/${encodeURIComponent(workflowId)}/draft/from/${version}`, { requestId }, conditional);
+  }
+  validateDraft<T>(workflowId: string, etag: string): Promise<T> {
+    return this.postV4<T>(`/workflows/${encodeURIComponent(workflowId)}/draft/validate`, {}, { 'If-Match': etag });
+  }
+  publishDraft<T>(workflowId: string, requestId: string, etag: string): Promise<T> {
+    return this.postV4<T>(`/workflows/${encodeURIComponent(workflowId)}/publish`, { requestId }, { 'If-Match': etag });
+  }
+  async listPublishedVersions<T>(workflowId: string): Promise<T[]> {
+    const items: T[] = [];
+    let cursor: string | null = null;
+    do {
+      const query = new URLSearchParams({ limit: '200' });
+      if (cursor) query.set('cursor', cursor);
+      const page = await this.getV4<{ items: T[]; nextCursor: string | null }>(
+        `/workflows/${encodeURIComponent(workflowId)}/versions?${query}`,
+      );
+      items.push(...page.items);
+      if (page.nextCursor && page.nextCursor === cursor) throw new Error('Published Version pagination did not advance.');
+      cursor = page.nextCursor;
+    } while (cursor);
+    return items;
   }
 
   async streamWorkflowChanges(after: number, signal: AbortSignal, onEvent: (event: any) => void, onOpen: () => void, onResync: () => void) {

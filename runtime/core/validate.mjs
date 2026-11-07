@@ -11,6 +11,7 @@ const BOUNDARY_PORTS = ['value', 'iteration', 'feedback'];
 export function nodePorts(node) {
   const { type, config } = node;
   switch (type) {
+    case 'task': return { inputs: { request: 'Text', source: 'ArtifactSet' }, outputs: { candidate: 'ArtifactSet', summary: 'JsonValue' } };
     case 'text': return { inputs: {}, outputs: { text: 'Text' } };
     case 'prompt-template': return { inputs: Object.fromEntries(config.slots.map(slot => [slot.id, 'Text'])), outputs: { text: 'Text' } };
     case 'agent': return {
@@ -29,6 +30,7 @@ export function nodePorts(node) {
     case 'cache': return { inputs: { value: config.valueType }, outputs: { value: config.valueType } };
     case 'route': return { inputs: { selector: 'JsonValue', value: config.valueType }, outputs: Object.fromEntries(config.cases.map(item => [item.id, config.valueType])) };
     case 'gate': {
+      if (config.mode === 'self-repair-verify') return { inputs: {}, outputs: { report: 'JsonValue' } };
       const slots = config.policy.slots.map(slot => slot.id);
       if (config.mode === 'prepare' && config.subject === 'delivery') return {
         inputs: { documentation: 'ArtifactSet', approval: 'JsonValue', summary: 'JsonValue', candidate: 'ArtifactSet', issues: 'JsonValue', ...(config.technicalPolicy ? { technical: 'JsonValue' } : {}) },
@@ -86,6 +88,8 @@ export function semanticIssues(workflow, { maximumAgentTimeoutSeconds = M1_MAXIM
   const all = new Map();
   const edgeIds = new Set();
   const caps = new Set(workflow.capabilities);
+  if (workflow.judgePolicy?.repairProfiles?.some(profile => profile.selfRepair) && !caps.has('protected-self-repair-v1'))
+    add('capability.protected_self_repair', '/capabilities', 'A Parent publication with a Self-Repair profile must declare protected-self-repair-v1.');
   // Walk every graph (outer and nested bodies) once for global identity and capability rules.
   const visitGraph = (nodes, edges, base, edgeBase, depth) => {
     nodes.forEach((node, index) => {
@@ -95,7 +99,22 @@ export function semanticIssues(workflow, { maximumAgentTimeoutSeconds = M1_MAXIM
       if (node.type === 'cache' && !caps.has('cache-v1')) add('capability.cache', `${at}/type`, `"${node.id}" needs the cache-v1 capability.`);
       if ((['gate', 'route'].includes(node.type) || (node.type === 'merge' && node.config.mode === 'selected') || (node.type === 'loop' && depth > 0)) && !caps.has('pipeline-v1'))
         add('capability.pipeline', `${at}/type`, `"${node.id}" needs the pipeline-v1 capability.`);
+      if (node.type === 'gate' && node.config.mode === 'self-repair-verify') {
+        if (!caps.has('protected-self-repair-v1')) add('capability.protected_self_repair', `${at}/config/mode`, 'A Self-Repair Verification Gate needs the protected-self-repair-v1 capability.');
+        if (depth > 0) add('p5.execution_profile', `${at}/config/mode`, 'A Self-Repair Verification Gate must be a top-level node in the enrolled sequential Repair workflow.');
+      }
       if (node.type === 'map' && !caps.has('delivery-v1')) add('capability.delivery', `${at}/type`, `"${node.id}" needs the delivery-v1 capability.`);
+      if (node.type === 'task' && !caps.has('task-planning-v1')) add('capability.task', `${at}/type`, `"${node.id}" needs the task-planning-v1 capability.`);
+      if (node.type === 'task') {
+        for (const [key, role] of Object.entries(node.config.roles)) {
+          if (role.role !== key) add('task.role', `${at}/config/roles/${key}`, 'The binding identity must match its role key.');
+          if (role.model.trim() !== role.model || !role.model.trim() || role.model.startsWith('-')) add('task.model', `${at}/config/roles/${key}/model`, 'Use an explicit nonempty model ID without leading options or surrounding whitespace.');
+          if (role.timeoutSeconds > maximumAgentTimeoutSeconds) add('timeout.capability', `${at}/config/roles/${key}`, 'The role timeout exceeds the runtime maximum.');
+        }
+        if (node.config.projectPolicy.requireIndependentAcceptance && !node.config.roles.businessAccepter) add('task.accepter', `${at}/config/roles`, 'Policy requires an explicit independent businessAccepter binding.');
+        if (new Set(node.config.checks.map(item => item.id)).size !== node.config.checks.length) add('task.checks', `${at}/config/checks`, 'Check IDs must be unique.');
+        for (const [domain, patterns] of Object.entries(node.config.scope)) for (const pattern of patterns) if (!pattern || pattern.startsWith('/') || pattern.includes('\\') || pattern.includes(':') || pattern.split('/').some(part => !part || part === '.' || part === '..' || part.toLowerCase() === '.git')) add('task.scope', `${at}/config/scope/${domain}`, 'Use normalized relative source patterns without traversal or Git metadata.');
+      }
       if (node.type === 'gate' && node.config.subject === 'delivery' && !caps.has('delivery-v1')) add('capability.delivery', `${at}/config/subject`, `"${node.id}" prepares a delivery subject; declare the delivery-v1 capability.`);
       if (((node.type === 'gate' && node.config.carry) || (node.type === 'map' && node.config.carryAcrossRevisions)) && !caps.has('revisions-v1'))
         add('capability.revisions', `${at}/config`, `"${node.id}" carries verified results across revisions; declare the revisions-v1 capability.`);
@@ -108,6 +127,49 @@ export function semanticIssues(workflow, { maximumAgentTimeoutSeconds = M1_MAXIM
   };
   visitGraph(workflow.nodes, workflow.edges, '/nodes', '/edges', 0);
   const loops = loopsOf(workflow.nodes).map(entry => entry.loop);
+
+  // A role marker is inert on legacy workflows. Only the versioned publication policy
+  // enables the stricter identity and isolation contract used by P4.
+  const judgePolicy = workflow.judgePolicy;
+  if (judgePolicy) {
+    const markedJudges = [...all.values()].filter(node => node.type === 'agent' && node.config.role === 'judge');
+    const judgeNodeIndex = workflow.nodes.findIndex(node => node.id === judgePolicy.judgeNodeId);
+    const judgeNode = judgeNodeIndex >= 0 ? workflow.nodes[judgeNodeIndex] : null;
+    if (markedJudges.length !== 1) add('judge.identity.count', '/nodes', 'A workflow-judge/1 policy requires exactly one Agent with config.role "judge".');
+    if (!judgeNode) add('judge.node.reference', '/judgePolicy/judgeNodeId', `Judge node "${judgePolicy.judgeNodeId}" must identify a top-level node.`);
+    else {
+      if (judgeNode.type !== 'agent') add('judge.node.type', `/nodes/${judgeNodeIndex}/type`, 'The designated Judge node must be an Agent.');
+      else {
+        if (judgeNode.config.role !== 'judge') add('judge.node.role', `/nodes/${judgeNodeIndex}/config/role`, 'The designated Agent must declare config.role "judge".');
+        if (judgeNode.config.contextId) add('judge.context.unsupported', `/nodes/${judgeNodeIndex}/config/contextId`, 'workflow-judge/1 does not support a Context-backed Judge.');
+        if (judgeNode.config.output.format !== 'json') add('judge.output.format', `/nodes/${judgeNodeIndex}/config/output/format`, 'The designated Judge must declare JSON output for the typed decision contract.');
+      }
+      if (markedJudges.length === 1 && markedJudges[0].id !== judgeNode.id)
+        add('judge.identity.binding', '/judgePolicy/judgeNodeId', 'judgeNodeId must bind the only Agent with config.role "judge".');
+      if (workflow.edges.some(edge => edge.source.nodeId === judgeNode.id || edge.target.nodeId === judgeNode.id))
+        add('judge.isolation.edge', '/edges', 'The designated Judge must have no incoming or outgoing data edges.');
+      if (workflow.after.some(item => item.before === judgeNode.id || item.after === judgeNode.id))
+        add('judge.isolation.after', '/after', 'The designated Judge must have no incoming or outgoing After dependencies.');
+    }
+
+    const unsupported = [...all.values()].find(node => ['loop', 'map', 'task'].includes(node.type));
+    if (unsupported) add('judge.execution.unsupported', '/nodes', `workflow-judge/1 cannot enroll workflows containing ${unsupported.type} execution.`);
+
+    const profileIds = new Set();
+    judgePolicy.repairProfiles.forEach((profile, index) => {
+      const at = `/judgePolicy/repairProfiles/${index}`;
+      if (profileIds.has(profile.profileId)) add('judge.repair_profile.unique', `${at}/profileId`, `Repair profile ID "${profile.profileId}" is duplicated.`);
+      profileIds.add(profile.profileId);
+      if (profile.repairWorkflowId === workflow.workflowId)
+        add('judge.repair_profile.self', `${at}/repairWorkflowId`, 'A Repair profile must target a separate published workflow.');
+      const failedNodeIndex = workflow.nodes.findIndex(node => node.id === profile.failedNodeInstanceId);
+      const failedNode = failedNodeIndex >= 0 ? workflow.nodes[failedNodeIndex] : null;
+      if (!failedNode || failedNode.type !== 'agent')
+        add('judge.repair_profile.failed_node', `${at}/failedNodeInstanceId`, 'failedNodeInstanceId must reference a top-level Agent in the Parent workflow.');
+      if (profile.verificationNodeInstanceIds.includes(profile.repairResultNodeInstanceId))
+        add('judge.repair_profile.verification', `${at}/verificationNodeInstanceIds`, 'The Repair result node cannot also be listed as a separate verification node.');
+    });
+  }
 
   const outerContexts = new Map(workflow.nodes.filter(node => node.type === 'context').map(node => [node.id, node]));
   const contextKey = context => context.config.mode === 'continue' ? `binding:${context.config.bindingId}` : `node:${context.id}`;
@@ -198,8 +260,10 @@ export function semanticIssues(workflow, { maximumAgentTimeoutSeconds = M1_MAXIM
         if (new Set(ids).size !== ids.length) add('gate.slot', `${at}/config/approvalPolicy/slots`, 'Approval policy slot IDs must be unique.');
       }
       if (node.type === 'gate') {
-        const ids = node.config.policy.slots.map(slot => slot.id);
-        if (new Set(ids).size !== ids.length || ids.some(id => GATE_RESERVED.includes(id) || (node.config.carry && id.length > 59))) add('gate.slot', `${at}/config/policy/slots`, `Slot IDs must be unique, at most 59 characters with carry, and cannot be ${GATE_RESERVED.join(', ')}.`);
+        if (node.config.mode !== 'self-repair-verify') {
+          const ids = node.config.policy.slots.map(slot => slot.id);
+          if (new Set(ids).size !== ids.length || ids.some(id => GATE_RESERVED.includes(id) || (node.config.carry && id.length > 59))) add('gate.slot', `${at}/config/policy/slots`, `Slot IDs must be unique, at most 59 characters with carry, and cannot be ${GATE_RESERVED.join(', ')}.`);
+        }
       }
       if (node.type === 'route') {
         const ids = node.config.cases.map(item => item.id);
@@ -231,6 +295,9 @@ export function semanticIssues(workflow, { maximumAgentTimeoutSeconds = M1_MAXIM
       for (const port of Object.keys(inputs)) {
         const count = incoming.get(`${id}\u0000${port}`) || 0;
         if (count === 1) continue;
+        // P4.2 supplies the isolated Judge prompt as an Engine-created evidence package.
+        // P4.1 only validates that this node is explicitly designated; it never schedules it.
+        if (id === workflow.judgePolicy?.judgeNodeId && port === 'prompt') continue;
         if (id === RETURN) add('loop.return', edgeBase, `${RETURN}.${port} needs exactly one connection (has ${count}).`);
         else add('input.required', `${base}/${local.get(id).index}`, `Input ${id}.${port} needs exactly one connection (has ${count}).`);
       }
@@ -292,7 +359,7 @@ export function semanticIssues(workflow, { maximumAgentTimeoutSeconds = M1_MAXIM
     for (const [id, { node, index }] of local) {
       if (node.type === 'context') {
         if (![...all.values()].some(other => contextIdsOf(other).includes(id))) add('context.unused', `${base}/${index}`, `Context "${id}" is not referenced by any Agent.`);
-      } else if (node.type !== 'result-viewer' && !cycle && !sinks.some(sink => reaches(id, sink))) {
+      } else if (node.type !== 'result-viewer' && id !== workflow.judgePolicy?.judgeNodeId && !cycle && !sinks.some(sink => reaches(id, sink))) {
         add('node.sink', `${base}/${index}`, boundary ? `"${id}" does not lead to ${RETURN}.` : `"${id}" does not lead to a Result Viewer.`);
       }
     }
@@ -343,7 +410,7 @@ export function capabilityIssues(capabilities) {
 const NODE_DEFS = {
   text: 'textNode', 'prompt-template': 'promptTemplateNode', agent: 'agentNode', context: 'contextNode', 'result-viewer': 'resultViewerNode',
   'file-input': 'fileInputNode', merge: 'mergeNode', 'json-select': 'jsonSelectNode', condition: 'conditionNode', loop: 'loopNode',
-  cache: 'cacheNode', route: 'routeNode', gate: 'gateNode', map: 'mapNode',
+  cache: 'cacheNode', route: 'routeNode', gate: 'gateNode', map: 'mapNode', task: 'taskNode',
 };
 const CORE = ['text', 'prompt-template', 'agent', 'context', 'result-viewer'];
 const definitions = new Map();

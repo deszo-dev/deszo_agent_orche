@@ -1,0 +1,384 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deszo.local/documentation/execution-plan.schema.json",
+  "title": "Execution Plan (ADR-0003)",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "kind": {
+      "const": "ExecutionPlan"
+    },
+    "planId": {
+      "type": "string"
+    },
+    "planRevisionId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "assessmentRunId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "executionRunId": {
+      "oneOf": [
+        {
+          "type": "string",
+          "format": "uuid"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "sourceSnapshotHash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "policyVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "selectorVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "classification": {
+      "type": "object",
+      "properties": {
+        "analystClassification": {
+          "type": "string"
+        },
+        "derivedFloor": {
+          "type": "string"
+        },
+        "winningClassification": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "analystClassification",
+        "derivedFloor",
+        "winningClassification",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "selectedStages": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "define",
+          "readiness_review",
+          "prepare",
+          "implement",
+          "assemble_and_check",
+          "delivery_review",
+          "accept_outcome",
+          "branch_delivery"
+        ]
+      }
+    },
+    "omittedStages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "stage": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "reviewerConfirmation": {
+            "type": "object",
+            "properties": {
+              "confirmed": {
+                "type": "boolean"
+              },
+              "confirmedBy": {
+                "type": "string"
+              },
+              "confirmedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "confirmed",
+              "confirmedBy",
+              "confirmedAt",
+              "reason"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "stage",
+          "reason",
+          "reviewerConfirmation"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "roleBindings": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "effort": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "provider",
+          "model",
+          "effort"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "contexts": {
+      "type": "object",
+      "properties": {
+        "codeReviewerContext": {
+          "type": "string"
+        },
+        "testReviewerContext": {
+          "type": "string"
+        },
+        "acceptanceContext": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "codeReviewerContext",
+        "testReviewerContext",
+        "acceptanceContext"
+      ],
+      "additionalProperties": false
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "candidate",
+              "task-result",
+              "delivery-clone"
+            ]
+          },
+          "command": {
+            "type": "string"
+          },
+          "args": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "expectedExitCode": {
+            "type": "integer"
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "id",
+          "source",
+          "command",
+          "args",
+          "expectedExitCode"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "deliveryBoundary": {
+      "enum": [
+        "candidate",
+        "verified_branch"
+      ]
+    },
+    "aggregateBounds": {
+      "type": "object",
+      "properties": {
+        "maxAttempts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxElapsedSeconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "consumedAttempts": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "consumedElapsedSeconds": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "maxAttempts",
+        "maxElapsedSeconds",
+        "consumedAttempts",
+        "consumedElapsedSeconds"
+      ],
+      "additionalProperties": false
+    },
+    "candidateFloorCheck": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "enum": [
+            "pending",
+            "passed",
+            "escalated"
+          ]
+        },
+        "evaluatedAt": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "exceededPaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "escalationRevisionId": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "status",
+        "evaluatedAt",
+        "exceededPaths"
+      ],
+      "additionalProperties": false
+    },
+    "planFingerprint": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "independentAcceptance": {
+      "type": "boolean"
+    },
+    "workflowBinding": {
+      "type": "object",
+      "properties": {
+        "snapshot": {
+          "type": "object",
+          "properties": {
+            "artifactId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "required": [
+            "artifactId",
+            "sha256"
+          ],
+          "additionalProperties": false
+        },
+        "executionHash": {
+          "type": "string"
+        },
+        "taskNodeId": {
+          "type": "string"
+        },
+        "compilerVersion": {
+          "const": 1
+        },
+        "templateFingerprint": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      },
+      "required": [
+        "snapshot",
+        "executionHash",
+        "taskNodeId",
+        "compilerVersion",
+        "templateFingerprint",
+        "steps"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "kind",
+    "planId",
+    "planRevisionId",
+    "assessmentRunId",
+    "sourceSnapshotHash",
+    "policyVersion",
+    "selectorVersion",
+    "classification",
+    "selectedStages",
+    "omittedStages",
+    "roleBindings",
+    "contexts",
+    "checks",
+    "deliveryBoundary",
+    "aggregateBounds",
+    "candidateFloorCheck",
+    "planFingerprint",
+    "createdAt"
+  ],
+  "additionalProperties": false
+}

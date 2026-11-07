@@ -1,6 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 import type { Capability, GatePolicy, LoopConfig, NodeType, Provider, ValueType, Workflow, WorkflowEdge, WorkflowNode } from './types';
 import { DEFAULT_EFFORT } from '../shared/effort.mjs';
+import { emptyTaskConfig } from '../shared/task-config.mjs';
 
 export type PortType = ValueType;
 export interface Ports { inputs: Record<string, PortType[]>; outputs: Record<string, PortType> }
@@ -9,6 +10,7 @@ export const RETURN = '$return';
 
 export function portsOf(node: WorkflowNode): Ports {
   switch (node.type) {
+    case 'task': return { inputs: { request: ['Text'], source: ['ArtifactSet'] }, outputs: { candidate: 'ArtifactSet', summary: 'JsonValue' } };
     case 'text': return { inputs: {}, outputs: { text: 'Text' } };
     case 'prompt-template': return { inputs: Object.fromEntries(node.config.slots.map(slot => [slot.id, ['Text' as PortType]])), outputs: { text: 'Text' } };
     case 'agent': return {
@@ -38,6 +40,7 @@ export function portsOf(node: WorkflowNode): Ports {
     case 'cache': return { inputs: { value: [node.config.valueType] }, outputs: { value: node.config.valueType } };
     case 'route': return { inputs: { selector: ['JsonValue'], value: [node.config.valueType] }, outputs: Object.fromEntries(node.config.cases.map(item => [item.id, node.config.valueType])) };
     case 'gate': {
+      if (node.config.mode === 'self-repair-verify') return { inputs: {}, outputs: { report: 'JsonValue' } };
       const slots = node.config.policy.slots.map(slot => slot.id);
       if (node.config.mode === 'prepare' && node.config.subject === 'delivery') return {
         inputs: { documentation: ['ArtifactSet'], approval: ['JsonValue'], summary: ['JsonValue'], candidate: ['ArtifactSet'], issues: ['JsonValue'], ...(node.config.technicalPolicy ? { technical: ['JsonValue' as PortType] } : {}) },
@@ -64,9 +67,9 @@ export function boundaryPorts(loop: LoopConfig) {
 export const NODE_LABELS: Record<NodeType, string> = {
   text: 'Text', 'prompt-template': 'Prompt Template', agent: 'Agent', context: 'Context', 'result-viewer': 'Result Viewer',
   'file-input': 'File / Artifact Input', merge: 'Merge', 'json-select': 'JSON Select', condition: 'Condition', loop: 'Loop',
-  cache: 'Cache', route: 'Route', gate: 'Gate', map: 'Implementation Map',
+  cache: 'Cache', route: 'Route', gate: 'Gate', map: 'Implementation Map', task: 'Managed Task',
 };
-export const LOOPS_TYPES: NodeType[] = ['file-input', 'merge', 'json-select', 'condition', 'loop', 'route', 'gate', 'map'];
+export const LOOPS_TYPES: NodeType[] = ['file-input', 'merge', 'json-select', 'condition', 'loop', 'route', 'gate', 'map', 'task'];
 export const DEFAULT_POLICY: GatePolicy = { slots: [
   { id: 'customer', role: 'customer', view: 'public' },
   { id: 'readiness', role: 'implementation-readiness', view: 'full' },
@@ -92,6 +95,7 @@ export const DECISION_SCHEMA = {
 
 export function createNode(type: NodeType, id: string, provider: Provider = 'codex'): WorkflowNode {
   switch (type) {
+    case 'task': return { id, type, config: emptyTaskConfig() };
     case 'text': return { id, type, config: { value: '' } };
     case 'prompt-template': return { id, type, config: { template: 'Instruction:\n{{instruction}}\n\nMaterial:\n{{material}}', slots: [{ id: 'instruction' }, { id: 'material' }] } };
     case 'agent': return { id, type, config: { provider, model: DEFAULT_MODELS[provider], effort: DEFAULT_EFFORT, timeoutSeconds: 600, output: { format: 'text' } } };
@@ -222,17 +226,20 @@ export function mapAllNodes(workflow: Workflow, fn: (node: WorkflowNode) => Work
 export function withCapabilities(workflow: Workflow): Workflow {
   const nodes = allNodes(workflow);
   const nested = nodes.some(node => node.type === 'loop' && node.config.body.nodes.some(inner => inner.type === 'loop'));
-  const delivery = nodes.some(node => node.type === 'map' || (node.type === 'gate' && node.config.subject === 'delivery'));
+  const delivery = nodes.some(node => node.type === 'map' || (node.type === 'gate' && node.config.mode === 'prepare' && node.config.subject === 'delivery'));
   const pipeline = delivery || nested || nodes.some(node => node.type === 'gate' || node.type === 'route' || (node.type === 'merge' && node.config.mode === 'selected'));
   const loops = pipeline || nodes.some(node => LOOPS_TYPES.includes(node.type)
     || (node.type === 'agent' && (node.config.attachFiles !== undefined || node.config.captures))
     || (node.type === 'context' && node.config.mode === 'new' && node.config.lifetime));
   const capabilities: Capability[] = ['core-v1'];
+  if (nodes.some(node => node.type === 'task')) capabilities.push('task-planning-v1');
   if (loops) capabilities.push('loops-v1');
   if (nodes.some(node => node.type === 'cache')) capabilities.push('cache-v1');
   if (pipeline) capabilities.push('pipeline-v1');
   if (delivery) capabilities.push('delivery-v1');
-  if (nodes.some(node => (node.type === 'gate' && node.config.carry) || (node.type === 'map' && node.config.carryAcrossRevisions))) capabilities.push('revisions-v1');
+  if (nodes.some(node => (node.type === 'gate' && node.config.mode === 'prepare' && node.config.carry) || (node.type === 'map' && node.config.carryAcrossRevisions))) capabilities.push('revisions-v1');
+  if (nodes.some(node => node.type === 'gate' && node.config.mode === 'self-repair-verify')
+    || workflow.judgePolicy?.repairProfiles.some(profile => profile.selfRepair)) capabilities.push('protected-self-repair-v1');
   return { ...workflow, capabilities };
 }
 

@@ -1,0 +1,531 @@
+{
+  "schemaVersion": 1,
+  "kind": "P6G0WindowsSqliteFeasibilityProbe",
+  "capturedAt": "2026-10-31T09:02:36.432Z",
+  "sourceHead": "1f54c47fe265c6b47bf36695be56214056fc3af1",
+  "branch": "codex/adr-0003-0005-completion",
+  "platform": "win32",
+  "windowsVersion": "Windows 11 Home Single Language",
+  "nodeVersion": "v22.20.0",
+  "sqliteVersion": "3.50.4",
+  "nativeHelper": {
+    "path": "C:\\my\\2026\\deszo_agent_orche\\lifecycle-host\\target\\debug\\examples\\p6_g0_file_guard_probe.exe",
+    "sha256": "79886965143762b48cdfa9e9adeec39e9067fd389f213a2863b4e7fa3a6cab30",
+    "source": "lifecycle-host/examples/p6_g0_file_guard_probe.rs"
+  },
+  "root": "C:\\Users\\jusse\\AppData\\Local\\Temp\\deszo-p6-g0-probe-20244-1793437356432",
+  "experiments": {
+    "liveStorePreflight": {
+      "aAndBUseSameDatabase": true,
+      "bReadiness": {
+        "event": "ready",
+        "journalMode": "wal",
+        "rows": [
+          {
+            "id": 1,
+            "value": "A-initial"
+          }
+        ]
+      },
+      "bWriteAttempt": {
+        "event": "write_refused",
+        "message": "attempt to write a readonly database",
+        "code": "ERR_SQLITE_ERROR"
+      },
+      "bCheckpointAttempt": {
+        "event": "checkpoint_refused",
+        "message": "disk I/O error",
+        "code": "ERR_SQLITE_ERROR"
+      },
+      "filesBefore": [
+        {
+          "suffix": "",
+          "exists": true,
+          "sha256": "5c9dec1886cc01f5f2307ee1ea87f9b32a4cef0f8f9a2c68beebc558013bedab",
+          "size": 4096
+        },
+        {
+          "suffix": "-wal",
+          "exists": true,
+          "sha256": "a41004298b59498c589d51939659ab06b359b95ab8ebd9c0f0c78cfa2e0316a5",
+          "size": 12392
+        },
+        {
+          "suffix": "-shm",
+          "exists": true,
+          "sha256": "4619013153c7a899a76286d737894499eeea6a1bc7acacce9e3df1c47f68439c",
+          "size": 32768
+        },
+        {
+          "suffix": "-journal",
+          "exists": false,
+          "sha256": null,
+          "size": null
+        }
+      ],
+      "filesAfterBOpenAndSql": [
+        {
+          "suffix": "",
+          "exists": true,
+          "sha256": "5c9dec1886cc01f5f2307ee1ea87f9b32a4cef0f8f9a2c68beebc558013bedab",
+          "size": 4096
+        },
+        {
+          "suffix": "-wal",
+          "exists": true,
+          "sha256": "a41004298b59498c589d51939659ab06b359b95ab8ebd9c0f0c78cfa2e0316a5",
+          "size": 12392
+        },
+        {
+          "suffix": "-shm",
+          "exists": true,
+          "sha256": "d543160bce4c5022c46fd43d92daf89aa170b4490a1838a76b8595f61b424511",
+          "size": 32768
+        },
+        {
+          "suffix": "-journal",
+          "exists": false,
+          "sha256": null,
+          "size": null
+        }
+      ],
+      "filesAfterBClose": [
+        {
+          "suffix": "",
+          "exists": true,
+          "sha256": "5c9dec1886cc01f5f2307ee1ea87f9b32a4cef0f8f9a2c68beebc558013bedab",
+          "size": 4096
+        },
+        {
+          "suffix": "-wal",
+          "exists": true,
+          "sha256": "a41004298b59498c589d51939659ab06b359b95ab8ebd9c0f0c78cfa2e0316a5",
+          "size": 12392
+        },
+        {
+          "suffix": "-shm",
+          "exists": true,
+          "sha256": "5fe2857802d2f5469f583a5df9efdef96312354ab54c98beb8ad17f62070e350",
+          "size": 32768
+        },
+        {
+          "suffix": "-journal",
+          "exists": false,
+          "sha256": null,
+          "size": null
+        }
+      ],
+      "filesAfterPreflight": [
+        {
+          "suffix": "",
+          "exists": true,
+          "sha256": "5c9dec1886cc01f5f2307ee1ea87f9b32a4cef0f8f9a2c68beebc558013bedab",
+          "size": 4096
+        },
+        {
+          "suffix": "-wal",
+          "exists": true,
+          "sha256": "e275c2903f386ad377a3663def4050ec9e84b457630e49eeb70cb3ee217166ac",
+          "size": 16512
+        },
+        {
+          "suffix": "-shm",
+          "exists": true,
+          "sha256": "e039efd77460debe3217388c62609b007da2ee233baebd41f7906a784f985f9f",
+          "size": 32768
+        },
+        {
+          "suffix": "-journal",
+          "exists": false,
+          "sha256": null,
+          "size": null
+        }
+      ],
+      "mainAndWalUnchangedByBOpen": true,
+      "shmChangedByBOpen": true,
+      "bClosed": {
+        "event": "closed"
+      },
+      "guardWhileAConnectionOpen": {
+        "opened": false,
+        "win32Error": 32
+      },
+      "separateWriterDuringBPreflight": {
+        "allowed": true
+      },
+      "sidecarsAfterAClosed": [
+        {
+          "suffix": "-wal",
+          "exists": false,
+          "sha256": null,
+          "size": null
+        },
+        {
+          "suffix": "-shm",
+          "exists": false,
+          "sha256": null,
+          "size": null
+        },
+        {
+          "suffix": "-journal",
+          "exists": false,
+          "sha256": null,
+          "size": null
+        }
+      ]
+    },
+    "readOnlyOpenWithMissingSidecars": {
+      "before": [
+        {
+          "suffix": "-wal",
+          "exists": false,
+          "sha256": null,
+          "size": null
+        },
+        {
+          "suffix": "-shm",
+          "exists": false,
+          "sha256": null,
+          "size": null
+        },
+        {
+          "suffix": "-journal",
+          "exists": false,
+          "sha256": null,
+          "size": null
+        }
+      ],
+      "rows": [
+        {
+          "id": 1,
+          "value": "A-concurrent-writer"
+        }
+      ],
+      "after": [
+        {
+          "suffix": "-wal",
+          "exists": true,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0
+        },
+        {
+          "suffix": "-shm",
+          "exists": true,
+          "sha256": "fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb",
+          "size": 32768
+        },
+        {
+          "suffix": "-journal",
+          "exists": false,
+          "sha256": null,
+          "size": null
+        }
+      ]
+    },
+    "individuallyMissingSidecarsInScratch": [
+      {
+        "caseName": "missing-wal",
+        "presentSuffix": "-shm",
+        "missingSuffix": "-wal",
+        "before": [
+          {
+            "suffix": "-wal",
+            "exists": false,
+            "sha256": null,
+            "size": null
+          },
+          {
+            "suffix": "-shm",
+            "exists": true,
+            "sha256": "c35020473aed1b4642cd726cad727b63fff2824ad68cedd7ffb73c7cbd890479",
+            "size": 32768
+          },
+          {
+            "suffix": "-journal",
+            "exists": false,
+            "sha256": null,
+            "size": null
+          }
+        ],
+        "rows": [
+          {
+            "id": 1,
+            "value": "A-concurrent-writer"
+          }
+        ],
+        "after": [
+          {
+            "suffix": "-wal",
+            "exists": true,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "size": 0
+          },
+          {
+            "suffix": "-shm",
+            "exists": true,
+            "sha256": "fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb",
+            "size": 32768
+          },
+          {
+            "suffix": "-journal",
+            "exists": false,
+            "sha256": null,
+            "size": null
+          }
+        ],
+        "SQLiteCreatedMissingSidecar": true
+      },
+      {
+        "caseName": "missing-shm",
+        "presentSuffix": "-wal",
+        "missingSuffix": "-shm",
+        "before": [
+          {
+            "suffix": "-wal",
+            "exists": true,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "size": 0
+          },
+          {
+            "suffix": "-shm",
+            "exists": false,
+            "sha256": null,
+            "size": null
+          },
+          {
+            "suffix": "-journal",
+            "exists": false,
+            "sha256": null,
+            "size": null
+          }
+        ],
+        "rows": [
+          {
+            "id": 1,
+            "value": "A-concurrent-writer"
+          }
+        ],
+        "after": [
+          {
+            "suffix": "-wal",
+            "exists": true,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "size": 0
+          },
+          {
+            "suffix": "-shm",
+            "exists": true,
+            "sha256": "fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb",
+            "size": 32768
+          },
+          {
+            "suffix": "-journal",
+            "exists": false,
+            "sha256": null,
+            "size": null
+          }
+        ],
+        "SQLiteCreatedMissingSidecar": true
+      }
+    ],
+    "disposableStoreCopy": {
+      "productionBeforeGuard": [
+        {
+          "suffix": "",
+          "exists": true,
+          "sha256": "8ce1408f02a27fd61f56ebe7ba1aa8863caeea08349145d93e3d2965d3691d6d",
+          "size": 8192
+        },
+        {
+          "suffix": "-wal",
+          "exists": false,
+          "sha256": null,
+          "size": null
+        },
+        {
+          "suffix": "-shm",
+          "exists": false,
+          "sha256": null,
+          "size": null
+        },
+        {
+          "suffix": "-journal",
+          "exists": false,
+          "sha256": null,
+          "size": null
+        }
+      ],
+      "nativeGuard": {
+        "event": "guard_ready",
+        "files": [
+          {
+            "identity": {
+              "fileIndexHigh": 13565952,
+              "fileIndexLow": 495871,
+              "lastWriteHigh": 31287574,
+              "lastWriteLow": 2481535744,
+              "sizeHigh": 0,
+              "sizeLow": 8192,
+              "volumeSerial": 538531228
+            },
+            "path": "C:\\Users\\jusse\\AppData\\Local\\Temp\\deszo-p6-g0-probe-20244-1793437356432\\stable-profile\\store\\state.sqlite"
+          }
+        ],
+        "shareMode": "FILE_SHARE_READ"
+      },
+      "productionSha256Before": "8ce1408f02a27fd61f56ebe7ba1aa8863caeea08349145d93e3d2965d3691d6d",
+      "productionSha256AfterPreflight": "8ce1408f02a27fd61f56ebe7ba1aa8863caeea08349145d93e3d2965d3691d6d",
+      "productionSha256AfterFallbackAWrite": "f31138915c1db29420ddd66c50d5a4aeeb289730472f4e74df382074373645e6",
+      "productionUnchangedDuringPreflight": true,
+      "productionFilesAfterPreflight": [
+        {
+          "suffix": "",
+          "exists": true,
+          "sha256": "8ce1408f02a27fd61f56ebe7ba1aa8863caeea08349145d93e3d2965d3691d6d",
+          "size": 8192
+        },
+        {
+          "suffix": "-wal",
+          "exists": false,
+          "sha256": null,
+          "size": null
+        },
+        {
+          "suffix": "-shm",
+          "exists": false,
+          "sha256": null,
+          "size": null
+        },
+        {
+          "suffix": "-journal",
+          "exists": false,
+          "sha256": null,
+          "size": null
+        }
+      ],
+      "snapshotRows": [
+        {
+          "id": 1,
+          "value": "A-stable"
+        }
+      ],
+      "snapshotWrite": {
+        "refused": true,
+        "message": "attempt to write a readonly database",
+        "code": "ERR_SQLITE_ERROR"
+      },
+      "snapshotCheckpoint": {
+        "refused": false,
+        "result": {
+          "busy": 0,
+          "log": 0,
+          "checkpointed": 0
+        }
+      },
+      "scratchSidecars": [
+        {
+          "suffix": "-wal",
+          "exists": true,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0
+        },
+        {
+          "suffix": "-shm",
+          "exists": true,
+          "sha256": "87a5cb35dca624f513085ed6c3bc81fe162990df97f6de290dc6167c47369c65",
+          "size": 32768
+        },
+        {
+          "suffix": "-journal",
+          "exists": false,
+          "sha256": null,
+          "size": null
+        }
+      ],
+      "guardReleased": {
+        "event": "guard_released"
+      },
+      "fallbackAReopenedAndCommitted": [
+        {
+          "id": 1,
+          "value": "A-stable"
+        },
+        {
+          "id": 2,
+          "value": "A-resumed"
+        }
+      ]
+    },
+    "noWriteThroughGuard": {
+      "databaseOpenSucceededWithReadonlyFallback": true,
+      "write": {
+        "refused": true,
+        "message": "attempt to write a readonly database",
+        "code": "ERR_SQLITE_ERROR"
+      }
+    },
+    "fileGuard": {
+      "shareMode": "FILE_SHARE_READ",
+      "nativeFileIdentity": {
+        "fileIndexHigh": 14548992,
+        "fileIndexLow": 495936,
+        "lastWriteHigh": 31287574,
+        "lastWriteLow": 2482680705,
+        "sizeHigh": 0,
+        "sizeLow": 12,
+        "volumeSerial": 538531228
+      },
+      "writeWhileHeld": {
+        "win32Error": 32,
+        "write": "refused"
+      },
+      "deleteWhileHeld": {
+        "deleted": false,
+        "win32Error": 32
+      },
+      "renameWhileHeld": {
+        "renamed": false,
+        "win32Error": 32
+      },
+      "writeAfterRelease": {
+        "write": "succeeded"
+      },
+      "renameAfterRelease": {
+        "renamed": true,
+        "win32Error": null
+      },
+      "deleteAfterRelease": {
+        "deleted": true,
+        "win32Error": null
+      },
+      "hostProcessKilledWhileGuardHeld": true,
+      "guardReacquiredAfterProcessDeath": {
+        "opened": true
+      },
+      "aConnectionBlocksGuard": {
+        "opened": false,
+        "win32Error": 32
+      },
+      "productionStoreGuard": {
+        "event": "guard_ready",
+        "files": [
+          {
+            "identity": {
+              "fileIndexHigh": 13565952,
+              "fileIndexLow": 495871,
+              "lastWriteHigh": 31287574,
+              "lastWriteLow": 2481535744,
+              "sizeHigh": 0,
+              "sizeLow": 8192,
+              "volumeSerial": 538531228
+            },
+            "path": "C:\\Users\\jusse\\AppData\\Local\\Temp\\deszo-p6-g0-probe-20244-1793437356432\\stable-profile\\store\\state.sqlite"
+          }
+        ],
+        "shareMode": "FILE_SHARE_READ"
+      }
+    }
+  },
+  "verdict": "DISPOSABLE_COPY_REQUIRED",
+  "disposition": "Live read-only SQLite preflight is not a physical no-write boundary: opening it changes -shm, a separate writer is not excluded, and absent WAL/SHM sidecars may be created. Stop A, guard the production Store, copy its stable SQLite files into Host-owned scratch, and preflight only that disposable copy. Never treat scratch sidecars as production Store changes."
+}

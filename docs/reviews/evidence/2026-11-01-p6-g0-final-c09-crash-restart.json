@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "evidence": "c09-crash-restart",
+  "capturedAt": "2026-11-02T12:05:32.289Z",
+  "node": "v22.20.0",
+  "platform": "win32 x64",
+  "operationId": "13d80622-d224-4f5d-9e71-8a76b006862b",
+  "crashPoint": "after_fenced",
+  "crashedHostExitCode": 86,
+  "recordedStoppingProcessId": 15736,
+  "restart": {
+    "phase": "held",
+    "terminationUnprovenProcessId": 15736,
+    "launches": [
+      "engine-a"
+    ]
+  },
+  "selector": {
+    "buildId": "engine-a",
+    "committedOperationId": null
+  }
+}

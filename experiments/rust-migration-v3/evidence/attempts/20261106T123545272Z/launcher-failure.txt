@@ -1,0 +1,2 @@
+CreateAppContainerProfile(d3v38f1cb3c23aafcore, name_len=20, display_len=34, description_len=90) HRESULT=0x80070057
+Host token: elevated=Some(true); integrity_rid=Some(12288); appcontainer_identity=Ok(WorkerIdentity { is_appcontainer: false, appcontainer_sid: "", capability_count: 0 })

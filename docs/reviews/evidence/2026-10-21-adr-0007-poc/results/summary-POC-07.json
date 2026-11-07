@@ -1,0 +1,15 @@
+{
+  "runRoot": "<POC_ROOT>",
+  "generatedBy": "run-poc.mjs",
+  "experiments": [
+    {
+      "id": "POC-07",
+      "status": "FAIL",
+      "failedChecks": [
+        "the App Server refuses a turn that carries no host-issued reservation"
+      ],
+      "elapsedMs": 142359,
+      "exitCode": 0
+    }
+  ]
+}

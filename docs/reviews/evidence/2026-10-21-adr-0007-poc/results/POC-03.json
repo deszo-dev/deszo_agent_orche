@@ -1,0 +1,27 @@
+{
+  "experiment": "POC-03",
+  "title": "Real event-triggered Judge turn",
+  "status": "BLOCKED",
+  "checks": [
+    {
+      "name": "turn-start evidence is observable from the App Server (POC-04 arm 1 measures turn/started)",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "a Judge response is received and correlated to the request",
+      "pass": null,
+      "detail": "isolated CODEX_HOME has no account (account/read returned no account)"
+    },
+    {
+      "name": "a harmless scoped tool is called by the model",
+      "pass": null,
+      "detail": "isolated CODEX_HOME has no account (account/read returned no account)"
+    }
+  ],
+  "blocker": "isolated CODEX_HOME has no account (account/read returned no account)",
+  "unblockBy": "The user completes the device sign-in into the isolated home (command in README). No credential is copied from the default profile.",
+  "notes": [
+    "turn/started is recorded as a turn-start fact only; it is not a successful wake-up without a model response."
+  ]
+}

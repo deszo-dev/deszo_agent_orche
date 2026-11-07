@@ -4,12 +4,25 @@ import { mkdir } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline';
-import { writeFileSync, renameSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
 import { ApiError, Engine } from './core/engine.mjs';
 import { ContractError } from './core/schemas.mjs';
 import { CorruptionError } from './core/store.mjs';
 import { supervisorFromEnvironment } from './core/supervisor-client.mjs';
+import { hostFromEnvironment } from './host/runtimeBinding.mjs';
+import { custodyBridgeFromEnvironment, lifecycleBridgeFromEnvironment } from './host/lifecycleBridge.mjs';
+import { P5_ENROLLMENT_RELATIVE_PATH } from './core/protectedSelfRepair.mjs';
+import { autonomyGateway } from './host/uiGateway.mjs';
 import { acquireRuntimeLock } from './lock.mjs';
+import { runP6MaintenancePreflight } from './host/p6Maintenance.mjs';
+import { assertAdmissionOpen, createSwitchQuiescence, requestEngineSwitch, SwitchRefusal } from './host/p6Switch.mjs';
+import { startTestEngineProbe } from './core/testEngineProbe.mjs';
+import { MIGRATION_FILES, MIGRATION_PATHS } from './core/migrations.mjs';
+import { testFaultHooksEnabled } from './core/testFaultPolicy.mjs';
+import { buildAndAttestEnginePackage } from './core/p6Builder.mjs';
+import { bindTrustedP6Builder, executeP6Activation } from './core/p6Consumer.mjs';
+// Switch refusals reach the API as the Engine's own error type, with the status and the stable code they carry.
+const apiRefusal = error => (error instanceof SwitchRefusal ? new ApiError(error.status, error.code, error.message) : error);
 
 const ORIGINS = new Set(['http://127.0.0.1:1420', 'http://localhost:1420', 'tauri://localhost', 'http://tauri.localhost', 'https://tauri.localhost']);
 const MAX_BODY = 4 * 1024 * 1024;
@@ -32,6 +45,46 @@ function json(res, status, body, headers = {}) {
   res.end(payload);
 }
 
+function atomicWrite(path, value) {
+  const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`;
+  writeFileSync(temporary, value, { mode: 0o600, flag: 'wx' });
+  renameSync(temporary, path);
+}
+
+// The runtime lock is released only after the Engine has shut down. An Engine whose shutdown failed may still run CLIs or timers, so its lock
+// is kept, and ends with this process.
+async function shutDownThenRelease(engine, releaseLock) {
+  if (engine) {
+    try { await engine.shutdown(); }
+    catch (error) {
+      process.stderr.write(`The Engine did not shut down cleanly; the runtime lock is kept until this process ends: ${error.message}\n`);
+      try { engine.store.close(); } catch { /* Already closed. */ }
+      return;
+    }
+  }
+  await releaseLock();
+}
+
+function readOrCreateOwnerToken(path) {
+  try {
+    const token = readFileSync(path, 'utf8');
+    if (!/^[a-f0-9]{64}$/i.test(token)) throw new Error('The stored Runtime Owner Token is invalid.');
+    return token;
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+    const token = randomBytes(32).toString('hex');
+    atomicWrite(path, token);
+    return token;
+  }
+}
+
+function equalSecret(candidate, expected) {
+  if (typeof candidate !== 'string' || typeof expected !== 'string') return false;
+  const supplied = Buffer.from(candidate);
+  const secret = Buffer.from(expected);
+  return supplied.length === secret.length && timingSafeEqual(supplied, secret);
+}
+
 async function readBody(req) {
   const chunks = []; let size = 0;
   for await (const chunk of req) { size += chunk.length; if (size > MAX_BODY) throw new ApiError(400, 'invalid_request', 'Request body is too large.'); chunks.push(chunk); }
@@ -51,40 +104,116 @@ function query(url, allowed, integers = []) {
   return result;
 }
 
-export async function startRunner({ root, connectionFile, bridgeFile, port = 0, supervised = false, adapters, maximumAgentTimeoutSeconds, loopMinuteMs, extraOrigins = [], runtimeInstanceId = randomUUID(), nodeExecutable = process.execPath, devTestConfirmationOff = false } = {}) {
+export async function startRunner({ root, connectionFile, bridgeFile, port = 0, supervised = false, adapters, maximumAgentTimeoutSeconds, loopMinuteMs, extraOrigins = [], runtimeInstanceId = randomUUID(), nodeExecutable = process.execPath, devTestConfirmationOff = false, exposeHostRequestForTests = false, judgeAttentionEnabled = false, custodyHost: scriptedCustodyHost = null, lifecycleHostBridge = undefined } = {}) {
   const origins = new Set([...ORIGINS, ...extraOrigins]);
   const defaultRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '.deszo');
   root = resolve(root || defaultRoot);
   const sameRoot = process.platform === 'win32' ? root.toLowerCase() === defaultRoot.toLowerCase() : root === defaultRoot;
   if (devTestConfirmationOff && sameRoot) throw new Error('The fixture confirmation policy requires a dedicated runtime root, separate from the default .deszo store.');
+  if (exposeHostRequestForTests && (PACKAGED_RUNTIME || !devTestConfirmationOff || sameRoot)) throw new Error('The test-only Host request helper requires an isolated, non-packaged fixture runtime.');
   connectionFile = resolve(connectionFile || join(root, 'runtime', 'connection.json'));
   bridgeFile = resolve(bridgeFile || join(dirname(fileURLToPath(import.meta.url)), '..', 'mcp', 'bridge.mjs'));
   await mkdir(join(root, 'runtime'), { recursive: true });
   const releaseLock = await acquireRuntimeLock(join(root, 'runtime', 'runner.lock'));
-  const token = randomBytes(32).toString('hex');
-  const firstPartyToken = randomBytes(32).toString('hex');
+  const ownerTokenPath = join(root, 'runtime', 'owner-token');
+  let token;
+  try { token = readOrCreateOwnerToken(ownerTokenPath); }
+  catch (error) { await releaseLock(); throw error; }
+  const hostToken = randomBytes(32).toString('hex');
+  let descriptor = null;
+  let connection = null;
   let engine;
+  let hostBinding = null;
+  let lifecycleHost = null;
+  // A maintenance candidate hands over the bridge it already read, so its commit does not depend on a second environment read.
+  const switchQuiescence = createSwitchQuiescence();
   try {
+    lifecycleHost = lifecycleHostBridge !== undefined ? lifecycleHostBridge : lifecycleBridgeFromEnvironment(process.env);
+    // An installation-owned P5 enrollment is the explicit opt-in for the managed Lifecycle
+    // Host's Custody service. Legacy installs without that file keep their existing launch path.
+    // The file only triggers attachment; Engine still validates its type, contents and provenance.
+    const p5EnrollmentInstalled = Boolean(lifecycleHost?.context?.profileRoot
+      && existsSync(join(lifecycleHost.context.profileRoot, P5_ENROLLMENT_RELATIVE_PATH)));
+    const processCustodyOptIn = process.env.DESZO_PROCESS_CUSTODY === '1' || p5EnrollmentInstalled;
+    // ADR-0006: a runtime launched or covered by a Local Control Host binds to it before serving requests.
+    hostBinding = await hostFromEnvironment(process.env, { packaged: PACKAGED_RUNTIME });
     if (PACKAGED_RUNTIME && devTestConfirmationOff) throw new Error('The packaged runtime does not support the fixture confirmation policy.');
-    engine = new Engine({ root, adapters, runtimeInstanceId, nodeExecutable, bridgeScript: bridgeFile, supervisor: supervisorFromEnvironment(),
+    engine = new Engine({ root, adapters, runtimeInstanceId, nodeExecutable, bridgeScript: bridgeFile, supervisor: supervisorFromEnvironment(), hostAuthority: hostBinding?.adapter ?? null, hostRuntimeGeneration: hostBinding?.runtimeGeneration ?? null, hostPolicyId: hostBinding?.policyId ?? null,hostVerificationOnly:hostBinding?.verificationOnly===true,judgeAttentionEnabled,
       externalRunConfirmationOverride: devTestConfirmationOff ? false : null,
+      lifecycleHost: lifecycleHost?.context ?? null,
+      lifecycleClient: lifecycleHost,
+      // Process Custody is an explicit experimental opt-in; without it every CLI keeps the existing launch path.
+      // A test-only seam: a scripted Host answers in place of the bridge, so the Engine's own Custody path runs with no real process.
+      custodyHost: scriptedCustodyHost ?? (processCustodyOptIn ? (lifecycleHost ?? custodyBridgeFromEnvironment(process.env)) : null),
+      // Preserve the explicit requirement so a missing Host bootstrap cannot fall through to a Node-launched provider.
+      processCustodyRequired: scriptedCustodyHost != null || processCustodyOptIn,
       processContainment: supervised ? 'tauri-job' : 'standalone-best-effort', ...(maximumAgentTimeoutSeconds ? { maximumAgentTimeoutSeconds } : {}), ...(loopMinuteMs ? { loopMinuteMs } : {}) });
-    await engine.initialize();
+    // The switch quiescence is the Engine's admission barrier: Run creation and deferred continuations consult it (engine.captureRun).
+    engine.switchQuiescence = switchQuiescence;
+    // The trusted P6 builder is bound here, by the entry point, before initialization can schedule a P6 activation (a setImmediate).
+    bindTrustedP6Builder(engine, { buildAndAttestEnginePackage });
+    // The activation is bound here too; the Engine calls it, but cannot reach the consumer or the builder by import.
+    engine.p6Activation = (repairRunId, targetEngineBuildId) => executeP6Activation({ engine, repairRunId, targetEngineBuildId });
+    await engine.initialize({
+      beforeRecovery: lifecycleHost ? () => engine.initializeProtectedSelfRepairEnrollment() : undefined,
+    });
+    // Test-built Engines only: a P6 end-to-end test drives this Engine's bridge and Custody client through the probe (no-op otherwise).
+    startTestEngineProbe({ engine, lifecycleHost });
+    engine.closePendingRunRequestsAtOwnerCutover();
+    if (lifecycleHost) {
+      const identity = engine.runtimeIdentity();
+      const ready = await lifecycleHost.ready({ pid: process.pid, storeId: identity.storeId, runtimeInstanceId: identity.runtimeInstanceId });
+      if (ready?.receipt) {
+        await engine.applyHostLifecycleReceipt(ready.receipt);
+        if (lifecycleHost.context.testDuplicateReceiptDelivery) {
+          const replay = await lifecycleHost.ready({ pid: process.pid, storeId: identity.storeId, runtimeInstanceId: identity.runtimeInstanceId });
+          if (replay?.receipt) await engine.applyHostLifecycleReceipt(replay.receipt);
+        }
+        await lifecycleHost.acknowledgeReceipt(ready.receipt.receiptId);
+      }
+      engine.on('lifecycle.operation_requested', request => {
+        void lifecycleHost.activateCandidate(request).catch(error => engine.recordLifecycleHostDeliveryFailure(request, error));
+      });
+    }
     if (devTestConfirmationOff && !engine.store.get('SELECT id FROM workspaces LIMIT 1'))
       engine.putWorkspace('main', { cwd: join(engine.store.workdirs, 'scratch', 'main') });
-  } catch (error) { await releaseLock(); throw error; }
+  } catch (error) {
+    hostBinding?.client.close();
+    await shutDownThenRelease(engine, releaseLock);
+    throw error;
+  }
+  // The host delivers the native Stop scope of a committed revocation or expiry.
+  // The stop reaches the owned runs; a failure here is reported and never silently dropped.
+  hostBinding?.client.events.on('stop', message => {
+    try { engine.stopHostPermits(message.permits, message.works); }
+    catch (error) { process.stderr.write(`Local Control Host stop failed: ${error.message}\n`); }
+  });
   const streams = new Set();
   let shuttingDown = false;
+  let closing = null;
 
-  const authorized = req => {
-    const supplied = Buffer.from((req.headers.authorization || '').replace(/^Bearer /, ''));
-    const external = Buffer.from(token);
-    const firstParty = Buffer.from(firstPartyToken);
-    if (supplied.length === external.length && timingSafeEqual(supplied, external)) return 'external';
-    if (supplied.length === firstParty.length && timingSafeEqual(supplied, firstParty)) return 'first-party';
+  const identifyCaller = req => {
+    const match = /^Bearer ([a-f0-9]{64})$/i.exec(req.headers.authorization || '');
+    if (!match) return null;
+    const supplied = match[1];
+    if (equalSecret(supplied, token)) return 'owner';
+    if (equalSecret(supplied, hostToken)) return 'host';
     return null;
   };
   const parse = text => { try { return JSON.parse(text || '{}'); } catch (error) { throw new ApiError(400, 'invalid_request', `Malformed JSON: ${error.message}`); } };
+  const writeEtag = req => {
+    const ifMatch = req.headers['if-match'], ifNoneMatch = req.headers['if-none-match'];
+    if (ifMatch !== undefined && ifNoneMatch !== undefined) throw new ApiError(400, 'invalid_request', 'Supply either If-Match or If-None-Match, not both.');
+    if (ifNoneMatch !== undefined) {
+      if (ifNoneMatch !== '*') throw new ApiError(400, 'invalid_request', 'Draft creation requires If-None-Match: *.');
+      return null;
+    }
+    return ifMatch;
+  };
+  const bodyText = async req => {
+    if (req.runtimeBodyText === undefined) req.runtimeBodyText = await readBody(req);
+    return req.runtimeBodyText;
+  };
 
   // Every incident or stop write records the authority the caller actually holds, not the one its body claims (ADR-0002 section 7).
   // A session id is recorded only when the controller credential for it is presented; a presented but unknown credential is refused.
@@ -93,112 +222,233 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
     const token = controllerTokenOf(req);
     const session = token ? engine.controllerSessionFor(token) : null;
     if (token && !session) throw new ApiError(403, 'controller_credential_required', 'The controller credential is not recognised.');
-    return { authority: req.authRole === 'first-party' ? 'first-party' : 'external', sessionId: session?.id ?? null };
+    return { authority: 'external', sessionId: session?.id ?? null };
   };
   const routes = [
-    ['GET', /^\/api\/v3\/authoring\/contract$/, async () => [200, engine.authoringContract()]],
-    ['GET', new RegExp(`^/api/v3/authoring/schemas/([^/]+)$`), ({ match }) => [200, engine.authoringSchema(decodeURIComponent(match[1]))]],
-    ['GET', /^\/api\/v3\/authoring\/node-types$/, () => [200, engine.authoringNodeTypes()]],
-    ['GET', /^\/api\/v3\/authoring\/templates$/, () => [200, { items: engine.authoringTemplates() }]],
-    ['GET', new RegExp(`^/api/v3/authoring/templates/(${ID})$`), ({ match }) => [200, engine.authoringTemplate(match[1])]],
-    ['GET', /^\/api\/v3\/authoring\/events$/, ({ url }) => {
+    ['POST', 'public', /^\/api\/v2\/owner-token\/rotate$/, async () => {
+      const previous = token;
+      const next = randomBytes(32).toString('hex');
+      try {
+        atomicWrite(ownerTokenPath, next);
+        token = next;
+        if (descriptor) { descriptor.token = next; atomicWrite(connectionFile, JSON.stringify(descriptor)); }
+        if (connection) connection.token = next;
+        if (hostBinding) await hostBinding.client.call('runtime.owner_token_rotated', { runtimeGeneration: hostBinding.runtimeGeneration, token: next });
+      } catch {
+        token = previous;
+        atomicWrite(ownerTokenPath, previous);
+        if (descriptor) { descriptor.token = previous; atomicWrite(connectionFile, JSON.stringify(descriptor)); }
+        if (connection) connection.token = previous;
+        if (connection) connection.firstPartyToken = previous;
+        if (hostBinding) { try { await hostBinding.client.call('runtime.owner_token_rotated', { runtimeGeneration: hostBinding.runtimeGeneration, token: previous }); } catch { /* The old credential remains authoritative locally. */ } }
+        throw new ApiError(503, 'owner_token_rotation_failed', 'The Owner Token could not be rotated across the Runtime and Host registration.');
+      }
+      if (connection) connection.firstPartyToken = next;
+      return [200, { rotated: true, token: next }];
+    }],
+    ['GET', 'public', /^\/api\/v2\/autonomy$/, async () => {
+      try { return [200, await autonomyGateway('status', null, hostBinding?.client)]; }
+      catch (error) { return [200, { available: false, autonomyEnabled: false, reason: error.message }]; }
+    }],
+    ...[['proposals','propose'],['open-consent','open'],['revoke','revoke']].map(([path, operation]) => ['POST', 'public', new RegExp(`^/api/v2/autonomy/${path}$`), async ({ req }) => {
+      try { return [200, await autonomyGateway(operation, parse(await bodyText(req)), hostBinding?.client)]; }
+      catch (error) { throw new ApiError(error.status || 503, error.code || 'autonomy_unavailable', error.message); }
+    }]),
+    ['GET', 'public', /^\/api\/v3\/authoring\/contract$/, async () => [200, engine.authoringContract()]],
+    ['GET', 'public', new RegExp(`^/api/v3/authoring/schemas/([^/]+)$`), ({ match }) => [200, engine.authoringSchema(decodeURIComponent(match[1]))]],
+    ['GET', 'public', /^\/api\/v3\/authoring\/node-types$/, () => [200, engine.authoringNodeTypes()]],
+    ['GET', 'public', /^\/api\/v3\/authoring\/templates$/, () => [200, { items: engine.authoringTemplates() }]],
+    ['GET', 'public', new RegExp(`^/api/v3/authoring/templates/(${ID})$`), ({ match }) => [200, engine.authoringTemplate(match[1])]],
+    ['GET', 'public', /^\/api\/v3\/authoring\/events$/, ({ url }) => {
       const params = query(url, ['after', 'limit'], ['after', 'limit']);
       return [200, engine.workflowChanges(params)];
     }],
-    ['POST', /^\/api\/v3\/authoring\/bridge-handshake$/, async ({ req }) => [200, engine.registerBridge(parse(await readBody(req))) ]],
-    ['DELETE', new RegExp(`^/api/v3/authoring/bridge-handshake/(${UUID})$`), ({ match }) => { engine.unregisterBridge(match[1]); return [200, { removed: true }]; }],
-    ['GET', /^\/api\/v3\/workflows$/, ({ url }) => [200, engine.listWorkflowsV3(query(url, ['limit', 'cursor'], ['limit']))]],
-    ['POST', /^\/api\/v3\/workflows\/validate$/, async ({ req }) => {
-      const body = parse(await readBody(req));
+    ['POST', 'public', /^\/api\/v3\/authoring\/bridge-handshake$/, async ({ req }) => [200, engine.registerBridge(parse(await bodyText(req))) ]],
+    ['DELETE', 'public', new RegExp(`^/api/v3/authoring/bridge-handshake/(${UUID})$`), ({ match }) => { engine.unregisterBridge(match[1]); return [200, { removed: true }]; }],
+    ['GET', 'public', /^\/api\/v3\/workflows$/, ({ url }) => [200, engine.listWorkflowsV3(query(url, ['limit', 'cursor'], ['limit']))]],
+    ['POST', 'public', /^\/api\/v3\/workflows\/validate$/, async ({ req }) => {
+      const body = parse(await bodyText(req));
       const workflow = body?.workflow ?? body;
       return [200, engine.validateWorkflow(workflow)];
     }],
-    ['PUT', new RegExp(`^/api/v3/workflows/(${ID})$`), async ({ req, match }) => {
-      const body = parse(await readBody(req));
+    ['PUT', 'retired', new RegExp(`^/api/v3/workflows/(${ID})$`), async ({ req, match }) => {
+      const retired = [410, { code: 'api_upgrade_required', message: 'Workflow saves require the Draft and Publication API.', details: [] }];
+      if (req.authPrincipal !== 'owner') return retired;
+      let body;
+      try { body = parse(await bodyText(req)); } catch { return retired; }
+      if (!body || typeof body !== 'object' || Array.isArray(body)) return retired;
       const ifMatch = req.headers['if-match'];
       const ifNoneMatch = req.headers['if-none-match'];
-      if (ifMatch && ifNoneMatch) throw new ApiError(400, 'invalid_request', 'Use If-Match or If-None-Match, not both.');
-      if (ifNoneMatch && ifNoneMatch !== '*') throw new ApiError(412, 'precondition_failed', 'Create-only saves require If-None-Match: *.');
-      const headerEtag = ifNoneMatch === '*' ? null : ifMatch;
-      if (body.expectedEtag !== undefined && headerEtag !== undefined && body.expectedEtag !== headerEtag)
-        throw new ApiError(400, 'invalid_request', 'The body precondition and HTTP conditional header disagree.');
-      const expectedEtag = headerEtag !== undefined ? headerEtag : body.expectedEtag;
-      if (expectedEtag === undefined) throw new ApiError(428, 'precondition_required', 'Use If-Match for a replacement or If-None-Match: * for creation.');
-      const saved = engine.saveWorkflowV3(match[1], { ...body, expectedEtag });
-      return [200, saved, { ETag: saved.etag }];
+      let expectedEtag;
+      if (ifMatch !== undefined && ifNoneMatch !== undefined) expectedEtag = '__invalid_precondition__';
+      else if (ifNoneMatch !== undefined && ifNoneMatch !== '*') expectedEtag = '__invalid_precondition__';
+      else {
+        const headerEtag = ifNoneMatch === '*' ? null : ifMatch;
+        expectedEtag = body.expectedEtag !== undefined && headerEtag !== undefined && body.expectedEtag !== headerEtag
+          ? '__invalid_precondition__'
+          : headerEtag !== undefined ? headerEtag : body.expectedEtag;
+      }
+      const replay = engine.replayCommittedReceipt(`PUT /api/v3/workflows/${match[1]}`, body.requestId, {
+        workflowId: match[1], expectedEtag: expectedEtag === undefined ? '__missing_precondition__' : expectedEtag,
+        workflow: body.workflow ?? null,
+      });
+      if (!replay.found) return retired;
+      return [200, replay.response, { ETag: replay.response.etag }];
     }],
-    ['GET', new RegExp(`^/api/v3/workflows/(${ID})$`), ({ match }) => {
+    ['GET', 'public', new RegExp(`^/api/v3/workflows/(${ID})$`), ({ match }) => {
       const saved = engine.getWorkflowV3(match[1]);
       return [200, saved, { ETag: saved.etag }];
     }],
-    ['GET', /^\/api\/v2\/capabilities$/, async () => [200, await engine.capabilities()]],
-    ['GET', /^\/api\/v2\/settings$/, () => [200, engine.settingsBody()]],
-    ['PUT', /^\/api\/v2\/settings$/, async ({ req }) => { const result = engine.updateSettings(parse(await readBody(req))); return [result.status, result.body]; }],
-    ['GET', /^\/api\/v2\/workspaces$/, ({ url }) => [200, engine.listWorkspaces(query(url, ['limit', 'cursor'], ['limit']))]],
-    ['PUT', new RegExp(`^/api/v2/workspaces/(${ID})$`), async ({ req, match }) => [200, engine.putWorkspace(match[1], parse(await readBody(req)))]],
-    ['GET', /^\/api\/v2\/workflows$/, ({ url }) => [200, engine.listWorkflows(query(url, ['limit', 'cursor'], ['limit']))]],
-    ['POST', /^\/api\/v2\/workflows\/validate$/, async ({ req }) => [200, engine.validateWorkflow(parse(await readBody(req)))]],
-    ['PUT', new RegExp(`^/api/v2/workflows/(${ID})$`), () => [410, { code: 'api_upgrade_required',
-      message: 'Workflow saves require API v3. Read the workflow ETag and save with a stable requestId and an explicit precondition.', details: [] }]],
-    ['GET', new RegExp(`^/api/v2/workflows/(${ID})$`), ({ match }) => [200, engine.getWorkflow(match[1])]],
-    ['GET', new RegExp(`^/api/v2/workflows/(${ID})/cache-pins$`), ({ match }) => [200, engine.listPins(match[1])]],
-    ['PUT', new RegExp(`^/api/v2/workflows/(${ID})/cache-pins/(${ID})$`), async ({ req, match }) => [200, engine.freezeCache(match[1], match[2], parse(await readBody(req)))]],
-    ['DELETE', new RegExp(`^/api/v2/workflows/(${ID})/cache-pins/(${ID})$`), ({ match }) => [200, engine.deleteCachePin(match[1], match[2])]],
-    ['GET', /^\/api\/v2\/context-bindings$/, ({ url }) => {
+    ['GET', 'public', /^\/api\/v4\/workflows$/, ({ url }) => [200, engine.listWorkflowLifecycle(query(url, ['limit', 'cursor'], ['limit']))]],
+    ['GET', 'public', new RegExp(`^/api/v4/workflows/(${ID})/draft$`), ({ match }) => {
+      const draft = engine.getWorkflowDraft(match[1]); return [200, draft, { ETag: draft.etag }];
+    }],
+    ['PUT', 'public', new RegExp(`^/api/v4/workflows/(${ID})/draft$`), async ({ req, match }) => {
+      const result = engine.saveWorkflowDraft(match[1], parse(await bodyText(req)), writeEtag(req)); return [200, result, { ETag: result.etag }];
+    }],
+    ['POST', 'public', new RegExp(`^/api/v4/workflows/(${ID})/draft/validate$`), async ({ req, match }) => {
+      const body = parse(await bodyText(req));
+      if (Object.keys(body).length) throw new ApiError(400, 'invalid_request', 'Draft validation takes an empty JSON object and an If-Match ETag.');
+      return [200, engine.validateWorkflowDraft(match[1], req.headers['if-match'])];
+    }],
+    ['POST', 'public', new RegExp(`^/api/v4/workflows/(${ID})/draft/from/([1-9][0-9]*)$`), async ({ req, match }) => {
+      const result = engine.deriveWorkflowDraft(match[1], Number(match[2]), parse(await bodyText(req)), writeEtag(req)); return [200, result, { ETag: result.etag }];
+    }],
+    ['POST', 'public', new RegExp(`^/api/v4/workflows/(${ID})/publish$`), async ({ req, match }) => {
+      const result = engine.publishWorkflowDraft(match[1], parse(await bodyText(req)), req.headers['if-match']); return [201, result, { ETag: result.etag }];
+    }],
+    ['GET', 'public', new RegExp(`^/api/v4/workflows/(${ID})/versions$`), ({ match, url }) => [200, engine.listWorkflowPublications(match[1], query(url, ['limit', 'cursor'], ['limit']))]],
+    ['GET', 'public', new RegExp(`^/api/v4/workflows/(${ID})/versions/latest$`), ({ match }) => {
+      const publication = engine.getLatestWorkflowPublication(match[1]); return [200, publication, { ETag: publication.etag }];
+    }],
+    ['GET', 'public', new RegExp(`^/api/v4/workflows/(${ID})/versions/([1-9][0-9]*)$`), ({ match }) => {
+      const publication = engine.getWorkflowPublication(match[1], Number(match[2])); return [200, publication, { ETag: publication.etag }];
+    }],
+    ['GET', 'public', /^\/api\/v2\/capabilities$/, async () => [200, await engine.capabilities()]],
+    ['GET', 'public', /^\/api\/v2\/installation\/source-release$/, async () => [200, await engine.installedSourceRelease()]],
+    ['GET', 'public', new RegExp(`^/api/v2/runs/(${UUID})/self-repair$`), ({ match }) => {
+      const projection = engine.protectedSelfRepairRunProjection(match[1]);
+      if (!projection) throw new ApiError(404, 'not_found', 'This Run has no Protected Self-Repair projection.');
+      return [200, projection];
+    }],
+    ['POST', 'public', new RegExp(`^/api/v2/runs/(${UUID})/self-repair/publication$`), async ({ match }) => {
+      const { status, body } = await engine.publishProtectedSelfRepairBranch(match[1]);
+      return [status, body];
+    }],
+    ['GET', 'public', new RegExp(`^/api/v2/runs/(${UUID})/self-repair/publication$`), ({ match }) => [200, engine.protectedSelfRepairPublicationStatus(match[1])]],
+    ['GET', 'public', /^\/api\/v2\/settings$/, () => [200, engine.settingsBody()]],
+    ['PUT', 'public', /^\/api\/v2\/settings$/, async ({ req }) => { const result = engine.updateSettings(parse(await bodyText(req))); return [result.status, result.body]; }],
+    ['GET', 'public', /^\/api\/v2\/workspaces$/, ({ url }) => [200, engine.listWorkspaces(query(url, ['limit', 'cursor'], ['limit']))]],
+    ['PUT', 'public', new RegExp(`^/api/v2/workspaces/(${ID})$`), async ({ req, match }) => [200, engine.putWorkspace(match[1], parse(await bodyText(req)))]],
+    ['GET', 'public', /^\/api\/v2\/workflows$/, ({ url }) => [200, engine.listWorkflows(query(url, ['limit', 'cursor'], ['limit']))]],
+    ['POST', 'public', /^\/api\/v2\/workflows\/validate$/, async ({ req }) => [200, engine.validateWorkflow(parse(await bodyText(req)))]],
+    ['PUT', 'retired', new RegExp(`^/api/v2/workflows/(${ID})$`), () => [410, { code: 'api_upgrade_required', message: 'Workflow saves require the Draft and Publication API.', details: [] }]],
+    ['GET', 'public', new RegExp(`^/api/v2/workflows/(${ID})$`), ({ match }) => [200, engine.getWorkflow(match[1])]],
+    ['GET', 'public', new RegExp(`^/api/v2/workflows/(${ID})/cache-pins$`), ({ match }) => [200, engine.listPins(match[1])]],
+    ['PUT', 'public', new RegExp(`^/api/v2/workflows/(${ID})/cache-pins/(${ID})$`), async ({ req, match }) => [200, engine.freezeCache(match[1], match[2], parse(await bodyText(req)))]],
+    ['DELETE', 'public', new RegExp(`^/api/v2/workflows/(${ID})/cache-pins/(${ID})$`), ({ match }) => [200, engine.deleteCachePin(match[1], match[2])]],
+    ['GET', 'public', /^\/api\/v2\/context-bindings$/, ({ url }) => {
       const { workspaceId } = query(url, ['workspaceId']);
       if (!workspaceId) throw new ApiError(400, 'invalid_request', 'workspaceId is required.');
       return [200, engine.listBindings(workspaceId)];
     }],
-    ['POST', new RegExp(`^/api/v2/context-bindings/(${UUID})/acknowledge$`), async ({ req, match }) => [200, engine.acknowledgeBinding(match[1], parse(await readBody(req)))]],
-    ['POST', new RegExp(`^/api/v2/context-bindings/(${UUID})/messages$`), async ({ req, match }) => { const result = engine.sendChat(match[1], parse(await readBody(req))); return [result.status, result.body]; }],
-    ['GET', /^\/api\/v2\/runs$/, ({ url }) => [200, engine.listRuns(query(url, ['workspaceId', 'state', 'kind', 'bindingId', 'limit', 'cursor'], ['limit']))]],
-    ['POST', /^\/api\/v2\/runs$/, async ({ req }) => { const result = engine.createRun(parse(await readBody(req)), { role: req.authRole, clientLabel: req.headers['x-deszo-client-label'], controllerToken: controllerTokenOf(req) }); return [result.status, result.body]; }],
-    ['GET', /^\/api\/v2\/run-requests$/, ({ url }) => {
+    ['POST', 'public', new RegExp(`^/api/v2/context-bindings/(${UUID})/acknowledge$`), async ({ req, match }) => [200, engine.acknowledgeBinding(match[1], parse(await bodyText(req)))]],
+    ['POST', 'public', new RegExp(`^/api/v2/context-bindings/(${UUID})/messages$`), async ({ req, match }) => { const result = engine.sendChat(match[1], parse(await bodyText(req))); return [result.status, result.body]; }],
+    ['GET', 'public', /^\/api\/v2\/runs$/, ({ url }) => [200, engine.listRuns(query(url, ['workspaceId', 'state', 'kind', 'bindingId', 'limit', 'cursor'], ['limit']))]],
+    // P6-G0 test trigger: present only in packages built with the test marker. A production Engine has no route that starts a switch;
+    // the P5 handoff trigger that P6-BUILD adds is the production caller of requestEngineSwitch (ADR-0010 section 12).
+    ...(testFaultHooksEnabled(import.meta.url) ? [
+      ['POST', 'public', /^\/api\/v4\/lifecycle\/engine-switch$/, async ({ req }) => {
+        try {
+          const outcome = await requestEngineSwitch({ engine, lifecycleHost, quiescence: switchQuiescence, body: parse(await bodyText(req)) });
+          // A recorded outcome answers an earlier request: 200. A switch that the Host accepted is 202.
+          return [outcome.duplicate ? 200 : 202, outcome];
+        }
+        catch (error) { throw apiRefusal(error); }
+      }, { switchRequest: true }],
+      ['POST', 'public', new RegExp(`^/api/v4/lifecycle/p6-activate/(${UUID})$`), async ({ req, match }) => {
+        let body = null;
+        try { body = parse(await bodyText(req)); } catch {}
+        engine.triggerP6Consumer(match[1], body?.targetEngineBuildId || null);
+        return [202, { accepted: true, repairRunId: match[1] }];
+      }],
+    ] : []),
+    ['POST', 'public', /^\/api\/v2\/runs$/, async ({ req }) => {
+      const body = parse(await bodyText(req));
+      const options = { role: req.authRole, clientLabel: req.headers['x-deszo-client-label'], controllerToken: controllerTokenOf(req) };
+      const result = body?.hostPermitId ? await engine.createRunUnderHostPermit(body, options) : await engine.createRunAsync(body, options);
+      return [result.status, result.body];
+    }, { hostVariant: true }],
+    ['GET', 'public', /^\/api\/v2\/run-requests$/, ({ url }) => {
       const params = query(url, ['state', 'limit'], ['limit']);
       return [200, engine.listRunRequests(params)];
     }],
-    ['GET', new RegExp(`^/api/v2/run-requests/(${UUID})$`), ({ match }) => [200, engine.getRunRequest(match[1])]],
-    ['POST', new RegExp(`^/api/v2/run-requests/(${UUID})/decision$`), async ({ req, match }) => {
-      const result = engine.decideRunRequest(match[1], parse(await readBody(req)));
-      return [result.status, result.body];
-    }],
-    ['GET', new RegExp(`^/api/v2/runs/(${UUID})/events/page$`), ({ match, url }) => {
+    ['GET', 'public', new RegExp(`^/api/v2/run-requests/(${UUID})$`), ({ match }) => [200, engine.getRunRequest(match[1])]],
+    ['POST', 'retired', new RegExp(`^/api/v2/run-requests/(${UUID})/decision$`), () => [410, { code: 'operation_retired', message: 'This run-request decision route is retired.', details: [] }]],
+    ['GET', 'public', new RegExp(`^/api/v2/runs/(${UUID})/events/page$`), ({ match, url }) => {
       const params = query(url, ['afterSequence', 'limit'], ['afterSequence', 'limit']);
       return [200, engine.listRunEvents(match[1], params)];
     }],
-    ['GET', new RegExp(`^/api/v2/runs/(${UUID})$`), ({ match }) => [200, engine.runSnapshot(match[1])]],
-    ['POST', new RegExp(`^/api/v2/runs/(${UUID})/stop$`), async ({ req, match }) => { const result = engine.stopRun(match[1], parse(await readBody(req))); return [result.status, result.body]; }],
-    ['POST', new RegExp(`^/api/v2/runs/(${UUID})/recovery$`), async ({ req, match }) => { const result = engine.recoverRun(match[1], parse(await readBody(req))); return [result.status, result.body]; }],
-    ['GET', new RegExp(`^/api/v2/runs/(${UUID})/maps/([^/]+)$`), ({ match }) => [200, engine.mapNavigator(match[1], decodeURIComponent(match[2]))]],
-    ['GET', new RegExp(`^/api/v2/runs/(${UUID})/maps/([^/]+)/executions$`), ({ match }) => [200, engine.mapHistory(match[1], decodeURIComponent(match[2]))]],
-    ['GET', new RegExp(`^/api/v2/map-executions/(${UUID})$`), ({ match }) => [200, engine.mapExecutionNavigator(match[1])]],
-    ['GET', new RegExp(`^/api/v2/artifacts/(${UUID})/provenance$`), ({ match }) => [200, engine.artifactProvenance(match[1])]],
-    // ADR-0002 observation, supervision, incidents and audit. Grants, incident triage and revocation are first-party only.
-    ['POST', /^\/api\/v2\/controller-sessions$/, async ({ req }) => { const result = engine.createControllerSession(parse(await readBody(req))); return [result.status, result.body]; }],
-    ['POST', /^\/api\/v2\/control-grants$/, async ({ req }) => { const result = engine.requestControlGrant(parse(await readBody(req)), { controllerToken: controllerTokenOf(req) }); return [result.status, result.body]; }],
-    ['GET', new RegExp(`^/api/v2/control-grants/(${UUID})$`), ({ match }) => [200, engine.getControlGrant(match[1])]],
-    ['POST', new RegExp(`^/api/v2/control-grants/(${UUID})/decision$`), async ({ req, match }) => { const result = engine.decideControlGrant(match[1], parse(await readBody(req))); return [result.status, result.body]; }],
-    ['POST', new RegExp(`^/api/v2/control-grants/(${UUID})/revoke$`), async ({ req, match }) => { const result = engine.revokeControlGrant(match[1], parse(await readBody(req))); return [result.status, result.body]; }],
-    ['GET', new RegExp(`^/api/v2/runs/(${UUID})/control$`), ({ match }) => [200, engine.getRunControl(match[1])]],
-    ['GET', new RegExp(`^/api/v2/runs/(${UUID})/watch$`), async ({ match, url }) => [200, await engine.watchRun(match[1], query(url, ['cursor', 'waitMs'], ['cursor', 'waitMs']))]],
-    ['POST', new RegExp(`^/api/v2/runs/(${UUID})/observation-acks$`), async ({ req, match }) => { const result = engine.acknowledgeObservation(match[1], parse(await readBody(req)), { controllerToken: controllerTokenOf(req) }); return [result.status, result.body]; }],
-    ['GET', new RegExp(`^/api/v2/runs/(${UUID})/evidence$`), ({ match }) => [200, { items: engine.runEvidence(match[1]) }]],
-    ['GET', new RegExp(`^/api/v2/runs/(${UUID})/processes$`), ({ match }) => [200, { items: engine.runProcesses(match[1]) }]],
-    ['POST', new RegExp(`^/api/v2/runs/(${UUID})/stop-and-report$`), async ({ req, match }) => { const body = parse(await readBody(req)); const result = engine.stopAndReport(match[1], body, reporterFor(req, body)); return [result.status, result.body]; }],
-    ['POST', new RegExp(`^/api/v2/runs/(${UUID})/audit-bundles$`), async ({ req, match }) => { const result = await engine.createAuditBundle(match[1], parse(await readBody(req))); return [result.status, result.body]; }],
-    ['GET', new RegExp(`^/api/v2/audit-bundles/(${UUID})$`), ({ match }) => [200, engine.getAuditBundle(match[1])]],
-    ['GET', new RegExp(`^/api/v2/artifacts/(${UUID})/range$`), ({ match, url }) => [200, engine.readArtifactRange(match[1], query(url, ['offset', 'length'], ['offset', 'length']))]],
-    ['POST', /^\/api\/v2\/incidents$/, async ({ req }) => { const body = parse(await readBody(req)); body.observation = { ...body.observation, reporter: reporterFor(req, body.observation) }; const result = engine.fileIncident(body); return [result.status, result.body]; }],
-    ['GET', /^\/api\/v2\/incidents$/, ({ url }) => [200, engine.listIncidents(query(url, ['state', 'runId', 'limit'], ['limit']))]],
-    ['GET', new RegExp(`^/api/v2/incidents/(${UUID})$`), ({ match }) => [200, engine.getIncident(match[1])]],
-    ['POST', new RegExp(`^/api/v2/incidents/(${UUID})/observations$`), async ({ req, match }) => { const body = parse(await readBody(req)); body.observation = { ...body.observation, reporter: reporterFor(req, body.observation) }; const result = engine.appendObservation(match[1], body); return [result.status, result.body]; }],
-    ['POST', new RegExp(`^/api/v2/incidents/(${UUID})/triage$`), async ({ req, match }) => { const result = engine.triageIncident(match[1], parse(await readBody(req))); return [result.status, result.body]; }],
-    ['GET', new RegExp(`^/api/v2/command-status/(${UUID})$`), ({ match }) => [200, engine.commandStatus(match[1])]],
-    ['GET', new RegExp(`^/api/v2/runs/(${UUID})/emergency-credential$`), ({ req, match }) => [200, engine.emergencyCredential(match[1], controllerTokenOf(req))]],
-    ['POST', new RegExp(`^/api/v2/runs/(${UUID})/control-extension$`), async ({ req, match }) => { const result = await engine.extendEscalation(match[1], parse(await readBody(req))); return [result.status, result.body]; }],
-    ['POST', new RegExp(`^/api/v2/runs/(${UUID})/nodes/([^/]+)/stop$`), async ({ req, match }) => {
-      const result = engine.stopNode(match[1], decodeURIComponent(match[2]), parse(await readBody(req))); return [result.status, result.body];
+    ['GET', 'public', new RegExp(`^/api/v2/runs/(${UUID})/failure-outcomes/page$`), ({ match, url }) => {
+      const params = query(url, ['afterSequence', 'limit'], ['afterSequence', 'limit']);
+      return [200, engine.listFailureOutcomes(match[1], params)];
     }],
+    ['GET', 'public', new RegExp(`^/api/v2/runs/(${UUID})/judge-questions$`), ({ match }) => [200, engine.getWorkflowJudgeQuestions(match[1])]],
+    ['GET', 'public', new RegExp(`^/api/v2/runs/(${UUID})$`), ({ match }) => [200, engine.runSnapshot(match[1])]],
+    ['POST', 'public', new RegExp(`^/api/v2/judge-questions/(${UUID})/answers$`), async ({ req, match }) => {
+      const result = engine.answerWorkflowJudgeQuestion(match[1], parse(await bodyText(req)));
+      return [result.status, result.body];
+    }],
+    ['POST', 'public', new RegExp(`^/api/v2/runs/(${UUID})/stop$`), async ({ req, match }) => { const result = engine.stopRun(match[1], parse(await bodyText(req))); return [result.status, result.body]; }, { settling: true }],
+    ['POST', 'public', new RegExp(`^/api/v2/runs/(${UUID})/recovery$`), async ({ req, match }) => { const result = engine.recoverRun(match[1], parse(await bodyText(req))); return [result.status, result.body]; }],
+    ['POST', 'public', new RegExp(`^/api/v2/runs/(${UUID})/linked-repair$`), async ({ req, match }) => { const result = engine.linkRepair(match[1], parse(await bodyText(req))); return [result.status, result.body]; }],
+    ['POST', 'retired', new RegExp(`^/api/v2/runs/(${UUID})/lifecycle-receipt$`), () => [410, { code: 'operation_retired', message: 'HTTP lifecycle receipts are retired; Host receipts use the authenticated lifecycle channel.', details: [] }]],
+    ['GET', 'public', new RegExp(`^/api/v2/runs/(${UUID})/maps/([^/]+)$`), ({ match }) => [200, engine.mapNavigator(match[1], decodeURIComponent(match[2]))]],
+    ['GET', 'public', new RegExp(`^/api/v2/runs/(${UUID})/tasks/([^/]+)$`), ({ match }) => [200, engine.managedTaskNavigator(match[1], decodeURIComponent(match[2]))]],
+    ['GET', 'public', new RegExp(`^/api/v2/runs/(${UUID})/maps/([^/]+)/executions$`), ({ match }) => [200, engine.mapHistory(match[1], decodeURIComponent(match[2]))]],
+    ['GET', 'public', new RegExp(`^/api/v2/map-executions/(${UUID})$`), ({ match }) => [200, engine.mapExecutionNavigator(match[1])]],
+    ['GET', 'public', new RegExp(`^/api/v2/artifacts/(${UUID})/provenance$`), ({ match }) => [200, engine.artifactProvenance(match[1])]],
+    // ADR-0007 is opt-in. Worker credentials and scoped invocation credentials have different rights.
+    ['POST', 'public', /^\/api\/v2\/judge-sessions$/, async ({req}) => { const r=engine.registerJudgeSession(parse(await bodyText(req)));return[r.status,r.body]; }],
+    ['POST', 'public', /^\/api\/v2\/judge-attention$/, async ({req}) => { const r=engine.createJudgeAttention(parse(await bodyText(req)),{controllerToken:controllerTokenOf(req)});return[r.status,r.body]; }],
+    ['GET', 'public', new RegExp(`^/api/v2/judge-sessions/(${UUID})/attention$`), ({req,match}) => [200,engine.listJudgeAttention(match[1],{controllerToken:controllerTokenOf(req)})]],
+    ['POST', 'public', new RegExp(`^/api/v2/judge-sessions/(${UUID})/owner$`), async ({req,match}) => { const r=engine.fenceJudgeOwner(match[1],parse(await bodyText(req)),{controllerToken:controllerTokenOf(req)});return[r.status,r.body]; }],
+    ['POST', 'internal-host', /^\/api\/v2\/judge-invocations$/, async ({req}) => { const r=await engine.admitJudgeInvocation(parse(await bodyText(req)),{controllerToken:controllerTokenOf(req)});return[r.status,r.body]; }],
+    ['POST', 'internal-host', new RegExp(`^/api/v2/judge-invocations/(${UUID})/started$`), async ({req,match}) => [200,engine.recordJudgeStarted(match[1],parse(await bodyText(req)),{controllerToken:controllerTokenOf(req)})]],
+    ['POST', 'internal-host', new RegExp(`^/api/v2/judge-invocations/(${UUID})/complete$`), async ({req,match}) => [200,await engine.completeJudgeInvocation(match[1],parse(await bodyText(req)),{controllerToken:controllerTokenOf(req)})]],
+    ['GET', 'public', new RegExp(`^/api/v2/judge-invocations/(${UUID})/evidence$`), async ({req,match}) => [200,await engine.readJudgeEvidence(match[1],{invocationToken:req.headers['x-deszo-judge-token']})]],
+    ['GET', 'internal-host', new RegExp(`^/api/v2/judge-invocations/(${UUID})/reads$`), ({req,match}) => [200,engine.listJudgeReads(match[1],{controllerToken:controllerTokenOf(req)})]],
+    ['GET', 'public', new RegExp(`^/api/v2/judge-invocations/(${UUID})/artifacts/(${UUID})$`), async ({req,match,url}) => [200,await engine.readJudgeArtifact(match[1],match[2],{invocationToken:req.headers['x-deszo-judge-token'],...query(url,['offset','length'],['offset','length'])})]],
+    ['POST', 'public', /^\/api\/v2\/judge-decisions$/, async ({req}) => { const r=await engine.submitJudgeDecision(parse(await bodyText(req)),{controllerToken:controllerTokenOf(req),invocationToken:req.headers['x-deszo-judge-token']});return[r.status,r.body]; }, { settling: true }],
+    ['GET', 'public', new RegExp(`^/api/v2/judge-decisions/(${UUID})$`), ({req,match}) => [200,engine.getJudgeDecision(match[1],{controllerToken:controllerTokenOf(req)})]],
+    // ADR-0002 observation, supervision, incidents and audit are all public owner operations.
+    ['POST', 'public', /^\/api\/v2\/controller-sessions$/, async ({ req }) => { const result = engine.createControllerSession(parse(await bodyText(req))); return [result.status, result.body]; }],
+    ['POST', 'public', /^\/api\/v2\/control-grants$/, async ({ req }) => { const result = engine.requestControlGrant(parse(await bodyText(req)), { controllerToken: controllerTokenOf(req) }); return [result.status, result.body]; }],
+    ['GET', 'public', new RegExp(`^/api/v2/control-grants/(${UUID})$`), ({ match }) => [200, engine.getControlGrant(match[1])]],
+    ['GET', 'public', /^\/api\/v2\/control-grants$/, ({ url }) => [200, engine.listControlGrants(query(url, ['state', 'limit'], ['limit']))]],
+    ['POST', 'public', new RegExp(`^/api/v2/control-grants/(${UUID})/decision$`), async ({ req, match }) => { const result = engine.decideControlGrant(match[1], parse(await bodyText(req))); return [result.status, result.body]; }],
+    ['POST', 'internal-host', new RegExp(`^/api/v2/control-grants/(${UUID})/host-approval$`), async ({ req, match }) => { const result = await engine.approveControlGrantUnderHostPermit(match[1], parse(await bodyText(req))); return [result.status, result.body]; }],
+    ['POST', 'public', new RegExp(`^/api/v2/control-grants/(${UUID})/revoke$`), async ({ req, match }) => { const result = engine.revokeControlGrant(match[1], parse(await bodyText(req))); return [result.status, result.body]; }],
+    ['GET', 'public', new RegExp(`^/api/v2/runs/(${UUID})/control$`), ({ match }) => [200, engine.getRunControl(match[1])]],
+    ['GET', 'public', new RegExp(`^/api/v2/runs/(${UUID})/watch$`), async ({ match, url }) => [200, await engine.watchRun(match[1], query(url, ['cursor', 'waitMs'], ['cursor', 'waitMs']))]],
+    ['POST', 'public', new RegExp(`^/api/v2/runs/(${UUID})/observation-acks$`), async ({ req, match }) => { const result = engine.acknowledgeObservation(match[1], parse(await bodyText(req)), { controllerToken: controllerTokenOf(req) }); return [result.status, result.body]; }, { settling: true }],
+    ['GET', 'public', new RegExp(`^/api/v2/runs/(${UUID})/evidence$`), ({ match }) => [200, { items: engine.runEvidence(match[1]) }]],
+    ['GET', 'public', new RegExp(`^/api/v2/runs/(${UUID})/processes$`), ({ match }) => [200, { items: engine.runProcesses(match[1]) }]],
+    ['POST', 'public', new RegExp(`^/api/v2/runs/(${UUID})/stop-and-report$`), async ({ req, match }) => { const body = parse(await bodyText(req)); const result = engine.stopAndReport(match[1], body, reporterFor(req, body)); return [result.status, result.body]; }, { settling: true }],
+    ['POST', 'public', new RegExp(`^/api/v2/runs/(${UUID})/audit-bundles$`), async ({ req, match }) => { const result = await engine.createAuditBundle(match[1], parse(await bodyText(req))); return [result.status, result.body]; }],
+    ['GET', 'public', new RegExp(`^/api/v2/audit-bundles/(${UUID})$`), ({ match }) => [200, engine.getAuditBundle(match[1])]],
+    ['GET', 'public', new RegExp(`^/api/v2/artifacts/(${UUID})/range$`), ({ match, url }) => [200, engine.readArtifactRange(match[1], query(url, ['offset', 'length'], ['offset', 'length']))]],
+    ['POST', 'public', /^\/api\/v2\/incidents$/, async ({ req }) => { const body = parse(await bodyText(req)); body.observation = { ...body.observation, reporter: reporterFor(req, body.observation) }; const result = engine.fileIncident(body); return [result.status, result.body]; }],
+    ['GET', 'public', /^\/api\/v2\/incidents$/, ({ url }) => [200, engine.listIncidents(query(url, ['state', 'runId', 'limit'], ['limit']))]],
+    ['GET', 'public', new RegExp(`^/api/v2/incidents/(${UUID})$`), ({ match }) => [200, engine.getIncident(match[1])]],
+    ['POST', 'public', new RegExp(`^/api/v2/incidents/(${UUID})/observations$`), async ({ req, match }) => { const body = parse(await bodyText(req)); body.observation = { ...body.observation, reporter: reporterFor(req, body.observation) }; const result = engine.appendObservation(match[1], body); return [result.status, result.body]; }],
+    ['POST', 'public', new RegExp(`^/api/v2/incidents/(${UUID})/triage$`), async ({ req, match }) => { const body = parse(await bodyText(req)); const result = engine.triageIncident(match[1], body, reporterFor(req, body)); return [result.status, result.body]; }],
+    ['GET', 'public', new RegExp(`^/api/v2/command-status/(${UUID})$`), ({ match }) => [200, engine.commandStatus(match[1])]],
+    ['GET', 'public', new RegExp(`^/api/v2/runs/(${UUID})/emergency-credential$`), ({ req, match }) => [200, engine.emergencyCredential(match[1], controllerTokenOf(req))]],
+    ['POST', 'public', new RegExp(`^/api/v2/runs/(${UUID})/control-extension$`), async ({ req, match }) => { const result = await engine.extendEscalation(match[1], parse(await bodyText(req))); return [result.status, result.body]; }, { settling: true }],
+    ['POST', 'public', new RegExp(`^/api/v2/runs/(${UUID})/nodes/([^/]+)/stop$`), async ({ req, match }) => {
+      const result = engine.stopNode(match[1], decodeURIComponent(match[2]), parse(await bodyText(req))); return [result.status, result.body];
+    }, { settling: true }],
   ];
 
   function stream(req, res, runId, url) {
@@ -255,38 +505,53 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
     res.on('close', () => { engine.store.off('workflow-change', listener); clearInterval(keepalive); });
   }
 
-  const firstPartyOnly = (method, pathname) => {
-    if (method === 'PUT' && /^\/api\/v2\/settings$/.test(pathname)) return true;
-    if (method === 'PUT' && /^\/api\/v2\/workspaces\//.test(pathname)) return true;
-    if (method === 'PUT' && /^\/api\/v2\/workflows\/[^/]+\/cache-pins\//.test(pathname)) return true;
-    if (method === 'DELETE' && /^\/api\/v2\/workflows\/[^/]+\/cache-pins\//.test(pathname)) return true;
-    if (method === 'POST' && /^\/api\/v2\/context-bindings\/[^/]+\/(acknowledge|messages)$/.test(pathname)) return true;
-    if (method === 'POST' && /^\/api\/v2\/runs\/[^/]+\/recovery$/.test(pathname)) return true;
-    if (method === 'GET' && /^\/api\/v2\/run-requests$/.test(pathname)) return true;
-    if (method === 'POST' && /^\/api\/v2\/run-requests\/[^/]+\/decision$/.test(pathname)) return true;
-    if (method === 'POST' && /^\/api\/v2\/control-grants\/[^/]+\/(decision|revoke)$/.test(pathname)) return true;
-    if (method === 'POST' && /^\/api\/v2\/incidents\/[^/]+\/triage$/.test(pathname)) return true;
-    if (method === 'POST' && /^\/api\/v2\/runs\/[^/]+\/control-extension$/.test(pathname)) return true;
-    return false;
-  };
+  const specialRoutes = [
+    ['GET', 'public', /^\/api\/v3\/authoring\/events\/stream$/, 'authoring-event-stream'],
+    ['GET', 'public', new RegExp(`^/api/v2/runs/(${UUID})/events$`), 'run-event-stream'],
+    ['GET', 'public', new RegExp(`^/api/v2/artifacts/(${UUID})$`), 'artifact-body'],
+  ];
+  const classifications = new Set(['public', 'internal-host', 'retired']);
+  const registeredRoutes = routes.map(([method, classification, pattern, handler, metadata]) => ({ method, classification, pattern, handler, metadata }));
+  const routeInventory = [
+    ...registeredRoutes.map(({ method, classification, pattern, metadata }) => ({ method, classification, pattern: pattern.source, ...(metadata?.hostVariant ? { hostVariant: 'POST /api/v2/runs with hostPermitId' } : {}) })),
+    ...specialRoutes.map(([method, classification, pattern, special]) => ({ method, classification, pattern: pattern.source, special })),
+    { method: 'OPTIONS', classification: 'public', pattern: '*', preflight: true },
+  ];
+  const uniqueRoutes = new Set();
+  for (const route of routeInventory) {
+    if (!classifications.has(route.classification)) throw new Error(`Runtime route ${route.method} ${route.pattern} has no valid classification.`);
+    const identity = `${route.method} ${route.pattern}`;
+    if (uniqueRoutes.has(identity)) throw new Error(`Runtime route ${identity} is registered more than once.`);
+    uniqueRoutes.add(identity);
+  }
 
   const server = createServer(async (req, res) => {
     const origin = req.headers.origin;
     if (origin && !origins.has(origin)) return problem(res, 403, 'unauthorized', 'Origin is not allowed.');
     if (origin) {
       res.setHeader('Access-Control-Allow-Origin', origin); res.setHeader('Vary', 'Origin');
-      res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, Last-Event-ID, If-Match, If-None-Match, Idempotency-Key, X-Deszo-Client-Label');
+      res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, Last-Event-ID, If-Match, If-None-Match, Idempotency-Key, X-Deszo-Client-Label, X-Deszo-Controller-Token, X-Deszo-Judge-Token');
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
       res.setHeader('Access-Control-Expose-Headers', 'ETag');
     }
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
-    const role = authorized(req);
-    if (!role) return problem(res, 401, 'unauthorized', 'Runtime token required.');
+    const caller = identifyCaller(req);
+    if (!caller) return problem(res, 401, 'unauthorized', 'A valid Runtime Owner Token or authenticated Host credential is required.');
     if (shuttingDown) return problem(res, 409, 'conflict', 'The runtime is shutting down.');
     const url = new URL(req.url, 'http://127.0.0.1');
     try {
-      req.authRole = role;
-      if (firstPartyOnly(req.method, url.pathname) && role !== 'first-party') return problem(res, 403, 'forbidden', 'This operation requires the first-party Deszo credential.');
+      const route = registeredRoutes.find(entry => entry.method === req.method && url.pathname.match(entry.pattern));
+      const special = specialRoutes.find(([method, , pattern]) => method === req.method && url.pathname.match(pattern));
+      const classification = route?.classification ?? special?.[1];
+      if (!classification) return problem(res, 404, 'not_found', `Unknown endpoint ${req.method} ${url.pathname}.`);
+      if (classification === 'internal-host' && caller !== 'host') return problem(res, 403, 'host_authentication_required', 'This operation requires the authenticated Lifecycle Host protocol.');
+      if (classification === 'public' && caller === 'host') {
+        if (!route?.metadata?.hostVariant) return problem(res, 403, 'owner_token_required', 'The Host credential cannot authorize a public Runtime API operation.');
+        const hostRun = parse(await bodyText(req));
+        if (typeof hostRun?.hostPermitId !== 'string' || !hostRun.hostPermitId) return problem(res, 403, 'host_permit_required', 'The Host route variant requires a Host permit.');
+      }
+      req.authRole = 'first-party';
+      req.authPrincipal = caller;
       if (req.method === 'GET' && url.pathname === '/api/v3/authoring/events/stream') return streamAuthoring(req, res, url);
       const events = url.pathname.match(new RegExp(`^/api/v2/runs/(${UUID})/events$`));
       if (req.method === 'GET' && events) return stream(req, res, events[1], url);
@@ -301,11 +566,17 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
         res.writeHead(200, { 'Content-Type': mediaType, ETag: `"${sha256}"`, 'Cache-Control': 'private, max-age=31536000, immutable' });
         res.end(bytes); return;
       }
-      for (const [method, pattern, handler] of routes) {
-        const match = url.pathname.match(pattern);
-        if (match && req.method === method) { const [status, body, headers] = await handler({ req, url, match }); return json(res, status, body, headers); }
+      if (route) {
+        // P6-G0: an Engine being replaced admits no owner mutation that could start a new Run. Reads, the switch request and the settling
+        // routes (Judge decisions, observation acknowledgements, escalation extensions, stop requests) stay open: they settle admitted work.
+        if (classification === 'public' && req.method !== 'GET' && !route.metadata?.switchRequest && !route.metadata?.settling) {
+          try { assertAdmissionOpen(switchQuiescence); } catch (error) { throw apiRefusal(error); }
+        }
+        const match = url.pathname.match(route.pattern);
+        const [status, body, headers] = await route.handler({ req, url, match });
+        return json(res, status, body, headers);
       }
-      problem(res, 404, 'not_found', `Unknown endpoint ${req.method} ${url.pathname}.`);
+      problem(res, 500, 'internal_error', 'A classified special Runtime route has no dispatch handler.');
     } catch (error) {
       if (res.headersSent) { res.end(); return; }
       if (error instanceof ApiError) return problem(res, error.status, error.code, error.message, error.details);
@@ -316,26 +587,48 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
     }
   });
 
+  // The initialized Engine may already run work (resumed Custody attempts, timers); it is shut down before the lock lets a successor in.
   try { await new Promise((resolvePromise, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolvePromise); }); }
-  catch (error) { engine.store.close(); await releaseLock(); throw error; }
+  catch (error) { await shutDownThenRelease(engine, releaseLock); throw error; }
   const identity = engine.runtimeIdentity();
-  const descriptor = { descriptorVersion: 1, apiVersions: ['v2', 'v3'], storeId: identity.storeId, runtimeInstanceId, applicationRoot: identity.applicationRoot,
+  if (hostBinding?.assurance === 'production'||hostBinding?.verificationOnly) {
+    try {
+      await hostBinding.client.call('runtime.ready', { runtimeGeneration: hostBinding.runtimeGeneration, port: server.address().port, token, hostToken,
+        buildId: hostBinding.buildId, protocolVersion: hostBinding.protocolVersion,
+        storeSchemaVersion: engine.store.get('SELECT MAX(version) AS version FROM schema_migrations').version, ...identity });
+    } catch (error) { server.close(); await shutDownThenRelease(engine, releaseLock); hostBinding.client.close(); throw error; }
+  }
+  descriptor = { descriptorVersion: 1, apiVersions: ['v2', 'v3', 'v4'], storeId: identity.storeId, runtimeInstanceId, applicationRoot: identity.applicationRoot,
     nodeExecutable: identity.nodeExecutable, bridgeScript: bridgeFile, connectionFile, port: server.address().port, token, root: identity.applicationRoot,
-    scratchRoot: join(engine.store.workdirs, 'scratch'), processContainment: engine.processContainment };
-  const temporary = `${connectionFile}.${process.pid}.tmp`;
-  writeFileSync(temporary, JSON.stringify(descriptor), { mode: 0o600 }); renameSync(temporary, connectionFile);
-  const connection = { ...descriptor, firstPartyToken };
+    scratchRoot: join(engine.store.workdirs, 'scratch'), processContainment: engine.processContainment,
+    ...(lifecycleHost ? { applicationBuildId: lifecycleHost.context.buildId, applicationGeneration: lifecycleHost.context.generation,
+      applicationPid: lifecycleHost.context.applicationPid } : {}) };
+  atomicWrite(connectionFile, JSON.stringify(descriptor));
+  // The UI compatibility field is an alias of Owner Token and carries no separate privilege tier.
+  connection = { ...descriptor, firstPartyToken: token };
   queueMicrotask(() => engine.startRun());
   return {
-    connection, engine,
-    async close() {
-      if (shuttingDown) return; shuttingDown = true;
-      for (const entry of streams) entry.close();
-      const serverClosed = new Promise(resolvePromise => server.close(resolvePromise));
-      server.closeAllConnections?.();
-      await engine.shutdown();
-      await serverClosed;
-      await releaseLock();
+    connection, engine, routeInventory,
+    ...(exposeHostRequestForTests ? { async hostRequest(method, path, body, { headers = {} } = {}) {
+      const response = await fetch(`http://127.0.0.1:${connection.port}${path}`, { method,
+        headers: { Authorization: `Bearer ${hostToken}`, ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}), ...headers },
+        body: body === undefined ? undefined : JSON.stringify(body) });
+      const text = await response.text();
+      return { status: response.status, body: text ? JSON.parse(text) : null, headers: response.headers };
+    } } : {}),
+    // Every caller waits for the one shutdown, so that none of them can end the process while the Engine is still stopping its CLIs.
+    close() {
+      closing ??= (async () => {
+        shuttingDown = true;
+        hostBinding?.client.close();
+        for (const entry of streams) entry.close();
+        const serverClosed = new Promise(resolvePromise => server.close(resolvePromise));
+        server.closeAllConnections?.();
+        await engine.shutdown();
+        await serverClosed;
+        await releaseLock();
+      })();
+      return closing;
     },
   };
 }
@@ -345,15 +638,35 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const supervised = process.argv.includes('--supervised');
   const firstPartyTokenStdout = process.argv.includes('--first-party-token-stdout') && !process.stdout.isTTY;
   const devTestConfirmationOff = !PACKAGED_RUNTIME && process.argv.includes('--dev-test-confirmation-off');
-  if (PACKAGED_RUNTIME && process.argv.some(argument => argument.startsWith('--') && !['--disable-warning=ExperimentalWarning', '--root', '--connection-file', '--bridge-file', '--supervised', '--first-party-token-stdout'].includes(argument))) {
+  const fixtureState = !PACKAGED_RUNTIME && option('--fixture-state');
+  let adapters;
+  if (fixtureState) {
+    const { fixtureAdapters } = await import('./tests/fixture-adapters.mjs');
+    adapters = fixtureAdapters(fixtureState);
+  }
+  if (PACKAGED_RUNTIME && process.argv.some(argument => argument.startsWith('--') && !['--disable-warning=ExperimentalWarning', '--root', '--connection-file', '--bridge-file', '--supervised', '--host-contained', '--first-party-token-stdout', '--p6-maintenance'].includes(argument))) {
     throw new Error('The packaged runtime was given an unsupported option.');
   }
   const lines = createInterface({ input: process.stdin });
+  const hostContained = process.argv.includes('--host-contained');
   // In Tauri mode the Rust supervisor confirms Job Object membership before any CLI can start.
-  if (supervised) await new Promise(resolvePromise => lines.on('line', function waitForContainment(line) {
+  if (supervised || hostContained) await new Promise(resolvePromise => lines.on('line', function waitForContainment(line) {
     try { if (JSON.parse(line).command === 'contained') { lines.off('line', waitForContainment); resolvePromise(); } } catch { /* Ignore other input. */ }
   }));
-  const runner = await startRunner({ root: option('--root'), connectionFile: option('--connection-file'), bridgeFile: option('--bridge-file'), supervised, firstPartyTokenStdout, devTestConfirmationOff });
+  // P6 candidate: the maintenance preflight runs before ordinary startup (no Store, no Run, no API). After the Host's commit the
+  // same process continues into startRunner with the bridge it already holds.
+  let preboundLifecycleHost;
+  if (process.argv.includes('--p6-maintenance')) {
+    preboundLifecycleHost = lifecycleBridgeFromEnvironment(process.env);
+    const operationId = process.env.DESZO_P6_OPERATION_ID;
+    const preflightStore = process.env.DESZO_P6_PREFLIGHT_STORE;
+    delete process.env.DESZO_P6_OPERATION_ID;
+    delete process.env.DESZO_P6_PREFLIGHT_STORE;
+    await runP6MaintenancePreflight({ bridge: preboundLifecycleHost, operationId, preflightStore,
+      migrations: { files: MIGRATION_FILES, paths: MIGRATION_PATHS } });
+  }
+  const runner = await startRunner({ root: option('--root'), connectionFile: option('--connection-file'), bridgeFile: option('--bridge-file'), supervised, firstPartyTokenStdout, devTestConfirmationOff, adapters,
+    lifecycleHostBridge: preboundLifecycleHost });
   const startup = { ...runner.connection };
   if (!firstPartyTokenStdout) delete startup.firstPartyToken;
   process.stdout.write(JSON.stringify(startup) + '\n');

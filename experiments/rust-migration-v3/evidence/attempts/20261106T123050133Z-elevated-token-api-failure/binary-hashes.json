@@ -1,0 +1,27 @@
+[
+  {
+    "name": "poc-host.exe",
+    "length": 663552,
+    "sha256": "693bd3f7742e740fb90b7ebef60d838e704b0cfaecd2ddf6682fe2bd3aef515a"
+  },
+  {
+    "name": "poc-core.exe",
+    "length": 784896,
+    "sha256": "14a37666e9acee783a0492eb0cc49d542c15b97a41c07d9582720a78b52332d6"
+  },
+  {
+    "name": "poc-worker-a.exe",
+    "length": 508416,
+    "sha256": "1a97e083f9a0c227ef3c97ff4b218f91d711d45e3eb2b2b62cfa9d196be167f1"
+  },
+  {
+    "name": "poc-worker-b.exe",
+    "length": 508416,
+    "sha256": "23db5a4615b31e67601c84f7855b12787fc999f552374036882d1bae2ce1d743"
+  },
+  {
+    "name": "poc-worker-fault.exe",
+    "length": 403456,
+    "sha256": "b55c94f39b69e43d58de388970918f06dd8eb875135ab653fb42f85ee59cf63e"
+  }
+]

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { Engine } from '../core/engine.mjs';
 import { StreamRecorder } from '../core/streams.mjs';
@@ -9,6 +9,7 @@ import { canonicalBytes, sha256 } from '../core/canonical.mjs';
 import { assertValid } from '../core/schemas.mjs';
 import { fixtureAdapters, singleAgent, startTestRunner } from './helpers.mjs';
 import clientTimeouts from '../../docs/authoring/client-timeouts.json' with { type: 'json' };
+import { ownedDir } from './test-roots.mjs';
 
 const testsRoot = resolve(import.meta.dirname, '../../.deszo/tests');
 const ENDED = ['succeeded', 'failed', 'canceled', 'interrupted'];
@@ -109,7 +110,7 @@ test('a stream stops at its hard bound with an explicit capture-limit fault and 
   assert.ok(!store.events.some(event => event.type === 'attempt.log_stream_closed'), 'a v1 run keeps the original journal shape');
 });
 
-test('supervision is refused without a supervisor, and grant decisions need the first-party credential', async () => {
+test('supervision is refused without a supervisor, and Owner Token reaches the public grant decision handler', async () => {
   const api = await startTestRunner();
   try {
     const session = await api.callExternal('POST', '/api/v2/controller-sessions', { requestId: randomUUID(), clientLabel: 'test controller', clientProvider: 'codex' });
@@ -119,7 +120,7 @@ test('supervision is refused without a supervisor, and grant decisions need the 
     assert.equal(refused.status, 409);
     assert.equal(refused.body.code, 'supervision_unavailable');
     const decision = await api.callExternal('POST', `/api/v2/control-grants/${randomUUID()}/decision`, { requestId: randomUUID(), decision: 'approve' });
-    assert.equal(decision.status, 403, 'a grant decision is first-party only');
+    assert.equal(decision.status, 404, 'Owner Token authorization reaches the public handler, which reports the missing grant');
   } finally { await api.close(); }
 });
 
@@ -135,7 +136,7 @@ test('an unverified client matrix refuses a grant even when a supervisor exists'
   } finally { await api.close(); }
 });
 
-test('incidents are filed by any authorised writer, triaged only by the first-party credential, and record their authority', async () => {
+test('Owner Token can file and triage incidents while audit attribution stays external', async () => {
   const api = await startTestRunner();
   try {
     const filed = await api.callExternal('POST', '/api/v2/incidents', { requestId: randomUUID(), observation: incidentObservation({ reporter: { authority: 'first-party', sessionId: null } }) });
@@ -144,7 +145,7 @@ test('incidents are filed by any authorised writer, triaged only by the first-pa
     const detail = await api.call('GET', `/api/v2/incidents/${incidentId}`);
     assert.equal(detail.body.initial.reporter.authority, 'external', 'the recorded authority is the caller\'s, not the body\'s');
     const external = await api.callExternal('POST', `/api/v2/incidents/${incidentId}/triage`, { requestId: randomUUID(), state: 'closed' });
-    assert.equal(external.status, 403, 'triage is first-party only');
+    assert.equal(external.status, 200, JSON.stringify(external.body));
     const appended = await api.callExternal('POST', `/api/v2/incidents/${incidentId}/observations`, { requestId: randomUUID(), observation: incidentObservation({ actual: 'Again.' }) });
     assert.equal(appended.status, 201, JSON.stringify(appended.body));
     const triaged = await api.call('POST', `/api/v2/incidents/${incidentId}/triage`, { requestId: randomUUID(), state: 'triaged', causeStatus: 'confirmed', note: 'Reproduced.' });
@@ -152,7 +153,7 @@ test('incidents are filed by any authorised writer, triaged only by the first-pa
     const after = await api.call('GET', `/api/v2/incidents/${incidentId}`);
     assert.equal(after.body.state, 'triaged');
     assert.equal(after.body.causeStatus, 'confirmed');
-    assert.deepEqual(after.body.updates.map(update => [update.kind, update.authority]), [['observation', 'external'], ['cause', 'first-party']]);
+    assert.deepEqual(after.body.updates.map(update => [update.kind, update.authority]), [['closure', 'external'], ['observation', 'external'], ['cause', 'external']]);
     const listed = await api.call('GET', '/api/v2/incidents?state=triaged');
     assert.ok(listed.body.items.some(item => item.incidentId === incidentId));
   } finally { await api.close(); }
@@ -302,9 +303,7 @@ test('a supervised run is armed before its first launch, a missed acknowledgemen
     assert.equal(ack.status, 200);
     assert.equal(engine.dispatchPaused.has(runId), false, 'a fresh acknowledgement resumes dispatch');
     const extendBody = { requestId: randomUUID(), extensionMs: 60000, reason: 'The controller is busy.' };
-    const external = await api.callExternal('POST', `/api/v2/runs/${runId}/control-extension`, { ...extendBody, requestId: randomUUID() });
-    assert.equal(external.status, 403, 'an extension is first-party only');
-    const extended = await api.call('POST', `/api/v2/runs/${runId}/control-extension`, extendBody);
+    const extended = await api.callExternal('POST', `/api/v2/runs/${runId}/control-extension`, extendBody);
     assert.equal(extended.status, 200, JSON.stringify(extended.body));
     assert.equal(extended.body.confirmed.extendedByMs, 60000);
     const replayed = await api.call('POST', `/api/v2/runs/${runId}/control-extension`, extendBody);
@@ -325,9 +324,44 @@ test('a supervised run is armed before its first launch, a missed acknowledgemen
   }
 });
 
+test('controller-paused Root Stop finalizes an idle supervised run without dispatching more work', async () => {
+  const api = await startTestRunner();
+  const engine = api.runner.engine;
+  try {
+    const seeded = await preparedSupervisedRun(api);
+    const started = await api.callExternal('POST', '/api/v2/runs', seeded.command, {headers: {'X-Deszo-Controller-Token': seeded.session.controllerToken}});
+    assert.equal(started.status, 202, JSON.stringify(started.body));
+    assert.equal(started.body.outcome, 'created');
+    const runId = started.body.run.runId;
+    await api.waitFor(runId, run => run.state === 'waiting_for_user');
+    assert.equal(engine.liveIn(engine.runs.get(runId)).length, 0, 'the shim refusal has left no launched child');
+    engine.store.run('UPDATE control_grants SET last_ack_at = ? WHERE id = ?', new Date(Date.now() - 60_000).toISOString(), seeded.grantId);
+    engine.watchdogTick(seeded.grantId, runId);
+    assert.equal(engine.dispatchPaused.has(runId), true);
+    const attemptsBeforeStop = engine.store.get('SELECT COUNT(*) AS n FROM attempts WHERE run_id = ?', runId).n;
+    engine.supervisor.escalated = true;
+    await engine.checkEscalation(runId);
+    const ended = await api.waitFor(runId, run => ENDED.includes(run.state), 2_000);
+    assert.equal(ended.run.state, 'canceled');
+    const proof = await waitUntil(() => engine.store.get('SELECT outcome, containment, proof_artifact_id FROM termination_proofs WHERE run_id = ?', runId), 2_000);
+    assert.equal(proof.outcome, 'stopped');
+    assert.equal(proof.containment, 'none', 'an empty launch set is proven without claiming native process containment');
+    const record = engine.store.readJson(proof.proof_artifact_id);
+    assert.equal(record.controlMode, 'supervised', 'the proof retains execution mode after the grant ends');
+    assert.equal(record.ownedAttempts, 0);
+    assert.deepEqual(record.members, []);
+    assert.ok(engine.supervisor.calls.some(([operation]) => operation === 'prove'));
+    assert.equal(engine.store.get('SELECT COUNT(*) AS n FROM attempts WHERE run_id = ?', runId).n, attemptsBeforeStop, 'Stop does not plan another attempt');
+    assert.ok(engine.store.all('SELECT process_id FROM attempts WHERE run_id = ?', runId).every(attempt => attempt.process_id === null), 'no child was launched after controller pause');
+    assert.equal(engine.activeGrant(runId), null, 'ending the run ends its control grant');
+    assert.equal(engine.watchdogs.has(runId), false);
+    assert.equal(engine.dispatchPaused.has(runId), false);
+  } finally { await api.close(); }
+});
+
 test('an incident spooled while the store was unavailable is reconciled into the registry on the next start', async () => {
   mkdirSync(testsRoot, { recursive: true });
-  const root = mkdtempSync(join(testsRoot, 'spool-'));
+  const root = ownedDir(join(testsRoot, 'spool-'));
   const incidentId = randomUUID();
   mkdirSync(join(root, 'spool', 'incidents'), { recursive: true });
   const spoolFile = join(root, 'spool', 'incidents', `${incidentId}.json`);
@@ -372,7 +406,7 @@ test('a refused arm revokes the grant and stops the run after exactly one arm re
 
 test('a truncated spool file is quarantined and recorded as a capture gap, and startup continues', async () => {
   mkdirSync(testsRoot, { recursive: true });
-  const root = mkdtempSync(join(testsRoot, 'truncated-spool-'));
+  const root = ownedDir(join(testsRoot, 'truncated-spool-'));
   const incidentId = randomUUID();
   mkdirSync(join(root, 'spool', 'incidents'), { recursive: true });
   const spoolFile = join(root, 'spool', 'incidents', `${incidentId}.json`);
@@ -459,7 +493,7 @@ test('a grant pins its workflow revision, and requesting or binding it needs the
     const saved = await api.save(singleAgent({ id: 'pinned' }));
     const session = engine.createControllerSession({ requestId: randomUUID(), clientLabel: 'test controller', clientProvider: 'codex' }).body;
     const request = sha => ({ requestId: randomUUID(), controllerSessionId: session.controllerSessionId, workflowId: 'pinned', workflowSnapshotSha256: sha,
-      workspaceId: 'main', clientProvider: 'codex', requestedActions: ['observe'], observationDeadlineMs: 10000, escalationDeadlineMs: 30000 });
+      workspaceId: 'main', clientProvider: 'codex', clientVersion: codex.testedVersion, requestedActions: ['observe'], observationDeadlineMs: 10000, escalationDeadlineMs: 30000 });
     const refusal = (fn, status, code) => { try { fn(); } catch (error) { assert.equal(error.status, status, error.message); assert.equal(error.code, code); return; } assert.fail(`expected ${status} ${code}`); };
     refusal(() => engine.requestControlGrant(request('f'.repeat(64)), { controllerToken: session.controllerToken }), 409, 'conflict');
     refusal(() => engine.requestControlGrant(request(saved.snapshotSha256), { controllerToken: null }), 403, 'controller_credential_required');
@@ -475,6 +509,74 @@ test('a grant pins its workflow revision, and requesting or binding it needs the
     codex.status = savedStatus;
     await api.close();
   }
+});
+
+async function preparedSupervisedRun(api) {
+  const engine = api.runner.engine;
+  engine.supervisor = fakeSupervisor();
+  await api.workspace();
+  const current = engine.currentSettings();
+  await api.call('PUT', '/api/v2/settings', {requestId: randomUUID(), expectedRevision: current.revision,
+    settings: {...current.settings, externalRunConfirmation: true}});
+  const saved = await api.save(singleAgent({id: 'supervised-approval', context: null}));
+  const session = engine.createControllerSession({requestId: randomUUID(), clientLabel: 'approval controller', clientProvider: 'codex'}).body;
+  const grantBody = {requestId: randomUUID(), controllerSessionId: session.controllerSessionId, workflowId: 'supervised-approval',
+    workflowSnapshotSha256: saved.snapshotSha256, workspaceId: 'main', clientProvider: 'codex',
+    clientVersion: clientTimeouts.entries.find(x => x.provider === 'codex').testedVersion,
+    requestedActions: ['observe', 'acknowledge', 'stop'], observationDeadlineMs: 10000, escalationDeadlineMs: 30000};
+  const options = {headers: {'X-Deszo-Controller-Token': session.controllerToken}};
+  const wrongVersion = await api.callExternal('POST', '/api/v2/control-grants', {...grantBody, requestId: randomUUID(), clientVersion: 'unmeasured-version'}, options);
+  assert.equal(wrongVersion.status, 409);
+  assert.equal(wrongVersion.body.code, 'supervision_unavailable');
+  const grant = await api.callExternal('POST', '/api/v2/control-grants', grantBody, options);
+  assert.equal(grant.status, 202, JSON.stringify(grant.body));
+  const queue = await api.callExternal('GET', '/api/v2/control-grants');
+  assert.equal(queue.status, 200, 'Owner Token can list the public approval queue');
+  assert.equal(queue.body.items[0].workflowSnapshotSha256, saved.snapshotSha256);
+  assert.equal(queue.body.items[0].clientLabel, 'approval controller');
+  assert.equal(queue.body.items[0].clientVersion, grantBody.clientVersion);
+  await api.call('POST', `/api/v2/control-grants/${grant.body.grantId}/decision`, {requestId: randomUUID(), decision: 'approve'});
+  const publication = api.publication('supervised-approval');
+  const command = {requestId: randomUUID(), workflowId: 'supervised-approval', workflowSnapshotSha256: saved.snapshotSha256,
+    publishedVersionId: publication.publishedVersionId, definitionDigest: publication.definitionDigest, workspaceId: 'main', controlGrantId: grant.body.grantId};
+  const withoutCredential = await api.callExternal('POST', '/api/v2/runs', {...command, requestId: randomUUID()});
+  assert.equal(withoutCredential.status, 403);
+  assert.equal(engine.store.get('SELECT COUNT(*) AS n FROM runs').n, 0, 'a missing controller credential creates no Run');
+  return {command, session, grantId: grant.body.grantId};
+}
+
+test('Owner Token starts a supervised Run after restart with its separate controller credential', async () => {
+  const first = await startTestRunner();
+  let seeded;
+  try {seeded = await preparedSupervisedRun(first);} finally {await first.close();}
+  const api = await startTestRunner({root: first.root});
+  api.runner.engine.supervisor = fakeSupervisor();
+  try {
+    const started = await api.callExternal('POST', '/api/v2/runs', seeded.command, {headers: {'X-Deszo-Controller-Token': seeded.session.controllerToken}});
+    assert.equal(started.status, 202, JSON.stringify(started.body));
+    assert.equal(started.body.outcome, 'created');
+    assert.equal(started.body.run.controlMode, 'supervised');
+    const runId = started.body.run.runId;
+    await api.waitFor(runId, run => run.state === 'waiting_for_user');
+    assert.deepEqual(api.runner.engine.supervisor.arms.map(x => x.runId), [runId], 'the native arm happens exactly once');
+    const attempts = api.runner.engine.store.all('SELECT process_id FROM attempts WHERE run_id = ?', runId);
+    assert.ok(attempts.every(x => x.process_id === null), 'the fake supervisor has no shim and must not fall back to direct process creation');
+    await api.call('POST', `/api/v2/runs/${runId}/stop`, {requestId: randomUUID()});
+    await api.waitFor(runId, run => ENDED.includes(run.state));
+  } finally {await api.close();}
+});
+
+test('revoking a pending run grant prevents capture and cannot fall back to an ordinary run', async () => {
+  const api = await startTestRunner();
+  try {
+    const seeded = await preparedSupervisedRun(api);
+    await api.call('POST', `/api/v2/control-grants/${seeded.grantId}/revoke`, {requestId: randomUUID(), reason: 'Operator revoked before dispatch.'});
+    const denied = await api.callExternal('POST', '/api/v2/runs', seeded.command, {headers: {'X-Deszo-Controller-Token': seeded.session.controllerToken}});
+    assert.equal(denied.status, 409, JSON.stringify(denied.body));
+    assert.equal(api.runner.engine.store.get('SELECT COUNT(*) AS n FROM runs').n, 0);
+    assert.equal(api.runner.engine.supervisor.arms.length, 0);
+    assert.equal(api.runner.engine.store.get('SELECT state FROM control_grants WHERE id=?', seeded.grantId).state, 'revoked');
+  } finally {await api.close();}
 });
 
 test('the emergency credential goes only to the granted controller, and the run ending ends it', async () => {

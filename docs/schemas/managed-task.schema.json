@@ -1,0 +1,855 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deszo.local/documentation/managed-task.schema.json",
+  "title": "Managed task contracts",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "kind": {
+      "const": "ManagedTaskSummary"
+    },
+    "taskExecutionId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "outcome": {
+      "enum": [
+        "accepted",
+        "READY_FOR_MERGE"
+      ]
+    },
+    "assessment": {
+      "$ref": "task-assessment.schema.json"
+    },
+    "plan": {
+      "$ref": "execution-plan.schema.json"
+    },
+    "candidate": {
+      "type": "object"
+    },
+    "acceptanceRecords": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "deliveryResult": {
+      "anyOf": [
+        {
+          "$ref": "delivery-result.schema.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "work": {
+      "type": "object"
+    },
+    "candidateFloorEvaluation": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "enum": [
+            "passed",
+            "escalated"
+          ]
+        },
+        "planRevisionId": {
+          "type": "string"
+        },
+        "candidateDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "sourceSnapshotHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "changedPaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "exceededPaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "evaluatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "status",
+        "planRevisionId",
+        "candidateDigest",
+        "sourceSnapshotHash",
+        "changedPaths",
+        "exceededPaths",
+        "evaluatedAt"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "kind",
+    "taskExecutionId",
+    "outcome",
+    "assessment",
+    "plan",
+    "candidate",
+    "acceptanceRecords",
+    "deliveryResult",
+    "work"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "config": {
+      "type": "object",
+      "properties": {
+        "roles": {
+          "type": "object",
+          "properties": {
+            "analyst": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "provider": {
+                  "enum": [
+                    "codex",
+                    "claude",
+                    "antigravity"
+                  ]
+                },
+                "model": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "effort": {
+                  "enum": [
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "max"
+                  ]
+                },
+                "timeoutSeconds": {
+                  "type": "integer",
+                  "minimum": 5,
+                  "maximum": 600
+                }
+              },
+              "required": [
+                "role",
+                "provider",
+                "model",
+                "effort",
+                "timeoutSeconds"
+              ],
+              "additionalProperties": false
+            },
+            "codeReviewer": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "provider": {
+                  "enum": [
+                    "codex",
+                    "claude",
+                    "antigravity"
+                  ]
+                },
+                "model": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "effort": {
+                  "enum": [
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "max"
+                  ]
+                },
+                "timeoutSeconds": {
+                  "type": "integer",
+                  "minimum": 5,
+                  "maximum": 600
+                }
+              },
+              "required": [
+                "role",
+                "provider",
+                "model",
+                "effort",
+                "timeoutSeconds"
+              ],
+              "additionalProperties": false
+            },
+            "testReviewer": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "provider": {
+                  "enum": [
+                    "codex",
+                    "claude",
+                    "antigravity"
+                  ]
+                },
+                "model": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "effort": {
+                  "enum": [
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "max"
+                  ]
+                },
+                "timeoutSeconds": {
+                  "type": "integer",
+                  "minimum": 5,
+                  "maximum": 600
+                }
+              },
+              "required": [
+                "role",
+                "provider",
+                "model",
+                "effort",
+                "timeoutSeconds"
+              ],
+              "additionalProperties": false
+            },
+            "testAuthor": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "provider": {
+                  "enum": [
+                    "codex",
+                    "claude",
+                    "antigravity"
+                  ]
+                },
+                "model": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "effort": {
+                  "enum": [
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "max"
+                  ]
+                },
+                "timeoutSeconds": {
+                  "type": "integer",
+                  "minimum": 5,
+                  "maximum": 600
+                }
+              },
+              "required": [
+                "role",
+                "provider",
+                "model",
+                "effort",
+                "timeoutSeconds"
+              ],
+              "additionalProperties": false
+            },
+            "developer": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "provider": {
+                  "enum": [
+                    "codex",
+                    "claude",
+                    "antigravity"
+                  ]
+                },
+                "model": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "effort": {
+                  "enum": [
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "max"
+                  ]
+                },
+                "timeoutSeconds": {
+                  "type": "integer",
+                  "minimum": 5,
+                  "maximum": 600
+                }
+              },
+              "required": [
+                "role",
+                "provider",
+                "model",
+                "effort",
+                "timeoutSeconds"
+              ],
+              "additionalProperties": false
+            },
+            "juniorAnalyst": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "provider": {
+                  "enum": [
+                    "codex",
+                    "claude",
+                    "antigravity"
+                  ]
+                },
+                "model": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "effort": {
+                  "enum": [
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "max"
+                  ]
+                },
+                "timeoutSeconds": {
+                  "type": "integer",
+                  "minimum": 5,
+                  "maximum": 600
+                }
+              },
+              "required": [
+                "role",
+                "provider",
+                "model",
+                "effort",
+                "timeoutSeconds"
+              ],
+              "additionalProperties": false
+            },
+            "businessAccepter": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "provider": {
+                  "enum": [
+                    "codex",
+                    "claude",
+                    "antigravity"
+                  ]
+                },
+                "model": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "effort": {
+                  "enum": [
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "max"
+                  ]
+                },
+                "timeoutSeconds": {
+                  "type": "integer",
+                  "minimum": 5,
+                  "maximum": 600
+                }
+              },
+              "required": [
+                "role",
+                "provider",
+                "model",
+                "effort",
+                "timeoutSeconds"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "analyst",
+            "codeReviewer",
+            "testReviewer",
+            "testAuthor",
+            "developer",
+            "juniorAnalyst"
+          ],
+          "additionalProperties": false
+        },
+        "scope": {
+          "type": "object",
+          "properties": {
+            "production": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "tests": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "documentation": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "excludedOutputs": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "required": [
+            "production",
+            "tests",
+            "documentation",
+            "excludedOutputs"
+          ],
+          "additionalProperties": false
+        },
+        "projectPolicy": {
+          "type": "object",
+          "properties": {
+            "criticalAreas": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "publicContracts": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "requireIndependentAcceptance": {
+              "type": "boolean"
+            },
+            "independentAcceptanceOnHighUncertainty": {
+              "type": "boolean"
+            },
+            "independentAcceptanceOnHighConsequence": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "criticalAreas",
+            "publicContracts",
+            "requireIndependentAcceptance"
+          ],
+          "additionalProperties": false
+        },
+        "bounds": {
+          "type": "object",
+          "properties": {
+            "maxAttempts": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000
+            },
+            "maxElapsedSeconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 86400
+            },
+            "maxContextTurns": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10
+            },
+            "maxRepairIterations": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 20
+            },
+            "maxDiscoveryTurns": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10
+            }
+          },
+          "required": [
+            "maxAttempts",
+            "maxElapsedSeconds",
+            "maxContextTurns",
+            "maxRepairIterations",
+            "maxDiscoveryTurns"
+          ],
+          "additionalProperties": false
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,40}$"
+              },
+              "command": {
+                "type": "string",
+                "minLength": 1
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "expectedExitCode": {
+                "type": "integer"
+              },
+              "timeoutMs": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 600000
+              },
+              "criteria": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              }
+            },
+            "required": [
+              "id",
+              "command",
+              "args",
+              "expectedExitCode",
+              "timeoutMs",
+              "criteria"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "delivery": {
+          "type": "object",
+          "properties": {
+            "boundary": {
+              "enum": [
+                "candidate",
+                "verified_branch"
+              ]
+            },
+            "baseCommit": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{40}$"
+            },
+            "targetBranchRef": {
+              "type": "string",
+              "pattern": "^refs/heads/codex/[A-Za-z0-9][A-Za-z0-9._/-]*$"
+            },
+            "expectedOldValue": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "commitPolicy": {
+              "type": "object",
+              "properties": {
+                "authorName": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "authorEmail": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "message": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "authorName",
+                "authorEmail",
+                "message"
+              ],
+              "additionalProperties": false
+            },
+            "installHooks": {
+              "type": "boolean"
+            },
+            "hookSource": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "boundary"
+          ],
+          "additionalProperties": false,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "boundary": {
+                    "const": "verified_branch"
+                  }
+                }
+              },
+              "then": {
+                "required": [
+                  "baseCommit",
+                  "targetBranchRef",
+                  "expectedOldValue",
+                  "commitPolicy"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "required": [
+        "roles",
+        "scope",
+        "projectPolicy",
+        "bounds",
+        "checks",
+        "delivery"
+      ],
+      "additionalProperties": false
+    },
+    "turn": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "enum": [
+            "COMPLETED",
+            "CONTEXT_NEEDED",
+            "REVIEW_INCOMPLETE"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "requestedPaths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "assessment": {
+          "anyOf": [
+            {
+              "$ref": "task-assessment.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "review": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "verdict": {
+                  "enum": [
+                    "APPROVED",
+                    "CHANGES_REQUESTED"
+                  ]
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "criteria": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "criterionId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "status": {
+                        "enum": [
+                          "satisfied",
+                          "unsatisfied",
+                          "unverified"
+                        ]
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "criterionId",
+                      "status",
+                      "reason"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "verdict",
+                "reason",
+                "criteria"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "triage": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "cause": {
+                  "enum": [
+                    "implementation",
+                    "tests",
+                    "requirements",
+                    "environment",
+                    "unknown"
+                  ]
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "cause",
+                "reason"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "status",
+        "reason",
+        "requestedPaths",
+        "assessment",
+        "review",
+        "triage"
+      ],
+      "additionalProperties": false
+    },
+    "review": {
+      "type": "object",
+      "properties": {
+        "verdict": {
+          "enum": [
+            "APPROVED",
+            "CHANGES_REQUESTED"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "criteria": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "criterionId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "status": {
+                "enum": [
+                  "satisfied",
+                  "unsatisfied",
+                  "unverified"
+                ]
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "criterionId",
+              "status",
+              "reason"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "verdict",
+        "reason",
+        "criteria"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

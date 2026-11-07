@@ -1,5 +1,8 @@
 import { createHash } from 'node:crypto';
 
+// Stable UTF-16 ordering, matching canonical object keys without consulting the host locale.
+export const compareText = (left, right) => left < right ? -1 : left > right ? 1 : 0;
+
 export class StrictJsonError extends Error {
   constructor(message, position) { super(position === undefined ? message : `${message} at position ${position}`); this.code = 'invalid_json'; }
 }

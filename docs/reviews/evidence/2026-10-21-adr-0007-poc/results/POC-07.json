@@ -1,0 +1,29 @@
+{
+  "experiment": "POC-07",
+  "title": "Budget and authority boundaries",
+  "status": "FAIL",
+  "checks": [
+    {
+      "name": "the existing Deszo managed-invocation, reservation, permit and authority tests pass",
+      "pass": true,
+      "detail": "pass=77 fail=0 exit=0"
+    },
+    {
+      "name": "the App Server refuses a turn that carries no host-issued reservation",
+      "pass": false,
+      "detail": "a turn with no reservation was admitted and emitted turn/started; enforcement must sit in the adapter and at the process boundary"
+    }
+  ],
+  "measurements": {
+    "durationMs": 142359,
+    "testPattern": "managed|reserve|budget|permit|invocation|authority|expired|revoked",
+    "deszoTestsPassed": 77,
+    "deszoTestsFailed": 0,
+    "deszoTestsExit": 0
+  },
+  "notes": [
+    "The Codex client did not enforce a host reservation. This is a boundary fact about the App Server, not about Deszo. The ADR must place enforcement in the adapter (sole path to turn/start, holding the only credential) and in the process boundary.",
+    "Deszo side: the test names matched are listed in the TAP file. Full suite evidence (578/578) is recorded separately.",
+    "Not observed here: whether an exhausted budget or expired authority would be extended by a real Codex turn, and what a provider charges. Both need a signed-in session and provider usage telemetry (see the POC-03 blocker). The status is FAIL on the boundary check alone; the unobserved items are not counted as passes."
+  ]
+}

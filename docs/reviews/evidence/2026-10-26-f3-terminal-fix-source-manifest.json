@@ -1,0 +1,222 @@
+{
+  "schemaVersion": 1,
+  "candidate": "F3 terminal safety fix: frozen light candidate (verification copy at C:/dz/f3c)",
+  "createdAt": "2026-10-26T09:50:12.401Z",
+  "branch": "codex/adr-0003-0005-completion",
+  "head": "4165707f2099006af41c4f0d32170f613abde7fb",
+  "excludedConcurrentWork": [
+    "P1 durable continuation hunks in runtime/core/engine.mjs (restart path only)",
+    "runtime/tests/custody-replay.test.mjs (restored to HEAD)",
+    "runtime/tests/p1-codex-continuation-real.mjs",
+    "runtime/tests/workflow-p1-continuation.test.mjs",
+    "runtime/tests/workflow-p1-published-and-ordinary.test.mjs",
+    "docs/reviews/evidence/2026-10-26-p1-codex-continuation-real*.json"
+  ],
+  "f3ChangedFiles": [
+    "runtime/core/custody.mjs",
+    "runtime/core/engine.mjs",
+    "runtime/runner.mjs",
+    "lifecycle-host/src/custody.rs",
+    "runtime/tests/custody-terminal-settlement.test.mjs"
+  ],
+  "files": [
+    {
+      "path": "docs/authoring/mcp-neutralizers.json",
+      "status": "modified",
+      "sha256": "f85e7459505e2e7a959e39f6658dfb3acdf5147c1a076ab2808d3ec9a72dfef5"
+    },
+    {
+      "path": "docs/reviews/2026-10-24-process-custody-poc.md",
+      "status": "modified",
+      "sha256": "91f044564cc7115d69e30256faebc5da9927d6d2dd59b5dfcf9de09fdb71cd43"
+    },
+    {
+      "path": "docs/schemas/journal-event-v2.schema.json",
+      "status": "modified",
+      "sha256": "1198f620d78e8ddfe2874ccf63152637192617f02899d2097390185e6e23badd"
+    },
+    {
+      "path": "docs/schemas/journal-event.schema.json",
+      "status": "modified",
+      "sha256": "4202eb9bc073acb00cd95176874b4c8cc6e63be34a685480b93d8398225fc8a9"
+    },
+    {
+      "path": "lifecycle-host/src/custody.rs",
+      "status": "modified",
+      "sha256": "4ee05b852278cc2021b0efce15b33e1542255fbc94f0cbb28f0e2b60e0267d27"
+    },
+    {
+      "path": "runtime/core/adapters.mjs",
+      "status": "modified",
+      "sha256": "0824484ee7b15e14c2b5afb2cbd035f8f59866d57a78d1a98abf43775cc49da0"
+    },
+    {
+      "path": "runtime/core/custody.mjs",
+      "status": "modified",
+      "sha256": "9f4b41c8b6b9ac91d9434106e9697cb81793ba113e12d46ab9559f9db8a402f1"
+    },
+    {
+      "path": "runtime/core/engine.mjs",
+      "status": "modified",
+      "sha256": "74aa8650eece8567cd5e3adb27146d9dd8557cd6fa36b5265fdffc54c2b7b228"
+    },
+    {
+      "path": "runtime/core/managed-isolation.mjs",
+      "status": "modified",
+      "sha256": "c8d10d8a5b5b78b128eb9f36b2e2d7ddc5b223bdaae84ea8779b64c7c888bac6"
+    },
+    {
+      "path": "runtime/host/lifecycleBridge.mjs",
+      "status": "modified",
+      "sha256": "1eb9937412d319e74dc5922305fbff1b4b96e4b61c59a65fed71921001610e1b"
+    },
+    {
+      "path": "runtime/runner.mjs",
+      "status": "modified",
+      "sha256": "c34290fbece38ef86df93d4654ec9ab1b1fc5418dd28eb49f9e9a33637c3bdc2"
+    },
+    {
+      "path": "runtime/tests/authoring.test.mjs",
+      "status": "modified",
+      "sha256": "a07c03a46a1caa75652dce10b596d0b9f0a0a0af82ae32f081f6f04d202303c3"
+    },
+    {
+      "path": "runtime/tests/custody-support.mjs",
+      "status": "modified",
+      "sha256": "5988a261b6f14f95f162fdb357f4ccd067b9cc3e0f291606a415d3216ca81851"
+    },
+    {
+      "path": "runtime/tests/engine.test.mjs",
+      "status": "modified",
+      "sha256": "cb135e7d4dbdf7da46287014ed8d05c67d383b977a2be4e68e49cae111f507d7"
+    },
+    {
+      "path": "runtime/tests/fixture-cli.mjs",
+      "status": "modified",
+      "sha256": "79452b210dbd636f1caf5d51e96ef0dce7cebdbbb1ded889510848b94d0a1a96"
+    },
+    {
+      "path": "runtime/tests/fixtures/custody-cli.rs",
+      "status": "modified",
+      "sha256": "54d37ee22c19bd9c1042ddb9b62406d8e399beff969b615314bc87500533e685"
+    },
+    {
+      "path": "runtime/tests/fixtures/proofb-cli.rs",
+      "status": "modified",
+      "sha256": "33f74b88b0123cb328d2ee20a953da8c99b0def06ec8966a2daf142bf8f48eee"
+    },
+    {
+      "path": "runtime/tests/process-custody.test.mjs",
+      "status": "modified",
+      "sha256": "71cc7fc0bf4927ca1e8b6630928763bbecea9579fda7a0b00760a032f7cdcd3e"
+    },
+    {
+      "path": "docs/reviews/2026-10-25-real-codex-process-custody-stage1.md",
+      "status": "untracked",
+      "sha256": "c49be991faef9d73c62d1ce1aab68287ef0eafbbaff3e4a0ee094c924fe2f580"
+    },
+    {
+      "path": "docs/reviews/evidence/2026-10-25-codex-custody-real-prior.json",
+      "status": "untracked",
+      "sha256": "c65c809415adad601a73fa93cc2400a0eee53edd45ad055cf5ae86942fda4abb"
+    },
+    {
+      "path": "docs/reviews/evidence/2026-10-25-codex-custody-real.json",
+      "status": "untracked",
+      "sha256": "763f606a1b03539483635ac8518de8ebea8d5fec7b9b1136b7f2ea86a77c8f0c"
+    },
+    {
+      "path": "docs/reviews/evidence/2026-10-25-codex-custody-source-manifest.json",
+      "status": "untracked",
+      "sha256": "c22abc26ab7d3dce3aaf1fb9f8f1ba565688b149ec62febec9221884ea0c73bb"
+    },
+    {
+      "path": "docs/reviews/evidence/2026-10-26-codex-custody-real-cutover-failure.json",
+      "status": "untracked",
+      "sha256": "d391bcbf85f7895aca7329bc98a041cb1facd4527abfc689dd3b10ded6790e60"
+    },
+    {
+      "path": "docs/reviews/evidence/2026-10-26-codex-custody-real-preflight.json",
+      "status": "untracked",
+      "sha256": "a2dc2e21ce03a44f554e494c59fd4201e7d5739737ab66ac712980008d5592ef"
+    },
+    {
+      "path": "runtime/tests/codex-adapter.test.mjs",
+      "status": "untracked",
+      "sha256": "bc992c735780888b74f0c875e001d3beca94f4a9060eddc0b0e937fa6b1b8341"
+    },
+    {
+      "path": "runtime/tests/codex-custody-real.mjs",
+      "status": "untracked",
+      "sha256": "06975fe154650423ac753be4503ceb28323615f55c83654d09017be4a91fd868"
+    },
+    {
+      "path": "runtime/tests/custody-terminal-settlement.test.mjs",
+      "status": "untracked",
+      "sha256": "c0cbcc60b9cab955d9165c60318f59da8c19d77c4df2d93329c401c0f453c327"
+    }
+  ],
+  "verification": {
+    "focusedNodeSuites": {
+      "command": "node --test --test-concurrency=1 custody-terminal-settlement custody-safety custody-workspace-hold custody-unresolved custody-replay codex-adapter",
+      "tests": 43,
+      "pass": 43,
+      "fail": 0,
+      "exit": 0
+    },
+    "processCustodySubset": {
+      "command": "node --test --test-name-pattern 'PC-17|PC-13' process-custody",
+      "tests": 2,
+      "pass": 2,
+      "fail": 0,
+      "exit": 0
+    },
+    "rustLifecycleHostTests": {
+      "command": "cargo test --manifest-path lifecycle-host/Cargo.toml",
+      "passed": 23,
+      "failed": 0,
+      "exit": 0
+    },
+    "docsCheck": {
+      "command": "npm run docs:check",
+      "errors": 0,
+      "exit": 0
+    },
+    "build": {
+      "command": "npm run build",
+      "exit": 0
+    },
+    "gitDiffCheck": {
+      "command": "git diff --check",
+      "exit": 0
+    },
+    "fullNpmTest": {
+      "command": "npm test",
+      "status": "NOT COMPLETED",
+      "reason": "No terminal result on the frozen candidate. See supersededRuns."
+    }
+  },
+  "supersededRuns": [
+    {
+      "name": "first gate (gate.sh, live tree)",
+      "started": "2026-10-26 08:44",
+      "status": "stalled, not a result",
+      "partialCounts": {
+        "ok": "see log",
+        "notOk": 5
+      },
+      "log": "scratchpad/gate-npm-test-INTERRUPTED-partial.log (uncopied)",
+      "notes": "Five process-custody failures came from a concurrent fixture link (LNK1104) on a shared artifact; the run then stalled in the PC-22 Host case. Not terminated."
+    },
+    {
+      "name": "snapshot gate (f3-candidate under a long temporary path)",
+      "started": "2026-10-26 11:54",
+      "status": "superseded and stalled at test 483",
+      "counts": {
+        "tested": 483,
+        "notOk": 16
+      },
+      "notes": "F7 tests failed with a Windows path-length error on .git objects; managed-isolation and linked-repair tests also failed. Not terminated."
+    }
+  ]
+}
