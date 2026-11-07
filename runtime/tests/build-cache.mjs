@@ -80,8 +80,8 @@ function installedDependencies() {
   return existsSync(path) ? sha256File(path) : null;
 }
 
-export function desktopPackageKey({ buildId, overlay }) {
-  return sha256(JSON.stringify({ schema: 2, buildId, overlay, inputs: repositoryInputs(), dependencies: installedDependencies(), node: process.version,
+export function desktopPackageKey({ buildId, overlay, testFaultHooks = false }) {
+  return sha256(JSON.stringify({ schema: 4, buildId, overlay, testFaultHooks, inputs: repositoryInputs(), dependencies: installedDependencies(), node: process.version,
     rustc: toolVersion('rustc', ['-vV']), cargo: toolVersion('cargo', ['-V']), platform: process.platform, arch: process.arch,
     environment: Object.fromEntries(Object.entries(process.env).filter(([name]) => /^(CARGO_|RUSTFLAGS|RUSTC|TAURI_)/i.test(name)).sort()) }));
 }

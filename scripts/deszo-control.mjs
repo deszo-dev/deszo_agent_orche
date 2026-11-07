@@ -1,10 +1,11 @@
 import { spawn } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { constants, copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PROJECT, hash, json, writeJson, migrationCatalog, profileCompatibility, inputFingerprint, inputsMatch,
   inspectProfileBindings, inspectRuntimeBuild, writeRuntimeManifest } from './deszo-artifacts.mjs';
 import { checkTransport } from './deszo-transport.mjs';
+import { assertPlainDirectories, buildLayout } from './build-layout.mjs';
 
 const desktopReceipt = join(PROJECT, 'src-tauri/target/release/deszo-build.json');
 const buildInputs = join(PROJECT, 'src-tauri/target/deszo-build-inputs.json');
@@ -30,6 +31,7 @@ export async function doctor({ profile, build, workflowId, workspaceId, workspac
     try {
       const packaged = json(join(build, 'package-manifest.json'));
       if (packaged.kind !== 'DeszoOperatorPackage' || packaged.version !== 1) issues.push(problem('unsupported_package_manifest'));
+      if (packaged.testFaultHooks !== false) issues.push(problem('test_fault_hooks_enabled'));
       if (packaged.runtimeManifestSha256 !== hash(readFileSync(join(build, 'runtime/runtime-manifest.json')))) issues.push(problem('runtime_manifest_changed'));
       if (packaged.exeSha256 !== hash(readFileSync(join(build, 'deszo.exe')))) issues.push(problem('desktop_artifact_changed'));
       if (packaged.desktopInputsSha256 !== inputFingerprint('desktop').sha256 || !inputsMatch('runtime', artifact.manifest.runtimeInputs))
@@ -68,6 +70,7 @@ async function buildDesktop() {
 }
 export async function prepare({ profile, out }) {
   if (!out) throw new Error('--out is required.');
+  if (process.env.DESZO_TEST_FAULT_HOOKS === '1') throw new Error('Test-enabled fault hooks cannot be prepared as an operator package.');
   if (existsSync(resolve(out))) {
     const existing = await doctor({ profile, build: out });
     const selected = json(join(resolve(out), 'package-manifest.json'));
@@ -82,7 +85,11 @@ export async function prepare({ profile, out }) {
   if (!insideProfile || (!insideProfile.startsWith('..') && !/^[a-z]:/i.test(insideProfile))) throw new Error('Build output must stay outside the selected data profile.');
   let desktop;
   try { desktop = json(desktopReceipt); } catch { /* No proven reusable desktop. */ }
-  if (!desktop || desktop.desktopInputsSha256 !== inputFingerprint('desktop').sha256 || !existsSync(binary) || desktop.exeSha256 !== hash(readFileSync(binary))) {
+  const currentRuntimeManifestSha256 = existsSync(join(runtime, 'runtime-manifest.json'))
+    ? hash(readFileSync(join(runtime, 'runtime-manifest.json'))) : null;
+  if (!desktop || desktop.schemaVersion !== 1 || desktop.testFaultHooks !== false
+    || desktop.runtimeManifestSha256 !== currentRuntimeManifestSha256
+    || desktop.desktopInputsSha256 !== inputFingerprint('desktop').sha256 || !existsSync(binary) || desktop.exeSha256 !== hash(readFileSync(binary))) {
     await buildDesktop(); desktop = json(desktopReceipt);
   } else {
     let previous; try { previous = inspectRuntimeBuild(runtime); } catch { /* Rebundle only. */ }
@@ -92,13 +99,17 @@ export async function prepare({ profile, out }) {
       if (code !== 0) throw new Error('Runtime bundling failed.');
     }
   }
+  if (desktop.testFaultHooks !== false) throw new Error('The desktop build receipt enables test fault hooks; the operator package was not prepared.');
   const check = inspectRuntimeBuild(runtime);
+  if (desktop.runtimeManifestSha256 !== hash(readFileSync(join(runtime, 'runtime-manifest.json'))))
+    throw new Error('The desktop build receipt does not match the runtime resources; the operator package was not prepared.');
   if (check.issues.length || !inputsMatch('runtime', check.manifest.runtimeInputs)) throw new Error('Runtime inputs changed during preparation.');
   const destination = resolve(out), staging = destination + '.preparing';
   if (existsSync(staging)) throw new Error('An earlier preparation exists. Inspect it; it is not removed automatically.');
+  assertPlainDirectories(buildLayout());
   mkdirSync(staging, { recursive: true }); cpSync(runtime, join(staging, 'runtime'), { recursive: true });
   cpSync(binary, join(staging, 'deszo.exe'));
-  writeJson(join(staging, 'package-manifest.json'), { kind: 'DeszoOperatorPackage', version: 1, preparedAt: new Date().toISOString(),
+  writeJson(join(staging, 'package-manifest.json'), { kind: 'DeszoOperatorPackage', version: 1, testFaultHooks: false, preparedAt: new Date().toISOString(),
     exeSha256: desktop.exeSha256, desktopInputsSha256: desktop.desktopInputsSha256, profileAtPreparation: resolve(profile),
     runtimeManifestSha256: hash(readFileSync(join(staging, 'runtime/runtime-manifest.json'))), authorityGranted: false });
   const final = await doctor({ profile, build: staging });
@@ -116,11 +127,38 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     if (command === 'doctor') result = await doctor({ profile: option('profile'), build: option('build'), workflowId: option('workflow'),
       workspaceId: option('workspace'), workspaceDirectory: option('workspace-dir'), live: process.argv.includes('--live') });
     else if (command === 'prepare') result = await prepare({ profile: option('profile'), out: option('out') });
-    else if (command === 'build-begin') { result = { desktopInputsSha256: inputFingerprint('desktop').sha256, runtimeInputsSha256: inputFingerprint('runtime').sha256 }; writeJson(buildInputs, result); }
+    else if (command === 'build-begin') {
+      const layout = buildLayout();
+      assertPlainDirectories(layout);
+      const testFaultHooks = process.env.DESZO_TEST_FAULT_HOOKS === '1';
+      // Outputs of an earlier build are removed first, so build-finish can only publish what this build produced.
+      for (const path of [layout.receipt, layout.exe, layout.shim, layout.runtimeShim]) rmSync(path, { force: true });
+      result = { schemaVersion: 1, desktopBuildId: process.env.DESZO_DESKTOP_BUILD_ID ?? null, testFaultHooks,
+        desktopInputsSha256: inputFingerprint('desktop').sha256, runtimeInputsSha256: inputFingerprint('runtime').sha256 };
+      writeJson(layout.inputs, result);
+    }
     else if (command === 'build-finish') {
-      const before = json(buildInputs);
-      if (before.desktopInputsSha256 !== inputFingerprint('desktop').sha256 || before.runtimeInputsSha256 !== inputFingerprint('runtime').sha256) throw new Error('Build inputs changed during compilation; no desktop receipt is published.');
-      writeRuntimeManifest(); result = { ...before, exeSha256: hash(readFileSync(binary)), builtAt: new Date().toISOString() }; writeJson(desktopReceipt, result);
+      const layout = buildLayout();
+      assertPlainDirectories(layout);
+      const before = json(layout.inputs);
+      const testFaultHooks = process.env.DESZO_TEST_FAULT_HOOKS === '1';
+      if (before.desktopBuildId !== (process.env.DESZO_DESKTOP_BUILD_ID ?? null) || before.testFaultHooks !== testFaultHooks
+        || before.desktopInputsSha256 !== inputFingerprint('desktop').sha256 || before.runtimeInputsSha256 !== inputFingerprint('runtime').sha256)
+        throw new Error('Build inputs or mode changed during compilation; no desktop receipt is published.');
+      // One compilation publishes the shim: tauri build compiled it with deszo.exe, and that copy is the one the runtime ships.
+      if (!existsSync(layout.shim) || !existsSync(layout.exe)) throw new Error('The desktop build did not produce deszo.exe and the launch shim; no receipt is published.');
+      mkdirSync(layout.runtime, { recursive: true });
+      // The directories are checked again right before this write (a link created after the first check is refused here).
+      assertPlainDirectories(layout);
+      // A stale or redirected entry is removed first, so the copy creates a new file and never writes through an existing link.
+      rmSync(layout.runtimeShim, { force: true });
+      copyFileSync(layout.shim, layout.runtimeShim, constants.COPYFILE_EXCL);
+      const publishedShim = hash(readFileSync(layout.runtimeShim));
+      if (publishedShim !== hash(readFileSync(layout.shim))) throw new Error('The published launch shim differs from the compiled one; no receipt is published.');
+      const manifest = writeRuntimeManifest(layout.runtime, { testFaultHooks });
+      result = { ...before, runtimeManifestSha256: hash(readFileSync(join(layout.runtime, 'runtime-manifest.json'))),
+        runtimeFiles: manifest.files, exeSha256: hash(readFileSync(layout.exe)), launchShimSha256: publishedShim, builtAt: new Date().toISOString() };
+      writeJson(layout.receipt, result);
     } else throw new Error('Use doctor --profile PATH [--build PATH] [--live], or prepare --profile PATH --out NEW_PATH.');
     if (option('out') && command === 'doctor') writeJson(resolve(option('out')), result);
     console.log(JSON.stringify(result)); if (result.state === 'blocked') process.exitCode = 1;

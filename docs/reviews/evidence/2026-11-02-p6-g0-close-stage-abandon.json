@@ -1,0 +1,22 @@
+{
+  "test": "stage_copy_failure_after_durable_intent_abandons_operation_and_leaves_selector_unchanged",
+  "location": "lifecycle-host/src/p6_gate_tests.rs",
+  "scenario": "Engine A active -> Host persists stage intent -> copy fails on controlled sharing violation -> Host records abandoned operation -> Engine A remains committed -> restart reconciles safely -> successor valid stage succeeds",
+  "trigger": "Controlled native Windows sharing violation: pre-created .incoming-<operationId>/locked_file.bin opened with share_mode(0)",
+  "errorClassification": "real native filesystem sharing violation (ERROR_SHARING_VIOLATION)",
+  "assertions": {
+    "intentDurablyPersisted": true,
+    "failureAfterIntent": true,
+    "committedEngineUnchanged": "engine-a",
+    "activeSelectorByteIdentical": true,
+    "incompletePackageNotInstalled": true,
+    "operationAbandonedRecorded": true,
+    "abandonEventLogged": "engine_stage_abandoned",
+    "restartReconciliationPlan": "StartPlan::Start",
+    "successorStageSucceeded": true,
+    "successorPackageInstalledAndVerified": true,
+    "selectorAfterSuccessorStaged": "engine-a"
+  },
+  "result": "PASS",
+  "suite": "Lifecycle Host Cargo Unit Tests (47/47 PASS)"
+}

@@ -515,6 +515,13 @@ pub struct CustodyConfig {
     /// directory, the later drain proof cannot be written.
     #[serde(default)]
     pub test_undrained_drain_ms: Option<u64>,
+    /// Debug-only graceful-shutdown regression seam: pause one authenticated native source identity request after an arm file appears.
+    #[serde(default)]
+    pub test_source_identity_pause_arm_file: Option<PathBuf>,
+    #[serde(default)]
+    pub test_source_identity_pause_entered_file: Option<PathBuf>,
+    #[serde(default)]
+    pub test_source_identity_pause_ms: Option<u64>,
 }
 
 // The durable record of one admitted invocation. Permits and emergency credentials are stored only as digests.
@@ -585,6 +592,8 @@ struct Live {
 
 #[derive(Default)]
 struct Inner {
+    /// Set by a P6 Engine switch: no new invocation is admitted while the Engine is being replaced. Existing invocations keep their state.
+    fenced: bool,
     epoch: u64,
     records: BTreeMap<String, Record>,
     by_attempt: HashMap<String, String>,
@@ -617,6 +626,8 @@ pub struct CustodyRegistry {
     crash_after_spool_bytes: Option<u64>,
     fail_running_record_after: Option<Duration>,
     undrained_drain: Option<Duration>,
+    test_source_identity_pause: Option<(PathBuf, PathBuf, Duration)>,
+    source_identity_pause_consumed: AtomicBool,
     inner: Arc<Mutex<Inner>>,
 }
 
@@ -655,6 +666,13 @@ impl CustodyRegistry {
             crash_after_spool_bytes: config.test_crash_after_spool_bytes,
             fail_running_record_after: config.test_fail_running_record_after_ms.filter(|_| cfg!(debug_assertions)).map(Duration::from_millis),
             undrained_drain: config.test_undrained_drain_ms.filter(|_| cfg!(debug_assertions)).map(Duration::from_millis),
+            test_source_identity_pause: if cfg!(debug_assertions) {
+                match (&config.test_source_identity_pause_arm_file, &config.test_source_identity_pause_entered_file, config.test_source_identity_pause_ms) {
+                    (Some(arm), Some(entered), Some(millis @ 1..=30_000)) => Some((arm.clone(), entered.clone(), Duration::from_millis(millis))),
+                    _ => None,
+                }
+            } else { None },
+            source_identity_pause_consumed: AtomicBool::new(false),
             inner: Arc::new(Mutex::new(Inner { epoch, records, by_attempt, ..Inner::default() })),
         })
     }
@@ -684,6 +702,12 @@ impl CustodyRegistry {
             Self::check_epoch(&inner, payload)?;
             inner.epoch
         };
+        if let Some((arm_file, entered_file, delay)) = &self.test_source_identity_pause {
+            if arm_file.is_file() && !self.source_identity_pause_consumed.swap(true, Ordering::SeqCst) {
+                fs::write(entered_file, format!("{}\n", std::process::id())).map_err(|error| storage(error.to_string()))?;
+                thread::sleep(*delay);
+            }
+        }
         let root = PathBuf::from(text(payload, "root")?);
         let include = string_list(payload, "include", 64, 1024)?;
         let exclude = string_list(payload, "exclude", 64, 1024)?;
@@ -760,6 +784,20 @@ impl CustodyRegistry {
         self.inner.lock().map_err(|_| Refusal { code: "unavailable", message: "The custody state is unavailable.".into() })
     }
 
+    /// P6 Engine switch fence. While fenced, no new invocation is admitted; admissions and launches share this lock, so the
+    /// fence and the zero-job proof below are one serialized decision.
+    pub fn set_fenced(&self, fenced: bool) -> Result<(), String> {
+        let mut inner = self.inner.lock().map_err(|_| "the custody state is unavailable".to_string())?;
+        inner.fenced = fenced;
+        Ok(())
+    }
+
+    /// Admitted, launching, running and not-yet-drained invocations. A switch may stop the managed Engine only at zero.
+    pub fn active_job_count(&self) -> Result<usize, String> {
+        let inner = self.inner.lock().map_err(|_| "the custody state is unavailable".to_string())?;
+        Ok(inner.pending.len() + inner.live.len() + inner.undrained.len())
+    }
+
     /// Called by the Host under its own state lock when a candidate activation advances the lifecycle generation.
     pub fn set_generation(&self, generation: &str) {
         if let Ok(mut current) = self.generation.lock() {
@@ -815,6 +853,11 @@ impl CustodyRegistry {
         if stdin.len() > STDIN_LIMIT {
             return refuse("stdin_too_large", "The invocation's stdin exceeds the Custody launch limit; it was not launched.");
         }
+        // A fenced registry refuses before the executable is hashed. Hashing a native CLI can outlast a switch's fence window, and an
+        // admission must not be decided after the switch has already released the fence it raced (P6-G0 B3).
+        if self.guard()?.fenced {
+            return refuse("custody_fenced", "The Engine is being replaced; no new Custody invocation is admitted until the switch completes.");
+        }
         let (executable, executable_sha256) = self.admit_executable(command)?;
         let cwd = node_path(&fs::canonicalize(cwd_text).map_err(|_| Refusal { code: "cwd_unavailable", message: "The working directory does not exist.".into() })?);
         if !cwd.is_dir() {
@@ -836,6 +879,11 @@ impl CustodyRegistry {
                 return refuse("conflicting_invocation", "This attempt was already admitted with a different invocation; nothing was launched.");
             }
             return Ok(json!({ "custodyId": existing_id, "state": existing.state, "reused": true, "permit": null, "emergencyToken": null }));
+        }
+        // Checked under the registry lock that also counts active invocations, so no admission can slip between the switch's
+        // zero-job proof and the Engine's stop.
+        if inner.fenced {
+            return refuse("custody_fenced", "The Engine is being replaced; no new Custody invocation is admitted until the switch completes.");
         }
         let custody_id = Uuid::new_v4().to_string();
         let permit = random_hex(32);
@@ -1596,7 +1644,7 @@ pub fn command_line(program: &str, arguments: &[String]) -> String {
 }
 
 #[cfg(windows)]
-mod native {
+pub(crate) mod native {
     use super::{command_line, Containment};
     use std::{
         ffi::c_void,
@@ -1686,12 +1734,16 @@ mod native {
     }
 
     // Windows requires the block sorted by name (case-insensitive) and terminated by an empty entry.
-    fn environment_block(env: &[(String, String)]) -> Vec<u16> {
+    pub(super) fn environment_block(env: &[(String, String)]) -> Vec<u16> {
         let mut entries: Vec<String> = env.iter().map(|(name, value)| format!("{name}={value}")).collect();
         entries.sort_by_key(|entry| entry.to_uppercase());
         let mut block = Vec::new();
         for entry in entries {
             block.extend(entry.encode_utf16());
+            block.push(0);
+        }
+        // An empty environment is still two NUL terminators; CreateProcessW rejects a single one (os error 87).
+        if block.is_empty() {
             block.push(0);
         }
         block.push(0);
@@ -1818,7 +1870,6 @@ mod native {
         Some(exit_code(&handle) == Some(STILL_ACTIVE))
     }
 
-    #[cfg(test)]
     pub fn creation_time_of(pid: u32) -> Option<u64> {
         let handle = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
         if handle.is_null() {
@@ -1848,7 +1899,7 @@ mod native {
 
 // Process Custody is a Windows implementation in this PoC. Other platforms compile, and refuse every launch.
 #[cfg(not(windows))]
-mod native {
+pub(crate) mod native {
     use super::Containment;
     use std::{fs::File, time::Duration};
 
@@ -1882,6 +1933,24 @@ mod native {
 
     pub fn identity_alive(_pid: u32, _creation_time: u64) -> Option<bool> {
         None
+    }
+
+    pub fn creation_time_of(_pid: u32) -> Option<u64> {
+        None
+    }
+}
+
+#[cfg(all(test, windows))]
+mod environment_block_tests {
+    use super::native::environment_block;
+
+    // The block CreateProcessW reads: each entry NUL-terminated, and the whole block NUL-terminated once more.
+    #[test]
+    fn an_empty_environment_is_two_nul_terminators_and_entries_are_sorted() {
+        assert_eq!(environment_block(&[]), vec![0u16, 0u16]);
+        let block = environment_block(&[("B".into(), "2".into()), ("a".into(), "1".into())]);
+        let text: Vec<u16> = "a=1\0B=2\0\0".encode_utf16().collect();
+        assert_eq!(block, text);
     }
 }
 
@@ -2104,6 +2173,34 @@ mod process_tests {
         let terminal = wait_for(&registry, epoch, &id, &["stopped"], Duration::from_secs(10));
         assert_eq!(terminal["terminal"], json!(true));
         assert!(terminal["stdoutDurable"].as_u64().unwrap() >= bytes.len() as u64);
+        fs::remove_dir_all(dir).ok();
+    }
+
+    // P6-G0: a live CLI holds the Engine. While the switch fence is up, the live job is counted, a new admission is refused, and the
+    // existing job still stops normally. Only a drained job brings the count to zero, which is what the switch requires.
+    #[test]
+    fn p6_fence_counts_live_jobs_and_refuses_new_admissions() {
+        let (dir, registry) = registry("p6-fence", CustodyConfig::default());
+        let epoch = attach(&registry);
+        assert_eq!(registry.active_job_count().unwrap(), 0);
+        let admitted = reserve(&registry, epoch, "attempt-p6-held", 60_000);
+        let id = admitted["custodyId"].as_str().unwrap().to_string();
+        let permit = admitted["permit"].as_str().unwrap().to_string();
+        assert_eq!(registry.active_job_count().unwrap(), 1, "an admitted, unlaunched invocation is active work");
+        let running = launch(&registry, epoch, &id, &permit).unwrap();
+        assert_eq!(running["state"], "running");
+        assert_eq!(registry.active_job_count().unwrap(), 1, "a running CLI is active work");
+        registry.set_fenced(true).unwrap();
+        let refused = reserve_for(&registry, epoch, "attempt-p6-after-fence", ping().to_str().unwrap(), &std::env::temp_dir(), 60_000, &["-n", "30", "127.0.0.1"])
+            .expect_err("a fenced Engine admits no new invocation");
+        assert_eq!(refused.code, "custody_fenced");
+        let stopped = registry.dispatch("custody.stop", &json!({ "epoch": epoch, "generation": "gen-1", "custodyId": id })).unwrap();
+        assert_eq!(stopped["jobEmpty"], json!(true), "the existing invocation drains while fenced");
+        wait_for(&registry, epoch, &id, &["stopped"], Duration::from_secs(10));
+        assert_eq!(registry.active_job_count().unwrap(), 0, "a drained, terminal invocation leaves no active work");
+        registry.set_fenced(false).unwrap();
+        let after = reserve(&registry, epoch, "attempt-p6-unfenced", 60_000);
+        assert!(after["custodyId"].is_string(), "an unfenced Engine admits invocations again");
         fs::remove_dir_all(dir).ok();
     }
 

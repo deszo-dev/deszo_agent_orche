@@ -1,17 +1,25 @@
 // A narrowly scoped, authenticated channel from the Engine process to its independent Rust lifecycle Host.
 // The one-generation capability is read once and removed before any provider CLI can be launched.
 import net from 'node:net';
+import { testFaultHooksEnabled } from '../core/testFaultPolicy.mjs';
+
+const TEST_FAULTS_ENABLED = testFaultHooksEnabled(import.meta.url);
 
 const ENV = [
   'DESZO_LIFECYCLE_HOST_ADDRESS', 'DESZO_LIFECYCLE_HOST_CAPABILITY', 'DESZO_LIFECYCLE_INSTALLATION_ID',
   'DESZO_LIFECYCLE_PROFILE_ROOT', 'DESZO_LIFECYCLE_GENERATION', 'DESZO_APPLICATION_BUILD_ID',
   'DESZO_LIFECYCLE_APPLICATION_PID', 'DESZO_TEST_DUPLICATE_LIFECYCLE_RECEIPT',
 ];
+// Set only by a P6 Shell. Legacy whole-release launches omit it, so it is optional and read-once like the rest.
+const OPTIONAL_ENV = ['DESZO_SHELL_BUILD_ID'];
 // Process Custody reads its own bootstrap, for an Engine started beside a custody service rather than a managed Host.
 const CUSTODY_ENV = ['DESZO_CUSTODY_ADDRESS', 'DESZO_CUSTODY_CAPABILITY', 'DESZO_CUSTODY_GENERATION'];
 // Custody admission and launch verify the complete allowlisted executable on the Host. A large native CLI can take tens of
 // seconds to hash in an unoptimized Host build, so these two bounded commands need a longer window than ordinary IPC.
 const CUSTODY_FILE_VERIFY_TIMEOUT_MS = 120_000;
+// P6 staging copies and verifies a whole Engine package; the switch admission and the candidate's readiness report are bounded too.
+const LONG_HOST_COMMANDS = new Set(['engine.source_release', 'engine.source_inventory', 'custody.reserve', 'custody.launch',
+  'custody.source_identity', 'custody.tool_identity', 'engine.stage', 'engine.switch']);
 
 function loopbackPort(address, label) {
   const match = /^127\.0\.0\.1:(\d+)$/.exec(address ?? '');
@@ -31,8 +39,7 @@ function hostCall(port, capability) {
       socket.destroy();
       error ? reject(error) : resolve(value);
     };
-    const timeoutMs = command === 'engine.source_release' || command === 'engine.source_inventory' || command === 'custody.reserve' || command === 'custody.launch' || command === 'custody.source_identity' || command === 'custody.tool_identity'
-      ? CUSTODY_FILE_VERIFY_TIMEOUT_MS : 5_000;
+    const timeoutMs = LONG_HOST_COMMANDS.has(command) ? CUSTODY_FILE_VERIFY_TIMEOUT_MS : 5_000;
     socket.setTimeout(timeoutMs, () => finish(new Error('Lifecycle Host IPC timed out.')));
     socket.once('error', error => finish(new Error(`Lifecycle Host IPC failed: ${error.message}`)));
     socket.once('connect', () => socket.write(`${JSON.stringify({ capability, command, payload })}\n`));
@@ -50,8 +57,8 @@ function hostCall(port, capability) {
 }
 
 export function lifecycleBridgeFromEnvironment(env = process.env) {
-  const values = Object.fromEntries(ENV.map(name => [name, env[name]]));
-  for (const name of ENV) delete env[name];
+  const values = Object.fromEntries([...ENV, ...OPTIONAL_ENV].map(name => [name, env[name]]));
+  for (const name of [...ENV, ...OPTIONAL_ENV]) delete env[name];
   if (ENV.every(name => !values[name])) return null;
   if (ENV.some(name => !values[name])) throw new Error('Lifecycle Host bootstrap is incomplete.');
   if (!/^[a-f0-9]{64}$/i.test(values.DESZO_LIFECYCLE_HOST_CAPABILITY)) throw new Error('Lifecycle Host capability is malformed.');
@@ -63,8 +70,10 @@ export function lifecycleBridgeFromEnvironment(env = process.env) {
     profileRoot: values.DESZO_LIFECYCLE_PROFILE_ROOT,
     generation: values.DESZO_LIFECYCLE_GENERATION,
     buildId: values.DESZO_APPLICATION_BUILD_ID,
+    // Present only when a P6 Shell launched this Engine; the Host requires it to name the installed Shell.
+    shellBuildId: values.DESZO_SHELL_BUILD_ID || null,
     applicationPid: values.DESZO_LIFECYCLE_APPLICATION_PID === 'self' ? process.pid : Number(values.DESZO_LIFECYCLE_APPLICATION_PID),
-    testDuplicateReceiptDelivery: values.DESZO_TEST_DUPLICATE_LIFECYCLE_RECEIPT === '1',
+    testDuplicateReceiptDelivery: TEST_FAULTS_ENABLED && values.DESZO_TEST_DUPLICATE_LIFECYCLE_RECEIPT === '1',
   });
   const call = hostCall(port, values.DESZO_LIFECYCLE_HOST_CAPABILITY);
 
@@ -72,7 +81,8 @@ export function lifecycleBridgeFromEnvironment(env = process.env) {
     context,
     async ready({ pid, storeId, runtimeInstanceId }) {
       return call('engine.ready', { pid, storeId, runtimeInstanceId, applicationPid: context.applicationPid, applicationBuildId: context.buildId,
-        installationId: context.installationId, profileRoot: context.profileRoot, generation: context.generation });
+        installationId: context.installationId, profileRoot: context.profileRoot, generation: context.generation,
+        shellBuildId: context.shellBuildId });
     },
     activateCandidate(request) { return call('lifecycle.activate_candidate', request); },
     acknowledgeReceipt(receiptId) { return call('lifecycle.receipt_ack', { receiptId }); },
@@ -90,6 +100,11 @@ export function lifecycleBridgeFromEnvironment(env = process.env) {
     },
     // Process Custody commands (custody.*). The same lifecycle capability authenticates them; the Host fences them by epoch.
     custody(command, payload) { return call(command, payload); },
+    // P6 Engine-only operations (engine.stage, engine.switch, engine.maintenance_*). The Host decides every one of them.
+    p6Call(command, payload = {}) {
+      if (!/^engine\.(stage|switch|switch_status|maintenance_ready|maintenance_wait)$/.test(command)) throw new Error('Unsupported P6 Host command.');
+      return call(command, payload);
+    },
   });
 }
 

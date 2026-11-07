@@ -9,13 +9,19 @@
 // packaged application, so a production runtime cannot be bound to fixture authority.
 import { connectHost } from './ipc.mjs';
 import { INSTALLED_HOST_PIPE } from './nativeClient.mjs';
+import { testFaultHooksEnabled } from '../core/testFaultPolicy.mjs';
 
 export const HOST_ENV = ['DESZO_CONTROL_HOST_PIPE', 'DESZO_HOST_POLICY_ID', 'DESZO_HOST_RUNTIME_GENERATION', 'DESZO_HOST_ATTACH_SECRET',
   'DESZO_HOST_OPERATION_ID', 'DESZO_HOST_REGISTRATION_NONCE', 'DESZO_HOST_PROCESS_EVIDENCE', 'DESZO_HOST_PROFILE_ROOT', 'DESZO_HOST_NODE_PATH', 'DESZO_HOST_BUILD_ID', 'DESZO_HOST_PROTOCOL_VERSION'];
+const TEST_FAULTS_ENABLED = testFaultHooksEnabled(import.meta.url);
+
+export function fixtureHostAllowed(env = process.env, { packaged = false } = {}) {
+  return TEST_FAULTS_ENABLED && env.DESZO_ALLOW_FIXTURE_HOST === '1' && !packaged;
+}
 
 export async function hostFromEnvironment(env = process.env, { packaged = false } = {}) {
   const values = Object.fromEntries(HOST_ENV.map(key => [key, env[key]]));
-  const allowFixture = env.DESZO_ALLOW_FIXTURE_HOST === '1' && !packaged;
+  const allowFixture = fixtureHostAllowed(env, { packaged });
   for (const key of HOST_ENV) delete env[key];
   const pipe = values.DESZO_CONTROL_HOST_PIPE;
   if (packaged && pipe && pipe !== INSTALLED_HOST_PIPE) throw new Error('This packaged runtime refuses a fixture Local Control Host or any non-installed host endpoint.');

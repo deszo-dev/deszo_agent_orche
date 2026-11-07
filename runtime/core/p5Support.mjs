@@ -1,5 +1,6 @@
 // P5-CLOSURE §5: which installed package layouts can run the trusted P5 Gate. A runtime-bootstrap release runs its attested
-// source layout directly. A bundled desktop (tauri) release runs the one-file `runtime/runner.mjs` and carries the same
+// source layout directly. A bundled desktop (tauri) release, or a P6 Engine package (bootstrap `engine`) beneath the stable
+// Shell, runs the one-file `runtime/runner.mjs` and carries the same
 // attested source layout and dependency closure as its support payload `p5/`, described by `p5/p5-support.json`. The payload
 // is inside the Host-attested package digest; this check binds it to the running release and to the running bundle itself.
 import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
@@ -55,7 +56,9 @@ export function verifyP5PackageLayout(release) {
       refuse('p5_package_layout_unsupported', 'This source-layout Engine is not a runtime-bootstrap release with the installed P5 verifier.');
     return { layout: 'runtime-source', root: ENGINE_ROOT };
   }
-  if (release?.bootstrap !== 'tauri') refuse('p5_package_layout_unsupported', 'A bundled Engine runs only inside a desktop (tauri) release.');
+  // A P6 installation runs the same bundle and payload layout as an Engine-only package beneath its stable Shell (bootstrap `engine`).
+  if (release?.bootstrap !== 'tauri' && release?.bootstrap !== 'engine')
+    refuse('p5_package_layout_unsupported', 'A bundled Engine runs only inside a desktop (tauri) release or a P6 Engine package.');
   const manifestPath = join(ENGINE_ROOT, P5_SUPPORT_MANIFEST);
   let info, bytes, manifest;
   try {

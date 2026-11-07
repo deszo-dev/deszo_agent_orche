@@ -21,11 +21,28 @@ struct LifecycleBootstrap {
     installation_id: String,
     profile_root: PathBuf,
     generation: String,
+    /// The selected Engine identity and its package root (always the Engine's own directory).
     application_build_id: String,
     application_root: PathBuf,
     node_executable: PathBuf,
     #[serde(default)]
     test_duplicate_receipt_delivery: bool,
+    /// P6 installations only: the stable Shell identity and the directory holding this executable. Absent in a legacy
+    /// whole-release launch, where the Shell and the Engine share one directory and one identity.
+    #[serde(default)]
+    shell_build_id: Option<String>,
+    #[serde(default)]
+    shell_root: Option<PathBuf>,
+    /// P6 candidate preflight: start the Engine's maintenance entrypoint at bootstrap, against the Host's disposable copy only.
+    #[serde(default)]
+    maintenance: Option<MaintenanceBootstrap>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct MaintenanceBootstrap {
+    operation_id: String,
+    preflight_store: PathBuf,
 }
 
 #[derive(Deserialize)]
@@ -52,8 +69,22 @@ impl LifecycleBootstrap {
         if capability.len() != 64 || !capability.bytes().all(|value| value.is_ascii_hexdigit()) {
             return Err("Lifecycle Host capability is malformed".into());
         }
-        if self.application_build_id != COMPILED_DESKTOP_BUILD_ID {
-            return Err("This desktop executable does not match the Host-selected build identity".into());
+        match self.shell_build_id.as_deref() {
+            // P6: the stable Shell keeps its compiled identity while the selected Engine has its own, which may not be the Shell's.
+            Some(shell) => {
+                if shell != COMPILED_DESKTOP_BUILD_ID {
+                    return Err("This desktop executable does not match the Host-selected Shell identity".into());
+                }
+                if self.shell_root.is_none() || shell == self.application_build_id {
+                    return Err("The Host-selected Shell and Engine identities are malformed".into());
+                }
+            }
+            // Legacy whole-release launch: the Engine identity is the compiled identity.
+            None => {
+                if self.application_build_id != COMPILED_DESKTOP_BUILD_ID {
+                    return Err("This desktop executable does not match the Host-selected build identity".into());
+                }
+            }
         }
         if !self.profile_root.is_absolute() || !self.profile_root.is_dir() {
             return Err("Lifecycle Host profile is not an existing absolute directory".into());
@@ -63,9 +94,25 @@ impl LifecycleBootstrap {
         }
         let executable = fs::canonicalize(std::env::current_exe().map_err(|error| error.to_string())?).map_err(|error| error.to_string())?;
         let actual_root = node_path(executable.parent().ok_or("Desktop executable has no parent directory")?);
-        let expected_root = node_path(&fs::canonicalize(&self.application_root).map_err(|error| error.to_string())?);
+        let shell_root = self.shell_root.as_ref().unwrap_or(&self.application_root);
+        let expected_root = node_path(&fs::canonicalize(shell_root).map_err(|error| error.to_string())?);
         if actual_root != expected_root {
-            return Err("The running desktop executable is outside the Host-selected build directory".into());
+            return Err("The running desktop executable is outside the Host-selected Shell directory".into());
+        }
+        if self.shell_build_id.is_some() {
+            // The Engine package is a separate directory: the Shell never runs code from the Shell directory as its Engine.
+            let engine_root = node_path(&fs::canonicalize(&self.application_root).map_err(|error| error.to_string())?);
+            if engine_root == expected_root {
+                return Err("The Engine root must be separate from the Shell root".into());
+            }
+        }
+        if let Some(maintenance) = self.maintenance.as_ref() {
+            if self.shell_build_id.is_none() || !maintenance.preflight_store.is_absolute() || !maintenance.preflight_store.is_file() {
+                return Err("The Host's maintenance preflight copy is unavailable".into());
+            }
+            if maintenance.operation_id.is_empty() || maintenance.operation_id.len() > 64 {
+                return Err("The Host's maintenance operation identity is malformed".into());
+            }
         }
         Ok(())
     }
@@ -389,7 +436,13 @@ fn get_runner_connection(app: tauri::AppHandle, state: tauri::State<RuntimeState
     if !bundled_frontend_loaded(&app) {
         return Err("The Runtime Owner Token is available only to the Deszo frontend.".into());
     }
-    let shared = state.0.clone();
+    let connection = start_or_attach_runtime(&app, &state.0.clone())?;
+    connection_for_window(connection, &app)
+}
+
+/// The running runtime's connection, or the start of a new runtime generation. A P6 maintenance candidate starts here at
+/// bootstrap, before any window exists; its connection is returned to the first window that asks for it.
+fn start_or_attach_runtime(app: &tauri::AppHandle, shared: &Arc<Mutex<Shared>>) -> Result<Connection, String> {
     let mut guard = shared.lock().map_err(|e| e.to_string())?;
     if let Some(message) = &guard.uncertain {
         return Err(message.clone());
@@ -397,7 +450,7 @@ fn get_runner_connection(app: tauri::AppHandle, state: tauri::State<RuntimeState
     if let Some(runner) = guard.runner.as_mut() {
         if runner.child.try_wait().map_err(|e| e.to_string())?.is_none() {
             refresh_runner_connection(runner)?;
-            return connection_for_window(runner.connection.clone(), &app);
+            return Ok(runner.connection.clone());
         }
         // Node exited unexpectedly: terminate its owned descendants before a new generation starts.
         if let Err(error) = runner.contain_exit() {
@@ -462,6 +515,12 @@ fn get_runner_connection(app: tauri::AppHandle, state: tauri::State<RuntimeState
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(stderr);
+    // A P6 maintenance candidate runs only its preflight until the Host decides; the decision keeps the same process.
+    let maintenance = lifecycle.as_ref().and_then(|bootstrap| bootstrap.maintenance.as_ref());
+    if let Some(spec) = maintenance {
+        command.arg("--p6-maintenance").env("DESZO_P6_OPERATION_ID", &spec.operation_id)
+            .env("DESZO_P6_PREFLIGHT_STORE", &spec.preflight_store);
+    }
     if let Some(bootstrap) = lifecycle.as_ref() {
         command
             .arg("--host-contained")
@@ -476,6 +535,10 @@ fn get_runner_connection(app: tauri::AppHandle, state: tauri::State<RuntimeState
                 "DESZO_TEST_DUPLICATE_LIFECYCLE_RECEIPT",
                 if bootstrap.test_duplicate_receipt_delivery { "1" } else { "0" },
             );
+    }
+    // The Engine reports the Shell identity it was launched under; the Host rejects a readiness that names another Shell.
+    if let Some(shell) = lifecycle.as_ref().and_then(|bootstrap| bootstrap.shell_build_id.as_deref()) {
+        command.env("DESZO_SHELL_BUILD_ID", shell);
     }
     #[cfg(windows)]
     {
@@ -542,14 +605,16 @@ fn get_runner_connection(app: tauri::AppHandle, state: tauri::State<RuntimeState
         let result = reader.read_line(&mut line).map(|_| line);
         let _ = sender.send(result);
     });
-    let line = match receiver.recv_timeout(Duration::from_secs(30)) {
+    // A maintenance candidate prints its startup line only after the Host's commit decision, so it waits as long as that takes.
+    let startup_wait = if maintenance.is_some() { Duration::from_secs(1200) } else { Duration::from_secs(30) };
+    let line = match receiver.recv_timeout(startup_wait) {
         Ok(Ok(line)) => line,
         _ => {
             #[cfg(windows)]
             let _ = job.terminate_and_wait(Duration::from_secs(10));
             let _ = child.kill();
             let _ = child.wait();
-            return Err("The runtime did not start within 30 seconds. See runtime/runner.log in the data folder.".into());
+            return Err("The runtime did not start within its startup window. See runtime/runner.log in the data folder.".into());
         }
     };
     let mut connection: Connection = match serde_json::from_str(&line) {
@@ -574,8 +639,8 @@ fn get_runner_connection(app: tauri::AppHandle, state: tauri::State<RuntimeState
         supervisor: Some(supervisor),
     });
     drop(guard);
-    supervise(app.clone(), shared, generation);
-    connection_for_window(connection, &app)
+    supervise(app.clone(), shared.clone(), generation);
+    Ok(connection)
 }
 
 /// The native launch shim: the development build output, or the copy bundled with the application's runtime.
@@ -665,6 +730,23 @@ fn main() {
                                 handle.exit(0);
                                 break;
                             }
+                        }
+                    })
+                    .map_err(|error| error.to_string())?;
+            }
+            // A P6 maintenance candidate starts at bootstrap, not on a window's request: no ordinary Engine work can precede the commit.
+            let maintenance = app.state::<RuntimeState>().0.lock().map_err(|error| error.to_string())?
+                .lifecycle_bootstrap.as_ref().is_some_and(|bootstrap| bootstrap.maintenance.is_some());
+            if maintenance {
+                let handle = app.handle().clone();
+                let shared = app.state::<RuntimeState>().0.clone();
+                std::thread::Builder::new()
+                    .name("deszo-p6-maintenance".into())
+                    .spawn(move || {
+                        if let Err(error) = start_or_attach_runtime(&handle, &shared) {
+                            // The Host watches this process: a candidate that cannot preflight ends the Shell at once, so the Host falls back.
+                            eprintln!("The P6 maintenance candidate did not start: {error}");
+                            handle.exit(1);
                         }
                     })
                     .map_err(|error| error.to_string())?;

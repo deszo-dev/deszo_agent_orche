@@ -1,0 +1,23 @@
+Resolver outcomes on the current working tree, 2026-11-05T15:48:14.717Z
+REFUSED (p5_subject_resolver_unsupported) R0 expression index (direct)
+    source: export const F = Object.values(Object.getOwnPropertyDescriptors(Object.getPrototypeOf(() => {})))[4].value;
+ACCEPTED                           R1 variable then values index
+    source: const d = Object.getOwnPropertyDescriptors(Object.getPrototypeOf(() => {})); const vals = Object.values(d); export const F = vals[4].value;
+ACCEPTED                           R2 spread values index
+    source: const d = Object.getOwnPropertyDescriptors(Object.getPrototypeOf(() => {})); export const F = [...Object.values(d)][4].value;
+ACCEPTED                           R3 entries index
+    source: const d = Object.getOwnPropertyDescriptors(Object.getPrototypeOf(() => {})); const e = Object.entries(d); export const F = e[4][1].value;
+ACCEPTED                           R4 search values
+    source: const d = Object.getOwnPropertyDescriptors(Object.getPrototypeOf(() => {})); export const F = (() => { for (const x of Object.values(d)) { if (x.value?.name?.length === 8) return x.value; } })();
+ACCEPTED                           R5 computed key across statements
+    source: const p = Object.getPrototypeOf(() => {}); const a = "constr"; const b = "uctor"; export const F = p[a + b];
+ACCEPTED                           R6 string built by append
+    source: let k = "cons"; k += "tructor"; export const F = (() => {})[k];
+ACCEPTED                           R7 key from array element
+    source: const names = ["constructor"]; const p = Object.getPrototypeOf(() => {}); export const F = p[names[0]];
+ACCEPTED                           R8 own property names index
+    source: const p = Object.getPrototypeOf(() => {}); export const F = [p][0][Object.getOwnPropertyNames(p)[4]];
+ACCEPTED                           R9 child_process import
+    source: import { spawn } from "node:child_process"; export const s = spawn;
+ACCEPTED                           R10 dynamic import through reflected Function
+    source: const d = Object.getOwnPropertyDescriptors(Object.getPrototypeOf(() => {})); const vals = Object.values(d); const F = vals[4].value; export const load = F('u', 'return import(u)');

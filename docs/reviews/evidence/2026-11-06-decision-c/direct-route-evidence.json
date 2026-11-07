@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 1,
+  "phase": "P6-DECISION-C Phase 1",
+  "capturedAt": "2026-11-06T03:18:42.368Z",
+  "node": "v22.20.0",
+  "platform": "win32 x64",
+  "steps": {
+    "packages": {
+      "engineB": "staged by the Host staging area, unmodified marker Engine",
+      "packageSha256Prefix": "3b672befe0d2"
+    },
+    "engineA": {
+      "runningAndAuthorizedToHost": true,
+      "hostPid": 16580,
+      "generation": "b50a1809-a806-4ec0-bc31-091bc07c73b1"
+    },
+    "step1_allowlist_refuses_engine_status": {
+      "ok": false,
+      "code": "probe_error",
+      "message": "Unsupported P6 Host command.",
+      "buildId": "engine-a",
+      "applicationPid": 2088
+    },
+    "step1_passthrough_forwards_engine_status": {
+      "ok": true,
+      "resultKeys": [
+        "activeBuildId",
+        "applicationPid",
+        "enginePid",
+        "generation",
+        "hostPid",
+        "installationId",
+        "operation",
+        "profileRoot",
+        "receipt"
+      ]
+    },
+    "step2_child_verifier_env_store_access": {
+      "childStatus": 0,
+      "child": {
+        "childLifecycleEnvKeys": 0,
+        "firstPartyDescriptorReadable": true,
+        "firstPartyTokenFieldPresent": true,
+        "storeTableCount": 58,
+        "storeWriteTransactionAcquiredAndRolledBack": true,
+        "storeDirectoryWritable": true
+      }
+    },
+    "step2_child_engine_env_store_access": {
+      "childStatus": 0,
+      "child": {
+        "childLifecycleEnvKeys": 0,
+        "firstPartyDescriptorReadable": true,
+        "firstPartyTokenFieldPresent": true,
+        "storeTableCount": 58,
+        "storeWriteTransactionAcquiredAndRolledBack": true,
+        "storeDirectoryWritable": true
+      }
+    },
+    "step3_child_reads_host_heap": {
+      "childStatus": 0,
+      "stderrHead": "",
+      "candidateCount": 473,
+      "regionsScanned": 36,
+      "bytesScanned": 999424
+    },
+    "step4_direct_stage_from_engine_bridge": {
+      "ok": true,
+      "phase": "staged",
+      "code": null,
+      "message": null
+    },
+    "step4_direct_switch_from_engine_bridge": {
+      "answeredByEngineA": true,
+      "accepted": true,
+      "note": null
+    },
+    "step4_outcome": {
+      "engineBServes": true,
+      "engineBPid": 22536,
+      "activeSelectorBuild": "engine-b",
+      "committedByOperation": true,
+      "operationPhase": "verified",
+      "fallbackAttempted": false,
+      "journalEventTypes": [
+        "host_started",
+        "application_spawned",
+        "engine_ready",
+        "engine_staged",
+        "engine_switch_accepted",
+        "managed_process_tree_stopped",
+        "engine_preflight_passed",
+        "engine_store_boundary_verified",
+        "engine_switch_committed",
+        "engine_switch_verified"
+      ],
+      "p5OrJudgeEventsInHostJournal": []
+    },
+    "step4_store_has_no_p6_admission_record": {
+      "admissionTextInStore": false
+    },
+    "step5_outside_process_authenticated": {
+      "candidatesTested": 473,
+      "matchedIndex": 4,
+      "p6CommandReachedAuthenticatedHost": true,
+      "refusalCode": "not_found"
+    }
+  },
+  "generatedAt": "2026-11-06T03:23:20.555Z"
+}

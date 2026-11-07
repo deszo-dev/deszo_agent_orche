@@ -9,11 +9,13 @@
 // Host-bound receipts arrive only through the authenticated local Lifecycle Host channel. The first-party route is retained
 // for the unbound development/test runtime and is refused whenever a Lifecycle Host bootstrap is present.
 import { randomUUID } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { canonicalHash, parseStrictJson } from './canonical.mjs';
 import { custodyFaultPoint } from './custody.mjs';
 import { allNodesDeep } from './planning.mjs';
-import { createP5Handoff, validateP5Contract, verifyP5Receipt } from './protectedSelfRepair.mjs';
-import { resolveWorkspaceRoot, workspaceRootsOverlap } from './workspaceIsolation.mjs';
+import { assertP5WorkspacePool, createP5Handoff, P5_ENROLLMENT_RELATIVE_PATH, p5EnrollmentWorkspacePool, validateP5Contract, verifyP5Receipt } from './protectedSelfRepair.mjs';
+import { resolveWorkspaceRoot, workspaceAliasOverlap, workspaceRootsOverlap } from './workspaceIsolation.mjs';
 
 const SHA256 = /^[0-9a-f]{64}$/;
 const PROPOSAL = /^REQUEST_LIFECYCLE_ACTION (\{.*\})\s*$/gm;
@@ -62,13 +64,108 @@ export function installLinkedRepair(Engine, { ApiError }) {
     if (!link?.authorization_artifact_id) return null;
     try { return this.store.readJson(link.authorization_artifact_id); } catch { return null; }
   };
-  P.protectedSelfRepairWorkspaceReserved = function (workspaceId) {
-    if (!workspaceId) return false;
-    for (const link of this.store.all("SELECT * FROM run_links WHERE repair_workspace_id = ? AND continuation_contract = 'logical_policy'", workspaceId)) {
-      const authorization = this.parentRepairAuthorization(link);
-      if (authorization?.profile?.selfRepair) return true;
+  // The enrolled slot a P5 Repair of this release claims: the effective enrollment's slot, which the Parent publication's pinned
+  // workspace must be a member of. The publication is immutable, so it cannot name the slot of a later release.
+  P.protectedSelfRepairRepairWorkspaceId = function (profile) {
+    const enrollment = this.protectedSelfRepairEnrollment;
+    if (!enrollment || !p5EnrollmentWorkspacePool(enrollment).some(entry => entry.workspaceId === profile.repairWorkspaceId))
+      throw Object.assign(new Error('The Parent publication pins a workspace outside the enrolled P5 slot pool.'), { code: 'p5_workspace_unenrolled' });
+    return enrollment.workspace.workspaceId;
+  };
+  // One claim predicate, with no contract, state or authorization filter: any P2 link on a slot claims it, so a claimed slot can
+  // never be reused by P5, by a native Repair, or by an ordinary Run. Retained content keeps its claim (P5-08).
+  P.protectedSelfRepairWorkspaceClaimed = function (workspaceId) {
+    return Boolean(workspaceId) && Boolean(this.store.get('SELECT id FROM run_links WHERE repair_workspace_id = ? LIMIT 1', workspaceId));
+  };
+  // The enrolled slots: the loaded enrollment's pool, or, when startup refused the enrollment or no Lifecycle Host is present, the pool
+  // the installed file in the profile still names, so those runtimes keep the slots out of ordinary use. The profile is the Store's
+  // root. Null when the installed file cannot be read.
+  P.protectedSelfRepairEnrolledSlots = function () {
+    const loaded = this.protectedSelfRepairEnrollment;
+    if (loaded) return p5EnrollmentWorkspacePool(loaded);
+    const profileRoot = this.lifecycleHost?.profileRoot ?? this.store?.root;
+    if (!profileRoot || !existsSync(join(profileRoot, P5_ENROLLMENT_RELATIVE_PATH))) return [];
+    try {
+      const enrollment = parseStrictJson(readFileSync(join(profileRoot, P5_ENROLLMENT_RELATIVE_PATH), 'utf8'));
+      // The loader's own pool rule applies (ordered, distinct, led by the enrolled workspace). A file that fails it is not a pool: it reads
+      // as unknown, which reserves every workspace (fail closed). It can never name fewer slots than the loader would.
+      assertP5WorkspacePool(enrollment);
+      const pool = p5EnrollmentWorkspacePool(enrollment);
+      return pool.every(entry => typeof entry?.workspaceId === 'string' && entry.workspaceId.length > 0
+        && typeof entry?.canonicalRoot === 'string' && entry.canonicalRoot.length > 0) ? pool : null;
     }
-    return false;
+    catch { return null; }
+  };
+  // The slots a P5 Repair has claimed: a Parent link whose immutable authorization names a protected profile. Their claim does not
+  // depend on the installed enrollment file, so a claimed slot stays reserved after that file is lost (P5-08). An unreadable
+  // authorization claims its slot too (fail closed). A readable authorization is content-addressed, so its decision is cached per
+  // Engine: the scan still reads every link, but each authorization is read once.
+  P.protectedSelfRepairP5ClaimedSlots = function () {
+    const decided = this.protectedSelfRepairClaimDecisions ??= new Map();
+    const claimed = [];
+    for (const link of this.store.all("SELECT repair_workspace_id, authorization_artifact_id FROM run_links WHERE continuation_contract = 'logical_policy' AND repair_workspace_id IS NOT NULL")) {
+      let isP5 = decided.get(link.authorization_artifact_id);
+      if (isP5 === undefined) {
+        const authorization = this.parentRepairAuthorization(link);
+        isP5 = authorization ? Boolean(authorization.profile?.selfRepair) : true;
+        if (authorization) decided.set(link.authorization_artifact_id, isP5);
+      }
+      if (!isP5) continue;
+      const row = this.store.get('SELECT cwd FROM workspaces WHERE id = ?', link.repair_workspace_id);
+      claimed.push({ workspaceId: link.repair_workspace_id, canonicalRoot: row?.cwd ?? null });
+    }
+    return claimed;
+  };
+  // An enrolled slot is reserved by identity. A workspace whose real directory overlaps an enrolled slot (nested, subst or 8.3 alias)
+  // is reserved by root. A junction or symbolic link inside the workspace that reaches an enrolled slot reserves it too: a write
+  // through the alias would land in retained Repair content, and root overlap alone does not see it. A workspace the Engine cannot
+  // resolve or walk to the end is reserved as well (fail closed). A claim by a generic P2 Repair does not reserve a workspace: P5-08
+  // single use is enforced at P5 admission by the claim check, so ordinary workspaces keep the behavior they had before the pool.
+  // An alias created after admission is not seen here; see the residual in the security review.
+  // An enrolled slot and a claimed slot keep their root: a rebind would move a protected root off its retained directory (P5-08). With
+  // no installed file, the claims are the only record of the slots, so they lock the root too. An unreadable installed file cannot say
+  // which slots are enrolled, so it locks every rebind (fail closed).
+  P.protectedSelfRepairRootLocked = function (workspaceId) {
+    const enrolled = this.protectedSelfRepairEnrolledSlots();
+    if (enrolled === null) return true;
+    return enrolled.some(entry => entry.workspaceId === workspaceId)
+      || this.protectedSelfRepairP5ClaimedSlots().some(entry => entry.workspaceId === workspaceId);
+  };
+  P.protectedSelfRepairWorkspaceReserved = function (workspaceId, cwd = null) {
+    const claimed = this.protectedSelfRepairP5ClaimedSlots();
+    if (claimed.some(entry => entry.workspaceId === workspaceId)) return true;
+    const enrolled = this.protectedSelfRepairEnrolledSlots();
+    if (enrolled === null) return true;
+    if (enrolled.some(entry => entry.workspaceId === workspaceId)) return true;
+    if (!cwd || enrolled.length + claimed.length === 0) return false;
+    let root;
+    try { root = resolveWorkspaceRoot(cwd); }
+    catch { return true; }
+    // An enrolled slot that cannot be resolved reserves every workspace (fail closed).
+    const enrolledRoots = [];
+    for (const entry of enrolled) {
+      let slotRoot;
+      try { slotRoot = resolveWorkspaceRoot(entry.canonicalRoot); }
+      catch { return true; }
+      if (workspaceRootsOverlap(slotRoot, root)) return true;
+      enrolledRoots.push(slotRoot);
+    }
+    // A claimed slot whose directory was removed holds no content a workspace could reach, so its declared root is compared as written:
+    // an ordinary workspace is not refused for a directory the Owner removed, while its claim still reserves the slot by identity.
+    const claimedRoots = [];
+    for (const entry of claimed) {
+      if (!entry.canonicalRoot) continue;
+      let slotRoot;
+      try { slotRoot = resolveWorkspaceRoot(entry.canonicalRoot); }
+      catch (error) {
+        // Only a directory that is gone takes the declared path; any other failure (unreadable, not a directory) reserves (fail closed).
+        if (error?.code !== 'ENOENT') return true;
+        slotRoot = resolve(entry.canonicalRoot);
+      }
+      if (workspaceRootsOverlap(slotRoot, root)) return true;
+      claimedRoots.push(slotRoot);
+    }
+    return workspaceAliasOverlap(root, [...enrolledRoots, ...claimedRoots]);
   };
   P.logicalRepairWaitingForDecision = function (repairRunId) {
     const link = this.store.get("SELECT * FROM run_links WHERE repair_run_id = ? AND continuation_contract = 'logical_policy' AND state = 'open'", repairRunId);
@@ -537,6 +634,7 @@ export function installLinkedRepair(Engine, { ApiError }) {
           ...(p5Artifacts ? { p5AcceptanceArtifact: approval.protectedSelfRepairAcceptance, p5HandoffArtifact: p5Artifacts.handoff } : {}) };
         this.store.appendEvents(link.repair_run_id, [event('continuation.repair_completed', payload), event('continuation.repair_result_accepted', payload)]);
         this.store.appendEvents(link.parent_run_id, [event('continuation.repair_result_accepted', payload)]);
+        if (p5Artifacts) this.triggerP6Consumer?.(link.repair_run_id);
         return this.store.get('SELECT * FROM run_links WHERE id = ?', link.id);
       }
       if (actualDigest === link.expected_repair_result_sha256) {
@@ -571,6 +669,7 @@ export function installLinkedRepair(Engine, { ApiError }) {
 
   P.resumeLogicalRepairParent = function (link) {
     if (!link || link.continuation_contract !== 'logical_policy' || link.state !== 'repair_accepted') return false;
+    // A quiescing Engine lets this continuation settle the work it admitted; a Run it would admit is refused at captureRun.
     if (!this.logicalRepairLinkIntact(link)) return this.blockLogicalRepair(link, 'coordination_invalid', 'Parent continuation failed the persisted identity, publication or workspace checks.');
     if (this.parentRepairWorkInFlight(link.parent_run_id)) return false;
     let resumed = false;
@@ -788,7 +887,10 @@ export function installLinkedRepair(Engine, { ApiError }) {
       if (this.store.get("SELECT id FROM run_links WHERE parent_run_id = ? AND state IN ('open','repair_completed','repair_accepted')", parentRunId))
         fail(409, 'conflict', 'The Parent already has an active linked Repair.');
 
+      // An enrolled single-use P5 slot, or a workspace overlapping one, is reserved for protected Repairs: a generic route may not use it.
       const repairWorkspace = this.requireWorkspace(body.repairWorkspaceId);
+      if (this.protectedSelfRepairWorkspaceReserved(repairWorkspace.id, repairWorkspace.cwd))
+        fail(409, 'p5_workspace_enrolled', 'An enrolled single-use P5 slot is reserved for protected Repairs and cannot start a generic Repair.');
       const parentWorkspace = this.requireWorkspace(parent.workspace_id);
       const isolationIssue = this.linkedRepairWorkspaceIssue(parentWorkspace, repairWorkspace);
       if (isolationIssue) fail(422, isolationIssue.code, isolationIssue.message);
@@ -911,7 +1013,17 @@ export function installLinkedRepair(Engine, { ApiError }) {
     if (profile.selfRepair && (!p5Admission || p5Admission.outcomeId !== targetOutcome.outcomeId
       || p5Admission.outcomeRevision !== targetOutcome.revision))
       failJudge('p5_incident_outcome_mismatch', 'The P5 input capture and P2 checkpoint do not name the same exact failed P3 outcome revision.');
-    const repairWorkspace = this.requireWorkspace(profile.repairWorkspaceId);
+    // A P5 Repair claims the enrolled slot of this release; the Parent publication pins only a member of the enrolled pool.
+    let repairWorkspaceId = profile.repairWorkspaceId;
+    if (profile.selfRepair) {
+      try { repairWorkspaceId = this.protectedSelfRepairRepairWorkspaceId(profile); }
+      catch (error) { failJudge(error.code || 'p5_workspace_unenrolled', error.message); }
+      if (this.protectedSelfRepairWorkspaceClaimed(repairWorkspaceId))
+        failJudge('p5_workspace_claimed', 'The enrolled single-use P5 slot is already claimed by a linked Repair and is never reused.');
+    }
+    const repairWorkspace = this.requireWorkspace(repairWorkspaceId);
+    if (!profile.selfRepair && this.protectedSelfRepairWorkspaceReserved(repairWorkspace.id, repairWorkspace.cwd))
+      failJudge('p5_workspace_enrolled', 'An enrolled single-use P5 slot is reserved for protected Repairs and cannot start an ordinary Repair.');
     const parentWorkspace = this.requireWorkspace(parent.workspace_id);
     const isolationIssue = this.linkedRepairWorkspaceIssue(parentWorkspace, repairWorkspace);
     if (isolationIssue) failJudge(isolationIssue.code, isolationIssue.message);
@@ -953,7 +1065,7 @@ export function installLinkedRepair(Engine, { ApiError }) {
       expectedRepairResultSha256: profile.expectedRepairResultSha256 ?? null, failedNodeRetry: profile.failedNodeRetry,
       verificationNodeInstanceIds: profile.verificationNodeInstanceIds || [], logicalAcceptance: profile.acceptanceMode === 'expected_digest'
         ? 'exact_text_artifact_sha256' : 'designated_repair_judge',
-      ...(p5Admission ? { selfRepairProfile: profile.selfRepair, p5Enrollment: p5Admission.enrollmentRef, p5SourceBinding: p5Admission.sourceBindingRef,
+      ...(p5Admission ? { selfRepairProfile: p5Admission.enrollment.profile, p5Enrollment: p5Admission.enrollmentRef, p5SourceBinding: p5Admission.sourceBindingRef,
         verificationInputs: p5Admission.verificationInputsRef, outcomeId: p5Admission.outcomeId, outcomeRevision: p5Admission.outcomeRevision } : {}) });
     const checkpoint = this.store.putJson({ schemaVersion: 1, kind: 'LinkedRepairCheckpoint', contract: 'logical_policy', incidentId,
       parentRunId, parentPublishedVersionId: parent.published_version_id,
@@ -966,7 +1078,7 @@ export function installLinkedRepair(Engine, { ApiError }) {
       acceptanceMode: profile.acceptanceMode, failedNodeRetry: profile.failedNodeRetry, authorizedAt: at });
     const link = { id: randomUUID(), incidentId, parentRunId, repairRunId, failedNodeInstanceId: profile.failedNodeInstanceId,
       repairWorkflowId: profile.repairWorkflowId, repairSnapshotSha256: profile.repairWorkflowSnapshotSha256,
-      repairWorkspaceId: profile.repairWorkspaceId, repairResultNodeInstanceId: profile.repairResultNodeInstanceId,
+      repairResultNodeInstanceId: profile.repairResultNodeInstanceId,
       expectedRepairResultSha256: profile.expectedRepairResultSha256 ?? null, failedNodeRetry: profile.failedNodeRetry,
       acceptanceMode: profile.acceptanceMode };
     this.store.run(`INSERT INTO run_links(id, kind, parent_run_id, repair_run_id, parent_workspace_id, repair_workspace_id,
@@ -1092,7 +1204,10 @@ export function installLinkedRepair(Engine, { ApiError }) {
       if (this.linkByParent(parentRunId, ['open', 'repair_completed', 'resumed', 'repair_failed'])) fail(409, 'conflict', 'This run already has a linked repair.');
       const failed = this.latestAttempt(parentRunId, body.failedNodeInstanceId);
       if (!failed || !['failed', 'canceled'].includes(failed.state)) fail(409, 'conflict', `Node "${body.failedNodeInstanceId}" has no failed attempt to resume.`);
+      // An enrolled single-use P5 slot, or a workspace overlapping one, is reserved for protected Repairs: a generic route may not use it.
       const repairWorkspace = this.requireWorkspace(body.repairWorkspaceId);
+      if (this.protectedSelfRepairWorkspaceReserved(repairWorkspace.id, repairWorkspace.cwd))
+        fail(409, 'p5_workspace_enrolled', 'An enrolled single-use P5 slot is reserved for protected Repairs and cannot start a generic Repair.');
       const parentWorkspace = this.requireWorkspace(parent.workspace_id);
       const isolationIssue = this.linkedRepairWorkspaceIssue(parentWorkspace, repairWorkspace);
       if (isolationIssue) fail(422, isolationIssue.code, isolationIssue.message);

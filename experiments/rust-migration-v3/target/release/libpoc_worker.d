@@ -1,0 +1,1 @@
+C:\my\2026\deszo_agent_orche\experiments\rust-migration-v3\target\release\libpoc_worker.rlib: C:\my\2026\deszo_agent_orche\experiments\rust-migration-v3\crates\poc-protocol\src\lib.rs C:\my\2026\deszo_agent_orche\experiments\rust-migration-v3\crates\poc-worker\src\lib.rs

@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "evidence": "c09-restart-proof",
+  "capturedAt": "2026-11-02T12:04:12.751Z",
+  "node": "v22.20.0",
+  "platform": "win32 x64",
+  "operationId": "46614523-45cd-4453-9efa-e901cccb82b8",
+  "recordedProcessId": 1932,
+  "restartWithoutProof": {
+    "phase": "held",
+    "launches": [
+      "engine-a"
+    ]
+  },
+  "restartWithProof": {
+    "phase": "abandoned",
+    "failure": "The Host proved the previous Engine's process tree ended after a restart; the switch is abandoned and the committed Engine restarts.",
+    "launches": [
+      "engine-a",
+      "engine-a"
+    ],
+    "newProcessId": 18656,
+    "newRuntimeInstanceId": "9092e6e1-baca-42d9-911e-84de3dcc1626"
+  },
+  "substitution": {
+    "status": 409,
+    "engineBLaunches": 0
+  },
+  "selector": {
+    "buildId": "engine-a",
+    "committedOperationId": null
+  }
+}

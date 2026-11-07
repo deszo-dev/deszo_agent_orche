@@ -2,6 +2,8 @@
 // by runtime/host/runtimeRelease.mjs, and the real Rust Lifecycle Host `run` mode (with Process Custody) managing the
 // installed Engine. Nothing here writes authoritative P5 events; the Engine produces every lifecycle record itself.
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { testLayout } from '../../scripts/build-layout.mjs';
+import { request as httpRequest } from 'node:http';
 import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { delimiter, dirname, join, resolve } from 'node:path';
@@ -81,27 +83,44 @@ export function createTestSourceRepository(root, gitPath, { extraFiles = new Map
 }
 
 /** The release-built desktop shell with compiled identity `build-a` (reused from Proof B's verified cache or built once). */
-export function desktopExecutable() {
-  const cached = join(desktopArtifacts, `desktop-build-${DESKTOP_BUILD_ID.slice(-1)}`, 'deszo.exe');
-  if (existsSync(cached)) return cached;
-  const env = { ...process.env, DESZO_DESKTOP_BUILD_ID: DESKTOP_BUILD_ID };
+export function desktopBuildInputs() {
+  const cachedRoot = join(desktopArtifacts, `desktop-build-${DESKTOP_BUILD_ID.slice(-1)}`);
+  const cached = join(cachedRoot, 'deszo.exe');
+  const receiptPath = join(desktopArtifacts, `desktop-build-${DESKTOP_BUILD_ID.slice(-1)}-receipt.json`);
+  const runtimeResources = join(cachedRoot, 'runtime');
+  // The desktop build writes into a test-owned root; the production outputs are never a target.
+  const layout = testLayout(join(desktopArtifacts, 'build-root'));
+  try {
+    const receipt = JSON.parse(readFileSync(receiptPath, 'utf8'));
+    const manifestBytes = readFileSync(join(runtimeResources, 'runtime-manifest.json'));
+    const manifest = JSON.parse(manifestBytes.toString('utf8'));
+    if (receipt.schemaVersion === 1 && receipt.desktopBuildId === DESKTOP_BUILD_ID && receipt.testFaultHooks === false
+      && receipt.exeSha256 === sha256(readFileSync(cached))
+      && receipt.runtimeManifestSha256 === sha256(manifestBytes) && manifest.testFaultHooks === false)
+      return { desktopExecutable: cached, desktopBuildReceipt: receiptPath, runtimeResources };
+  } catch { /* Build a clean production package below when any cached provenance is absent or mismatched. */ }
+  const env = { ...process.env, DESZO_BUILD_ROOT: layout.root, DESZO_DESKTOP_BUILD_ID: DESKTOP_BUILD_ID };
   const result = spawnSync(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', 'npm run desktop:build'], { cwd: repo, env, encoding: 'utf8',
     timeout: 900_000, windowsHide: true, maxBuffer: 64 * 1024 * 1024 });
   if (result.status !== 0) throw new Error(`npm run desktop:build failed: ${result.stdout}\n${result.stderr}`);
-  mkdirSync(dirname(cached), { recursive: true });
-  copyFileSync(join(repo, 'src-tauri', 'target', 'release', 'deszo.exe'), cached);
-  return cached;
+  mkdirSync(cachedRoot, { recursive: true });
+  copyFileSync(layout.exe, cached);
+  cpSync(layout.runtime, runtimeResources, { recursive: true });
+  copyFileSync(layout.receipt, receiptPath);
+  return { desktopExecutable: cached, desktopBuildReceipt: receiptPath, runtimeResources };
 }
+
+export function desktopExecutable() { return desktopBuildInputs().desktopExecutable; }
 
 export async function packageInstalledRelease({ sourceRoot, gitTool, installation, buildId, distribution = 'runtime' }) {
   mkdirSync(join(installation, 'versions'), { recursive: true });
   mkdirSync(join(installation, 'staging'), { recursive: true });
   const outDir = join(installation, 'versions', buildId);
-  if (distribution !== 'desktop') return packageRuntimeRelease({ sourceRoot, gitTool, outDir, buildId });
+  if (distribution !== 'desktop') return packageRuntimeRelease({ sourceRoot, gitTool, outDir, buildId, testOnlyFaultHooks: true });
+  const inputs = desktopBuildInputs();
   for (const name of ['bridge.mjs', 'deszo-launch-shim.exe', 'runtime-manifest.json'])
-    if (!existsSync(join(repo, 'dist-runtime', name))) throw new Error(`dist-runtime/${name} is missing; run npm run runtime:bundle and npm run shim:build.`);
-  return packageDesktopRelease({ sourceRoot, gitTool, outDir, buildId, desktopExecutable: desktopExecutable(),
-    runtimeResources: join(repo, 'dist-runtime') });
+    if (!existsSync(join(inputs.runtimeResources, name))) throw new Error(`The desktop release resources are missing ${name}; rebuild with npm run desktop:build.`);
+  return packageDesktopRelease({ sourceRoot, gitTool, outDir, buildId, ...inputs });
 }
 
 export function hostExecutable() { return buildArtifacts().hostExe; }
@@ -170,12 +189,37 @@ export function currentDescriptor(profile) {
 
 export function api(connection, token) {
   return async (method, path, body, headers = {}) => {
+    // The publication admission re-verifies the installed package for every source-inventory batch. In a debug Host that takes
+    // minutes, longer than undici's fixed response-header timeout, so only this request waits on an explicit, larger ceiling.
+    if (method === 'POST' && /\/self-repair\/publication$/.test(path)) return publicationRequest(connection, token, path, body, headers);
     const response = await fetch(`http://127.0.0.1:${connection.port}${path}`, { method,
       headers: { Authorization: `Bearer ${token}`, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...headers },
       body: body === undefined ? undefined : JSON.stringify(body) });
     const text = await response.text();
     return { status: response.status, etag: response.headers.get('etag'), body: text ? JSON.parse(text) : null };
   };
+}
+
+const PUBLICATION_CEILING_MS = 1_200_000;
+function publicationRequest(connection, token, path, body, headers) {
+  return new Promise((resolve, reject) => {
+    const payload = body === undefined ? null : Buffer.from(JSON.stringify(body), 'utf8');
+    const request = httpRequest({ host: '127.0.0.1', port: connection.port, method: 'POST', path,
+      headers: { Authorization: `Bearer ${token}`, ...(payload ? { 'Content-Type': 'application/json', 'Content-Length': payload.length } : {}), ...headers } }, response => {
+      const chunks = [];
+      response.on('data', chunk => chunks.push(chunk));
+      response.on('end', () => {
+        const text = Buffer.concat(chunks).toString('utf8');
+        try { resolve({ status: response.statusCode, etag: response.headers.etag ?? null, body: text ? JSON.parse(text) : null }); }
+        catch (error) { reject(error); }
+      });
+      response.on('error', reject);
+    });
+    request.setTimeout(PUBLICATION_CEILING_MS, () => request.destroy(new Error(`POST ${path} exceeded ${PUBLICATION_CEILING_MS} ms`)));
+    request.on('error', reject);
+    if (payload) request.write(payload);
+    request.end();
+  });
 }
 
 export function profileQuery(profile, sql, ...parameters) {

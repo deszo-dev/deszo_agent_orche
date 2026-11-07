@@ -12,13 +12,14 @@ import {
   p5CheckInputDigest, p5ExecutionTreeDigest, p5VerificationReceiptId, validateP5Contract,
   verifyP5GitBaselineCurrent, verifyP5OverlayManifest, verifyP5Receipt, verifyP5RunningSourceInventory, verifyP5VerificationInputsCurrent,
   P5_VERIFICATION_INPUT_MANIFEST_ENV, P5_VERIFICATION_CANDIDATE_ENTRYPOINT_ENV,
-  materializeP5BaselineReproducerTree, P5_BASELINE_TREE_DIRECTORY,
+  materializeP5BaselineReproducerTree, P5_BASELINE_TREE_DIRECTORY, enrolledRootPolicyRef,
 } from './protectedSelfRepair.mjs';
 import { verifyP5GitCandidateCurrent } from './p5GitCandidate.mjs';
 import { custodyCrashOnce } from './custody.mjs';
 import { ENGINE_PACKAGED, ENGINE_ROOT } from './engineRoot.mjs';
 import { P5_TRUSTED_CONTROL_PATHS } from './p5HostBoundary.mjs';
 import { readInstalledSourceInventory, verifyP5PackageLayout } from './p5Support.mjs';
+import { testFaultHooksEnabled } from './testFaultPolicy.mjs';
 
 const P5_PROVIDER = 'p5-verifier';
 const VERIFIER_RELATIVE = 'runtime/verification/p5Verifier.mjs';
@@ -37,6 +38,19 @@ const samePath = (left, right) => process.platform === 'win32' ? left.toLowerCas
 const asRef = artifact => ({ artifactId: artifact.artifactId, sha256: artifact.sha256 });
 
 function fail(code, message) { throw Object.assign(new Error(message), { code }); }
+
+// Test seam, inert in production packages (testFaultHooksEnabled is false there): when a test names a barrier directory, the Gate
+// reports the named point and waits until the test releases it, so the test can alter the installed release between two checks.
+async function testGateBarrier(name) {
+  const directory = process.env.DESZO_TEST_GATE_BARRIER_DIR;
+  if (!directory || !testFaultHooksEnabled(import.meta.url)) return;
+  writeFileSync(join(directory, `reached-${name}`), 'reached\n');
+  const deadline = Date.now() + 120_000;
+  while (!existsSync(join(directory, `resume-${name}`)) && Date.now() < deadline)
+    await new Promise(resolve => setTimeout(resolve, 50));
+  // A missing release refuses the verification; the Gate never proceeds unreleased.
+  if (!existsSync(join(directory, `resume-${name}`))) fail('p5_test_barrier_timeout', `The test barrier "${name}" was never released.`);
+}
 
 function verifyP5ActiveSourceInventory(engine, currentRunningSourceRelease) {
   return verifyP5RunningSourceInventory({ store: engine.store, enrollment: engine.protectedSelfRepairEnrollment,
@@ -274,29 +288,104 @@ function readCandidateModule(store, entry) {
   return bytes.toString('utf8');
 }
 
-// Executable resolution the recorded closure cannot follow (review F14). `node:module` may be imported only for these
-// read-only names and is never re-exported. Loader entry points are refused as syntax (identifiers and property names, never
-// text inside strings or comments), so an alias or re-export of the loader cannot reach a module outside the closure.
+// Executable resolution the recorded closure cannot follow (review F14, B1, second review). The resolver is syntactic. It refuses
+// loader and realm names wherever they occur as an identifier, as a string literal that is not a module specifier or an array
+// element, and as a key assembled from constant strings (a concatenation or a template). It refuses the imports and statements
+// that reach a loader by another route. A key assembled at run time (obj[key] where key is not a constant) is not resolvable
+// statically. The Engine closure contains such accesses; that limit is a recorded residual, not a closed case.
 const LOADER_MODULES = new Set(['module', 'node:module']);
 const SAFE_LOADER_BINDINGS = new Set(['builtinModules', 'isBuiltin']);
-const CODE_LOADING_BUILTINS = new Set(['vm', 'worker_threads', 'wasi'].flatMap(name => [name, `node:${name}`]));
+// Builtins that load or evaluate code, or that hand out the process object, by a route the rules below do not follow.
+// A subpath of one of these (node:inspector/promises) reaches the same capability, so the test is on the first path segment.
+// node:test is not refused: the P5 reproducer tests of the candidate's own closure import it, and the Gate applies this resolver to them.
+const CODE_LOADING_BUILTINS = new Set(['vm', 'worker_threads', 'wasi', 'inspector', 'repl', 'process', 'cluster']);
+const builtinRoot = specifier => specifier.replace(/^node:/, '').split('/')[0];
+// The P6 control modules are imported by the entry point only. A subject module that imported one could bind or replace the trusted builder
+// or the activation (second review, blocker 1), so such an import is refused wherever it is written.
+const PROTECTED_IMPORT_BASENAMES = new Set(['p6Consumer.mjs', 'p6Builder.mjs', 'runner.mjs']);
 const LOADER_NAMES = new Set(['require', 'createRequire', '_load', '_resolveFilename', 'getBuiltinModule']);
-const PROCESS_LOADERS = new Set(['binding', '_linkedBinding', 'dlopen', 'getBuiltinModule', 'mainModule']);
 const CODE_EVALUATORS = new Set(['eval', 'Function']);
 const GLOBAL_OWNERS = new Set(['process', 'globalThis', 'global']);
+// Realm objects and reflective APIs reach the constructors and loaders above by another name.
+const REALM_IDENTIFIERS = new Set(['globalThis', 'global', 'Reflect', 'AsyncFunction', 'GeneratorFunction', 'AsyncGeneratorFunction']);
+// CommonJS bindings an ES module cannot use. As identifiers they are refused; the same text as a string (a directory name, say) is not.
+const COMMONJS_NAMES = new Set(['module', 'exports', '__filename', '__dirname']);
+// Names refused as an identifier, as a constant string key (literal or assembled), anywhere in the subject.
+const DENIED_NAMES = new Set([...LOADER_NAMES, ...CODE_EVALUATORS, ...REALM_IDENTIFIERS,
+  'constructor', '__proto__', 'runInThisContext', 'runInNewContext', 'runInContext', 'prepareStackTrace', 'getThis', 'getFunction']);
+// The process members the Engine uses; reading any other member, or the object itself, is refused.
+const PROCESS_MEMBERS = new Set(['env', 'argv', 'argv0', 'execArgv', 'execPath', 'platform', 'arch', 'pid', 'ppid', 'cwd', 'exit', 'exitCode',
+  'stdout', 'stderr', 'stdin', 'version', 'versions', 'release', 'hrtime', 'memoryUsage', 'uptime', 'nextTick', 'kill', 'on', 'once', 'off',
+  'emit', 'emitWarning', 'umask', 'title', 'cpuUsage', 'resourceUsage', 'features', 'listeners', 'removeListener']);
+const IMPORT_META_MEMBERS = new Set(['url', 'dirname', 'filename']);
+// Object reflection returns the function values of the realm (the prototype's constructor is Function) and their descriptors. Indexing into
+// such a result by any number or name reaches them without a name the rules above can see (review R1, third round).
+const REFLECTIVE_OBJECT_CALLS = new Set(['values', 'entries', 'getOwnPropertyDescriptors', 'getOwnPropertyDescriptor', 'getPrototypeOf', 'getOwnPropertySymbols']);
+const isImportMeta = node => ts.isMetaProperty(node) && node.keywordToken === ts.SyntaxKind.ImportKeyword;
+// A name written in a declaration or a property position is not a reference to the object of that name.
+const isNamePosition = node => {
+  const parent = node.parent;
+  return !!parent && ((ts.isPropertyAccessExpression(parent) && parent.name === node) || (ts.isPropertyAssignment(parent) && parent.name === node)
+    || (ts.isPropertyDeclaration(parent) && parent.name === node) || (ts.isMethodDeclaration(parent) && parent.name === node));
+};
+// True when an enclosing scope of the reference declares the name, so the reference is to that local binding and not to the global.
+// A declaration that is not an enclosing scope is not counted, so an unknown reference is treated as the global object.
+const declaresName = (scope, name) => {
+  const isNamed = declaration => !!declaration.name && ts.isIdentifier(declaration.name) && declaration.name.text === name;
+  if (ts.isFunctionLike(scope) && scope.parameters?.some(parameter => ts.isIdentifier(parameter.name) && parameter.name.text === name)) return true;
+  if (ts.isCatchClause(scope) && scope.variableDeclaration && isNamed(scope.variableDeclaration)) return true;
+  if ((ts.isForStatement(scope) || ts.isForOfStatement(scope) || ts.isForInStatement(scope)) && scope.initializer && ts.isVariableDeclarationList(scope.initializer)
+    && scope.initializer.declarations.some(isNamed)) return true;
+  const statements = ts.isBlock(scope) || ts.isSourceFile(scope) || ts.isModuleBlock(scope) ? scope.statements : null;
+  return !!statements && statements.some(statement => (ts.isVariableStatement(statement) && statement.declarationList.declarations.some(isNamed))
+    || ((ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) && statement.name?.text === name));
+};
+const isLocallyDeclared = (node, name) => {
+  for (let scope = node.parent; scope; scope = scope.parent) if (declaresName(scope, name)) return true;
+  return false;
+};
+// The value of an expression built only from constants (string and numeric literals, '+' and templates without runtime parts), or null.
+const constantText = node => {
+  if (ts.isStringLiteralLike(node) || ts.isNumericLiteral(node)) return node.text;
+  if (ts.isParenthesizedExpression(node)) return constantText(node.expression);
+  // An element of an array literal, read at a numeric index, is the constant that element holds.
+  if (ts.isElementAccessExpression(node) && ts.isArrayLiteralExpression(node.expression) && ts.isNumericLiteral(node.argumentExpression)) {
+    const element = node.expression.elements[Number(node.argumentExpression.text)];
+    return element && !ts.isSpreadElement(element) ? constantText(element) : null;
+  }
+  if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken) {
+    const left = constantText(node.left), right = constantText(node.right);
+    return left === null || right === null ? null : left + right;
+  }
+  if (ts.isTemplateExpression(node)) {
+    let text = node.head.text;
+    for (const span of node.templateSpans) {
+      const value = constantText(span.expression);
+      if (value === null) return null;
+      text += value + span.literal.text;
+    }
+    return text;
+  }
+  return null;
+};
+const isModuleSpecifier = node => (ts.isImportDeclaration(node.parent) || ts.isExportDeclaration(node.parent)) && node.parent.moduleSpecifier === node;
+const EQUALITY_OPERATORS = new Set([ts.SyntaxKind.EqualsEqualsToken, ts.SyntaxKind.EqualsEqualsEqualsToken, ts.SyntaxKind.ExclamationEqualsToken,
+  ts.SyntaxKind.ExclamationEqualsEqualsToken]);
+const isEqualityOperand = node => ts.isBinaryExpression(node.parent) && EQUALITY_OPERATORS.has(node.parent.operatorToken.kind);
 
 export function importSpecifiers(source, label) {
   if (/\.json$/i.test(label)) return [];
   const refuse = what => fail('p5_subject_resolver_unsupported', `P5 cannot statically resolve ${what} in "${label}".`);
+  if (/\.cjs$/i.test(label)) refuse('a CommonJS source');
   const file = ts.createSourceFile(label, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
   if (file.parseDiagnostics.length) refuse('a module that does not parse');
   const specifiers = new Set();
-  const nameOf = node => ts.isIdentifier(node) || ts.isPrivateIdentifier(node) || ts.isStringLiteralLike(node) ? node.text : null;
   const visit = node => {
     if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier) {
       if (!ts.isStringLiteral(node.moduleSpecifier)) refuse('a computed module specifier');
       const specifier = node.moduleSpecifier.text;
-      if (CODE_LOADING_BUILTINS.has(specifier)) refuse(`an import of the code-loading builtin "${specifier}"`);
+      if (CODE_LOADING_BUILTINS.has(builtinRoot(specifier))) refuse(`an import of the code-loading or process builtin "${specifier}"`);
+      if (PROTECTED_IMPORT_BASENAMES.has(specifier.split('/').pop())) refuse(`an import of protected P6 control code "${specifier}"`);
       if (LOADER_MODULES.has(specifier)) {
         const clause = ts.isImportDeclaration(node) ? node.importClause : null;
         const named = clause?.namedBindings && ts.isNamedImports(clause.namedBindings) ? clause.namedBindings.elements : null;
@@ -307,22 +396,43 @@ export function importSpecifiers(source, label) {
     }
     if (ts.isImportEqualsDeclaration(node)) refuse('an import-equals declaration');
     if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) refuse('a dynamic import');
+    if (ts.isWithStatement(node)) refuse('a with statement, which rebinds names');
     if (ts.isMetaProperty(node) && ts.isPropertyAccessExpression(node.parent) && node.parent.name.text === 'resolve') refuse('import.meta.resolve');
-    if (ts.isIdentifier(node) && LOADER_NAMES.has(node.text)) refuse(`the module loader "${node.text}"`);
-    // Code evaluation reaches modules outside the closure as well (review R4).
-    if (ts.isIdentifier(node) && CODE_EVALUATORS.has(node.text)) refuse(`the code evaluator "${node.text}"`);
-    if ((ts.isElementAccessExpression(node) || ts.isPropertyAccessExpression(node)) && ts.isIdentifier(node.expression)
-      && GLOBAL_OWNERS.has(node.expression.text)) {
-      const key = ts.isPropertyAccessExpression(node) ? node.name.text : ts.isStringLiteralLike(node.argumentExpression) ? node.argumentExpression.text : null;
-      if (key === null) refuse(`a computed member of "${node.expression.text}"`);
-      // `globalThis.eval`, `globalThis['process'].binding`, `process['dlopen']`: the same references by another spelling.
-      if (GLOBAL_OWNERS.has(key) || CODE_EVALUATORS.has(key)) refuse(`an indirect "${key}" reference`);
+    // import.meta is used only as import.meta.url, .dirname or .filename; any other use, including an alias, is refused.
+    if (isImportMeta(node) && !(ts.isPropertyAccessExpression(node.parent) && node.parent.expression === node && IMPORT_META_MEMBERS.has(node.parent.name.text)))
+      refuse('import.meta outside url, dirname and filename');
+    if (ts.isIdentifier(node)) {
+      if (DENIED_NAMES.has(node.text) || COMMONJS_NAMES.has(node.text)) refuse(`the name "${node.text}"`);
+      // The process object is used only through PROCESS_MEMBERS; any other use is an alias of it (a local binding excepted).
+      if (node.text === 'process' && !isNamePosition(node) && !isLocallyDeclared(node, 'process')) {
+        const access = node.parent;
+        if (!(ts.isPropertyAccessExpression(access) && access.expression === node && PROCESS_MEMBERS.has(access.name.text)))
+          refuse('a reference to the process object other than its listed members');
+      }
     }
-    if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
-      const property = ts.isPropertyAccessExpression(node) ? nameOf(node.name) : nameOf(node.argumentExpression);
-      const owner = ts.isIdentifier(node.expression) ? node.expression.text : null;
-      if (property && (LOADER_NAMES.has(property) || owner === 'process' && PROCESS_LOADERS.has(property)))
-        refuse(`the module loader "${property}"`);
+    // A denied name spelled as a string: a key, an argument, an initializer. An array element is a value list, and an operand of an
+    // equality test is a comparison; neither reaches a member. Any other position is refused.
+    if (ts.isStringLiteralLike(node) && !isModuleSpecifier(node) && !ts.isArrayLiteralExpression(node.parent) && !isEqualityOperand(node)
+      && DENIED_NAMES.has(node.text))
+      refuse(`the constant "${node.text}"`);
+    // A denied name assembled from constants by '+' or a template.
+    if ((ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken) || ts.isTemplateExpression(node)) {
+      const assembled = constantText(node);
+      if (assembled !== null && DENIED_NAMES.has(assembled)) refuse(`the constant "${assembled}" assembled from parts`);
+    }
+    if (ts.isComputedPropertyName(node)) {
+      const key = constantText(node.expression);
+      if (key !== null && DENIED_NAMES.has(key)) refuse(`the computed property "${key}"`);
+    }
+    if (ts.isElementAccessExpression(node)) {
+      let receiver = node.expression; while (ts.isParenthesizedExpression(receiver)) receiver = receiver.expression;
+      if (ts.isCallExpression(receiver) && ts.isPropertyAccessExpression(receiver.expression) && ts.isIdentifier(receiver.expression.expression)
+        && receiver.expression.expression.text === 'Object' && REFLECTIVE_OBJECT_CALLS.has(receiver.expression.name.text))
+        refuse(`an index into the result of Object.${receiver.expression.name.text}`);
+      const key = constantText(node.argumentExpression);
+      if (key !== null && DENIED_NAMES.has(key)) refuse(`the member "${key}"`);
+      // A computed member of a realm or process object is not resolvable, whatever its key.
+      if (ts.isIdentifier(node.expression) && GLOBAL_OWNERS.has(node.expression.text) && key === null) refuse(`a computed member of "${node.expression.text}"`);
     }
     ts.forEachChild(node, visit);
   };
@@ -657,9 +767,9 @@ export function installProtectedSelfRepairGate(Engine) {
     if (!link || link.state !== 'open' || link.repair_run_id !== state.id
       || !this.logicalRepairLinkIntact(link, this.store.get('SELECT * FROM runs WHERE id = ?', state.id))
       || authorization?.p5Enrollment?.artifactId !== this.protectedSelfRepairEnrollmentArtifact.artifactId
-      || authorization?.selfRepairProfile?.artifactId !== enrollment.profile.artifactId
+      || authorization?.selfRepairProfile?.artifactId !== enrollment.profile.artifactId || authorization?.selfRepairProfile?.sha256 !== enrollment.profile.sha256
       || authorization?.verificationInputs?.artifactId == null
-      || canonicalHash(node.config.verificationPolicy) !== canonicalHash(enrollment.verificationPolicy))
+      || canonicalHash(node.config.verificationPolicy) !== canonicalHash(enrolledRootPolicyRef(this.store, enrollment)))
       fail('p5_gate_link_invalid', 'P5 Verification Gate is not bound to the exact enrolled P2 Repair link and policy.');
     const profile = readRecord(this.store, enrollment.profile, 'profile');
     const policy = readRecord(this.store, enrollment.verificationPolicy, 'verificationPolicy');
@@ -738,6 +848,8 @@ export function installProtectedSelfRepairGate(Engine) {
   P.prepareProtectedSelfRepairGate = async function prepareProtectedSelfRepairGate(state, node, attempt, workspace, authorized) {
     const { store } = this;
     const { link, profile, policy, candidate, candidateRef, verificationInputs } = authorized;
+    // The first installed-release read of the Gate, the running-release attestation, follows this point.
+    await testGateBarrier('before-running-release');
     const installedEnrollment = await this.verifyProtectedSelfRepairEnrollmentFileCurrent();
     if (canonicalHash(installedEnrollment) !== canonicalHash(this.protectedSelfRepairEnrollment))
       fail('p5_enrollment_changed', 'Installed P5 enrollment changed before trusted verification.');

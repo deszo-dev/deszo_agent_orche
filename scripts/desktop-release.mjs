@@ -20,6 +20,7 @@ import { bundleRunner } from './runtime-bundle.mjs';
 import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { verifyDesktopBuildReceipt } from './deszo-artifacts.mjs';
 
 const refuse = message => { throw Object.assign(new Error(message), { code: 'desktop_release_refused' }); };
 const portable = (root, path) => relative(root, path).split(sep).join('/');
@@ -40,14 +41,17 @@ const digestFile = (root, path) => ({ path: portable(root, path), sha256: sha256
 /**
  * @param sourceRoot clean committed checkout the release is derived from
  * @param desktopExecutable the compiled desktop shell whose build identity is `buildId`
+ * @param desktopBuildReceipt the build receipt produced beside the executable by `desktop:build`
  * @param runtimeResources the desktop runtime resource directory (`dist-runtime`); its runner.mjs is replaced by the rebuild
  */
-export async function packageDesktopRelease({ sourceRoot, gitTool, outDir, buildId, desktopExecutable, runtimeResources }) {
+export async function packageDesktopRelease({ sourceRoot, gitTool, outDir, buildId, desktopExecutable, desktopBuildReceipt, runtimeResources }) {
   if (!/^[A-Za-z0-9_-]{1,100}$/.test(buildId || '')) refuse('A simple build identity is required.');
   const out = resolve(outDir);
   if (existsSync(out)) refuse('The release destination already exists and is never replaced.');
   for (const name of ['bridge.mjs', 'deszo-launch-shim.exe', 'runtime-manifest.json'])
     if (!existsSync(join(runtimeResources, name))) refuse(`The desktop runtime resources lack ${name}.`);
+  try { verifyDesktopBuildReceipt({ receiptPath: desktopBuildReceipt, executablePath: desktopExecutable, runtimeResources, buildId }); }
+  catch (error) { refuse(`Desktop build provenance check failed: ${error.message}`); }
   const { root, closure, packaged, dependencyPackages } = await capturedReleaseSource({ sourceRoot, gitTool });
   const { sourceCommit, sourceDigest } = closure.source;
   const inputsDigest = buildInputsDigest(closure);
@@ -77,6 +81,7 @@ export async function packageDesktopRelease({ sourceRoot, gitTool, outDir, build
   const resourceManifest = JSON.parse(readFileSync(join(runtimeResources, 'runtime-manifest.json'), 'utf8'));
   resourceManifest.files = Object.fromEntries(readdirSync(runtimeRoot).sort().map(name => [name, sha256(readFileSync(join(runtimeRoot, name)))]));
   resourceManifest.sourceHead = sourceCommit;
+  resourceManifest.testFaultHooks = false;
   resourceManifest.assurance = 'Desktop release resources; the Engine bundle is reproduced from the attested P5 support payload.';
   writeFileSync(join(runtimeRoot, 'runtime-manifest.json'), `${JSON.stringify(resourceManifest, null, 2)}\n`, { flag: 'wx' });
   copyFileSync(desktopExecutable, join(out, 'deszo.exe'));
@@ -105,10 +110,108 @@ export async function packageDesktopRelease({ sourceRoot, gitTool, outDir, build
     runnerBytes: support.runtimeBundle.bytes, manifest };
 }
 
+// P6 installation formats (ADR-0010 sections 6-7). The stable Shell is one executable plus a manifest of its frozen runtime
+// resources; an Engine package is a desktop runtime bundle bound to that Shell, with no executable and no Shell identity of
+// its own. Both derive from the same trusted source capture and bundling path as the release above.
+export const SHELL_RELEASE_KIND = 'DeszoShellRelease';
+export const SHELL_FROZEN_RESOURCES = ['runtime/bridge.mjs', 'runtime/deszo-launch-shim.exe'];
+export const ENGINE_MANIFEST_SCHEMA = 2;
+
+/** The stable Shell release: `deszo.exe` and `shell.json`, whose identity is `shellBuildId` alone. */
+export function packageShellRelease({ shellBuildId, desktopExecutable, desktopBuildReceipt, runtimeResources, outDir }) {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(shellBuildId || '')) refuse('A simple Shell build identity is required.');
+  const out = resolve(outDir);
+  if (existsSync(out)) refuse('The Shell destination already exists and is never replaced.');
+  for (const name of ['bridge.mjs', 'deszo-launch-shim.exe', 'runtime-manifest.json'])
+    if (!existsSync(join(runtimeResources, name))) refuse(`The desktop runtime resources lack ${name}.`);
+  try { verifyDesktopBuildReceipt({ receiptPath: desktopBuildReceipt, executablePath: desktopExecutable, runtimeResources, buildId: shellBuildId }); }
+  catch (error) { refuse(`Desktop build provenance check failed: ${error.message}`); }
+  mkdirSync(out);
+  copyFileSync(desktopExecutable, join(out, 'deszo.exe'));
+  const executable = digestFile(out, join(out, 'deszo.exe'));
+  const frozenResources = SHELL_FROZEN_RESOURCES.map(path => {
+    const from = join(runtimeResources, path.slice('runtime/'.length));
+    return { path, sha256: sha256(readFileSync(from)), bytes: statSync(from).size };
+  });
+  const shell = { schemaVersion: 1, kind: SHELL_RELEASE_KIND, shellBuildId,
+    desktopExecutable: { path: executable.path, sha256: executable.sha256, bytes: executable.bytes }, frozenResources };
+  writeFileSync(join(out, 'shell.json'), `${JSON.stringify(shell, null, 2)}\n`, { flag: 'wx' });
+  return shell;
+}
+
+/**
+ * An Engine package bound to an installed Shell. Its frozen resources must equal the Shell's frozen digests byte-for-byte;
+ * everything else (the Engine bundle, the P5 support payload and the source identity) is captured from `sourceRoot`.
+ */
+export async function packageEngineRelease({ sourceRoot, gitTool, outDir, engineBuildId, shell, runtimeResources, testFaultHooks = false }) {
+  if (!/^[A-Za-z0-9_-]{1,100}$/.test(engineBuildId || '')) refuse('A simple Engine build identity is required.');
+  // Test-owned Engine packages only: the fault-hook marker joins the verified artifact set, and the Node test policy reads it.
+  if (testFaultHooks && (process.env.DESZO_TEST_FAULT_HOOKS !== '1' || !process.env.NODE_TEST_CONTEXT)) refuse('Test fault hooks are reserved for test-owned Engine packages.');
+  if (!shell || shell.kind !== SHELL_RELEASE_KIND) refuse('An Engine package is bound to a Shell release.');
+  if (shell.shellBuildId === engineBuildId) refuse('The Engine identity must differ from the Shell identity.');
+  const out = resolve(outDir);
+  if (existsSync(out)) refuse('The release destination already exists and is never replaced.');
+  for (const name of ['bridge.mjs', 'deszo-launch-shim.exe', 'runtime-manifest.json'])
+    if (!existsSync(join(runtimeResources, name))) refuse(`The desktop runtime resources lack ${name}.`);
+  for (const frozen of shell.frozenResources) {
+    if (sha256(readFileSync(join(runtimeResources, frozen.path.slice('runtime/'.length)))) !== frozen.sha256)
+      refuse(`The Engine's frozen resource differs from the installed Shell: ${frozen.path}`);
+  }
+  const { root, closure, packaged, dependencyPackages } = await capturedReleaseSource({ sourceRoot, gitTool });
+  const { sourceCommit, sourceDigest } = closure.source;
+  const inputsDigest = buildInputsDigest(closure);
+  mkdirSync(out);
+  const payloadRoot = join(out, P5_SUPPORT_ROOT_NAME), runtimeRoot = join(out, 'runtime');
+  mkdirSync(payloadRoot); mkdirSync(runtimeRoot);
+  const payloadFiles = copyRuntimeSourceLayout({ root, packaged, dependencyPackages, out: payloadRoot });
+  const runnerPath = join(runtimeRoot, 'runner.mjs');
+  await bundleRunner({ root: payloadRoot, outfile: runnerPath });
+  const reproductionRoot = mkdtempSync(join(tmpdir(), 'deszo-engine-reproduce-'));
+  try {
+    await bundleRunner({ root: payloadRoot, outfile: join(reproductionRoot, 'runner.mjs') });
+    if (!readFileSync(runnerPath).equals(readFileSync(join(reproductionRoot, 'runner.mjs'))))
+      refuse('The Engine bundle is not reproducible from the attested payload.');
+  } finally { rmSync(reproductionRoot, { recursive: true, force: true }); }
+  const runnerDigest = sha256(readFileSync(runnerPath));
+  for (const name of readdirSync(runtimeResources).sort()) {
+    if (['runner.mjs', 'runtime-manifest.json'].includes(name)) continue;
+    const from = join(runtimeResources, name);
+    if (!lstatSync(from).isFile()) refuse(`Desktop runtime resources must be plain files: ${name}`);
+    copyFileSync(from, join(runtimeRoot, name));
+  }
+  const resourceManifest = JSON.parse(readFileSync(join(runtimeResources, 'runtime-manifest.json'), 'utf8'));
+  resourceManifest.files = Object.fromEntries(readdirSync(runtimeRoot).sort().map(name => [name, sha256(readFileSync(join(runtimeRoot, name)))]));
+  resourceManifest.sourceHead = sourceCommit;
+  resourceManifest.testFaultHooks = false;
+  resourceManifest.assurance = 'P6 Engine package; the bundle is reproduced from the attested P5 support payload.';
+  // A test-owned package carries the fault-hook marker inside its verified artifact set (the test policy reads it). Production never does.
+  if (testFaultHooks) writeFileSync(join(out, '.deszo-test-fault-hooks'), 'DESZO_TEST_FAULT_HOOKS_V1\n', { flag: 'wx' });
+  writeFileSync(join(runtimeRoot, 'runtime-manifest.json'), `${JSON.stringify(resourceManifest, null, 2)}\n`, { flag: 'wx' });
+  const support = { schemaVersion: 1, kind: P5_SUPPORT_KIND, buildId: engineBuildId, sourceCommit, sourceDigest, inputsDigest,
+    dependencyDigest: closure.dependencyDigest, dependencyPackages,
+    runtimeBundle: { path: 'runtime/runner.mjs', sha256: runnerDigest, bytes: statSync(runnerPath).size, reproducible: true },
+    builder: { node: process.version, esbuild: createRequire(import.meta.url)('esbuild/package.json').version },
+    copiedResources: readdirSync(runtimeRoot).filter(name => name !== 'runner.mjs').sort()
+      .map(name => ({ path: `runtime/${name}`, sha256: sha256(readFileSync(join(runtimeRoot, name))) })),
+    files: payloadFiles.map(({ path, sha256: digest, bytes }) => ({ path, sha256: digest, bytes })) };
+  const supportBytes = Buffer.from(canonicalize(support), 'utf8');
+  writeFileSync(join(payloadRoot, P5_SUPPORT_MANIFEST), supportBytes, { flag: 'wx' });
+  const inventory = writeSourceInventory(out, closure);
+  const artifacts = plainFiles(out).map(path => digestFile(out, path)).sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+  const manifest = { schemaVersion: ENGINE_MANIFEST_SCHEMA, buildId: engineBuildId, engineBuildId, shellBuildId: shell.shellBuildId,
+    runtimeApiVersion: RUNTIME_API_VERSION, bootstrap: 'engine', sourceCommit, dirtySourceDigest: sourceDigest, inputsDigest, artifacts,
+    sourceInventory: { path: SOURCE_INVENTORY_PATH, sha256: inventory.sha256 },
+    p5Support: { path: `${P5_SUPPORT_ROOT_NAME}/${P5_SUPPORT_MANIFEST}`, sha256: sha256(supportBytes) } };
+  writeFileSync(join(out, 'build.json'), JSON.stringify(manifest), { flag: 'wx' });
+  await assertReleaseSourceUnchanged({ root, gitTool, closure });
+  return { engineBuildId, shellBuildId: shell.shellBuildId, sourceCommit, sourceDigest, inputsDigest, runnerDigest, dependencyPackages,
+    payloadFiles: payloadFiles.length, manifest };
+}
+
 // Release entry point (review R1): node scripts/desktop-release.mjs --source <clean checkout> --out <new release directory>
-//   --build-id <id> [--git <git.exe>] [--exe <deszo.exe>] [--resources <dist-runtime>]
-// The desktop shell must have been built with DESZO_DESKTOP_BUILD_ID=<id> (npm run desktop:build) and the runtime resources
-// with npm run runtime:bundle and npm run shim:build. The output is installed by the Lifecycle Host as versions/<id>.
+//   --build-id <id> [--git <git.exe>] [--exe <deszo.exe>] [--receipt <deszo-build.json>] [--resources <dist-runtime>]
+// The desktop shell and its runtime resources must come from one npm run desktop:build with DESZO_DESKTOP_BUILD_ID=<id>; that
+// build publishes the shipped launch shim beside the runtime. The output is installed by the Lifecycle Host as versions/<id>.
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
   const option = (name, fallback = null) => { const index = process.argv.indexOf(name); return index < 0 ? fallback : process.argv[index + 1]; };
   const repo = resolve(import.meta.dirname, '..');
@@ -116,6 +219,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
   const gitTool = { path: gitPath, sha256: sha256(readFileSync(gitPath)) };
   const result = await packageDesktopRelease({ sourceRoot: resolve(option('--source', repo)), gitTool, outDir: resolve(option('--out')),
     buildId: option('--build-id'), desktopExecutable: resolve(option('--exe', join(repo, 'src-tauri', 'target', 'release', 'deszo.exe'))),
+    desktopBuildReceipt: resolve(option('--receipt', join(repo, 'src-tauri', 'target', 'release', 'deszo-build.json'))),
     runtimeResources: resolve(option('--resources', join(repo, 'dist-runtime'))) });
   process.stdout.write(`${JSON.stringify({ buildId: result.buildId, sourceCommit: result.sourceCommit, sourceDigest: result.sourceDigest,
     inputsDigest: result.inputsDigest, runnerDigest: result.runnerDigest, payloadFiles: result.payloadFiles })}\n`);

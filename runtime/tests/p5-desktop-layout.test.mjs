@@ -48,6 +48,11 @@ test('P5-CLOSURE desktop layout: the bundled Engine admits only its exact attest
     assert.throws(() => good.verify({ sourceDigest: 'e'.repeat(64) }), { code: 'p5_support_payload_mismatch' }, 'another source digest');
     assert.throws(() => good.verify({ buildId: 'other-build' }), { code: 'p5_support_payload_mismatch' }, 'another build');
     assert.throws(() => good.verify({ bootstrap: 'runtime' }), { code: 'p5_package_layout_unsupported' }, 'a bundle claiming a runtime-bootstrap release');
+    // P6-BUILD-UNBLOCK: a P6 Engine package (bootstrap `engine`) has the same bundle and payload layout and the same bindings.
+    assert.deepEqual(good.verify({ bootstrap: 'engine' }), layout, 'a P6 Engine package admits the same attested payload');
+    assert.throws(() => good.verify({ bootstrap: 'engine', sourceCommit: 'd'.repeat(40) }), { code: 'p5_support_payload_mismatch' },
+      'a P6 Engine package is still bound to its Host-attested release');
+    assert.throws(() => good.verify({ bootstrap: 'shell' }), { code: 'p5_package_layout_unsupported' }, 'an unknown bootstrap');
 
     const tampered = await release(scratch.root, 'tampered');
     writeFileSync(join(tampered.payloadRoot, 'runtime/verification/p5Verifier.mjs'), '// candidate-substituted verifier\n');

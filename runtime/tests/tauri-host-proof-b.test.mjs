@@ -1,25 +1,35 @@
 // Proof B exercises the independently compiled Rust Host and the repository's real release Tauri executable.
 // WebView2's temporary loopback CDP endpoint is used only to obtain the same connection the bundled UI obtains;
 // all workflow setup then uses the Engine's normal first-party API. After Host acceptance this test only observes.
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { spawn, spawnSync } from 'node:child_process';
 import { cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
-import { existsSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { delimiter, join, resolve } from 'node:path';
 import { buildRustFixture, desktopPackageKey, recordDesktopPackage, rustFixtureDir, verifiedDesktopPackage } from './build-cache.mjs';
 import { ownedDir, trackProcess } from './test-roots.mjs';
+import { testLayout } from '../../scripts/build-layout.mjs';
+import { productionArtifactSnapshot, snapshotChanges } from './production-artifacts.mjs';
 
 const repo = resolve(import.meta.dirname, '../..');
 const testsRoot = join(repo, '.deszo/tests');
 const artifactRoot = join(testsRoot, 'desktop-host-proof-b-artifacts');
+// Every desktop build of this file writes into its own test-owned root; the production set is checked before and after the file.
+const buildRoot = join(artifactRoot, 'build-root');
+const layout = testLayout(buildRoot);
+const productionBefore = productionArtifactSnapshot();
+after(() => assert.deepEqual(snapshotChanges(productionBefore, productionArtifactSnapshot()), [], 'this file changes no production artifact'));
 const hostExe = join(repo, 'lifecycle-host/target/debug', process.platform === 'win32' ? 'deszo-lifecycle-host.exe' : 'deszo-lifecycle-host');
+const testFaultMarker = 'DESZO_TEST_FAULT_HOOKS_V1\n';
 const buildAId = 'build-a';
 const buildBId = 'build-b';
 const checkpointId = 'chk-desktop-host-proof-b';
 let artifactsPromise;
+let faultArtifactsPromise;
+let duplicateReceiptArtifactsPromise;
 // DESZO_PROOFB_KEEP_ARTIFACTS=1 keeps every installation root, so its roots are then ordinary directories, not test-owned ones.
 const testRoot = prefix => (process.env.DESZO_PROOFB_KEEP_ARTIFACTS === '1' ? mkdtempSync(prefix) : ownedDir(prefix));
 
@@ -46,8 +56,47 @@ function run(command, args, options = {}) {
   return result;
 }
 
-async function runDesktopBuild(buildId, logPath) {
-  const env = { ...process.env, DESZO_DESKTOP_BUILD_ID: buildId,
+function testPackageArtifacts(root) {
+  const artifacts = [];
+  const walk = directory => {
+    for (const entry of readdirSync(directory, { withFileTypes: true }).sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)) {
+      const path = join(directory, entry.name);
+      if (path === join(root, 'build.json')) continue;
+      if (entry.isDirectory()) walk(path);
+      else if (entry.isFile()) {
+        const bytes = readFileSync(path);
+        artifacts.push({ path: path.slice(root.length + 1).replaceAll('\\', '/'), sha256: createHash('sha256').update(bytes).digest('hex'), bytes: statSync(path).size });
+      } else throw new Error(`Desktop test package contains an unsupported filesystem entry: ${path}`);
+    }
+  };
+  walk(root);
+  return artifacts.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+}
+
+async function refreshTestPackageManifest(root) {
+  const manifestPath = join(root, 'build.json');
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+  manifest.artifacts = testPackageArtifacts(root);
+  await writeFile(manifestPath, JSON.stringify(manifest));
+}
+
+function fileSha256Sync(path) { return createHash('sha256').update(readFileSync(path)).digest('hex'); }
+
+function receiptMatchesPackage(packageRoot, receiptPath, buildId, testFaultHooks) {
+  try {
+    const receipt = JSON.parse(readFileSync(receiptPath, 'utf8'));
+    const manifestBytes = readFileSync(join(packageRoot, 'runtime/runtime-manifest.json'));
+    const manifest = JSON.parse(manifestBytes.toString('utf8'));
+    return receipt.schemaVersion === 1 && receipt.desktopBuildId === buildId && receipt.testFaultHooks === testFaultHooks
+      && receipt.exeSha256 === fileSha256Sync(join(packageRoot, 'deszo.exe'))
+      && receipt.runtimeManifestSha256 === createHash('sha256').update(manifestBytes).digest('hex')
+      && manifest.testFaultHooks === testFaultHooks;
+  } catch { return false; }
+}
+
+async function runDesktopBuild(buildId, logPath, { testFaultHooks = false } = {}) {
+  const env = { ...process.env, DESZO_BUILD_ROOT: buildRoot, DESZO_DESKTOP_BUILD_ID: buildId,
+    ...(testFaultHooks ? { DESZO_TEST_FAULT_HOOKS: '1' } : {}),
     DESZO_TAURI_CONFIG_OVERLAY: join(artifactRoot, 'tauri-proofb-debug.json') };
   const result = run(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', 'npm run desktop:build'], { env, timeout: 600_000, windowsHide: true });
   await writeFile(logPath, `${result.stdout || ''}\n${result.stderr || ''}`);
@@ -71,29 +120,33 @@ async function makeDesktopArtifacts() {
   // Build A and Build B differ only in their compiled build identity, so each needs its own release build. A package built earlier from
   // exactly the same repository inputs, toolchain and overlay is reused after its executable and candidate digests are verified again.
   // DESZO_TEST_REBUILD_DESKTOP=1 always builds.
-  const executable = join(repo, 'src-tauri/target/release/deszo.exe');
-  const runtime = join(repo, 'dist-runtime');
+  const executable = layout.exe;
+  const runtime = layout.runtime;
   const packages = [];
   for (const [label, buildId] of [['a', buildAId], ['b', buildBId]]) {
     const packageRoot = join(artifactRoot, `desktop-build-${label}`);
+    const buildReceipt = join(artifactRoot, `desktop-build-${label}-receipt.json`);
     const key = desktopPackageKey({ buildId, overlay: tauriConfig });
-    const reused = process.env.DESZO_TEST_REBUILD_DESKTOP === '1' ? { hit: false, reason: 'rebuild requested' } : await verifiedDesktopPackage(packageRoot, key, digestCandidate);
+    let reused = process.env.DESZO_TEST_REBUILD_DESKTOP === '1' ? { hit: false, reason: 'rebuild requested' } : await verifiedDesktopPackage(packageRoot, key, digestCandidate);
+    if (reused.hit && !receiptMatchesPackage(packageRoot, buildReceipt, buildId, false)) reused = { hit: false, reason: 'matching production build receipt is missing or invalid' };
     if (reused.hit) {
       packages.push({ label, buildId, packageRoot, executable: join(packageRoot, 'deszo.exe'), runtime: join(packageRoot, 'runtime'),
-        exeSha256: reused.exeSha256, packageDigest: reused.packageDigest, cache: { hit: true, key } });
+        buildReceipt, exeSha256: reused.exeSha256, packageDigest: reused.packageDigest, cache: { hit: true, key } });
       continue;
     }
     await rm(`${packageRoot}.cache.json`, { force: true });
     const started = Date.now();
     await runDesktopBuild(buildId, join(artifactRoot, `desktop-${label}-build.log`));
+    assertBuildIdentity(buildId, false);
     await rm(packageRoot, { recursive: true, force: true });
     await mkdir(packageRoot, { recursive: true });
     await cp(executable, join(packageRoot, 'deszo.exe'));
     await cp(runtime, join(packageRoot, 'runtime'), { recursive: true });
+    await cp(layout.receipt, buildReceipt);
     await writeFile(join(packageRoot, 'build.json'), JSON.stringify({ schemaVersion: 1, buildId, runtimeApiVersion: 2,
-      bootstrap: 'tauri', desktopExecutable: 'deszo.exe', desktopBuildId: buildId }));
+      bootstrap: 'tauri', desktopExecutable: 'deszo.exe', desktopBuildId: buildId, artifacts: testPackageArtifacts(packageRoot) }));
     const built = { label, buildId, packageRoot, executable: join(packageRoot, 'deszo.exe'), runtime: join(packageRoot, 'runtime'),
-      exeSha256: await fileSha256(join(packageRoot, 'deszo.exe')), packageDigest: await digestCandidate(packageRoot),
+      buildReceipt, exeSha256: await fileSha256(join(packageRoot, 'deszo.exe')), packageDigest: await digestCandidate(packageRoot),
       cache: { hit: false, key, reason: reused.reason, buildMs: Date.now() - started } };
     // Recorded for reuse only when no input changed while the build ran.
     if (desktopPackageKey({ buildId, overlay: tauriConfig }) === key)
@@ -108,6 +161,111 @@ async function makeDesktopArtifacts() {
 function desktopArtifacts() {
   artifactsPromise ??= makeDesktopArtifacts();
   return artifactsPromise;
+}
+
+// The identity-window containment test needs a deterministic Engine crash after OS process creation. Keep that fault hook in
+// a separate, explicitly test-owned Build A bundle; the normal Proof B and P5 desktop packages remain production-hook-free.
+function desktopFaultArtifacts() {
+  faultArtifactsPromise ??= makeDesktopFaultArtifacts();
+  return faultArtifactsPromise;
+}
+
+async function makeDesktopFaultArtifacts() {
+  const fixtureSource = join(repo, 'runtime/tests/fixtures/proofb-cli.rs');
+  const fixtureCli = join(rustFixtureDir(fixtureSource, join(artifactRoot, 'provider-fixture-bin')), 'codex.exe');
+  buildRustFixture(fixtureSource, fixtureCli);
+  const packageRoot = join(artifactRoot, 'desktop-build-a-test-faults');
+  const buildReceipt = join(artifactRoot, 'desktop-build-a-test-faults-receipt.json');
+  const overlay = JSON.parse(await readFile(join(artifactRoot, 'tauri-proofb-debug.json'), 'utf8'));
+  const key = desktopPackageKey({ buildId: buildAId, overlay, testFaultHooks: true });
+  let reused = process.env.DESZO_TEST_REBUILD_DESKTOP === '1' ? { hit: false, reason: 'rebuild requested' }
+    : await verifiedDesktopPackage(packageRoot, key, digestCandidate);
+  if (reused.hit && !receiptMatchesPackage(packageRoot, buildReceipt, buildAId, true)) reused = { hit: false, reason: 'matching test build receipt is missing or invalid' };
+
+  let productionB = null;
+  const productionBRoot = join(artifactRoot, 'desktop-build-b');
+  const productionBRecordPath = `${productionBRoot}.cache.json`;
+  if (existsSync(productionBRecordPath)) {
+    try {
+      const cached = JSON.parse(readFileSync(productionBRecordPath, 'utf8'));
+      const checked = await verifiedDesktopPackage(productionBRoot, cached.key, digestCandidate);
+      const receiptPath = join(artifactRoot, 'desktop-build-b-receipt.json');
+      if (checked.hit && receiptMatchesPackage(productionBRoot, receiptPath, buildBId, false)) productionB = { label: 'b', buildId: buildBId, packageRoot: productionBRoot,
+        executable: join(productionBRoot, 'deszo.exe'), runtime: join(productionBRoot, 'runtime'), buildReceipt: receiptPath, exeSha256: checked.exeSha256,
+        packageDigest: checked.packageDigest, cache: { hit: true, key: cached.key } };
+    } catch { /* An unused staged package is rebuilt by the normal builder below if its cache cannot be verified. */ }
+  }
+  if (!productionB) productionB = (await desktopArtifacts()).packages[1];
+  if (reused.hit) {
+    const testBuild = { label: 'a', buildId: buildAId, packageRoot, executable: join(packageRoot, 'deszo.exe'),
+      runtime: join(packageRoot, 'runtime'), buildReceipt, exeSha256: reused.exeSha256, packageDigest: reused.packageDigest, cache: { hit: true, key } };
+    return { packages: [testBuild, productionB], fixtureCli };
+  }
+
+  await rm(`${packageRoot}.cache.json`, { force: true });
+  await runDesktopBuild(buildAId, join(artifactRoot, 'desktop-a-test-faults-build.log'), { testFaultHooks: true });
+  assertBuildIdentity(buildAId, true);
+  await rm(packageRoot, { recursive: true, force: true });
+  await mkdir(packageRoot, { recursive: true });
+  await cp(layout.exe, join(packageRoot, 'deszo.exe'));
+  await cp(layout.runtime, join(packageRoot, 'runtime'), { recursive: true });
+  await cp(layout.receipt, buildReceipt);
+  await writeFile(join(packageRoot, '.deszo-test-fault-hooks'), testFaultMarker);
+  await writeFile(join(packageRoot, 'build.json'), JSON.stringify({ schemaVersion: 1, buildId: buildAId, runtimeApiVersion: 2,
+    bootstrap: 'tauri', desktopExecutable: 'deszo.exe', desktopBuildId: buildAId, artifacts: testPackageArtifacts(packageRoot) }));
+  const exeSha256 = await fileSha256(join(packageRoot, 'deszo.exe'));
+  const packageDigest = await digestCandidate(packageRoot);
+  recordDesktopPackage(packageRoot, { key, buildId: buildAId, exeSha256, packageDigest });
+  const testBuild = { label: 'a', buildId: buildAId, packageRoot, executable: join(packageRoot, 'deszo.exe'), runtime: join(packageRoot, 'runtime'), buildReceipt,
+    exeSha256, packageDigest, cache: { hit: false, key } };
+  return { packages: [testBuild, productionB], fixtureCli };
+}
+
+async function makeDuplicateReceiptArtifacts() {
+  const production = await desktopArtifacts();
+  const source = production.packages[1];
+  const packageRoot = join(artifactRoot, 'desktop-build-b-test-duplicate-receipt');
+  const buildReceipt = source.buildReceipt;
+  const overlay = JSON.parse(await readFile(join(artifactRoot, 'tauri-proofb-debug.json'), 'utf8'));
+  const key = desktopPackageKey({ buildId: buildBId, overlay, testFaultHooks: true });
+  let reused = process.env.DESZO_TEST_REBUILD_DESKTOP === '1' ? { hit: false, reason: 'rebuild requested' }
+    : await verifiedDesktopPackage(packageRoot, key, digestCandidate);
+  if (reused.hit && (!existsSync(join(packageRoot, '.deszo-test-fault-hooks')) || !receiptMatchesPackage(packageRoot, buildReceipt, buildBId, false)))
+    reused = { hit: false, reason: 'marked test package is missing or invalid' };
+  if (!reused.hit) {
+    await rm(`${packageRoot}.cache.json`, { force: true });
+    await rm(packageRoot, { recursive: true, force: true });
+    await cp(source.packageRoot, packageRoot, { recursive: true });
+    await writeFile(join(packageRoot, '.deszo-test-fault-hooks'), testFaultMarker);
+    await refreshTestPackageManifest(packageRoot);
+    reused = { hit: false, reason: reused.reason, exeSha256: await fileSha256(join(packageRoot, 'deszo.exe')),
+      packageDigest: await digestCandidate(packageRoot) };
+    recordDesktopPackage(packageRoot, { key, buildId: buildBId, exeSha256: reused.exeSha256, packageDigest: reused.packageDigest });
+  }
+  const testBuild = { ...source, packageRoot, executable: join(packageRoot, 'deszo.exe'), runtime: join(packageRoot, 'runtime'), buildReceipt,
+    exeSha256: reused.exeSha256, packageDigest: reused.packageDigest,
+    cache: { hit: reused.hit, key, ...(reused.reason ? { reason: reused.reason } : {}) } };
+  return { packages: [production.packages[0], testBuild], fixtureCli: production.fixtureCli };
+}
+
+function desktopDuplicateReceiptArtifacts() {
+  duplicateReceiptArtifactsPromise ??= makeDuplicateReceiptArtifacts();
+  return duplicateReceiptArtifactsPromise;
+}
+
+// One compilation publishes deszo.exe, its launch shim and the runtime copy of that shim. The receipt names all three, and the
+// runtime manifest records the shipped shim, so each identity below is one build's output, never a stale or second copy.
+function assertBuildIdentity(buildId, testFaultHooks) {
+  const receipt = JSON.parse(readFileSync(layout.receipt, 'utf8'));
+  const runtimeManifest = JSON.parse(readFileSync(join(layout.runtime, 'runtime-manifest.json'), 'utf8'));
+  const shim = fileSha256Sync(layout.shim);
+  assert.equal(receipt.desktopBuildId, buildId);
+  assert.equal(receipt.testFaultHooks, testFaultHooks);
+  assert.equal(receipt.exeSha256, fileSha256Sync(layout.exe), 'the receipt names the deszo.exe this build compiled');
+  assert.equal(receipt.launchShimSha256, shim, 'the receipt names the launch shim this build compiled');
+  assert.equal(fileSha256Sync(layout.runtimeShim), shim, 'the runtime ships the launch shim this build compiled');
+  assert.equal(runtimeManifest.files['deszo-launch-shim.exe'], shim, 'the runtime manifest records the shipped launch shim');
+  assert.equal(runtimeManifest.testFaultHooks, testFaultHooks);
 }
 
 async function digestCandidate(path) {
@@ -126,8 +284,9 @@ async function createPackage(source, destination, buildId) {
   await mkdir(destination, { recursive: true });
   await cp(source.executable, join(destination, 'deszo.exe'));
   await cp(source.runtime, join(destination, 'runtime'), { recursive: true });
-  await writeFile(join(destination, 'build.json'), JSON.stringify({ schemaVersion: 1, buildId, runtimeApiVersion: 2,
-    bootstrap: 'tauri', desktopExecutable: 'deszo.exe', desktopBuildId: buildId }));
+  await cp(join(source.packageRoot, 'build.json'), join(destination, 'build.json'));
+  const testMarker = join(source.packageRoot, '.deszo-test-fault-hooks');
+  if (existsSync(testMarker)) await cp(testMarker, join(destination, '.deszo-test-fault-hooks'));
 }
 
 async function prepareInstallation(tag, artifacts, { damageCandidate = null, swapCandidateExeToA = false, readyTimeoutMs, custody = false } = {}) {
@@ -156,6 +315,7 @@ async function prepareInstallation(tag, artifacts, { damageCandidate = null, swa
     const resourceManifest = JSON.parse(await readFile(resourceManifestPath, 'utf8'));
     resourceManifest.files['runner.mjs'] = await fileSha256(runnerPath);
     await writeFile(resourceManifestPath, JSON.stringify(resourceManifest, null, 2));
+    await refreshTestPackageManifest(candidateB);
   }
   const candidateDigest = await digestCandidate(candidateB);
   // Custody allowlist: the only executable the Host may launch for a provider is the proof's provider fixture, by digest.
@@ -642,7 +802,7 @@ async function runFreshProof(iteration, artifacts, { custody = false } = {}) {
 
 test('Proof B: real Rust Host restarts Tauri A as Tauri B and Engine autonomously continues Parent and Repair twice',
   { timeout: 900_000 }, async () => {
-    const artifacts = await desktopArtifacts();
+    const artifacts = await desktopDuplicateReceiptArtifacts();
     const evidence = [await runFreshProof(1, artifacts), await runFreshProof(2, artifacts)];
     assert.equal(evidence.length, 2);
     assert.notEqual(evidence[0].hostPid, evidence[1].hostPid);
@@ -654,7 +814,7 @@ test('Proof B: real Rust Host restarts Tauri A as Tauri B and Engine autonomousl
 // custody service. The live CLI and its descendant must survive the replacement with the same identity, and be bound to Build B.
 test('Proof B with Process Custody: a Custody-owned provider CLI and its descendant survive real Tauri A to Tauri B replacement',
   { timeout: 900_000 }, async () => {
-    const artifacts = await desktopArtifacts();
+    const artifacts = await desktopDuplicateReceiptArtifacts();
     const evidence = await runFreshProof(3, artifacts, { custody: true });
     assert.deepEqual(evidence.buildIds, ['build-a', 'build-b']);
     assert.equal(evidence.custody, true);
@@ -732,6 +892,7 @@ test('negative desktop bootstrap: manifest Build B identity cannot be satisfied 
   await Promise.all([mkdir(initial, { recursive: true }), mkdir(profile, { recursive: true }), mkdir(staging, { recursive: true })]);
   await createPackage(artifacts.packages[1], initial, 'build-b');
   await cp(artifacts.packages[0].executable, join(initial, 'deszo.exe'), { force: true });
+  await refreshTestPackageManifest(initial);
   const config = join(root, 'host-config.json');
   await writeFile(config, JSON.stringify({ installationRoot: installation, profileRoot: profile, stagingRoot: staging,
     nodeExecutable: process.execPath, initialBuildId: 'build-b' }));
@@ -822,7 +983,7 @@ async function observeDeaths(pids, timeoutMs) {
 }
 
 async function runSupervisedWriterProof(scenario) {
-  const artifacts = await desktopArtifacts();
+  const artifacts = scenario === 'identity-window' ? await desktopFaultArtifacts() : await desktopArtifacts();
   const prepared = await prepareInstallation(`supervised-${scenario}`, artifacts, { custody: false });
   const marker = join(prepared.root, 'crash-before-identity.marker');
   // The Host passes its environment to the application and the runtime; the marker is named only for the Host that starts Tauri A.

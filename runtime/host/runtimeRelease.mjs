@@ -11,6 +11,8 @@ import { buildInputsDigest, plainFiles, securityClosure } from './installedBuild
 import { SOURCE_INVENTORY_PATH } from './sourceProvenance.mjs';
 
 const refuse = message => { throw new HostError(403, 'runtime_release_refused', message); };
+const TEST_FAULT_MARKER = '.deszo-test-fault-hooks';
+const TEST_FAULT_MARKER_CONTENT = 'DESZO_TEST_FAULT_HOOKS_V1\n';
 // Source paths a runtime-bootstrap package carries; tests, test fixtures, UI sources and build tooling stay out of it.
 export const RUNTIME_RELEASE_PATTERN = /^(runtime\/(?!tests\/)|mcp\/|shared\/|docs\/(schemas|storage|authoring)\/|docs\/examples\/(m1-context-chain|reference-delivery|managed-task)\/|package\.json$)/;
 export const RUNTIME_API_VERSION = 2;
@@ -139,16 +141,24 @@ export async function assertReleaseSourceUnchanged({ root, gitTool, closure }) {
     refuse('The source or dependency closure changed while the release was packaged.');
 }
 
-export async function packageRuntimeRelease({ sourceRoot, gitTool, outDir, buildId }) {
+export async function packageRuntimeRelease({ sourceRoot, gitTool, outDir, buildId, testOnlyFaultHooks = false }) {
   if (!/^[A-Za-z0-9_-]{1,100}$/.test(buildId || '')) refuse('A simple build identity is required.');
+  if (testOnlyFaultHooks && !process.env.NODE_TEST_CONTEXT)
+    refuse('Test fault hooks can only be packaged by a running Node test process.');
   const out = resolve(outDir);
   if (existsSync(out)) refuse('The release destination already exists and is never replaced.');
   const { root, closure, packaged, dependencyPackages } = await capturedReleaseSource({ sourceRoot, gitTool });
   const { sourceCommit, sourceDigest } = closure.source;
   mkdirSync(out);
   const copied = copyRuntimeSourceLayout({ root, packaged, dependencyPackages, out });
+  const generatedArtifacts = [];
+  if (testOnlyFaultHooks) {
+    const markerPath = join(out, TEST_FAULT_MARKER);
+    writeFileSync(markerPath, TEST_FAULT_MARKER_CONTENT, { flag: 'wx' });
+    generatedArtifacts.push({ path: TEST_FAULT_MARKER, sha256: sha256(readFileSync(markerPath)), bytes: statSync(markerPath).size });
+  }
   const inventoryArtifact = writeSourceInventory(out, closure);
-  const artifacts = [...copied, inventoryArtifact].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+  const artifacts = [...copied, ...generatedArtifacts, inventoryArtifact].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
   const inputsDigest = buildInputsDigest(closure);
   const manifest = { schemaVersion: 1, buildId, runtimeApiVersion: RUNTIME_API_VERSION, bootstrap: 'runtime', sourceCommit,
     dirtySourceDigest: sourceDigest, inputsDigest, artifacts, sourceInventory: { path: SOURCE_INVENTORY_PATH, sha256: inventoryArtifact.sha256 } };

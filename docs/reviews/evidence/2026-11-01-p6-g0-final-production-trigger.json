@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "evidence": "production-trigger",
+  "capturedAt": "2026-11-02T12:08:59.947Z",
+  "node": "v22.20.0",
+  "platform": "win32 x64",
+  "engineBuildId": "engine-a",
+  "route": "POST /api/v4/lifecycle/engine-switch",
+  "status": 404,
+  "package": "production, built without the test marker"
+}

@@ -21,10 +21,15 @@ test('AMD-19 inventories every route and Owner Token survives rotation and resta
   try {
     const inventory = api.runner.routeInventory;
     const counts = Object.groupBy(inventory, route => route.classification);
+    // P6-G0 adds one public, Owner-Token route: the explicit switch request of a managed Engine (ADR-0010 section 5).
+    // The P6-BUILD activation trigger is inventoried only under the test-fault policy (testFaultPolicy.mjs), which the test runner enables.
     assert.deepEqual(Object.fromEntries(Object.entries(counts).map(([key, value]) => [key, value.length])), {
-      public: 96, 'internal-host': 5, retired: 4,
+      public: 98, 'internal-host': 5, retired: 4,
     });
-    assert.equal(inventory.length, 105);
+    assert.equal(inventory.length, 107);
+    assert.equal(inventory.filter(route => route.pattern.includes('p6-activate')).length, 1, 'the activation trigger exists only under the test-fault policy');
+    assert.deepEqual(inventory.filter(route => route.pattern.includes('engine-switch')).map(({ method, classification }) => ({ method, classification })),
+      [{ method: 'POST', classification: 'public' }], 'the P6-G0 switch request is the only lifecycle trigger and is Owner-Token only');
     assert.deepEqual(inventory.filter(route => route.pattern.includes('judge-questions')).map(({ method, classification }) => ({ method, classification })), [
       { method: 'GET', classification: 'public' }, { method: 'POST', classification: 'public' },
     ], 'P4 Owner questions use the existing public Owner Token boundary');

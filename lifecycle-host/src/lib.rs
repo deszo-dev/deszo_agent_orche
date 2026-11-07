@@ -17,7 +17,12 @@ use std::{
 use uuid::Uuid;
 
 mod custody;
+mod engine_switch;
+#[cfg(test)]
+mod p6_gate_tests;
+mod store_guard;
 pub use custody::{run_service as run_custody_service, AllowedExecutable, CustodyConfig, CustodyRegistry, Refusal, ServiceConfig};
+pub use store_guard::{guard_and_copy_store, StoreFileEvidence, StoreSnapshotEvidence, StoreSnapshotGuard};
 
 const IPC_MAX_LINE: usize = 128 * 1024;
 const ENGINE_READY_TIMEOUT: Duration = Duration::from_secs(45);
@@ -83,6 +88,21 @@ pub struct HostConfig {
     /// Process Custody (PoC). Absent means custody commands are refused and no CLI is ever launched through the Host.
     #[serde(default)]
     pub custody: Option<CustodyConfig>,
+    /// Debug-only native recovery seam: the Host exits at this named P6 switch point (see engine_switch::crash_point).
+    #[serde(default)]
+    pub test_switch_crash_at: Option<String>,
+    /// Debug-only C09 seam: the switch's managed-tree check withholds its Job-empty answer after the real termination ran.
+    #[serde(default)]
+    pub test_switch_termination_uncertain: bool,
+    /// Debug-only C09 seam: a restarted Host cannot prove a held termination ended, so the switch stays held.
+    #[serde(default)]
+    pub test_switch_proof_uncertain: bool,
+    /// Debug-only B3 seam: the switch holds its Custody fence for this many milliseconds before its zero-job proof.
+    #[serde(default)]
+    pub test_switch_fence_pause_ms: Option<u64>,
+    /// Debug-only M1 seam: the switch worker parks at the named points (`pre_commit`, `post_commit`) until the test writes the resume file.
+    #[serde(default)]
+    pub test_switch_barrier_dir: Option<String>,
 }
 
 fn default_true() -> bool {
@@ -177,6 +197,31 @@ struct BuildManifest {
     desktop_executable: Option<String>,
     #[serde(default)]
     desktop_build_id: Option<String>,
+    /// P6 Engine packages (schema 2, bootstrap "engine") name their Engine identity separately from the Shell they run under.
+    #[serde(default)]
+    engine_build_id: Option<String>,
+    #[serde(default)]
+    shell_build_id: Option<String>,
+}
+
+/// The stable Tauri Shell of a P6 installation (`shell/shell.json`). Its executable is never replaced while Engines change.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ShellRelease {
+    schema_version: u32,
+    kind: String,
+    shell_build_id: String,
+    desktop_executable: ShellFile,
+    /// Digests of the frozen runtime resources every Engine package must carry byte-for-byte.
+    frozen_resources: Vec<ShellFile>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ShellFile {
+    path: String,
+    sha256: String,
+    bytes: u64,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -229,6 +274,9 @@ struct ActivePointer {
     build_id: String,
     digest: String,
     generation: String,
+    /// The P6 operation whose single atomic write selected this release. Absent for every legacy selection.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    committed_operation_id: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -252,6 +300,16 @@ struct DurableState {
     generation: String,
     store_id: Option<String>,
     operation: Option<OperationRecord>,
+    /// The P6 Engine-only operation (stage and switch). Absent in every legacy installation, and omitted from its state file.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    engine_operation: Option<engine_switch::EngineOperation>,
+}
+
+/// The Host-side facts of one candidate maintenance launch: the Engine operation it serves and the disposable copy it reads.
+#[derive(Clone, Debug)]
+struct MaintenanceSpec {
+    operation_id: String,
+    preflight_store: PathBuf,
 }
 
 #[derive(Debug, Deserialize)]
@@ -279,8 +337,13 @@ struct Response {
 struct RuntimeState {
     durable: DurableState,
     managed: Option<ManagedProcess>,
+    /// A managed tree the Host could not prove ended. It keeps its Job handle, so the tree is never closed unrecorded (C09).
+    unproven: Option<ManagedProcess>,
     ready_generation: Option<String>,
     stop_requested: bool,
+    /// Set by the Host's own shutdown before it takes the managed Engine's record. A switch commit decided under the same lock
+    /// refuses to select a candidate once this is set, so the shutdown and the commit never interleave (P6-HOST-M1).
+    shutdown_requested: bool,
 }
 
 struct Shared {
@@ -288,8 +351,12 @@ struct Shared {
     installation_root: PathBuf,
     installation_id: String,
     desktop_bootstrap: bool,
+    /// Present only in a P6 installation: one stable Shell under `shell/` runs whichever Engine is selected.
+    shell: Option<ShellRelease>,
     profile_root: PathBuf,
     staging_root: PathBuf,
+    /// The Host's own state directory (`.deszo-host`), where P6 scratch and records live.
+    host_dir: PathBuf,
     state_file: PathBuf,
     active_file: PathBuf,
     endpoint_file: PathBuf,
@@ -299,6 +366,12 @@ struct Shared {
     ready: Condvar,
     journal: Mutex<File>,
     custody: Option<CustodyRegistry>,
+    /// Serializes P6 stage and switch admissions. Long work runs after it is released, under the operation's own phases.
+    switch_gate: Mutex<()>,
+    /// The production Store guards of a P6 switch between the Store boundary and the commit (or fallback, or hold).
+    switch_guard: Mutex<Option<store_guard::StoreSnapshotGuard>>,
+    /// Serializes every stop of the managed Engine tree, so a Host stop cannot return while a switch is still stopping that tree (P6-HOST-M1).
+    managed_stop: Mutex<()>,
 }
 
 struct ManagedProcess {
@@ -418,6 +491,54 @@ impl Containment {
         Ok(())
     }
 
+    /// Every process the Job holds now, by process identifier. An error means the membership is not known.
+    fn members(&self) -> Result<Vec<u32>, String> {
+        #[cfg(windows)]
+        unsafe {
+            use std::mem::size_of;
+            use windows_sys::Win32::System::JobObjects::{
+                JobObjectBasicProcessIdList, QueryInformationJobObject, JOBOBJECT_BASIC_PROCESS_ID_LIST,
+            };
+            // The Job reports the identifiers it can hold in `capacity` slots and the assigned count. A bigger list is requested
+            // when the count exceeds the slots, so no member is silently left out.
+            let mut capacity = 64usize;
+            loop {
+                let bytes = size_of::<JOBOBJECT_BASIC_PROCESS_ID_LIST>() + capacity * size_of::<usize>();
+                let mut buffer = vec![0usize; bytes.div_ceil(size_of::<usize>())];
+                let mut returned = 0u32;
+                let ok = QueryInformationJobObject(
+                    self.0,
+                    JobObjectBasicProcessIdList,
+                    buffer.as_mut_ptr() as *mut _,
+                    (buffer.len() * size_of::<usize>()) as u32,
+                    &mut returned,
+                );
+                let list = buffer.as_ptr() as *const JOBOBJECT_BASIC_PROCESS_ID_LIST;
+                let assigned = (*list).NumberOfAssignedProcesses as usize;
+                if assigned > capacity {
+                    capacity = assigned;
+                    continue;
+                }
+                if ok == 0 {
+                    return Err(format!("QueryInformationJobObject failed: {}", std::io::Error::last_os_error()));
+                }
+                let listed = (*list).NumberOfProcessIdsInList as usize;
+                if listed > assigned {
+                    return Err("the Job listed more processes than it reports as assigned".into());
+                }
+                // The identifiers follow the header in the buffer. The struct declares a single array slot, so the slice starts at the
+                // field's offset within the buffer and spans the listed count, which the capacity check above keeps inside the buffer.
+                let first = (buffer.as_ptr() as *const u8).add(std::mem::offset_of!(JOBOBJECT_BASIC_PROCESS_ID_LIST, ProcessIdList)) as *const usize;
+                let ids = std::slice::from_raw_parts(first, listed);
+                return Ok(ids.iter().map(|id| *id as u32).collect());
+            }
+        }
+        #[cfg(not(windows))]
+        {
+            Err("Job membership is not available on this platform".into())
+        }
+    }
+
     fn is_empty(&self) -> Result<bool, String> {
         #[cfg(windows)]
         unsafe {
@@ -476,13 +597,20 @@ impl Host {
         let staging_root = fs::canonicalize(&config.staging_root).map_err(err)?;
         let host_dir = installation_root.join(".deszo-host");
         fs::create_dir_all(&host_dir).map_err(err)?;
-        let initial_manifest = verify_build(
-            &installation_root
-                .join("versions")
-                .join(&config.initial_build_id),
-            &config.initial_build_id,
-        )?;
-        let desktop_bootstrap = initial_manifest.bootstrap == "tauri";
+        let shell = load_shell_release(&installation_root)?;
+        let initial_root = installation_root.join("versions").join(&config.initial_build_id);
+        let initial_manifest = verify_build(&initial_root, &config.initial_build_id)?;
+        if let Some(shell) = shell.as_ref() {
+            // A P6 installation has one stable Shell; the initial Engine must be a desktop Engine package bound to that Shell.
+            if initial_manifest.bootstrap != "engine" {
+                return Err("a P6 installation's initial release must be an Engine package".into());
+            }
+            verify_engine_binding(&initial_root, shell, &initial_manifest)?;
+        } else if initial_manifest.bootstrap == "engine" {
+            // An installation without its Shell cannot launch an Engine, so it selects none (ADR-0010 section 7).
+            return Err("an Engine package needs a P6 installation with its Shell; this installation cannot start it".into());
+        }
+        let desktop_bootstrap = is_desktop_bootstrap(&initial_manifest.bootstrap);
         let installation_id =
             installation_identity(&installation_root, &profile_root, desktop_bootstrap)?;
         let profile_key = hex::encode(Sha256::digest(profile_root.to_string_lossy().as_bytes()));
@@ -533,6 +661,8 @@ impl Host {
             desktop_bootstrap,
         )?;
         reconcile_crash(&mut durable, &state_file, &active_file, &journal_file)?;
+        let start_plan = engine_switch::reconcile_at_start(&mut durable, &installation_root, &profile_root, &state_file, &active_file,
+            &journal_file, config.test_switch_proof_uncertain)?;
 
         let listener =
             TcpListener::bind(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0)).map_err(err)?;
@@ -555,8 +685,10 @@ impl Host {
             installation_root,
             installation_id,
             desktop_bootstrap,
+            shell,
             profile_root,
             staging_root,
+            host_dir: host_dir.clone(),
             state_file,
             active_file,
             endpoint_file,
@@ -565,11 +697,16 @@ impl Host {
             state: Mutex::new(RuntimeState {
                 durable,
                 managed: None,
+                unproven: None,
                 ready_generation: None,
                 stop_requested: false,
+                shutdown_requested: false,
             }),
             ready: Condvar::new(),
             journal: Mutex::new(journal),
+            switch_gate: Mutex::new(()),
+            switch_guard: Mutex::new(None),
+            managed_stop: Mutex::new(()),
         });
         write_json_atomic(
             &shared.endpoint_file,
@@ -588,15 +725,26 @@ impl Host {
             .spawn(move || serve(listener_thread, listener_shared))
             .map_err(err)?;
 
-        start_current_build(&shared)?;
-        if let Err(error) = wait_for_engine_ready(&shared, readiness_timeout(&shared.config)) {
-            let cleanup = shutdown_managed(&shared);
-            return Err(match cleanup {
-                Ok(()) => error,
-                Err(cleanup_error) => {
-                    format!("{error}; managed process cleanup failed: {cleanup_error}")
+        match &start_plan {
+            engine_switch::StartPlan::Start => {
+                start_current_build(&shared)?;
+                if let Err(error) = wait_for_engine_ready(&shared, readiness_timeout(&shared.config)) {
+                    let cleanup = shutdown_managed(&shared);
+                    return Err(match cleanup {
+                        Ok(()) => error,
+                        Err(cleanup_error) => {
+                            format!("{error}; managed process cleanup failed: {cleanup_error}")
+                        }
+                    });
                 }
-            });
+            }
+            // A held P6 operation starts no Engine: its Store or process facts cannot be proven exact. Custody stays fenced.
+            engine_switch::StartPlan::Hold(reason) => {
+                log_event(&shared, "engine_start_held", serde_json::json!({ "message": reason }))?;
+                if let Some(custody) = shared.custody.as_ref() {
+                    custody.set_fenced(true)?;
+                }
+            }
         }
         Ok(Self {
             shared,
@@ -639,7 +787,7 @@ impl Host {
                             operation.phase.as_str(),
                             "accepted" | "shutdown_requested" | "old_process_stopped" | "starting"
                         )
-                    });
+                    }) || guard.durable.engine_operation.as_ref().is_some_and(|operation| operation.in_flight());
                 if lifecycle_transition {
                     None
                 } else if let Some(process) = guard.managed.as_mut() {
@@ -701,6 +849,7 @@ impl Host {
                     }
                     continue;
                 }
+                let _ = request_host_shutdown(&self.shared);
                 if let Err(error) = shutdown_managed(&self.shared) {
                     let cleanup_message =
                         format!("{message}; managed process cleanup failed: {error}");
@@ -722,6 +871,7 @@ impl Host {
         if let Some(custody) = &self.shared.custody {
             custody.shutdown();
         }
+        let _ = request_host_shutdown(&self.shared);
         shutdown_managed(&self.shared)?;
         self.listener.set_nonblocking(true).ok();
         let _ = fs::remove_file(&self.shared.endpoint_file);
@@ -737,6 +887,7 @@ impl Host {
 impl Drop for Host {
     fn drop(&mut self) {
         // A normal drop is graceful. An OS crash closes the Windows Job/process group and contains descendants.
+        let _ = request_host_shutdown(&self.shared);
         let _ = shutdown_managed(&self.shared);
         let _ = fs::remove_file(&self.shared.endpoint_file);
     }
@@ -822,6 +973,18 @@ fn validate_config(config: &HostConfig) -> Result<(), String> {
     if config.test_duplicate_receipt_delivery && !cfg!(debug_assertions) {
         return Err("duplicate receipt delivery is unavailable in a release Host".into());
     }
+    if config.test_switch_crash_at.is_some() && !cfg!(debug_assertions) {
+        return Err("switch crash points are unavailable in a release Host".into());
+    }
+    if (config.test_switch_termination_uncertain || config.test_switch_proof_uncertain) && !cfg!(debug_assertions) {
+        return Err("switch termination seams are unavailable in a release Host".into());
+    }
+    if config.test_switch_fence_pause_ms.is_some_and(|millis| millis > 30_000 || !cfg!(debug_assertions)) {
+        return Err("switch fence pause is unavailable in a release Host".into());
+    }
+    if config.test_switch_barrier_dir.is_some() && !cfg!(debug_assertions) {
+        return Err("switch barriers are unavailable in a release Host".into());
+    }
     if config
         .test_pause_after_shutdown_requested_ms
         .is_some_and(|millis| millis > 30_000 || !cfg!(debug_assertions))
@@ -866,7 +1029,12 @@ fn load_or_initialize(
                     && operation.request.candidate_digest == active.digest
                     && matches!(operation.phase.as_str(), "old_process_stopped" | "starting")
             });
-            if !recover_candidate {
+            // A P6 commit writes the selector before the operation record: the selector names the operation that committed.
+            let recover_engine_commit = state.engine_operation.as_ref().is_some_and(|operation| {
+                operation.phase == engine_switch::PHASE_COMMITTING
+                    && active.committed_operation_id.as_deref() == Some(operation.operation_id.as_str())
+            });
+            if !recover_candidate && !recover_engine_commit {
                 return Err("durable Host state and active installation pointer disagree".into());
             }
             verify_build(
@@ -904,7 +1072,7 @@ fn load_or_initialize(
     };
     if desktop_bootstrap {
         let manifest = verify_build(&install.join("versions").join(&build_id), &build_id)?;
-        if manifest.bootstrap != "tauri" {
+        if !is_desktop_bootstrap(&manifest.bootstrap) {
             return Err("active installation bootstrap changed from desktop to runtime".into());
         }
     }
@@ -917,6 +1085,7 @@ fn load_or_initialize(
         generation: generation.clone(),
         store_id: None,
         operation: None,
+        engine_operation: None,
     };
     write_json_atomic(
         active_file,
@@ -924,6 +1093,7 @@ fn load_or_initialize(
             build_id: state.active_build_id.clone(),
             digest,
             generation,
+            committed_operation_id: None,
         },
     )?;
     write_json_atomic(state_file, &state)?;
@@ -1086,19 +1256,72 @@ fn select_source_inventory_entries(inventory: &BuildSourceInventory, paths: &[St
     }).collect()
 }
 
+/// When a release declares artifact records, require the manifest to describe the complete package payload. The manifest
+/// itself is intentionally excluded from that list to avoid a self-hash cycle; the Host's whole-package digest binds it.
+/// Older test/fixture manifests without artifact records retain their existing schema-1 compatibility behavior.
+fn verify_build_artifact_set(root: &Path, manifest: &BuildManifest) -> Result<(), String> {
+    if manifest.artifacts.is_empty() {
+        return Ok(());
+    }
+    let mut expected = std::collections::HashSet::with_capacity(manifest.artifacts.len());
+    let mut folded = std::collections::HashSet::with_capacity(manifest.artifacts.len());
+    for artifact in &manifest.artifacts {
+        validate_build_inventory_path(&artifact.path).map_err(|_| "build artifact path is not canonical and portable".to_string())?;
+        if artifact.path == "build.json" {
+            return Err("build artifact list must exclude build.json".into());
+        }
+        if !valid_lower_hex(&artifact.sha256, 64) {
+            return Err(format!("build artifact digest is malformed: {}", artifact.path));
+        }
+        if !expected.insert(artifact.path.clone()) || !folded.insert(artifact.path.to_lowercase()) {
+            return Err("build artifact list contains duplicate or case-fold-colliding paths".into());
+        }
+        let path = root.join(&artifact.path);
+        let metadata = fs::symlink_metadata(&path).map_err(|_| format!("build artifact is missing, non-regular, or has the wrong size: {}", artifact.path))?;
+        if metadata.file_type().is_symlink() || !metadata.is_file() || metadata.len() != artifact.bytes {
+            return Err(format!("build artifact is missing, non-regular, or has the wrong size: {}", artifact.path));
+        }
+        if !digest_eq(&file_sha256(&path)?, &artifact.sha256) {
+            return Err(format!("build artifact digest is invalid: {}", artifact.path));
+        }
+    }
+    let mut actual = Vec::new();
+    collect_files(root, root, &mut actual)?;
+    let actual = actual.into_iter().filter_map(|(path, _)| (path != "build.json").then_some(path)).collect::<std::collections::HashSet<_>>();
+    if actual != expected {
+        return Err("build artifact list does not match the exact package file set".into());
+    }
+    Ok(())
+}
+
 fn verify_build(root: &Path, expected_id: &str) -> Result<BuildManifest, String> {
     let root = fs::canonicalize(root).map_err(err)?;
     let manifest_path = root.join("build.json");
     let manifest: BuildManifest =
         serde_json::from_slice(&fs::read(&manifest_path).map_err(err)?).map_err(err)?;
-    if manifest.schema_version != 1
+    // Schema 2 is the P6 Engine package; every other release, including the H1 desktop package, stays schema 1.
+    let schema_compatible = manifest.schema_version == 1 || (manifest.schema_version == 2 && manifest.bootstrap == "engine");
+    if !schema_compatible
         || manifest.build_id != expected_id
         || manifest.runtime_api_version != 2
-        || !matches!(manifest.bootstrap.as_str(), "runtime" | "tauri")
+        || !matches!(manifest.bootstrap.as_str(), "runtime" | "tauri" | "engine")
     {
         return Err(
             "candidate manifest is malformed or incompatible with the managed runtime".into(),
         );
+    }
+    verify_build_artifact_set(&root, &manifest)?;
+    // Every launch and install path verifies through here: a test-fault build is admitted only inside a Node test process (second review, M2).
+    // The marker is read from the package root (testFaultPolicy.mjs), whatever the artifact records say: a manifest with no records must not bypass it.
+    // Every entry is read: a failed entry must refuse the package, not be skipped.
+    let mut marker_on_disk = false;
+    for entry in fs::read_dir(&root).map_err(err)? {
+        let entry = entry.map_err(err)?;
+        marker_on_disk |= entry.file_name().to_string_lossy().eq_ignore_ascii_case(".deszo-test-fault-hooks");
+    }
+    let marker_listed = manifest.artifacts.iter().any(|artifact| artifact.path.eq_ignore_ascii_case(".deszo-test-fault-hooks"));
+    if (marker_on_disk || marker_listed) && std::env::var_os("NODE_TEST_CONTEXT").is_none() {
+        return Err("a test-fault build is refused outside a Node test process".into());
     }
     read_build_source_inventory(&root, &manifest)?;
     if !root.join("runtime/runner.mjs").is_file() {
@@ -1107,7 +1330,7 @@ fn verify_build(root: &Path, expected_id: &str) -> Result<BuildManifest, String>
     if manifest.bootstrap == "runtime" && !root.join("runtime/core/engine.mjs").is_file() {
         return Err("candidate is missing required artifact runtime/core/engine.mjs".into());
     }
-    if manifest.bootstrap == "tauri" {
+    if is_desktop_bootstrap(&manifest.bootstrap) {
         let resources: RuntimeResourceManifest = serde_json::from_slice(
             &fs::read(root.join("runtime/runtime-manifest.json")).map_err(err)?,
         )
@@ -1156,7 +1379,95 @@ fn verify_build(root: &Path, expected_id: &str) -> Result<BuildManifest, String>
             }
         }
     }
+    if manifest.bootstrap == "engine" {
+        // A P6 Engine package carries no Shell: its identity is separate, and it may never impersonate the Shell.
+        if manifest.artifacts.is_empty() || manifest.desktop_executable.is_some() || manifest.desktop_build_id.is_some() {
+            return Err("engine package must carry an exact artifact list and no desktop executable".into());
+        }
+        if manifest.engine_build_id.as_deref() != Some(expected_id) {
+            return Err("engine package identity does not match the candidate identity".into());
+        }
+        let shell_build_id = manifest.shell_build_id.as_deref().ok_or("engine package names no Shell identity")?;
+        validate_id(shell_build_id)?;
+        if shell_build_id == expected_id {
+            return Err("engine identity must differ from the Shell identity".into());
+        }
+        for relative in ["runtime/bridge.mjs", "runtime/runtime-manifest.json", "runtime/deszo-launch-shim.exe"] {
+            if !root.join(relative).is_file() {
+                return Err(format!("engine package is missing required resource {relative}"));
+            }
+        }
+    }
     Ok(manifest)
+}
+
+fn is_desktop_bootstrap(bootstrap: &str) -> bool {
+    matches!(bootstrap, "tauri" | "engine")
+}
+
+const SHELL_RELEASE_FILE: &str = "shell.json";
+const SHELL_RELEASE_KIND: &str = "DeszoShellRelease";
+const SHELL_EXECUTABLE: &str = "deszo.exe";
+const SHELL_FROZEN_RESOURCES: [&str; 2] = ["runtime/bridge.mjs", "runtime/deszo-launch-shim.exe"];
+
+/// Reads and verifies the installation's Shell release. Absent means a legacy whole-release installation. The Shell
+/// directory holds exactly the executable and its manifest; a changed byte in either refuses the installation.
+fn load_shell_release(install: &Path) -> Result<Option<ShellRelease>, String> {
+    let shell_root = install.join("shell");
+    let manifest_path = shell_root.join(SHELL_RELEASE_FILE);
+    match fs::symlink_metadata(&manifest_path) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(err(error)),
+        Ok(metadata) if metadata.file_type().is_symlink() || !metadata.is_file() => {
+            return Err("the installed Shell manifest is not a regular file".into());
+        }
+        Ok(_) => {}
+    }
+    let shell: ShellRelease = serde_json::from_slice(&fs::read(&manifest_path).map_err(err)?).map_err(err)?;
+    if shell.schema_version != 1 || shell.kind != SHELL_RELEASE_KIND {
+        return Err("the installed Shell manifest is incompatible with this Host".into());
+    }
+    validate_id(&shell.shell_build_id)?;
+    if shell.desktop_executable.path != SHELL_EXECUTABLE || !valid_lower_hex(&shell.desktop_executable.sha256, 64) {
+        return Err("the installed Shell executable record is malformed".into());
+    }
+    let mut frozen: Vec<&str> = shell.frozen_resources.iter().map(|file| file.path.as_str()).collect();
+    frozen.sort_unstable();
+    let mut expected = SHELL_FROZEN_RESOURCES.to_vec();
+    expected.sort_unstable();
+    if frozen != expected || shell.frozen_resources.iter().any(|file| !valid_lower_hex(&file.sha256, 64)) {
+        return Err("the installed Shell frozen resource set is incomplete or malformed".into());
+    }
+    let executable = shell_root.join(SHELL_EXECUTABLE);
+    let actual = fs::symlink_metadata(&executable).map_err(err)?;
+    if actual.file_type().is_symlink() || !actual.is_file() || actual.len() != shell.desktop_executable.bytes {
+        return Err("the installed Shell executable is missing, non-regular, or has the wrong size".into());
+    }
+    if !digest_eq(&file_sha256(&executable)?, &shell.desktop_executable.sha256) {
+        return Err("the installed Shell executable changed outside the Host".into());
+    }
+    let mut names = Vec::new();
+    collect_files(&shell_root, &shell_root, &mut names)?;
+    let mut actual_names: Vec<String> = names.into_iter().map(|(name, _)| name).collect();
+    actual_names.sort_unstable();
+    if actual_names != [SHELL_EXECUTABLE.to_string(), SHELL_RELEASE_FILE.to_string()] {
+        return Err("the installed Shell directory holds unexpected files".into());
+    }
+    Ok(Some(shell))
+}
+
+/// An Engine package is bound to the installed Shell when it carries the Shell's frozen resources byte-for-byte.
+fn verify_engine_binding(engine_root: &Path, shell: &ShellRelease, manifest: &BuildManifest) -> Result<(), String> {
+    if manifest.bootstrap != "engine" || manifest.shell_build_id.as_deref() != Some(shell.shell_build_id.as_str()) {
+        return Err("Engine package is not bound to the installed Shell identity".into());
+    }
+    for frozen in &shell.frozen_resources {
+        let actual = file_sha256(&engine_root.join(&frozen.path))?;
+        if !digest_eq(&actual, &frozen.sha256) {
+            return Err(format!("Engine package frozen resource differs from the installed Shell: {}", frozen.path));
+        }
+    }
+    Ok(())
 }
 
 fn verify_staged_candidate(shared: &Shared, request: &LifecycleRequest) -> Result<PathBuf, String> {
@@ -1167,10 +1478,15 @@ fn verify_staged_candidate(shared: &Shared, request: &LifecycleRequest) -> Resul
         return Err("candidate is outside the Host staging area".into());
     }
     let manifest = verify_build(&canonical, &request.candidate_id)?;
-    if (shared.desktop_bootstrap && manifest.bootstrap != "tauri")
+    if (shared.desktop_bootstrap && !is_desktop_bootstrap(&manifest.bootstrap))
         || (!shared.desktop_bootstrap && manifest.bootstrap != "runtime")
+        || (shared.shell.is_some() && manifest.bootstrap != "engine")
     {
         return Err("candidate bootstrap is incompatible with this Host installation".into());
+    }
+    // An Engine runs under the installed Shell. An installation without one accepts no Engine package (ADR-0010 section 7).
+    if shared.shell.is_none() && manifest.bootstrap == "engine" {
+        return Err("an Engine package needs a P6 installation with its Shell; this installation cannot activate it".into());
     }
     let actual = candidate_digest(&canonical)?;
     if !digest_eq(&actual, &request.candidate_digest) {
@@ -1204,11 +1520,37 @@ fn start_current_build(shared: &Arc<Shared>) -> Result<(), String> {
 }
 
 fn spawn_build(shared: &Arc<Shared>, build_id: &str, generation: &str) -> Result<(), String> {
+    spawn_build_with(shared, build_id, generation, None)
+}
+
+fn spawn_build_with(shared: &Arc<Shared>, build_id: &str, generation: &str, maintenance: Option<MaintenanceSpec>) -> Result<(), String> {
+    if maintenance.is_some() && shared.shell.is_none() {
+        return Err("a maintenance preflight requires a P6 installation".into());
+    }
     // Node's Windows path parser does not accept Rust's extended `\\?\` absolute paths.
     // Keep those paths for filesystem operations, but pass ordinary drive paths to Node.
     let build_root = node_path(&shared.installation_root.join("versions").join(build_id));
     let manifest = verify_build(&build_root, build_id)?;
-    let executable = if manifest.bootstrap == "tauri" {
+    if shared.shell.is_some() && manifest.bootstrap != "engine" {
+        return Err("a P6 installation launches only Engine packages beneath its Shell".into());
+    }
+    let engine = manifest.bootstrap == "engine";
+    // The Shell root is stable across Engine switches; the executable it runs is verified against its installed digest.
+    let shell_root = match shared.shell.as_ref().filter(|_| engine) {
+        Some(shell) => {
+            verify_engine_binding(&build_root, shell, &manifest)?;
+            let root = node_path(&shared.installation_root.join("shell"));
+            let executable_path = root.join(SHELL_EXECUTABLE);
+            if !digest_eq(&file_sha256(&executable_path)?, &shell.desktop_executable.sha256) {
+                return Err("the installed Shell executable changed outside the Host".into());
+            }
+            Some(root)
+        }
+        None => None,
+    };
+    let executable = if engine {
+        shell_root.as_ref().ok_or("an Engine launch needs a verified Shell")?.join(SHELL_EXECUTABLE)
+    } else if manifest.bootstrap == "tauri" {
         build_root.join(
             manifest
                 .desktop_executable
@@ -1227,7 +1569,7 @@ fn spawn_build(shared: &Arc<Shared>, build_id: &str, generation: &str) -> Result
             .durable
             .operation
             .is_none();
-    let mut command = if manifest.bootstrap == "tauri" {
+    let mut command = if is_desktop_bootstrap(&manifest.bootstrap) {
         let mut command = Command::new(&executable);
         command.arg("--host-managed");
         command
@@ -1256,7 +1598,7 @@ fn spawn_build(shared: &Arc<Shared>, build_id: &str, generation: &str) -> Result
         }
         command
     };
-    if manifest.bootstrap == "tauri" {
+    if is_desktop_bootstrap(&manifest.bootstrap) {
         // An explicitly supplied WebView2 root is a host-side override (used by isolated desktop
         // runs). Give each immutable build its own browser data directory so a closing version
         // cannot hold a profile lock while its replacement starts. Normal desktop launches keep
@@ -1308,6 +1650,16 @@ fn spawn_build(shared: &Arc<Shared>, build_id: &str, generation: &str) -> Result
         command.process_group(0);
     }
     let mut containment = Containment::create()?;
+    // The check precedes the spawn, under the lock that records the new process: an unproven tree may still run, so no second
+    // application starts beside it, not even briefly (L6, L-7).
+    let mut state = shared.state.lock().map_err(poison)?;
+    if state.managed.is_some() || state.unproven.is_some() {
+        return Err("Host already has a managed or unproven application process".into());
+    }
+    // A Host that has begun its shutdown starts no application: a process started now would outlive the Host's own stop (P6-HOST-M1).
+    if state.shutdown_requested {
+        return Err("the Host is shutting down; no application process is started".into());
+    }
     let mut child = command.spawn().map_err(err)?;
     if let Err(error) = containment.assign(&child) {
         let _ = child.kill();
@@ -1315,12 +1667,6 @@ fn spawn_build(shared: &Arc<Shared>, build_id: &str, generation: &str) -> Result
         return Err(error);
     }
     let pid = child.id();
-    let mut state = shared.state.lock().map_err(poison)?;
-    if state.managed.is_some() {
-        let _ = child.kill();
-        let _ = child.wait();
-        return Err("Host already has a managed application process".into());
-    }
     state.managed = Some(ManagedProcess {
         child,
         containment,
@@ -1335,8 +1681,10 @@ fn spawn_build(shared: &Arc<Shared>, build_id: &str, generation: &str) -> Result
         .as_mut()
         .and_then(|process| process.child.stdin.as_mut())
         .ok_or("managed runtime stdin is unavailable")?;
-    let bootstrap = if manifest.bootstrap == "tauri" {
-        serde_json::to_vec(&serde_json::json!({
+    let bootstrap = if is_desktop_bootstrap(&manifest.bootstrap) {
+        // The Engine (application) identity and root are always the selected package; the Shell identity and root are
+        // added only for a P6 Engine launch, where the same Shell may run a different Engine next generation.
+        let mut value = serde_json::json!({
             "command": "bootstrap",
             "hostAddress": shared.address.to_string(),
             "hostCapability": shared.capability,
@@ -1347,7 +1695,20 @@ fn spawn_build(shared: &Arc<Shared>, build_id: &str, generation: &str) -> Result
             "applicationRoot": build_root,
             "nodeExecutable": shared.config.node_executable,
             "testDuplicateReceiptDelivery": shared.config.test_duplicate_receipt_delivery,
-        }))
+        });
+        if let Some(root) = shell_root.as_ref() {
+            let shell = shared.shell.as_ref().ok_or("an Engine launch needs a verified Shell")?;
+            value["shellBuildId"] = serde_json::json!(shell.shell_build_id);
+            value["shellRoot"] = serde_json::json!(root);
+        }
+        if let Some(spec) = maintenance.as_ref() {
+            if !engine {
+                return Err("a maintenance preflight launches only an Engine package".into());
+            }
+            // The candidate reads only this disposable copy and runs no ordinary startup before the Host's commit decision.
+            value["maintenance"] = serde_json::json!({ "operationId": spec.operation_id, "preflightStore": spec.preflight_store });
+        }
+        serde_json::to_vec(&value)
         .map_err(err)?
     } else {
         b"{\"command\":\"contained\"}\n".to_vec()
@@ -1469,6 +1830,10 @@ fn dispatch(shared: &Arc<Shared>, command: &str, payload: serde_json::Value) -> 
             Ok(result) => Dispatch::Reply(ok(result)),
             Err(message) => Dispatch::Reply(Response { ok: false, result: None, error: Some(message), code: Some("source_inventory_unavailable".into()) }),
         },
+        // A P6 installation has no legacy whole-release activation: the refusal happens before any staging, stop or selector write.
+        "lifecycle.activate_candidate" if shared.shell.is_some() => Dispatch::Reply(Response { ok: false, result: None,
+            error: Some("This P6 installation refuses legacy whole-release activation; Engine changes use the P6 switch.".into()),
+            code: Some("p6_legacy_activation_refused".into()) }),
         "lifecycle.activate_candidate" => match serde_json::from_value::<LifecycleRequest>(payload)
         {
             Ok(request) => match accept_operation(shared, request.clone()) {
@@ -1490,6 +1855,27 @@ fn dispatch(shared: &Arc<Shared>, command: &str, payload: serde_json::Value) -> 
             None => Dispatch::Reply(error_response(
                 "receipt acknowledgement is missing its identity".into(),
             )),
+        },
+        // P6 Engine-only operations (ADR-0010): staging, the fenced switch, and the candidate's maintenance handshake.
+        "engine.stage" => match engine_switch::stage(shared, &payload) {
+            Ok(value) => Dispatch::Reply(ok(value)),
+            Err(failure) => Dispatch::Reply(engine_switch::failure_response(failure)),
+        },
+        "engine.switch" => match engine_switch::switch(shared, &payload) {
+            Ok(value) => Dispatch::Reply(ok(value)),
+            Err(failure) => Dispatch::Reply(engine_switch::failure_response(failure)),
+        },
+        "engine.switch_status" => match engine_switch::status(shared, &payload) {
+            Ok(value) => Dispatch::Reply(ok(value)),
+            Err(failure) => Dispatch::Reply(engine_switch::failure_response(failure)),
+        },
+        "engine.maintenance_ready" => match engine_switch::maintenance_ready(shared, &payload) {
+            Ok(value) => Dispatch::Reply(ok(value)),
+            Err(failure) => Dispatch::Reply(engine_switch::failure_response(failure)),
+        },
+        "engine.maintenance_wait" => match engine_switch::maintenance_wait(shared, &payload) {
+            Ok(value) => Dispatch::Reply(ok(value)),
+            Err(failure) => Dispatch::Reply(engine_switch::failure_response(failure)),
         },
         command if command.starts_with("custody.") => match &shared.custody {
             Some(custody) => match custody.dispatch(command, &payload) {
@@ -1544,6 +1930,11 @@ fn active_source_release(shared: &Arc<Shared>, payload: &serde_json::Value) -> R
         (state.durable.generation.clone(), state.durable.active_build_id.clone(), state.durable.active_digest.clone(),
             application_pid, managed.engine_pid, state.ready_generation.clone())
     };
+    let selector_before: ActivePointer = serde_json::from_slice(&fs::read(&shared.active_file).map_err(err)?)
+        .map_err(err)?;
+    if selector_before.build_id != build_id || selector_before.digest != expected_digest || selector_before.generation != generation {
+        return Err("active selector differs from the Lifecycle Host's committed release".into());
+    }
     let parent_pid = if expected_engine_pid.is_none() && shared.desktop_bootstrap {
         Some(process_parent_pid(requested_engine_pid)?)
     } else { None };
@@ -1559,7 +1950,8 @@ fn active_source_release(shared: &Arc<Shared>, payload: &serde_json::Value) -> R
     if !digest_eq(&package_digest, &expected_digest) {
         return Err("active managed package changed after Host verification".into());
     }
-    let result = source_release_value(&shared.installation_id, &build_id, &manifest, &package_digest)?;
+    let result = source_release_value(&shared.installation_id, &build_id, &manifest, &package_digest,
+        selector_before.committed_operation_id.as_deref())?;
     let state = shared.state.lock().map_err(poison)?;
     let managed = state.managed.as_ref().ok_or("Lifecycle Host has no managed application")?;
     let current_application_pid = managed.child.id();
@@ -1570,6 +1962,14 @@ fn active_source_release(shared: &Arc<Shared>, payload: &serde_json::Value) -> R
         || state.durable.active_digest != expected_digest || managed.generation != generation || managed.build_id != build_id
     {
         return Err("active source release changed while it was being verified".into());
+    }
+    let selector_after: ActivePointer = serde_json::from_slice(&fs::read(&shared.active_file).map_err(err)?)
+        .map_err(err)?;
+    if selector_after.build_id != selector_before.build_id || selector_after.digest != selector_before.digest
+        || selector_after.generation != selector_before.generation
+        || selector_after.committed_operation_id != selector_before.committed_operation_id
+    {
+        return Err("active selector changed while the source release was being verified".into());
     }
     validate_source_release_engine_pid(requested_engine_pid, current_application_pid, managed.engine_pid,
         state.ready_generation.as_deref(), &generation, shared.desktop_bootstrap, current_parent_pid)
@@ -1660,7 +2060,8 @@ fn validate_source_release_engine_pid(requested_pid: u32, application_pid: u32, 
     }
 }
 
-fn source_release_value(installation_id: &str, build_id: &str, manifest: &BuildManifest, package_digest: &str) -> Result<serde_json::Value, String> {
+fn source_release_value(installation_id: &str, build_id: &str, manifest: &BuildManifest, package_digest: &str,
+    committed_operation_id: Option<&str>) -> Result<serde_json::Value, String> {
     if installation_id.len() != 32 || !installation_id.bytes().all(|value| value.is_ascii_hexdigit())
         || build_id.is_empty() || build_id.len() > 100
         || !build_id.bytes().all(|value| value.is_ascii_alphanumeric() || matches!(value, b'_' | b'-'))
@@ -1681,7 +2082,7 @@ fn source_release_value(installation_id: &str, build_id: &str, manifest: &BuildM
             return Err(format!("active build {label} digest is malformed"));
         }
     }
-    Ok(serde_json::json!({
+    let mut release = serde_json::json!({
         "schemaVersion": 1,
         "kind": "ProtectedSelfRepairRunningSourceRelease",
         "installationId": installation_id.to_ascii_lowercase(),
@@ -1691,7 +2092,11 @@ fn source_release_value(installation_id: &str, build_id: &str, manifest: &BuildM
         "sourceCommit": source_commit.to_ascii_lowercase(),
         "sourceDigest": source_digest.to_ascii_lowercase(),
         "inputsDigest": inputs_digest.to_ascii_lowercase(),
-    }))
+    });
+    if let Some(operation_id) = committed_operation_id {
+        release["committedOperationId"] = serde_json::Value::String(operation_id.to_string());
+    }
+    Ok(release)
 }
 
 #[derive(Debug, Deserialize)]
@@ -1700,6 +2105,9 @@ struct ReadyMessage {
     pid: u32,
     application_pid: u32,
     application_build_id: String,
+    /// The Shell identity the Engine was launched under. Required by a P6 installation, absent in a legacy one.
+    #[serde(default)]
+    shell_build_id: Option<String>,
     installation_id: String,
     profile_root: String,
     generation: String,
@@ -1791,6 +2199,11 @@ fn accept_ready(shared: &Arc<Shared>, message: ReadyMessage) -> Result<serde_jso
     {
         return Err("Engine readiness names a different installation/profile".into());
     }
+    if let Some(shell) = shared.shell.as_ref() {
+        if message.shell_build_id.as_deref() != Some(shell.shell_build_id.as_str()) {
+            return Err("Engine readiness names a different Shell identity".into());
+        }
+    }
     if message.application_build_id != state.durable.active_build_id
         || message.generation != state.durable.generation
         || managed.build_id != message.application_build_id
@@ -1849,8 +2262,24 @@ fn accept_ready(shared: &Arc<Shared>, message: ReadyMessage) -> Result<serde_jso
             }
         }
     }
+    // A committed P6 Engine that becomes ready completes its operation (after a Host restart this is the only completion path).
+    let mut engine_receipt = None;
+    if let Some(operation) = state.durable.engine_operation.as_mut() {
+        if operation.phase == engine_switch::PHASE_COMMITTED && operation.to_build_id == message.application_build_id
+            && operation.candidate_generation == message.generation
+        {
+            operation.phase = engine_switch::PHASE_VERIFIED.into();
+            operation.receipt = Some(serde_json::json!({ "enginePid": message.pid, "applicationPid": application_pid,
+                "engineBuildId": message.application_build_id, "generation": message.generation, "storeId": message.store_id,
+                "readyAt": now() }));
+            engine_receipt = Some(operation.operation_id.clone());
+        }
+    }
     persist_state(&shared.state_file, &state.durable)?;
     drop(state);
+    if let Some(operation_id) = engine_receipt {
+        log_event(shared, "engine_switch_verified", serde_json::json!({ "operationId": operation_id }))?;
+    }
     log_event(
         shared,
         "engine_ready",
@@ -2048,6 +2477,7 @@ fn activate_candidate_inner(
                 build_id: request.candidate_id.clone(),
                 digest: installed_digest.clone(),
                 generation: new_generation.clone(),
+                committed_operation_id: None,
             },
         )?;
         persist_state(&shared.state_file, &state.durable)?;
@@ -2158,20 +2588,48 @@ fn wait_for_engine_ready(shared: &Arc<Shared>, timeout: Duration) -> Result<(), 
 }
 
 fn shutdown_managed(shared: &Arc<Shared>) -> Result<(), String> {
-    shutdown_managed_inner(shared, false)
+    shutdown_managed_inner(shared, false, false)
+}
+
+/// The Host's own shutdown. The request is recorded under the state lock before the managed Engine's record is taken, so a switch
+/// commit that has not yet decided refuses the candidate, and a commit that already decided is a postcommit stop (P6-HOST-M1).
+fn request_host_shutdown(shared: &Arc<Shared>) -> Result<(), String> {
+    shared.state.lock().map_err(poison)?.shutdown_requested = true;
+    log_event(shared, "host_shutdown_requested", serde_json::json!({ "hostPid": std::process::id() }))
+}
+
+// The switch's stop. It differs from the others only in the debug-only C09 seam of `containment_empty`.
+fn shutdown_managed_for_switch(shared: &Arc<Shared>) -> Result<(), String> {
+    shutdown_managed_inner(shared, false, true)
 }
 
 fn shutdown_managed_for_lifecycle(shared: &Arc<Shared>) -> Result<(), String> {
-    shutdown_managed_inner(shared, true)
+    shutdown_managed_inner(shared, true, false)
 }
 
-fn shutdown_managed_inner(shared: &Arc<Shared>, require_running: bool) -> Result<(), String> {
+// Debug-only C09 seam: during a switch's stop, the Job's emptiness answer is withheld. The real termination still runs first,
+// so the code under test is the Host's own decision that an unproven tree holds the switch.
+fn containment_empty(shared: &Shared, containment: &Containment, switch_path: bool) -> Result<bool, String> {
+    if switch_path && cfg!(debug_assertions) && shared.config.test_switch_termination_uncertain {
+        return Ok(false);
+    }
+    containment.is_empty()
+}
+
+fn shutdown_managed_inner(shared: &Arc<Shared>, require_running: bool, switch_path: bool) -> Result<(), String> {
+    // One stop at a time: a Host stop that finds no record waits for a switch that is still stopping the tree, and only then returns.
+    let _managed_stop = shared.managed_stop.lock().map_err(poison)?;
     let mut managed = {
         let mut state = shared.state.lock().map_err(poison)?;
         state.managed.take()
     };
     let Some(mut process) = managed.take() else {
-        return Ok(());
+        // On the switch path a missing Engine is not a stopped one: the record that named it has left the Host, so nothing proves its tree ended.
+        return if switch_path {
+            Err("the managed Engine left the Host's records before its stop; its tree cannot be proven stopped".into())
+        } else {
+            Ok(())
+        };
     };
     let exited_before_shutdown = process.child.try_wait().map_err(err)?;
     if let Some(status) = exited_before_shutdown.as_ref() {
@@ -2207,16 +2665,18 @@ fn shutdown_managed_inner(shared: &Arc<Shared>, require_running: bool) -> Result
     let _ = process.child.wait();
     let containment_deadline = Instant::now() + Duration::from_secs(5);
     loop {
-        if process.containment.is_empty()? {
+        if containment_empty(shared, &process.containment, switch_path)? {
             break;
         }
         if Instant::now() >= containment_deadline {
             process.containment.terminate()?;
             let verify_deadline = Instant::now() + Duration::from_secs(5);
-            while Instant::now() < verify_deadline && !process.containment.is_empty()? {
+            while Instant::now() < verify_deadline && !containment_empty(shared, &process.containment, switch_path)? {
                 thread::sleep(Duration::from_millis(50));
             }
-            if !process.containment.is_empty()? {
+            if !containment_empty(shared, &process.containment, switch_path)? {
+                // Unproven: the Host keeps the Job handle it could not prove empty. Closing it here would end the tree unrecorded.
+                shared.state.lock().map_err(poison)?.unproven = Some(process);
                 return Err(
                     "Host could not confirm termination of every owned managed process".into(),
                 );
@@ -2244,6 +2704,11 @@ fn shutdown_managed_inner(shared: &Arc<Shared>, require_running: bool) -> Result
 }
 
 fn copy_tree(source: &Path, destination: &Path) -> Result<(), String> {
+    copy_tree_observed(source, destination, &mut || Ok(()))
+}
+
+// The same copy, reporting each file it has written. A P6 staging copy uses the report for its debug-only crash point (C02).
+fn copy_tree_observed(source: &Path, destination: &Path, after_file: &mut dyn FnMut() -> Result<(), String>) -> Result<(), String> {
     fs::create_dir_all(destination).map_err(err)?;
     for entry in fs::read_dir(source).map_err(err)? {
         let entry = entry.map_err(err)?;
@@ -2253,9 +2718,10 @@ fn copy_tree(source: &Path, destination: &Path) -> Result<(), String> {
         }
         let out = destination.join(entry.file_name());
         if ty.is_dir() {
-            copy_tree(&entry.path(), &out)?;
+            copy_tree_observed(&entry.path(), &out, after_file)?;
         } else if ty.is_file() {
             fs::copy(entry.path(), out).map_err(err)?;
+            after_file()?;
         } else {
             return Err("candidate contains an unsupported filesystem object".into());
         }
@@ -2535,25 +3001,46 @@ mod tests {
         .unwrap();
         path
     }
+    fn artifact_fixture(root: &Path) -> PathBuf {
+        let path = root.join("release-a");
+        fs::create_dir_all(path.join("runtime/core")).unwrap();
+        let entries = [("runtime/runner.mjs", b"runner bytes".as_slice()), ("runtime/core/engine.mjs", b"engine bytes".as_slice())];
+        let artifacts = entries.iter().map(|(name, bytes)| {
+            let file = path.join(name);
+            fs::write(file, bytes).unwrap();
+            serde_json::json!({"path": name, "sha256": hex::encode(Sha256::digest(bytes)), "bytes": bytes.len()})
+        }).collect::<Vec<_>>();
+        fs::write(path.join("build.json"), serde_json::json!({
+            "schemaVersion": 1, "buildId": "release-a", "runtimeApiVersion": 2, "bootstrap": "runtime", "artifacts": artifacts
+        }).to_string()).unwrap();
+        path
+    }
     #[test]
     fn running_source_release_binds_host_package_and_build_source_fields() {
         let manifest: BuildManifest = serde_json::from_value(serde_json::json!({
             "schemaVersion": 1, "buildId": "release-1", "runtimeApiVersion": 2, "bootstrap": "runtime",
             "sourceCommit": "A".repeat(40), "dirtySourceDigest": "B".repeat(64), "inputsDigest": "C".repeat(64)
         })).unwrap();
-        let release = source_release_value("a".repeat(32).as_str(), "release-1", &manifest, "D".repeat(64).as_str()).unwrap();
+        let release = source_release_value("a".repeat(32).as_str(), "release-1", &manifest, "D".repeat(64).as_str(), None).unwrap();
         assert_eq!(release["kind"], "ProtectedSelfRepairRunningSourceRelease");
         assert_eq!(release["installationId"], "a".repeat(32));
         assert_eq!(release["packageSha256"], "d".repeat(64));
+        assert!(release.get("committedOperationId").is_none());
         assert_eq!(release["sourceCommit"], "a".repeat(40));
         assert_eq!(release["sourceDigest"], "b".repeat(64));
         assert_eq!(release["inputsDigest"], "c".repeat(64));
+
+        let operation_id = "123e4567-e89b-12d3-a456-426614174000";
+        let committed = source_release_value("a".repeat(32).as_str(), "release-1", &manifest,
+            "D".repeat(64).as_str(), Some(operation_id)).unwrap();
+        assert_eq!(committed["committedOperationId"], operation_id,
+            "the Host release names the operation committed by the active selector");
 
         let incomplete: BuildManifest = serde_json::from_value(serde_json::json!({
             "schemaVersion": 1, "buildId": "release-1", "runtimeApiVersion": 2, "bootstrap": "runtime",
             "sourceCommit": "a".repeat(40), "dirtySourceDigest": null, "inputsDigest": "c".repeat(64)
         })).unwrap();
-        assert!(source_release_value("a".repeat(32).as_str(), "release-1", &incomplete, "d".repeat(64).as_str()).is_err());
+        assert!(source_release_value("a".repeat(32).as_str(), "release-1", &incomplete, "d".repeat(64).as_str(), None).is_err());
     }
     #[test]
     fn packaged_source_inventory_is_digest_bound_and_returns_only_requested_entries() {
@@ -2619,6 +3106,47 @@ mod tests {
         let _ = fs::remove_dir_all(root);
     }
     #[test]
+    fn declared_build_artifacts_bind_exact_files_bytes_and_case_folded_paths() {
+        let root = temp("artifact-set");
+        fs::create_dir_all(&root).unwrap();
+        let path = artifact_fixture(&root);
+        assert!(verify_build(&path, "release-a").is_ok(), "a complete exact package is admitted");
+
+        fs::write(path.join("unexpected.mjs"), b"extra").unwrap();
+        assert!(verify_build(&path, "release-a").unwrap_err().contains("exact package file set"), "unlisted files refuse");
+        fs::remove_file(path.join("unexpected.mjs")).unwrap();
+
+        fs::write(path.join("runtime/core/engine.mjs"), b"engine BYTEs").unwrap();
+        assert!(verify_build(&path, "release-a").unwrap_err().contains("digest is invalid"), "same-size mutation refuses");
+        fs::write(path.join("runtime/core/engine.mjs"), b"engine bytes").unwrap();
+
+        let manifest: serde_json::Value = serde_json::from_slice(&fs::read(path.join("build.json")).unwrap()).unwrap();
+        let mut artifacts = manifest["artifacts"].as_array().unwrap().clone();
+        artifacts.push(serde_json::json!({"path":"Runtime/runner.mjs", "sha256":"a".repeat(64), "bytes": 12}));
+        fs::write(path.join("build.json"), serde_json::json!({
+            "schemaVersion":1,"buildId":"release-a","runtimeApiVersion":2,"bootstrap":"runtime","artifacts":artifacts
+        }).to_string()).unwrap();
+        assert!(verify_build(&path, "release-a").unwrap_err().contains("case-fold-colliding"), "case-folded aliases refuse");
+        let _ = fs::remove_dir_all(root);
+    }
+    #[test]
+    fn legacy_schema_one_fixture_without_artifact_list_remains_compatible() {
+        let root = temp("legacy-artifacts");
+        let path = fixture(&root, "release-a", "legacy");
+        assert!(verify_build(&path, "release-a").is_ok());
+        let _ = fs::remove_dir_all(root);
+    }
+    #[test]
+    fn h1_refuses_a_future_engine_manifest_schema() {
+        let root = temp("future-schema");
+        let path = fixture(&root, "release-a", "future");
+        fs::write(path.join("build.json"), serde_json::json!({
+            "schemaVersion": 2, "buildId": "release-a", "runtimeApiVersion": 2, "bootstrap": "runtime"
+        }).to_string()).unwrap();
+        assert!(verify_build(&path, "release-a").unwrap_err().contains("incompatible"));
+        let _ = fs::remove_dir_all(root);
+    }
+    #[test]
     fn candidate_digest_refuses_symlinks() {
         let root = temp("symlink");
         let path = fixture(&root, "a", "old");
@@ -2675,6 +3203,7 @@ mod tests {
                 build_id: "a".into(),
                 digest: "d".into(),
                 generation: "g".into(),
+                committed_operation_id: None,
             },
         )
         .unwrap();

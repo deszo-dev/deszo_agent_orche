@@ -1,0 +1,2 @@
+& "C:\my\2026\deszo_agent_orche\experiments\rust-migration-v3\target\release\poc-host.exe" --preflight
+Then, only when preflight exits 0: & "C:\my\2026\deszo_agent_orche\experiments\rust-migration-v3\target\release\poc-host.exe"

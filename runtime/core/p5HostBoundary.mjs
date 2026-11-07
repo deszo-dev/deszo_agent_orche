@@ -26,6 +26,18 @@ export const P5_TRUSTED_CONTROL_PATHS = Object.freeze([
   'runtime/core/utilities.mjs', 'runtime/core/validate.mjs', 'runtime/core/protectedSelfRepair.mjs', 'runtime/core/canonical.mjs',
   'runtime/core/schemas.mjs', 'runtime/runner.mjs', 'docs/schemas/protected-self-repair.schema.json', 'runtime/core/p5Provisioning.mjs',
   'runtime/core/workspaceIsolation.mjs',
+  'runtime/core/p6Scope.mjs', 'runtime/core/p6Reconstruction.mjs', 'runtime/core/p6Successor.mjs',
+  'runtime/core/p6Builder.mjs', 'runtime/core/p6Continuation.mjs', 'runtime/core/p6Consumer.mjs', 'runtime/core/p6GitObjectSource.mjs',
+  'runtime/core/testFaultPolicy.mjs',
+]);
+// Protected P5/P6 control code (second review, the owner's decision): autonomous Self-Repair may not change these, nor the modules the
+// successor build and activation depend on. They stay part of the installed Engine and attested control closure; a change to them goes
+// through a separate trusted maintainer release process. Their transitive dependencies on the activation path are listed here too.
+export const P6_PROTECTED_CONTROL_PATHS = Object.freeze([
+  'runtime/runner.mjs', 'runtime/core/p6Builder.mjs', 'runtime/core/p6Consumer.mjs', 'runtime/core/p6Scope.mjs',
+  'runtime/core/p6Reconstruction.mjs', 'runtime/core/p6Successor.mjs', 'runtime/core/p6Continuation.mjs', 'runtime/core/p6GitObjectSource.mjs',
+  'runtime/core/testFaultPolicy.mjs', 'runtime/core/protectedSelfRepair.mjs', 'runtime/core/schemas.mjs', 'runtime/core/canonical.mjs',
+  'runtime/core/workspaceIsolation.mjs', 'runtime/core/p5GitCandidate.mjs',
 ]);
 // Engine verification tiers (P5-FINAL §5.2). Engine source is repairable; what the path decides is only how strictly the
 // candidate is verified. Rules are ordered most sensitive first; a path takes the first tier whose prefix or exact path
@@ -149,13 +161,19 @@ export function assertP5HostBoundary({ changes, protection = null, candidateClos
   const refused = [];
   for (const change of changes) {
     const path = typeof change === 'string' ? change : change.path;
-    const reason = p5HostStaticReason(path) ?? (derived.has(path) ? 'host_import_closure'
-      : underivable && CLOSURE_ROOTS.some(root => path.startsWith(root)) ? 'host_closure_underivable' : null);
+    // The protected reason is decided first, so a case variant is reported as protected and not as an unknown-impact path.
+    // Non-strings are refused by validateP5SourcePath before this point; the comparison only needs a string.
+    const text = typeof path === 'string' ? path : '';
+    const protectedPath = P6_PROTECTED_CONTROL_PATHS.some(item => item.toLowerCase() === text.toLowerCase());
+    const folded = text.toLowerCase();
+    const derivedPath = [...derived].some(item => item.toLowerCase() === folded);
+    const reason = protectedPath ? 'protected_control_module' : p5HostStaticReason(path) ?? (derivedPath ? 'host_import_closure'
+      : underivable && CLOSURE_ROOTS.some(root => folded.startsWith(root.toLowerCase())) ? 'host_closure_underivable' : null);
     if (reason) refused.push({ path, reason });
   }
   if (refused.length) {
     const first = refused[0];
-    fail('p5_host_boundary_violation', `P5 Self-Repair may not change Lifecycle Host source, trust or build inputs: "${first.path}" (${first.reason})${refused.length > 1 ? ` and ${refused.length - 1} more` : ''}.`);
+    fail('p5_host_boundary_violation', `P5 Self-Repair may not change Lifecycle Host source, protected P5/P6 control code, trust or build inputs: "${first.path}" (${first.reason})${refused.length > 1 ? ` and ${refused.length - 1} more` : ''}.`);
   }
   return { checked: changes.length, policy: P5_HOST_BOUNDARY_POLICY };
 }

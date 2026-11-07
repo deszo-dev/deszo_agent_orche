@@ -1,0 +1,16 @@
+BLOCKED before Core/Worker launch and before CreateAppContainerProfile.
+Preflight exit code: 5
+Decision: BLOCKED: launcher is not an ordinary, non-elevated, medium-integrity desktop-user process; CreateAppContainerProfile was not attempted
+No profile creation was attempted by this preflight.
+
+Open an ordinary Windows desktop PowerShell session as the signed-in user (do not use Run as administrator) and run:
+  cd C:\my\2026\deszo_agent_orche
+  .\experiments\rust-migration-v3\scripts\run-poc.ps1
+
+Compare the displayed OS identity with winver. Return these files for analysis:
+  experiments\rust-migration-v3\evidence\launcher-preflight.json
+  experiments\rust-migration-v3\evidence\environment.json
+  experiments\rust-migration-v3\evidence\preflight-output.txt
+  experiments\rust-migration-v3\evidence\build.log
+  experiments\rust-migration-v3\evidence\operator-handoff.txt
+Also include launcher-failure.txt and run.json if the PoC progresses past preflight.

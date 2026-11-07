@@ -15,7 +15,7 @@ export function plainFiles(root) {
   const files = []; function walk(dir) { for (const entry of readdirSync(dir, { withFileTypes: true })) { const path = join(dir, entry.name); if (entry.isSymbolicLink()) fail('A build/dependency closure cannot contain a reparse point.'); if (entry.isDirectory()) walk(path); else if (entry.isFile()) files.push(path); else fail('Unsupported build object.'); } }
   walk(root); return files.sort();
 }
-export async function securityClosure(sourceRoot,gitTool,readGit=null) {
+export async function securityClosure(sourceRoot,gitTool,readGit=null,dependencyRoot=sourceRoot) {
   const root = resolve(sourceRoot);
   const inventory=await sourceInventory(root,gitTool,readGit),tracked=inventory.files.map(file=>file.path);
   const selected=tracked.filter(p => /^(runtime\/(?!tests\/)|mcp\/|src-tauri\/|scripts\/|shared\/|docs\/(schemas|storage|authoring)\/|package[^/]*\.json$|[^/]*lock[^/]*$|vite\.config\.|tsconfig[^/]*\.json$|src\/transport\.ts$)/.test(p));
@@ -28,8 +28,12 @@ export async function securityClosure(sourceRoot,gitTool,readGit=null) {
     if (!existsSync(path)) inputs.push({ path: name, absent: true });
     else { if (lstatSync(path).isSymbolicLink() || resolve(realpathSync(path)).toLowerCase() !== path.toLowerCase()) fail('Source authority uses a reparse point.'); inputs.push({ path: name, sha256: sha256(readFileSync(path)) }); }
   }
-  const dependencies = existsSync(join(root, 'node_modules')) ? plainFiles(join(root, 'node_modules')).map(path => ({ path: relative(root, path).split(sep).join('/'), sha256: sha256(readFileSync(path)) })) : [];
-  return { digest: canonicalHash({ inputs, dependencies, importGraph:graph.digest,metadataTool:inventory.gitTool }), inputs, importGraph:graph, dependencyDigest: canonicalHash(dependencies), dependencyFiles: dependencies.length,source:inventory };
+  const dependencyBase = join(resolve(dependencyRoot), 'node_modules');
+  const dependencies = existsSync(dependencyBase) ? plainFiles(dependencyBase).map(path => ({
+    path: `node_modules/${relative(dependencyBase, path).split(sep).join('/')}`, sha256: sha256(readFileSync(path)),
+  })) : [];
+  return { digest: canonicalHash({ inputs, dependencies, importGraph:graph.digest,metadataTool:inventory.gitTool }),
+    inputs, dependencies, importGraph:graph, dependencyDigest: canonicalHash(dependencies), dependencyFiles: dependencies.length,source:inventory };
 }
 
 // The build-input identity the Host attests as `inputsDigest`: source commit and bytes, authority import and dependency closure, metadata tool.

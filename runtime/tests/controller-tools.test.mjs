@@ -45,6 +45,13 @@ test('build inspection detects replaced executables and unexpected runtime files
   writeFileSync(join(dir, 'unexpected.mjs'), '// not in manifest\n');
   assert.ok(inspectRuntimeBuild(dir).issues.some(item => item.code === 'runtime_inventory_changed'));
 });
+test('build inspection refuses a runtime manifest that enables test fault hooks', () => {
+  const dir = temporary();
+  for (const entry of migrationCatalog()) copyFileSync(resolve('docs/storage', entry.file), join(dir, entry.file));
+  writeFileSync(join(dir, 'runner.mjs'), '// test-enabled runtime fixture\n');
+  writeRuntimeManifest(dir, { testFaultHooks: true });
+  assert.ok(inspectRuntimeBuild(dir).issues.some(item => item.code === 'test_fault_hooks_enabled'));
+});
 test('doctor refuses an unmanifested build instead of presenting it as ready', async () => {
   const root = temporary(), store = new Store(root); store.close();
   const result = await doctor({ profile: root, build: temporary() });
@@ -60,7 +67,7 @@ test('prepare reuses a matching package without building or overwriting it', asy
   writeFileSync(join(dir, 'runner.mjs'), '// fixture, never executed\n'); writeFileSync(join(build, 'deszo.exe'), 'fixture, never executed');
   writeRuntimeManifest(dir);
   const manifestPath = join(build, 'package-manifest.json');
-  writeFileSync(manifestPath, JSON.stringify({ kind: 'DeszoOperatorPackage', version: 1, profileAtPreparation: root,
+  writeFileSync(manifestPath, JSON.stringify({ kind: 'DeszoOperatorPackage', version: 1, testFaultHooks: false, profileAtPreparation: root,
     exeSha256: hash(readFileSync(join(build, 'deszo.exe'))), desktopInputsSha256: inputFingerprint('desktop').sha256,
     runtimeManifestSha256: hash(readFileSync(join(dir, 'runtime-manifest.json'))) }));
   const before = readFileSync(manifestPath); const result = await prepare({ profile: root, out: build });

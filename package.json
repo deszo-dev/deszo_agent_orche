@@ -10,7 +10,7 @@
     "tauri": "tauri",
     "desktop": "npm run shim:dev && tauri dev",
     "desktop:release": "node scripts/desktop-release.mjs",
-    "desktop:build": "node scripts/deszo-control.mjs build-begin && npm run runtime:bundle && npm run shim:build && node scripts/tauri-build.mjs && node scripts/deszo-control.mjs build-finish",
+    "desktop:build": "node scripts/deszo-control.mjs build-begin && npm run runtime:bundle && node scripts/tauri-build.mjs && node scripts/deszo-control.mjs build-finish",
     "shim:dev": "node scripts/build-shim.mjs",
     "shim:build": "node scripts/build-shim.mjs --release",
     "runner": "node --disable-warning=ExperimentalWarning runtime/runner.mjs",

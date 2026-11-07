@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "evidence": "c09-native-hold",
+  "capturedAt": "2026-11-02T12:02:14.912Z",
+  "node": "v22.20.0",
+  "platform": "win32 x64",
+  "operationId": "412203c4-9d43-4439-af32-95c8e623cba2",
+  "processId": 30840,
+  "processCreationTime": 134380944878788210,
+  "injected": true,
+  "operation": {
+    "phase": "held",
+    "terminationUnprovenProcessId": 30840,
+    "failure": "the active Engine's process tree could not be proven ended: Host could not confirm termination of every owned managed process"
+  },
+  "launches": [
+    "engine-a"
+  ],
+  "committedRecorded": false,
+  "selector": {
+    "buildId": "engine-a",
+    "committedOperationId": null
+  },
+  "processAliveAfterRealTermination": false,
+  "shellSha256": {
+    "before": "60cd2526f37c649d444aeeee74f150a62b32fe53d649cac8e2607f1ddbd72dbe",
+    "after": "60cd2526f37c649d444aeeee74f150a62b32fe53d649cac8e2607f1ddbd72dbe"
+  },
+  "hostSha256": {
+    "before": "c7015bf60ec67628c29d7ec290507e6588c5a4e282f8334df07468e463287ac2",
+    "after": "c7015bf60ec67628c29d7ec290507e6588c5a4e282f8334df07468e463287ac2"
+  }
+}

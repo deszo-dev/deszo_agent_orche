@@ -11,6 +11,7 @@ import { EventEmitter } from 'node:events';
 import { appendFileSync, existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { parseStrictJson } from './canonical.mjs';
 import { nowIso } from './store.mjs';
+import { testFaultHooksEnabled } from './testFaultPolicy.mjs';
 import { isAlive, killTree } from './processes.mjs';
 import { transportSchema } from './transport.mjs';
 import { resolveEffort } from '../../shared/effort.mjs';
@@ -18,6 +19,7 @@ import { resolveWorkspaceRoot, workspaceRootsOverlap } from './workspaceIsolatio
 
 const POLL_MS = 100;
 const READ_BYTES = 32 * 1024;
+const TEST_FAULTS_ENABLED = testFaultHooksEnabled(import.meta.url);
 // One command line must fit the Host's 128 KiB IPC line with its envelope; leave headroom for the capability and framing.
 const MAX_COMMAND_BYTES = 120 * 1024;
 // While the Host cannot be reached, the Engine asks again at this interval. Asking again never settles or releases anything.
@@ -37,14 +39,15 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 // Crash-point hook for the replay audit. A test names one point; the Engine then exits without any cleanup, so that a later
 // Engine must recover from exactly the state that point leaves. Unset in production, it does nothing.
 export function custodyFaultPoint(name) {
-  if (process.env.DESZO_CUSTODY_TEST_FAULT === name) process.exit(97);
+  if (TEST_FAULTS_ENABLED && process.env.DESZO_CUSTODY_TEST_FAULT === name) process.exit(97);
 }
 
 // Test-only one-shot Engine exit (P5-CLOSURE C07). Inert unless DESZO_P5_TEST_CRASH_ONCE names a marker file holding the
 // point name, and never in a packaged runtime. The first pass consumes the marker, so the relaunched Engine continues.
 export function custodyCrashOnce(name) {
+  if (!TEST_FAULTS_ENABLED) return;
   const path = process.env.DESZO_P5_TEST_CRASH_ONCE;
-  if (!path || (typeof __DESZO_PACKAGED__ !== 'undefined' && __DESZO_PACKAGED__) || !existsSync(path)) return;
+  if (!path || !existsSync(path)) return;
   if (readFileSync(path, 'utf8').trim() !== name) return;
   writeFileSync(path, 'consumed');
   process.exit(97);
@@ -54,8 +57,9 @@ export function custodyCrashOnce(name) {
 // "<point> <count>", and never in a packaged runtime. Each pass through the named point consumes one count and throws the
 // connection-reset code a real Custody Host outage produces.
 export function custodyTransientFault(name) {
+  if (!TEST_FAULTS_ENABLED) return;
   const path = process.env.DESZO_P5_TEST_TRANSIENT_CAPTURE;
-  if (!path || (typeof __DESZO_PACKAGED__ !== 'undefined' && __DESZO_PACKAGED__) || !existsSync(path)) return;
+  if (!path || !existsSync(path)) return;
   const [point, count] = readFileSync(path, 'utf8').trim().split(/\s+/);
   if (point !== name || !(Number(count) > 0)) return;
   writeFileSync(path, `${point} ${Number(count) - 1}`);
@@ -67,6 +71,7 @@ export function custodyTransientFault(name) {
 // point consumes the marker, withholds the identity write, and keeps the Engine running for the delay (so the launched process starts and writes),
 // then ends the Engine without cleanup. Returns true while the identity is held. Inert unless the variable names a marker.
 export function crashBeforeIdentityPoint() {
+  if (!TEST_FAULTS_ENABLED) return false;
   const marker = process.env.DESZO_TEST_CRASH_BEFORE_IDENTITY_MARKER;
   if (!marker || !existsSync(marker)) return false;
   const delayMs = Number(readFileSync(marker, 'utf8')) || 0;
@@ -86,6 +91,7 @@ export function afterBarrierWork(barrier, name, detail, work) {
 // Test-only outage injection for the workspace-hold proofs. Inert unless the environment names it. While the named file exists, every
 // Host call fails as unreachable; the Host itself keeps running and the CLI keeps running under it.
 export function custodyOutageActive() {
+  if (!TEST_FAULTS_ENABLED) return false;
   const file = process.env.DESZO_CUSTODY_TEST_OUTAGE_FILE;
   return Boolean(file) && existsSync(file);
 }
@@ -94,6 +100,7 @@ export function custodyOutageActive() {
 // Host command about the invocation it names is refused as `not_found`, as a Host without that record answers; the Host and its CLI run on.
 // Each refused command is appended to `<file>.calls`, so that a proof can count what the Engine asked.
 export function custodyRefusalActive(custodyId, command) {
+  if (!TEST_FAULTS_ENABLED) return false;
   const file = process.env.DESZO_CUSTODY_TEST_REFUSE_FILE;
   if (!file || !existsSync(file)) return false;
   let target = '';
@@ -496,7 +503,7 @@ export function installCustody(Engine) {
     // A refusal names the command it answered, for the unresolved condition it may become.
     const call = this.custodyHost.custody(command, { ...payload, epoch: this.custodyEpoch, generation: this.custodyHost.context.generation })
       .catch(error => { throw error instanceof Error ? Object.assign(error, { command: error.command ?? command }) : error; });
-    if (command === 'custody.launch' && process.env.DESZO_CUSTODY_TEST_DROP_LAUNCH_REPLY === '1' && !this.custodyLaunchReplyLost) {
+    if (TEST_FAULTS_ENABLED && command === 'custody.launch' && process.env.DESZO_CUSTODY_TEST_DROP_LAUNCH_REPLY === '1' && !this.custodyLaunchReplyLost) {
       this.custodyLaunchReplyLost = true;
       return call.then(() => { throw refusal('custody_unreachable', 'Injected fault: the launch reply was lost after the Host launched the CLI.'); });
     }

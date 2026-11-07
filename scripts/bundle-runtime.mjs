@@ -6,18 +6,25 @@ import { spawnSync } from 'node:child_process';
 import { MIGRATION_FILES } from '../runtime/core/migrations.mjs';
 import { writeRuntimeManifest } from './deszo-artifacts.mjs';
 import { bundleRunner } from './runtime-bundle.mjs';
+import { assertPlainDirectories, buildLayout } from './build-layout.mjs';
 
 const root = resolve(import.meta.dirname, '..');
-const out = resolve(root, 'dist-runtime');
-// The launch shim is built by `npm run shim:build` and is not part of this bundle. Keep it across the rebuild, so
-// running this script alone cannot leave a packaged app without the shim it refuses to start without.
+// Refuses test-hook bundles outside a test-owned root before anything is written.
+const layout = buildLayout();
+assertPlainDirectories(layout);
+const out = layout.runtime;
+const testFaultHooks = process.env.DESZO_TEST_FAULT_HOOKS === '1';
+// The launch shim is compiled by the desktop build (tauri build) and copied in by build-finish. Keep an existing copy across
+// this rebuild, so running this script alone cannot leave a packaged app without the shim it refuses to start without.
 const shimPath = resolve(out, 'deszo-launch-shim.exe');
 const keptShim = existsSync(shimPath) ? readFileSync(shimPath) : null;
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
-if (keptShim) writeFileSync(shimPath, keptShim);
-else console.warn('dist-runtime has no launch shim: run `npm run shim:build` before packaging, or the app will refuse to start.');
-await bundleRunner({ root, outfile: resolve(out, 'runner.mjs') });
+if (keptShim) writeFileSync(shimPath, keptShim, { flag: 'wx' });
+else console.warn(`${out} has no launch shim yet: build-finish publishes it after tauri build; a package without it refuses to start.`);
+// The directories are checked again before the bundle is written and before the manifest is (a link created in between is refused).
+assertPlainDirectories(layout);
+await bundleRunner({ root, outfile: resolve(out, 'runner.mjs'), testFaultHooks });
 await build({
   entryPoints: [resolve(root, 'mcp/bridge.mjs')], outfile: resolve(out, 'bridge.mjs'),
   bundle: true, platform: 'node', format: 'esm', target: 'node22', legalComments: 'none',
@@ -50,4 +57,5 @@ for (const file of MIGRATION_FILES) copyFileSync(resolve(root, 'docs/storage', f
 const serviceImport=spawnSync(process.execPath,['--disable-warning=ExperimentalWarning',resolve(out,'service-runtime.mjs')],{input:'',encoding:'utf8',windowsHide:true,timeout:15000});
 if(serviceImport.status!==0)throw new Error(`The bundled protected backend cannot initialize: ${serviceImport.stderr}`);
 console.log(`Runtime bundled into ${out}`);
-writeRuntimeManifest(out);
+assertPlainDirectories(layout);
+writeRuntimeManifest(out, { testFaultHooks });

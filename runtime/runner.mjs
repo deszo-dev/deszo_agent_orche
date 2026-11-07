@@ -14,6 +14,15 @@ import { custodyBridgeFromEnvironment, lifecycleBridgeFromEnvironment } from './
 import { P5_ENROLLMENT_RELATIVE_PATH } from './core/protectedSelfRepair.mjs';
 import { autonomyGateway } from './host/uiGateway.mjs';
 import { acquireRuntimeLock } from './lock.mjs';
+import { runP6MaintenancePreflight } from './host/p6Maintenance.mjs';
+import { assertAdmissionOpen, createSwitchQuiescence, requestEngineSwitch, SwitchRefusal } from './host/p6Switch.mjs';
+import { startTestEngineProbe } from './core/testEngineProbe.mjs';
+import { MIGRATION_FILES, MIGRATION_PATHS } from './core/migrations.mjs';
+import { testFaultHooksEnabled } from './core/testFaultPolicy.mjs';
+import { buildAndAttestEnginePackage } from './core/p6Builder.mjs';
+import { bindTrustedP6Builder, executeP6Activation } from './core/p6Consumer.mjs';
+// Switch refusals reach the API as the Engine's own error type, with the status and the stable code they carry.
+const apiRefusal = error => (error instanceof SwitchRefusal ? new ApiError(error.status, error.code, error.message) : error);
 
 const ORIGINS = new Set(['http://127.0.0.1:1420', 'http://localhost:1420', 'tauri://localhost', 'http://tauri.localhost', 'https://tauri.localhost']);
 const MAX_BODY = 4 * 1024 * 1024;
@@ -95,7 +104,7 @@ function query(url, allowed, integers = []) {
   return result;
 }
 
-export async function startRunner({ root, connectionFile, bridgeFile, port = 0, supervised = false, adapters, maximumAgentTimeoutSeconds, loopMinuteMs, extraOrigins = [], runtimeInstanceId = randomUUID(), nodeExecutable = process.execPath, devTestConfirmationOff = false, exposeHostRequestForTests = false, judgeAttentionEnabled = false, custodyHost: scriptedCustodyHost = null } = {}) {
+export async function startRunner({ root, connectionFile, bridgeFile, port = 0, supervised = false, adapters, maximumAgentTimeoutSeconds, loopMinuteMs, extraOrigins = [], runtimeInstanceId = randomUUID(), nodeExecutable = process.execPath, devTestConfirmationOff = false, exposeHostRequestForTests = false, judgeAttentionEnabled = false, custodyHost: scriptedCustodyHost = null, lifecycleHostBridge = undefined } = {}) {
   const origins = new Set([...ORIGINS, ...extraOrigins]);
   const defaultRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '.deszo');
   root = resolve(root || defaultRoot);
@@ -116,8 +125,10 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
   let engine;
   let hostBinding = null;
   let lifecycleHost = null;
+  // A maintenance candidate hands over the bridge it already read, so its commit does not depend on a second environment read.
+  const switchQuiescence = createSwitchQuiescence();
   try {
-    lifecycleHost = lifecycleBridgeFromEnvironment(process.env);
+    lifecycleHost = lifecycleHostBridge !== undefined ? lifecycleHostBridge : lifecycleBridgeFromEnvironment(process.env);
     // An installation-owned P5 enrollment is the explicit opt-in for the managed Lifecycle
     // Host's Custody service. Legacy installs without that file keep their existing launch path.
     // The file only triggers attachment; Engine still validates its type, contents and provenance.
@@ -137,9 +148,17 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
       // Preserve the explicit requirement so a missing Host bootstrap cannot fall through to a Node-launched provider.
       processCustodyRequired: scriptedCustodyHost != null || processCustodyOptIn,
       processContainment: supervised ? 'tauri-job' : 'standalone-best-effort', ...(maximumAgentTimeoutSeconds ? { maximumAgentTimeoutSeconds } : {}), ...(loopMinuteMs ? { loopMinuteMs } : {}) });
+    // The switch quiescence is the Engine's admission barrier: Run creation and deferred continuations consult it (engine.captureRun).
+    engine.switchQuiescence = switchQuiescence;
+    // The trusted P6 builder is bound here, by the entry point, before initialization can schedule a P6 activation (a setImmediate).
+    bindTrustedP6Builder(engine, { buildAndAttestEnginePackage });
+    // The activation is bound here too; the Engine calls it, but cannot reach the consumer or the builder by import.
+    engine.p6Activation = (repairRunId, targetEngineBuildId) => executeP6Activation({ engine, repairRunId, targetEngineBuildId });
     await engine.initialize({
       beforeRecovery: lifecycleHost ? () => engine.initializeProtectedSelfRepairEnrollment() : undefined,
     });
+    // Test-built Engines only: a P6 end-to-end test drives this Engine's bridge and Custody client through the probe (no-op otherwise).
+    startTestEngineProbe({ engine, lifecycleHost });
     engine.closePendingRunRequestsAtOwnerCutover();
     if (lifecycleHost) {
       const identity = engine.runtimeIdentity();
@@ -336,6 +355,24 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
     ['POST', 'public', new RegExp(`^/api/v2/context-bindings/(${UUID})/acknowledge$`), async ({ req, match }) => [200, engine.acknowledgeBinding(match[1], parse(await bodyText(req)))]],
     ['POST', 'public', new RegExp(`^/api/v2/context-bindings/(${UUID})/messages$`), async ({ req, match }) => { const result = engine.sendChat(match[1], parse(await bodyText(req))); return [result.status, result.body]; }],
     ['GET', 'public', /^\/api\/v2\/runs$/, ({ url }) => [200, engine.listRuns(query(url, ['workspaceId', 'state', 'kind', 'bindingId', 'limit', 'cursor'], ['limit']))]],
+    // P6-G0 test trigger: present only in packages built with the test marker. A production Engine has no route that starts a switch;
+    // the P5 handoff trigger that P6-BUILD adds is the production caller of requestEngineSwitch (ADR-0010 section 12).
+    ...(testFaultHooksEnabled(import.meta.url) ? [
+      ['POST', 'public', /^\/api\/v4\/lifecycle\/engine-switch$/, async ({ req }) => {
+        try {
+          const outcome = await requestEngineSwitch({ engine, lifecycleHost, quiescence: switchQuiescence, body: parse(await bodyText(req)) });
+          // A recorded outcome answers an earlier request: 200. A switch that the Host accepted is 202.
+          return [outcome.duplicate ? 200 : 202, outcome];
+        }
+        catch (error) { throw apiRefusal(error); }
+      }, { switchRequest: true }],
+      ['POST', 'public', new RegExp(`^/api/v4/lifecycle/p6-activate/(${UUID})$`), async ({ req, match }) => {
+        let body = null;
+        try { body = parse(await bodyText(req)); } catch {}
+        engine.triggerP6Consumer(match[1], body?.targetEngineBuildId || null);
+        return [202, { accepted: true, repairRunId: match[1] }];
+      }],
+    ] : []),
     ['POST', 'public', /^\/api\/v2\/runs$/, async ({ req }) => {
       const body = parse(await bodyText(req));
       const options = { role: req.authRole, clientLabel: req.headers['x-deszo-client-label'], controllerToken: controllerTokenOf(req) };
@@ -362,7 +399,7 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
       const result = engine.answerWorkflowJudgeQuestion(match[1], parse(await bodyText(req)));
       return [result.status, result.body];
     }],
-    ['POST', 'public', new RegExp(`^/api/v2/runs/(${UUID})/stop$`), async ({ req, match }) => { const result = engine.stopRun(match[1], parse(await bodyText(req))); return [result.status, result.body]; }],
+    ['POST', 'public', new RegExp(`^/api/v2/runs/(${UUID})/stop$`), async ({ req, match }) => { const result = engine.stopRun(match[1], parse(await bodyText(req))); return [result.status, result.body]; }, { settling: true }],
     ['POST', 'public', new RegExp(`^/api/v2/runs/(${UUID})/recovery$`), async ({ req, match }) => { const result = engine.recoverRun(match[1], parse(await bodyText(req))); return [result.status, result.body]; }],
     ['POST', 'public', new RegExp(`^/api/v2/runs/(${UUID})/linked-repair$`), async ({ req, match }) => { const result = engine.linkRepair(match[1], parse(await bodyText(req))); return [result.status, result.body]; }],
     ['POST', 'retired', new RegExp(`^/api/v2/runs/(${UUID})/lifecycle-receipt$`), () => [410, { code: 'operation_retired', message: 'HTTP lifecycle receipts are retired; Host receipts use the authenticated lifecycle channel.', details: [] }]],
@@ -382,7 +419,7 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
     ['GET', 'public', new RegExp(`^/api/v2/judge-invocations/(${UUID})/evidence$`), async ({req,match}) => [200,await engine.readJudgeEvidence(match[1],{invocationToken:req.headers['x-deszo-judge-token']})]],
     ['GET', 'internal-host', new RegExp(`^/api/v2/judge-invocations/(${UUID})/reads$`), ({req,match}) => [200,engine.listJudgeReads(match[1],{controllerToken:controllerTokenOf(req)})]],
     ['GET', 'public', new RegExp(`^/api/v2/judge-invocations/(${UUID})/artifacts/(${UUID})$`), async ({req,match,url}) => [200,await engine.readJudgeArtifact(match[1],match[2],{invocationToken:req.headers['x-deszo-judge-token'],...query(url,['offset','length'],['offset','length'])})]],
-    ['POST', 'public', /^\/api\/v2\/judge-decisions$/, async ({req}) => { const r=await engine.submitJudgeDecision(parse(await bodyText(req)),{controllerToken:controllerTokenOf(req),invocationToken:req.headers['x-deszo-judge-token']});return[r.status,r.body]; }],
+    ['POST', 'public', /^\/api\/v2\/judge-decisions$/, async ({req}) => { const r=await engine.submitJudgeDecision(parse(await bodyText(req)),{controllerToken:controllerTokenOf(req),invocationToken:req.headers['x-deszo-judge-token']});return[r.status,r.body]; }, { settling: true }],
     ['GET', 'public', new RegExp(`^/api/v2/judge-decisions/(${UUID})$`), ({req,match}) => [200,engine.getJudgeDecision(match[1],{controllerToken:controllerTokenOf(req)})]],
     // ADR-0002 observation, supervision, incidents and audit are all public owner operations.
     ['POST', 'public', /^\/api\/v2\/controller-sessions$/, async ({ req }) => { const result = engine.createControllerSession(parse(await bodyText(req))); return [result.status, result.body]; }],
@@ -394,10 +431,10 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
     ['POST', 'public', new RegExp(`^/api/v2/control-grants/(${UUID})/revoke$`), async ({ req, match }) => { const result = engine.revokeControlGrant(match[1], parse(await bodyText(req))); return [result.status, result.body]; }],
     ['GET', 'public', new RegExp(`^/api/v2/runs/(${UUID})/control$`), ({ match }) => [200, engine.getRunControl(match[1])]],
     ['GET', 'public', new RegExp(`^/api/v2/runs/(${UUID})/watch$`), async ({ match, url }) => [200, await engine.watchRun(match[1], query(url, ['cursor', 'waitMs'], ['cursor', 'waitMs']))]],
-    ['POST', 'public', new RegExp(`^/api/v2/runs/(${UUID})/observation-acks$`), async ({ req, match }) => { const result = engine.acknowledgeObservation(match[1], parse(await bodyText(req)), { controllerToken: controllerTokenOf(req) }); return [result.status, result.body]; }],
+    ['POST', 'public', new RegExp(`^/api/v2/runs/(${UUID})/observation-acks$`), async ({ req, match }) => { const result = engine.acknowledgeObservation(match[1], parse(await bodyText(req)), { controllerToken: controllerTokenOf(req) }); return [result.status, result.body]; }, { settling: true }],
     ['GET', 'public', new RegExp(`^/api/v2/runs/(${UUID})/evidence$`), ({ match }) => [200, { items: engine.runEvidence(match[1]) }]],
     ['GET', 'public', new RegExp(`^/api/v2/runs/(${UUID})/processes$`), ({ match }) => [200, { items: engine.runProcesses(match[1]) }]],
-    ['POST', 'public', new RegExp(`^/api/v2/runs/(${UUID})/stop-and-report$`), async ({ req, match }) => { const body = parse(await bodyText(req)); const result = engine.stopAndReport(match[1], body, reporterFor(req, body)); return [result.status, result.body]; }],
+    ['POST', 'public', new RegExp(`^/api/v2/runs/(${UUID})/stop-and-report$`), async ({ req, match }) => { const body = parse(await bodyText(req)); const result = engine.stopAndReport(match[1], body, reporterFor(req, body)); return [result.status, result.body]; }, { settling: true }],
     ['POST', 'public', new RegExp(`^/api/v2/runs/(${UUID})/audit-bundles$`), async ({ req, match }) => { const result = await engine.createAuditBundle(match[1], parse(await bodyText(req))); return [result.status, result.body]; }],
     ['GET', 'public', new RegExp(`^/api/v2/audit-bundles/(${UUID})$`), ({ match }) => [200, engine.getAuditBundle(match[1])]],
     ['GET', 'public', new RegExp(`^/api/v2/artifacts/(${UUID})/range$`), ({ match, url }) => [200, engine.readArtifactRange(match[1], query(url, ['offset', 'length'], ['offset', 'length']))]],
@@ -408,10 +445,10 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
     ['POST', 'public', new RegExp(`^/api/v2/incidents/(${UUID})/triage$`), async ({ req, match }) => { const body = parse(await bodyText(req)); const result = engine.triageIncident(match[1], body, reporterFor(req, body)); return [result.status, result.body]; }],
     ['GET', 'public', new RegExp(`^/api/v2/command-status/(${UUID})$`), ({ match }) => [200, engine.commandStatus(match[1])]],
     ['GET', 'public', new RegExp(`^/api/v2/runs/(${UUID})/emergency-credential$`), ({ req, match }) => [200, engine.emergencyCredential(match[1], controllerTokenOf(req))]],
-    ['POST', 'public', new RegExp(`^/api/v2/runs/(${UUID})/control-extension$`), async ({ req, match }) => { const result = await engine.extendEscalation(match[1], parse(await bodyText(req))); return [result.status, result.body]; }],
+    ['POST', 'public', new RegExp(`^/api/v2/runs/(${UUID})/control-extension$`), async ({ req, match }) => { const result = await engine.extendEscalation(match[1], parse(await bodyText(req))); return [result.status, result.body]; }, { settling: true }],
     ['POST', 'public', new RegExp(`^/api/v2/runs/(${UUID})/nodes/([^/]+)/stop$`), async ({ req, match }) => {
       const result = engine.stopNode(match[1], decodeURIComponent(match[2]), parse(await bodyText(req))); return [result.status, result.body];
-    }],
+    }, { settling: true }],
   ];
 
   function stream(req, res, runId, url) {
@@ -530,6 +567,11 @@ export async function startRunner({ root, connectionFile, bridgeFile, port = 0, 
         res.end(bytes); return;
       }
       if (route) {
+        // P6-G0: an Engine being replaced admits no owner mutation that could start a new Run. Reads, the switch request and the settling
+        // routes (Judge decisions, observation acknowledgements, escalation extensions, stop requests) stay open: they settle admitted work.
+        if (classification === 'public' && req.method !== 'GET' && !route.metadata?.switchRequest && !route.metadata?.settling) {
+          try { assertAdmissionOpen(switchQuiescence); } catch (error) { throw apiRefusal(error); }
+        }
         const match = url.pathname.match(route.pattern);
         const [status, body, headers] = await route.handler({ req, url, match });
         return json(res, status, body, headers);
@@ -602,7 +644,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     const { fixtureAdapters } = await import('./tests/fixture-adapters.mjs');
     adapters = fixtureAdapters(fixtureState);
   }
-  if (PACKAGED_RUNTIME && process.argv.some(argument => argument.startsWith('--') && !['--disable-warning=ExperimentalWarning', '--root', '--connection-file', '--bridge-file', '--supervised', '--host-contained', '--first-party-token-stdout'].includes(argument))) {
+  if (PACKAGED_RUNTIME && process.argv.some(argument => argument.startsWith('--') && !['--disable-warning=ExperimentalWarning', '--root', '--connection-file', '--bridge-file', '--supervised', '--host-contained', '--first-party-token-stdout', '--p6-maintenance'].includes(argument))) {
     throw new Error('The packaged runtime was given an unsupported option.');
   }
   const lines = createInterface({ input: process.stdin });
@@ -611,7 +653,20 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (supervised || hostContained) await new Promise(resolvePromise => lines.on('line', function waitForContainment(line) {
     try { if (JSON.parse(line).command === 'contained') { lines.off('line', waitForContainment); resolvePromise(); } } catch { /* Ignore other input. */ }
   }));
-  const runner = await startRunner({ root: option('--root'), connectionFile: option('--connection-file'), bridgeFile: option('--bridge-file'), supervised, firstPartyTokenStdout, devTestConfirmationOff, adapters });
+  // P6 candidate: the maintenance preflight runs before ordinary startup (no Store, no Run, no API). After the Host's commit the
+  // same process continues into startRunner with the bridge it already holds.
+  let preboundLifecycleHost;
+  if (process.argv.includes('--p6-maintenance')) {
+    preboundLifecycleHost = lifecycleBridgeFromEnvironment(process.env);
+    const operationId = process.env.DESZO_P6_OPERATION_ID;
+    const preflightStore = process.env.DESZO_P6_PREFLIGHT_STORE;
+    delete process.env.DESZO_P6_OPERATION_ID;
+    delete process.env.DESZO_P6_PREFLIGHT_STORE;
+    await runP6MaintenancePreflight({ bridge: preboundLifecycleHost, operationId, preflightStore,
+      migrations: { files: MIGRATION_FILES, paths: MIGRATION_PATHS } });
+  }
+  const runner = await startRunner({ root: option('--root'), connectionFile: option('--connection-file'), bridgeFile: option('--bridge-file'), supervised, firstPartyTokenStdout, devTestConfirmationOff, adapters,
+    lifecycleHostBridge: preboundLifecycleHost });
   const startup = { ...runner.connection };
   if (!firstPartyTokenStdout) delete startup.firstPartyToken;
   process.stdout.write(JSON.stringify(startup) + '\n');

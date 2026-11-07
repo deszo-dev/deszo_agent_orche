@@ -62,7 +62,7 @@ export function inputsMatch(scope, recorded) {
   // Compare every actual build input, including additions/deletions, without invalidating binaries for a doctor-only fix.
   return Array.isArray(recorded?.entries) && JSON.stringify(recorded.entries.filter(entry => isBuildInput(entry.path, scope))) === JSON.stringify(current.entries);
 }
-export function writeRuntimeManifest(directory = join(PROJECT, 'dist-runtime')) {
+export function writeRuntimeManifest(directory = join(PROJECT, 'dist-runtime'), { testFaultHooks = false } = {}) {
   const transport = checkTransport();
   const registry = json(join(PROJECT, 'docs/authoring/client-timeouts.json'));
   const codex = registry.entries.find(entry => entry.provider === 'codex');
@@ -70,16 +70,35 @@ export function writeRuntimeManifest(directory = join(PROJECT, 'dist-runtime')) 
     throw new Error('Verified Codex registry does not match the saved transport evidence.');
   const files = Object.fromEntries(readdirSync(directory, { withFileTypes: true }).filter(item => item.isFile() && item.name !== 'runtime-manifest.json')
     .map(item => [item.name, hash(readFileSync(join(directory, item.name)))]));
-  const manifest = { kind: 'DeszoRuntimeBuild', version: 1, builtAt: new Date().toISOString(),
+  const manifest = { kind: 'DeszoRuntimeBuild', version: 1, builtAt: new Date().toISOString(), testFaultHooks,
     sourceHead: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: PROJECT, encoding: 'utf8', windowsHide: true }).trim(),
     runtimeInputs: inputFingerprint('runtime'), migrations: migrationCatalog(directory), files,
     controllerTransport: transport.valid ? { fingerprint: transport.fingerprint, clientVersion: transport.identity.clientVersion } : null,
     assurance: 'Local build metadata; not ADR-0006 trusted build attestation or authority.' };
   writeJson(join(directory, 'runtime-manifest.json'), manifest); return manifest;
 }
+
+export function verifyDesktopBuildReceipt({ receiptPath, executablePath, runtimeResources, buildId }) {
+  const receipt = json(receiptPath);
+  const runtimeManifestPath = join(runtimeResources, 'runtime-manifest.json');
+  const runtimeManifestBytes = readFileSync(runtimeManifestPath);
+  const runtimeManifest = JSON.parse(runtimeManifestBytes.toString('utf8'));
+  if (receipt.schemaVersion !== 1 || typeof receipt.desktopBuildId !== 'string')
+    throw new Error('A versioned desktop build receipt with a compiled build identity is required.');
+  if (receipt.desktopBuildId !== buildId)
+    throw new Error('The desktop build receipt identity does not match the requested release identity.');
+  if (receipt.testFaultHooks !== false || runtimeManifest.testFaultHooks !== false)
+    throw new Error('A test-enabled desktop build cannot be packaged as a release.');
+  if (receipt.exeSha256 !== hash(readFileSync(executablePath)))
+    throw new Error('The supplied desktop executable does not match its build receipt.');
+  if (receipt.runtimeManifestSha256 !== hash(runtimeManifestBytes))
+    throw new Error('The supplied desktop runtime resources do not match their build receipt.');
+  return receipt;
+}
 export function inspectRuntimeBuild(directory) {
   const manifest = json(join(directory, 'runtime-manifest.json')), issues = [];
   if (manifest.kind !== 'DeszoRuntimeBuild' || manifest.version !== 1) throw new Error('Unsupported runtime build manifest.');
+  if (manifest.testFaultHooks !== false) issues.push({ code: 'test_fault_hooks_enabled' });
   const actual = readdirSync(directory, { withFileTypes: true }).filter(item => item.name !== 'runtime-manifest.json');
   if (actual.some(item => !item.isFile()) || actual.map(item => item.name).sort().join('\0') !== Object.keys(manifest.files).sort().join('\0'))
     issues.push({ code: 'runtime_inventory_changed' });

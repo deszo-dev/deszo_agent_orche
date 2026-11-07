@@ -3,6 +3,7 @@
   "$id": "https://deszo.local/documentation/protected-self-repair.schema.json",
   "title": "Protected Self-Repair P5 records",
   "$defs": {
+    "enrollmentWorkspace": { "type": "object", "properties": { "workspaceId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" }, "canonicalRoot": { "type": "string", "minLength": 1, "maxLength": 4096 }, "allocationId": { "type": "string", "format": "uuid" }, "nativeIdentity": { "$ref": "#/$defs/nativeIdentity" } }, "required": ["workspaceId", "canonicalRoot", "allocationId", "nativeIdentity"], "additionalProperties": false },
     "ref": {
       "type": "object",
       "properties": {
@@ -116,7 +117,9 @@
         "gitSource": { "$ref": "#/$defs/gitSource" },
         "pathPolicyDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "effectiveSourceDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "baselineId": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "baselineManifest": { "$ref": "#/$defs/ref" },
         "runningSourceRelease": { "$ref": "#/$defs/ref" }, "parentPublication": { "$ref": "#/$defs/publication" }, "profile": { "$ref": "#/$defs/ref" }, "repairPublication": { "$ref": "#/$defs/publication" },
-        "workspace": { "type": "object", "properties": { "workspaceId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" }, "canonicalRoot": { "type": "string", "minLength": 1, "maxLength": 4096 }, "allocationId": { "type": "string", "format": "uuid" }, "nativeIdentity": { "$ref": "#/$defs/nativeIdentity" } }, "required": ["workspaceId", "canonicalRoot", "allocationId", "nativeIdentity"], "additionalProperties": false },
+        "workspace": { "$ref": "#/$defs/enrollmentWorkspace" },
+        "workspacePool": { "type": "array", "minItems": 1, "maxItems": 8, "items": { "$ref": "#/$defs/enrollmentWorkspace" } },
+        "rootProfile": { "$ref": "#/$defs/ref" },
         "verificationPolicy": { "$ref": "#/$defs/ref" }, "harnessClosureDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "toolIdentities": { "type": "array", "minItems": 1, "maxItems": 64, "items": { "type": "object", "properties": { "name": { "type": "string", "minLength": 1, "maxLength": 128 }, "path": { "type": "string", "minLength": 1, "maxLength": 1024 }, "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" } }, "required": ["name", "path", "sha256"], "additionalProperties": false } },
         "scope": { "$ref": "#/$defs/scope" }, "budgets": { "$ref": "#/$defs/budgets" }, "minimumReaderCapability": { "const": "protected-self-repair-v1" }
       },
@@ -139,10 +142,39 @@
         "fetchRefs": { "type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "pattern": "^refs/(heads|tags)/[A-Za-z0-9._/-]{1,200}$" } },
         "sourceCommit": { "type": "string", "pattern": "^([a-f0-9]{40}|[a-f0-9]{64})$" }, "sourceTree": { "type": "string", "pattern": "^([a-f0-9]{40}|[a-f0-9]{64})$" }, "objectFormat": { "enum": ["sha1", "sha256"] },
         "releaseSourceDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "verifiedLocalSource": { "$ref": "#/$defs/gitObjectSource" },
         "credentialPolicy": { "const": "none" },
         "publication": { "$ref": "#/$defs/gitPublicationPolicy" }
       },
       "required": ["schemaVersion", "kind", "policy", "sourceRepositoryId", "remote", "fetchRefs", "sourceCommit", "sourceTree", "objectFormat", "releaseSourceDigest", "credentialPolicy", "publication"],
+      "additionalProperties": false
+    },
+    "gitObjectSource": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "P6StoreGitObjectSource" },
+        "enrollmentId": { "type": "string", "format": "uuid" },
+        "repositoryIdentityDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "sourceRepositoryId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+        "remoteId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+        "baselineId": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "candidateSourceDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "sourceCommit": { "type": "string", "pattern": "^([a-f0-9]{40}|[a-f0-9]{64})$" },
+        "sourceTree": { "type": "string", "pattern": "^([a-f0-9]{40}|[a-f0-9]{64})$" },
+        "objectFormat": { "enum": ["sha1", "sha256"] },
+        "releaseSourceDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "installationId": { "type": "string", "pattern": "^[a-f0-9]{32}$" },
+        "engineBuildId": { "type": "string", "pattern": "^[a-zA-Z0-9_-]{1,100}$" },
+        "operationId": { "type": "string", "format": "uuid" },
+        "packageSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "predecessorEnrollment": { "$ref": "#/$defs/ref" },
+        "handoff": { "$ref": "#/$defs/ref" },
+        "buildReceipt": { "$ref": "#/$defs/ref" },
+        "continuationReceipt": { "$ref": "#/$defs/ref" }
+      },
+      "required": ["schemaVersion", "kind", "enrollmentId", "repositoryIdentityDigest", "sourceRepositoryId", "remoteId",
+        "baselineId", "candidateSourceDigest", "sourceCommit", "sourceTree", "objectFormat", "releaseSourceDigest",
+        "installationId", "engineBuildId", "operationId", "packageSha256", "predecessorEnrollment", "handoff", "buildReceipt", "continuationReceipt"],
       "additionalProperties": false
     },
     "gitPublicationPolicy": {
@@ -165,8 +197,9 @@
         "remoteId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
         "remoteUrl": { "type": "string", "minLength": 8, "maxLength": 2048, "pattern": "^(file:///|https://)[^\\s@?#]+$" },
         "protocol": { "enum": ["file", "https"] },
-        "strategy": { "enum": ["commit", "enrolled-refs", "present"] },
+        "strategy": { "enum": ["commit", "enrolled-refs", "present", "store-objects+enrolled-refs"] },
         "refspecs": { "type": "array", "maxItems": 16, "items": { "type": "string", "minLength": 1, "maxLength": 256 } },
+        "localObjectSource": { "$ref": "#/$defs/gitObjectSource" },
         "sourceCommit": { "type": "string", "pattern": "^([a-f0-9]{40}|[a-f0-9]{64})$" }, "sourceTree": { "type": "string", "pattern": "^([a-f0-9]{40}|[a-f0-9]{64})$" }, "objectFormat": { "enum": ["sha1", "sha256"] }, "releaseSourceDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
         "unreachableObjects": { "type": "array", "maxItems": 1000000, "uniqueItems": true, "items": { "type": "string", "pattern": "^([a-f0-9]{40}|[a-f0-9]{64})$" } },
         "recordedAt": { "type": "string", "format": "date-time" }
@@ -523,11 +556,12 @@
         "kind": { "const": "ProtectedSelfRepairRunningSourceRelease" },
         "installationId": { "type": "string", "pattern": "^[a-f0-9]{32}$" },
         "buildId": { "type": "string", "pattern": "^[a-zA-Z0-9_-]{1,100}$" },
-        "bootstrap": { "enum": ["runtime", "tauri"] },
+        "bootstrap": { "enum": ["runtime", "tauri", "engine"] },
         "packageSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
         "sourceCommit": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" },
         "sourceDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-        "inputsDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        "inputsDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "committedOperationId": { "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }] }
       },
       "required": ["schemaVersion", "kind", "installationId", "buildId", "bootstrap", "packageSha256", "sourceCommit", "sourceDigest", "inputsDigest"],
       "additionalProperties": false
@@ -953,7 +987,7 @@
         "schemaVersion": { "const": 1 }, "kind": { "const": "ProtectedSelfRepairVerificationDependencyClosure" },
         "candidateId": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "gateAttemptId": { "type": "string", "format": "uuid" },
         "installedRelease": { "type": "object", "properties": {
-          "buildId": { "type": "string", "minLength": 1, "maxLength": 100 }, "bootstrap": { "enum": ["runtime", "tauri"] },
+          "buildId": { "type": "string", "minLength": 1, "maxLength": 100 }, "bootstrap": { "enum": ["runtime", "tauri", "engine"] },
           "packageSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "inputsDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "artifactList": { "type": "string", "minLength": 1, "maxLength": 256 }, "artifactListSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
         }, "required": ["buildId", "bootstrap", "packageSha256", "inputsDigest", "artifactList", "artifactListSha256"], "additionalProperties": false },
         "resolutionRoot": { "const": "candidate-execution-tree/node_modules" },
@@ -1068,6 +1102,207 @@
         "schemaVersion": { "const": 1 }, "kind": { "const": "ProtectedSelfRepairHandoff" }, "handoffId": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "candidateId": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "candidateSourceDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "candidate": { "$ref": "#/$defs/ref" }, "gitCandidate": { "$ref": "#/$defs/ref" }, "baselineId": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "repositoryIdentity": { "$ref": "#/$defs/repositoryIdentity" }, "sourceBinding": { "$ref": "#/$defs/ref" }, "enrollment": { "$ref": "#/$defs/ref" }, "sourceManifest": { "$ref": "#/$defs/ref" }, "changeManifest": { "$ref": "#/$defs/ref" }, "verificationPolicy": { "$ref": "#/$defs/ref" }, "verificationInputs": { "$ref": "#/$defs/ref" }, "verificationReceipt": { "$ref": "#/$defs/ref" }, "parentRunId": { "type": "string", "format": "uuid" }, "repairRunId": { "type": "string", "format": "uuid" }, "linkId": { "type": "string", "format": "uuid" }, "incidentId": { "type": "string", "format": "uuid" }, "judgeAttemptId": { "type": "string", "format": "uuid" }, "decisionId": { "type": "string", "format": "uuid" }, "p2Authorization": { "$ref": "#/$defs/ref" }, "p2Approval": { "$ref": "#/$defs/ref" }, "p2Outcome": { "$ref": "#/$defs/ref" }, "retentionRecord": { "$ref": "#/$defs/ref" }, "continuationState": { "type": "string", "minLength": 1, "maxLength": 64 }, "hostProvenance": { "$ref": "#/$defs/execution" }, "retention": { "type": "object", "properties": { "status": { "const": "retained" }, "revision": { "type": "integer", "minimum": 1 }, "retainedAt": { "type": "string", "format": "date-time" }, "cleanupDeferred": { "const": true } }, "required": ["status", "revision", "retainedAt", "cleanupDeferred"], "additionalProperties": false }, "currentEligibility": { "$ref": "#/$defs/eligibilityEvidence" }, "authority": { "type": "object", "properties": { "sourceCandidateAccepted": { "const": true }, "sourceApplied": { "const": false }, "branchPublished": { "const": false }, "productionBuilt": { "const": false }, "binaryInstalled": { "const": false }, "activated": { "const": false }, "hostModificationAuthorized": { "const": false }, "hostReplacementAuthorized": { "const": false }, "hostUpdateAuthorized": { "const": false } }, "required": ["sourceCandidateAccepted", "sourceApplied", "branchPublished", "productionBuilt", "binaryInstalled", "activated"], "additionalProperties": false }
       },
       "required": ["schemaVersion", "kind", "handoffId", "candidateId", "candidateSourceDigest", "candidate", "baselineId", "repositoryIdentity", "sourceBinding", "enrollment", "sourceManifest", "changeManifest", "verificationPolicy", "verificationInputs", "verificationReceipt", "parentRunId", "repairRunId", "linkId", "incidentId", "judgeAttemptId", "decisionId", "p2Authorization", "p2Approval", "p2Outcome", "retentionRecord", "continuationState", "hostProvenance", "retention", "currentEligibility", "authority"],
+      "additionalProperties": false
+    },
+    "p6BuildReceipt": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "kind": { "const": "P6BuildReceipt" },
+        "operationId": { "type": "string", "format": "uuid" },
+        "operationIntent": { "$ref": "#/$defs/ref" },
+        "handoff": { "$ref": "#/$defs/ref" },
+        "handoffId": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "candidate": { "$ref": "#/$defs/ref" },
+        "gitCandidate": { "$ref": "#/$defs/ref" },
+        "candidateSourceDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "sourceCommit": { "type": "string", "pattern": "^([a-f0-9]{40}|[a-f0-9]{64})$" },
+        "sourceTree": { "type": "string", "pattern": "^([a-f0-9]{40}|[a-f0-9]{64})$" },
+        "previousRelease": { "$ref": "#/$defs/runningSourceRelease" },
+        "engineBuildId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "shellBuildId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "buildInputDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "buildInputClosure": {
+          "type": "object",
+          "properties": {
+            "schemaVersion": { "const": 1 },
+            "kind": { "const": "P6BuildInputClosure" },
+            "sourceInventoryDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "authorityClosureDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "dependencyDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "hostInputsDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "gitTool": {
+              "type": "object",
+              "properties": {
+                "path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+                "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+              },
+              "required": ["path", "sha256"],
+              "additionalProperties": false
+            },
+            "builderIdentity": { "$ref": "#/$defs/p6BuilderIdentity" },
+            "dependencyPackages": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 256 }, "uniqueItems": true }
+          },
+          "required": ["schemaVersion", "kind", "sourceInventoryDigest", "authorityClosureDigest", "dependencyDigest", "hostInputsDigest", "gitTool", "builderIdentity", "dependencyPackages"],
+          "additionalProperties": false
+        },
+        "builderIdentity": { "$ref": "#/$defs/p6BuilderIdentity" },
+        "successorP5Profile": { "$ref": "#/$defs/ref" },
+        "installedSourceDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "manifestSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "packageSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": { "type": "string", "minLength": 1, "maxLength": 1024 },
+              "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "bytes": { "type": "integer", "minimum": 0 }
+            },
+            "required": ["path", "sha256", "bytes"],
+            "additionalProperties": false
+          }
+        },
+        "reproducedPackageSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "reproducible": { "const": true },
+        "recordedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "schemaVersion", "kind", "operationId", "operationIntent", "handoff", "handoffId", "candidate", "gitCandidate",
+        "candidateSourceDigest", "sourceCommit", "sourceTree", "previousRelease", "installedSourceDigest",
+        "engineBuildId", "shellBuildId", "buildInputDigest", "buildInputClosure", "builderIdentity",
+        "successorP5Profile", "manifestSha256", "packageSha256", "files",
+        "reproducedPackageSha256", "reproducible", "recordedAt"
+      ],
+      "additionalProperties": false
+    },
+    "p6BuilderIdentity": {
+      "type": "object",
+      "properties": {
+        "node": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "esbuild": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "nodeExecutable": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+            "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+          },
+          "required": ["path", "sha256"], "additionalProperties": false
+        },
+        "esbuildPackage": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+            "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+          },
+          "required": ["path", "sha256"], "additionalProperties": false
+        }
+      },
+      "required": ["node", "esbuild", "nodeExecutable", "esbuildPackage"],
+      "additionalProperties": false
+    },
+    "p6Operation": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "P6Operation" },
+        "operationId": { "type": "string", "format": "uuid" },
+        "handoff": { "$ref": "#/$defs/ref" }, "handoffId": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "candidate": { "$ref": "#/$defs/ref" }, "gitCandidate": { "$ref": "#/$defs/ref" },
+        "candidateId": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "candidateSourceDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "previousRelease": { "$ref": "#/$defs/runningSourceRelease" },
+        "engineBuildId": { "type": "string", "pattern": "^[a-zA-Z0-9_-]{1,100}$" },
+        "shellBuildId": { "type": "string", "pattern": "^[a-zA-Z0-9_-]{1,100}$" },
+        "generation": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "enrollmentRoot": { "$ref": "#/$defs/ref" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["schemaVersion", "kind", "operationId", "handoff", "handoffId", "candidate", "gitCandidate",
+        "candidateId", "candidateSourceDigest", "previousRelease", "engineBuildId", "shellBuildId", "generation", "enrollmentRoot", "createdAt"],
+      "additionalProperties": false
+    },
+    "p6SourceRefusal": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "P6SourceContinuityRefusal" },
+        "operationId": { "type": "string", "format": "uuid" }, "operationIntent": { "$ref": "#/$defs/ref" },
+        "handoff": { "$ref": "#/$defs/ref" }, "handoffId": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "candidate": { "$ref": "#/$defs/ref" }, "gitCandidate": { "$ref": "#/$defs/ref" },
+        "packageSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "sourceCommit": { "type": "string", "pattern": "^([a-f0-9]{40}|[a-f0-9]{64})$" },
+        "sourceTree": { "type": "string", "pattern": "^([a-f0-9]{40}|[a-f0-9]{64})$" },
+        "reasonCode": { "type": "string", "pattern": "^[a-z0-9_]{1,96}$" },
+        "diagnosticsDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "recordedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["schemaVersion", "kind", "operationId", "operationIntent", "handoff", "handoffId", "candidate", "gitCandidate",
+        "packageSha256", "sourceCommit", "sourceTree", "reasonCode", "diagnosticsDigest", "recordedAt"],
+      "additionalProperties": false
+    },
+    "p6StageReceipt": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "P6StageReceipt" },
+        "operationId": { "type": "string", "format": "uuid" },
+        "fromEngineBuildId": { "type": "string", "pattern": "^[a-zA-Z0-9_-]{1,100}$" },
+        "toEngineBuildId": { "type": "string", "pattern": "^[a-zA-Z0-9_-]{1,100}$" },
+        "shellBuildId": { "type": "string", "pattern": "^[a-zA-Z0-9_-]{1,100}$" },
+        "packageSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "phase": { "const": "staged" }, "recordedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["schemaVersion", "kind", "operationId", "fromEngineBuildId", "toEngineBuildId", "shellBuildId", "packageSha256", "phase", "recordedAt"],
+      "additionalProperties": false
+    },
+    "p6SwitchAdmission": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "P6SwitchAdmission" },
+        "operationId": { "type": "string", "format": "uuid" },
+        "operationIntent": { "$ref": "#/$defs/ref" }, "handoff": { "$ref": "#/$defs/ref" },
+        "buildReceipt": { "$ref": "#/$defs/ref" }, "stageReceipt": { "$ref": "#/$defs/ref" },
+        "candidate": { "$ref": "#/$defs/ref" }, "gitCandidate": { "$ref": "#/$defs/ref" },
+        "previousRelease": { "$ref": "#/$defs/runningSourceRelease" },
+        "engineBuildId": { "type": "string", "pattern": "^[a-zA-Z0-9_-]{1,100}$" },
+        "shellBuildId": { "type": "string", "pattern": "^[a-zA-Z0-9_-]{1,100}$" },
+        "generation": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "packageSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "admittedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["schemaVersion", "kind", "operationId", "operationIntent", "handoff", "buildReceipt", "stageReceipt",
+        "candidate", "gitCandidate", "previousRelease", "engineBuildId", "shellBuildId", "generation", "packageSha256", "admittedAt"],
+      "additionalProperties": false
+    },
+    "p6ContinuationReceipt": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 }, "kind": { "const": "P6ContinuationReceipt" },
+        "operationId": { "type": "string", "format": "uuid" },
+        "buildReceipt": { "$ref": "#/$defs/ref" }, "operationIntent": { "$ref": "#/$defs/ref" },
+        "stageReceipt": { "$ref": "#/$defs/ref" }, "switchAdmission": { "$ref": "#/$defs/ref" },
+        "handoff": { "$ref": "#/$defs/ref" }, "candidate": { "$ref": "#/$defs/ref" }, "gitCandidate": { "$ref": "#/$defs/ref" },
+        "previousRelease": { "$ref": "#/$defs/runningSourceRelease" },
+        "successorRelease": { "$ref": "#/$defs/ref" }, "successorProfile": { "$ref": "#/$defs/ref" },
+        "packageSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "hostSwitchStatus": {
+          "type": "object",
+          "properties": {
+            "operationId": { "type": "string", "format": "uuid" },
+            "phase": { "enum": ["committed", "verified"] },
+            "fromEngineBuildId": { "type": "string", "pattern": "^[a-zA-Z0-9_-]{1,100}$" },
+            "toEngineBuildId": { "type": "string", "pattern": "^[a-zA-Z0-9_-]{1,100}$" },
+            "shellBuildId": { "type": "string", "pattern": "^[a-zA-Z0-9_-]{1,100}$" },
+            "packageSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+          },
+          "required": ["operationId", "phase", "fromEngineBuildId", "toEngineBuildId", "shellBuildId", "packageSha256"],
+          "additionalProperties": false
+        },
+        "observedRunningSourceRelease": { "$ref": "#/$defs/runningSourceRelease" },
+        "recordedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["schemaVersion", "kind", "operationId", "buildReceipt", "operationIntent", "stageReceipt", "switchAdmission",
+        "handoff", "candidate", "gitCandidate", "previousRelease", "successorRelease", "successorProfile", "packageSha256",
+        "hostSwitchStatus", "observedRunningSourceRelease", "recordedAt"],
       "additionalProperties": false
     }
   }

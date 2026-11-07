@@ -4,7 +4,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
@@ -16,6 +17,8 @@ const repo = resolve(import.meta.dirname, '../..');
 const testsRoot = join(repo, '.deszo/tests');
 const hostExe = join(repo, 'lifecycle-host/target/debug', process.platform === 'win32' ? 'deszo-lifecycle-host.exe' : 'deszo-lifecycle-host');
 const CHECKPOINT_ID = 'chk-host-proof-a-checkpoint';
+const TEST_FAULT_MARKER = '.deszo-test-fault-hooks';
+const TEST_FAULT_MARKER_CONTENT = 'DESZO_TEST_FAULT_HOOKS_V1\n';
 
 const agent = (id, provider, model, extra = {}) => ({ id, type: 'agent', config: { provider, model, timeoutSeconds: 120, output: { format: 'text' }, ...extra } });
 const edge = (id, source, sourcePort, target, targetPort) => ({ id, source: { nodeId: source, port: sourcePort }, target: { nodeId: target, port: targetPort } });
@@ -30,7 +33,32 @@ const repairWorkflow = () => workflow('repair-host-proof', [
 ], [edge('request-developer', 'request', 'text', 'developer', 'prompt'), edge('developer-watcher', 'developer', 'text', 'watcher', 'prompt'),
   edge('watcher-judge', 'watcher', 'text', 'judge', 'prompt'), edge('judge-finalize', 'judge', 'text', 'finalize', 'prompt'), edge('finalize-result', 'finalize', 'text', 'result', 'value')]);
 
-async function copyRuntimePackage(root, buildId, marker) {
+function packageArtifacts(root) {
+  const artifacts = [];
+  const walk = directory => {
+    for (const entry of readdirSync(directory, { withFileTypes: true }).sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)) {
+      const path = join(directory, entry.name);
+      if (path === join(root, 'build.json')) continue;
+      if (entry.isDirectory()) walk(path);
+      else if (entry.isFile()) {
+        const bytes = readFileSync(path);
+        artifacts.push({ path: path.slice(root.length + 1).replaceAll('\\', '/'),
+          sha256: createHash('sha256').update(bytes).digest('hex'), bytes: statSync(path).size });
+      }
+    }
+  };
+  walk(root);
+  return artifacts.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+}
+
+async function refreshBuildArtifacts(root) {
+  const manifestPath = join(root, 'build.json');
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  manifest.artifacts = packageArtifacts(root);
+  await writeFile(manifestPath, JSON.stringify(manifest));
+}
+
+async function copyRuntimePackage(root, buildId, marker, { testFaultHooks = false } = {}) {
   await mkdir(root, { recursive: true });
   await cp(join(repo, 'runtime'), join(root, 'runtime'), { recursive: true });
   await cp(join(repo, 'mcp'), join(root, 'mcp'), { recursive: true });
@@ -42,7 +70,9 @@ async function copyRuntimePackage(root, buildId, marker) {
     const source = join(repo, 'docs/examples', name);
     await cp(source, join(root, 'docs/examples', name), { recursive: true });
   }
-  await writeFile(join(root, 'build.json'), JSON.stringify({ schemaVersion: 1, buildId, runtimeApiVersion: 2, bootstrap: 'runtime', marker }));
+  if (testFaultHooks) await writeFile(join(root, TEST_FAULT_MARKER), TEST_FAULT_MARKER_CONTENT);
+  await writeFile(join(root, 'build.json'), JSON.stringify({ schemaVersion: 1, buildId, runtimeApiVersion: 2, bootstrap: 'runtime', marker,
+    artifacts: packageArtifacts(root) }));
 }
 
 function hostProcess(configPath, { expectSetupToken = true } = {}) {
@@ -187,8 +217,11 @@ async function prepareFreshInstallation(iteration, { candidateManifestBuildId = 
   const fixtureState = join(root, 'fixture-state'); const buildA = join(install, 'versions/build-a'); const candidateB = join(staging, 'build-b');
   await Promise.all([mkdir(buildA, { recursive: true }), mkdir(candidateB, { recursive: true }), mkdir(profile, { recursive: true }), mkdir(staging, { recursive: true }), mkdir(fixtureState, { recursive: true })]);
   await copyRuntimePackage(buildA, 'build-a', `current-${iteration}`);
-  await copyRuntimePackage(candidateB, candidateManifestBuildId, `candidate-${iteration}`);
-  if (corruptCandidateRunner) await writeFile(join(candidateB, 'runtime/runner.mjs'), "throw new Error('candidate Engine readiness failure');\n");
+  await copyRuntimePackage(candidateB, candidateManifestBuildId, `candidate-${iteration}`, { testFaultHooks: duplicateReceiptDelivery });
+  if (corruptCandidateRunner) {
+    await writeFile(join(candidateB, 'runtime/runner.mjs'), "throw new Error('candidate Engine readiness failure');\n");
+    await refreshBuildArtifacts(candidateB);
+  }
   const candidateDigest = await digestCandidate(candidateB);
   const configPath = join(root, 'host-config.json');
   await writeFile(configPath, JSON.stringify({ installationRoot: install, profileRoot: profile, stagingRoot: staging, nodeExecutable: process.execPath,

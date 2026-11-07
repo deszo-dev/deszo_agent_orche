@@ -718,6 +718,18 @@ test('P5 candidate capture seals actual add/modify/delete bytes and refuses scop
   await assert.rejects(verifyP5EnrollmentFileCurrent({ ...loaded, ...fixtureNativeEvidence }),
     { code: 'p5_enrollment_changed' });
   writeFileSync(enrollmentPath, enrollmentBytes);
+  // A P6 successor (P6-BUILD-UNBLOCK): the installed file stays the root enrollment while the loaded one is its continuation.
+  assert.equal(loaded.fileEnrollmentDigest, canonicalHash(enrollment));
+  const successor = { ...enrollment, harnessClosureDigest: '7'.repeat(64) };
+  const successorLoaded = { ...loaded, enrollment: successor, enrollmentDigest: canonicalHash(successor) };
+  assert.equal(canonicalHash(await verifyP5EnrollmentFileCurrent({ ...successorLoaded, ...fixtureNativeEvidence })), canonicalHash(successor));
+  await assert.rejects(verifyP5EnrollmentFileCurrent({ ...successorLoaded, fileEnrollmentDigest: undefined, ...fixtureNativeEvidence }),
+    { code: 'p5_enrollment_changed' }, 'comparing the root file with the successor digest refuses every P6 successor (the defect)');
+  await assert.rejects(verifyP5EnrollmentFileCurrent({ ...successorLoaded, enrollment: { ...successor, baseTree: 'e'.repeat(40) },
+    ...fixtureNativeEvidence }), { code: 'p5_enrollment_unavailable' });
+  writeFileSync(enrollmentPath, Buffer.concat([enrollmentBytes, Buffer.from('\n')]));
+  await assert.rejects(verifyP5EnrollmentFileCurrent({ ...successorLoaded, ...fixtureNativeEvidence }), { code: 'p5_enrollment_changed' });
+  writeFileSync(enrollmentPath, enrollmentBytes);
   assert.equal(assertP5EnrollmentCurrent({ store, enrollment, profile, parentPublication, repairPublication, sourceRelease: releaseRef,
     currentRepositoryIdentity: repositoryIdentity }).profileDigest, canonicalHash(profile));
   assert.throws(() => assertP5EnrollmentCurrent({ store, enrollment: { ...enrollment, harnessClosureDigest: '5'.repeat(64) },

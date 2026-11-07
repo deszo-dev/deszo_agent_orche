@@ -1,0 +1,304 @@
+{
+  "schemaVersion": 1,
+  "kind": "P6G0SwitchEvidence",
+  "capturedAt": "2026-11-01T09:26:36.794Z",
+  "host": {
+    "path": "C:\\my\\2026\\deszo_agent_orche\\lifecycle-host\\target\\debug\\deszo-lifecycle-host.exe",
+    "sha256Before": "190efe9beda1edb019f6b3db97532a890cb9d5c3445c6df73d4f9774056b2a56",
+    "sha256After": "190efe9beda1edb019f6b3db97532a890cb9d5c3445c6df73d4f9774056b2a56"
+  },
+  "shell": {
+    "path": "installation/shell/deszo.exe",
+    "sha256Before": "60cd2526f37c649d444aeeee74f150a62b32fe53d649cac8e2607f1ddbd72dbe",
+    "shellBuildId": "shell-g0",
+    "sha256After": "60cd2526f37c649d444aeeee74f150a62b32fe53d649cac8e2607f1ddbd72dbe"
+  },
+  "engines": {
+    "A": {
+      "engineBuildId": "engine-a",
+      "shellBuildId": "shell-g0",
+      "sourceCommit": "25cf8f8e46ca66dfe96a08cd95fd7a181966e143",
+      "runnerSha256": "1c947140416eb5f31325274901f90c194095415ce286e539851c7f2f5da955f7",
+      "packageSha256": "425aa77de5d349622b62f9ac71096da331b12933f45e18230d7016761eb93104"
+    },
+    "B": {
+      "engineBuildId": "engine-b",
+      "shellBuildId": "shell-g0",
+      "sourceCommit": "f342202f3e400ad71e19d202442edb7b30204b1f",
+      "runnerSha256": "c442d429cccda6d53342ae866014434fffc988157dc7cc6ea8e31c026cd61a80",
+      "packageSha256": "f3ce0add6b1f1ad3e2f5ab86a92eaf4a39e4696b617c71eae0cc30beb1866695"
+    }
+  },
+  "operation": {
+    "operationId": "f95e307e-6951-4668-acec-d137fe4cf73b",
+    "productionStoreSha256BeforeSwitch": "a536ebc2f686a1b83ec2f78cca54fa11122ccc343792a655e1b64d8c4823f6cf",
+    "triggerStatus": 202,
+    "triggerBody": {
+      "operationId": "f95e307e-6951-4668-acec-d137fe4cf73b",
+      "accepted": true,
+      "phase": "fenced",
+      "stagedPhase": "staged"
+    },
+    "phase": "verified",
+    "fallbackAttempted": false,
+    "previousGeneration": "0060c301-2840-4db1-91be-4306d0277fdb",
+    "candidateGeneration": "8feca578-08ac-41e5-ba3a-8592af63ad4a",
+    "storeEvidence": {
+      "copiedFiles": [
+        {
+          "bytes": 786432,
+          "fileIndex": 5910974512859678,
+          "lastWriteTime": 134379988675501550,
+          "name": "state.sqlite",
+          "path": "\\\\?\\C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\p6-g0-evidence-eSJAHO\\installation\\.deszo-host\\p6\\f95e307e-6951-4668-acec-d137fe4cf73b\\preflight\\state.sqlite",
+          "sha256": "a536ebc2f686a1b83ec2f78cca54fa11122ccc343792a655e1b64d8c4823f6cf",
+          "volumeSerial": 538531228
+        },
+        {
+          "bytes": 37112,
+          "fileIndex": 5910974512859736,
+          "lastWriteTime": 134379988676169920,
+          "name": "state.sqlite-wal",
+          "path": "\\\\?\\C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\p6-g0-evidence-eSJAHO\\installation\\.deszo-host\\p6\\f95e307e-6951-4668-acec-d137fe4cf73b\\preflight\\state.sqlite-wal",
+          "sha256": "4d609dbd32ae3905298e6f7e756508c98daaed57ce0ff98f9da0a5c745af10c1",
+          "volumeSerial": 538531228
+        }
+      ],
+      "productionFiles": [
+        {
+          "bytes": 786432,
+          "fileIndex": 18295873488128530,
+          "lastWriteTime": 134379988388937660,
+          "name": "state.sqlite",
+          "path": "\\\\?\\C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\p6-g0-evidence-eSJAHO\\profile\\store\\state.sqlite",
+          "sha256": "a536ebc2f686a1b83ec2f78cca54fa11122ccc343792a655e1b64d8c4823f6cf",
+          "volumeSerial": 538531228
+        },
+        {
+          "bytes": 37112,
+          "fileIndex": 11540474047072784,
+          "lastWriteTime": 134379988389735470,
+          "name": "state.sqlite-wal",
+          "path": "\\\\?\\C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\p6-g0-evidence-eSJAHO\\profile\\store\\state.sqlite-wal",
+          "sha256": "4d609dbd32ae3905298e6f7e756508c98daaed57ce0ff98f9da0a5c745af10c1",
+          "volumeSerial": 538531228
+        },
+        {
+          "bytes": 32768,
+          "fileIndex": 5066549582727705,
+          "lastWriteTime": 134379988389023570,
+          "name": "state.sqlite-shm",
+          "path": "\\\\?\\C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\p6-g0-evidence-eSJAHO\\profile\\store\\state.sqlite-shm",
+          "sha256": "672ac280e4ad9aa6ceaa7de343f13f0ecc58f9269f6e02c09fbbf695fafd8da8",
+          "volumeSerial": 538531228
+        }
+      ],
+      "productionRoot": "\\\\?\\C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\p6-g0-evidence-eSJAHO\\profile\\store",
+      "scratchRoot": "\\\\?\\C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\p6-g0-evidence-eSJAHO\\installation\\.deszo-host\\p6\\f95e307e-6951-4668-acec-d137fe4cf73b\\preflight",
+      "snapshotSha256": "3acf5676160c4c2b77518bfd18779e9dae3c121df15cfe6d34462c0aac195f8b"
+    },
+    "preflight": {
+      "applicationPid": 19768,
+      "copySha256": "a536ebc2f686a1b83ec2f78cca54fa11122ccc343792a655e1b64d8c4823f6cf",
+      "engineBuildId": "engine-b",
+      "generation": "8feca578-08ac-41e5-ba3a-8592af63ad4a",
+      "migrationCount": 22,
+      "pid": 3148,
+      "quickCheck": "ok",
+      "shellBuildId": "shell-g0",
+      "storeSchemaVersion": 22
+    },
+    "receipt": {
+      "applicationPid": 19768,
+      "engineBuildId": "engine-b",
+      "enginePid": 3148,
+      "generation": "8feca578-08ac-41e5-ba3a-8592af63ad4a",
+      "readyAt": "1793525282131",
+      "storeId": "c55920b9-c24a-473b-9a2a-152e2f56de82"
+    },
+    "copiedStateSha256": "a536ebc2f686a1b83ec2f78cca54fa11122ccc343792a655e1b64d8c4823f6cf",
+    "productionStateSha256AtBoundary": "a536ebc2f686a1b83ec2f78cca54fa11122ccc343792a655e1b64d8c4823f6cf"
+  },
+  "selectorBefore": {
+    "buildId": "engine-a",
+    "digest": "425aa77de5d349622b62f9ac71096da331b12933f45e18230d7016761eb93104",
+    "generation": "0060c301-2840-4db1-91be-4306d0277fdb"
+  },
+  "selectorAfter": {
+    "buildId": "engine-b",
+    "digest": "f3ce0add6b1f1ad3e2f5ab86a92eaf4a39e4696b617c71eae0cc30beb1866695",
+    "generation": "8feca578-08ac-41e5-ba3a-8592af63ad4a",
+    "committedOperationId": "f95e307e-6951-4668-acec-d137fe4cf73b"
+  },
+  "journal": [
+    {
+      "at": "1793525229880",
+      "type": "host_started",
+      "payload": {
+        "hostPid": 28728,
+        "installationId": "aa68801d1a15af3e8acbcb7ef77e3592",
+        "profileRoot": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\p6-g0-evidence-eSJAHO\\profile"
+      }
+    },
+    {
+      "at": "1793525236369",
+      "type": "application_spawned",
+      "payload": {
+        "applicationPid": 4956,
+        "arguments": [
+          "--host-managed"
+        ],
+        "bootstrap": "engine",
+        "buildId": "engine-a",
+        "executable": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\p6-g0-evidence-eSJAHO\\installation\\shell\\deszo.exe",
+        "generation": "0060c301-2840-4db1-91be-4306d0277fdb",
+        "pid": 4956,
+        "profileRoot": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\p6-g0-evidence-eSJAHO\\profile"
+      }
+    },
+    {
+      "at": "1793525239018",
+      "type": "engine_ready",
+      "payload": {
+        "applicationPid": 4956,
+        "buildId": "engine-a",
+        "enginePid": 20420,
+        "generation": "0060c301-2840-4db1-91be-4306d0277fdb",
+        "pid": 20420,
+        "receiptId": null,
+        "runtimeInstanceId": "273dcefe-7d38-4fcc-bcd5-b861f16d6b7a",
+        "storeId": "c55920b9-c24a-473b-9a2a-152e2f56de82"
+      }
+    },
+    {
+      "at": "1793525257087",
+      "type": "engine_staged",
+      "payload": {
+        "candidateGeneration": "8feca578-08ac-41e5-ba3a-8592af63ad4a",
+        "engineBuildId": "engine-b",
+        "operationId": "f95e307e-6951-4668-acec-d137fe4cf73b",
+        "packageSha256": "f3ce0add6b1f1ad3e2f5ab86a92eaf4a39e4696b617c71eae0cc30beb1866695"
+      }
+    },
+    {
+      "at": "1793525265642",
+      "type": "engine_switch_accepted",
+      "payload": {
+        "fromEngineBuildId": "engine-a",
+        "generation": "0060c301-2840-4db1-91be-4306d0277fdb",
+        "operationId": "f95e307e-6951-4668-acec-d137fe4cf73b",
+        "toEngineBuildId": "engine-b"
+      }
+    },
+    {
+      "at": "1793525267474",
+      "type": "managed_process_tree_stopped",
+      "payload": {
+        "applicationPid": 4956,
+        "bootstrap": "engine",
+        "buildId": "engine-a",
+        "enginePid": 20420,
+        "generation": "0060c301-2840-4db1-91be-4306d0277fdb",
+        "pid": 4956
+      }
+    },
+    {
+      "at": "1793525271408",
+      "type": "application_spawned",
+      "payload": {
+        "applicationPid": 19768,
+        "arguments": [
+          "--host-managed"
+        ],
+        "bootstrap": "engine",
+        "buildId": "engine-b",
+        "executable": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\p6-g0-evidence-eSJAHO\\installation\\shell\\deszo.exe",
+        "generation": "8feca578-08ac-41e5-ba3a-8592af63ad4a",
+        "pid": 19768,
+        "profileRoot": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\p6-g0-evidence-eSJAHO\\profile"
+      }
+    },
+    {
+      "at": "1793525272693",
+      "type": "engine_preflight_passed",
+      "payload": {
+        "applicationPid": 19768,
+        "copySha256": "a536ebc2f686a1b83ec2f78cca54fa11122ccc343792a655e1b64d8c4823f6cf",
+        "engineBuildId": "engine-b",
+        "generation": "8feca578-08ac-41e5-ba3a-8592af63ad4a",
+        "migrationCount": 22,
+        "pid": 3148,
+        "quickCheck": "ok",
+        "shellBuildId": "shell-g0",
+        "storeSchemaVersion": 22
+      }
+    },
+    {
+      "at": "1793525272825",
+      "type": "engine_store_boundary_verified",
+      "payload": {
+        "copiedFiles": 2,
+        "operationId": "f95e307e-6951-4668-acec-d137fe4cf73b",
+        "productionFiles": 3,
+        "productionSnapshotSha256": "3acf5676160c4c2b77518bfd18779e9dae3c121df15cfe6d34462c0aac195f8b"
+      }
+    },
+    {
+      "at": "1793525281487",
+      "type": "engine_switch_committed",
+      "payload": {
+        "engineBuildId": "engine-b",
+        "generation": "8feca578-08ac-41e5-ba3a-8592af63ad4a",
+        "operationId": "f95e307e-6951-4668-acec-d137fe4cf73b",
+        "packageSha256": "f3ce0add6b1f1ad3e2f5ab86a92eaf4a39e4696b617c71eae0cc30beb1866695"
+      }
+    },
+    {
+      "at": "1793525282136",
+      "type": "engine_switch_verified",
+      "payload": {
+        "operationId": "f95e307e-6951-4668-acec-d137fe4cf73b"
+      }
+    },
+    {
+      "at": "1793525282140",
+      "type": "engine_ready",
+      "payload": {
+        "applicationPid": 19768,
+        "buildId": "engine-b",
+        "enginePid": 3148,
+        "generation": "8feca578-08ac-41e5-ba3a-8592af63ad4a",
+        "pid": 3148,
+        "receiptId": null,
+        "runtimeInstanceId": "17536c73-4b9c-4a30-8b5e-be37b44e3326",
+        "storeId": "c55920b9-c24a-473b-9a2a-152e2f56de82"
+      }
+    },
+    {
+      "at": "1793525282500",
+      "type": "managed_process_tree_stopped",
+      "payload": {
+        "applicationPid": 19768,
+        "bootstrap": "engine",
+        "buildId": "engine-b",
+        "enginePid": 3148,
+        "generation": "8feca578-08ac-41e5-ba3a-8592af63ad4a",
+        "pid": 19768
+      }
+    },
+    {
+      "at": "1793525282505",
+      "type": "host_stopped",
+      "payload": {
+        "hostPid": 28728
+      }
+    }
+  ],
+  "enginePids": {
+    "A": 20420,
+    "B": 3148,
+    "AAliveAfter": false,
+    "BAliveAfterHostStop": false
+  },
+  "scratchCopy": true
+}

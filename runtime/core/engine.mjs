@@ -13,7 +13,8 @@ import { UtilityError, captureFiles, jsonValue, ref, resolvePointer, runUtility,
 import { loadP5EnrollmentWithHostIdentity, P5_ENROLLMENT_RELATIVE_PATH, P5_EVENT_TYPES, validateP5Contract, verifyP5EnrollmentFileCurrent,
   verifyP5GitBaselineCurrent, prepareP5WorkspaceFromIntent, captureP5VerificationInputs, verifyP5VerificationInputsCurrent,
   sealP5Candidate, verifyP5RunningSourceInventory, verifyP5Receipt, inventoryP5SourceWithHost, p5CandidateId, assertP5VerificationPolicy,
-  ProtectedSelfRepairError, verifyP5GitToolIdentity, p5CaptureFailureDisposition, p5CaptureHoldDecision, P5_CAPTURE_HOLD_DELAYS_MS } from './protectedSelfRepair.mjs';
+  ProtectedSelfRepairError, verifyP5GitToolIdentity, p5CaptureFailureDisposition, p5CaptureHoldDecision, P5_CAPTURE_HOLD_DELAYS_MS,
+  enrolledParentProfile, p5EnrollmentWorkspacePool } from './protectedSelfRepair.mjs';
 import { installProtectedSelfRepairGate } from './p5Gate.mjs';
 // The installed release root (no P5 candidate workspace may overlap it) and its P5 package-layout check.
 import { ENGINE_RELEASE_ROOT } from './engineRoot.mjs';
@@ -102,8 +103,12 @@ export function routeCase(cases, selected) {
   return matches.length > 1 ? { error: 'contract' } : matches.length ? { caseId: matches[0].id } : { caseId: null };
 }
 
+// A value keyed by data (a node identity), read only from the table's own entries: a key such as 'constructor' must not reach Object
+// through the prototype chain.
+const ownEntry = (table, key) => (Object.hasOwn(table, key) ? table[key] : undefined);
+
 export class Engine {
-  constructor({ root, adapters = defaultAdapters, processContainment = 'standalone-best-effort', supervisorGeneration = randomUUID(), runtimeInstanceId = randomUUID(), nodeExecutable = process.execPath, bridgeScript = resolve(import.meta.dirname, '../../mcp/bridge.mjs'), externalRunConfirmationOverride = null, maximumAgentTimeoutSeconds = M1_MAXIMUM_TIMEOUT, detectionTtlMs = 30_000, loopMinuteMs = 60_000, supervisor = null, hostAuthority = null, hostRuntimeGeneration = null, hostPolicyId = null,hostVerificationOnly=false, judgeAttentionEnabled=false, lifecycleHost = null, lifecycleClient = null, custodyHost = null, processCustodyRequired = false } = {}) {
+  constructor({ root, adapters = defaultAdapters, processContainment = 'standalone-best-effort', supervisorGeneration = randomUUID(), runtimeInstanceId = randomUUID(), nodeExecutable = process.execPath, bridgeScript = resolve(import.meta.dirname, '../../mcp/bridge.mjs'), externalRunConfirmationOverride = null, maximumAgentTimeoutSeconds = M1_MAXIMUM_TIMEOUT, detectionTtlMs = 30_000, loopMinuteMs = 60_000, supervisor = null, hostAuthority = null, hostRuntimeGeneration = null, hostPolicyId = null,hostVerificationOnly=false, judgeAttentionEnabled=false, lifecycleHost = null, lifecycleClient = null, custodyHost = null, processCustodyRequired = false, } = {}) {
     // Process Custody (PoC) owns CLIs through the Lifecycle Host. A Local Control Host binding has its own run permits, so the
     // two are not combined in this PoC.
     if ((custodyHost || processCustodyRequired) && hostAuthority) throw new Error('Process Custody is not available with a Local Control Host binding in this PoC.');
@@ -240,7 +245,8 @@ export class Engine {
       const runningSourceRelease = await this.lifecycleClient.runningSourceRelease({ pid: process.pid });
       const readers = this.protectedSelfRepairHostReaders();
       const loaded = await loadP5EnrollmentWithHostIdentity({ profileRoot, store: this.store,
-        installationId: this.lifecycleHost.installationId, runningSourceRelease, ...readers });
+        installationId: this.lifecycleHost.installationId, runningSourceRelease,
+        hostSwitchStatusReader: operationId => this.lifecycleClient.p6Call('engine.switch_status', { operationId }), ...readers });
       if (!loaded) return false;
       await verifyP5RunningSourceInventory({ store: this.store, enrollment: loaded.enrollment,
         currentRunningSourceRelease: runningSourceRelease, generation: this.lifecycleHost.generation,
@@ -436,7 +442,7 @@ export class Engine {
       || workflow.workflowId !== enrollment.parentPublication.workflowId)
       throw new ApiError(409, 'p5_publication_mismatch', 'This P5 Run does not use the exact enrolled Parent publication.');
     const profileMatches = (workflow.judgePolicy?.repairProfiles || []).filter(item => item.selfRepair
-      && canonicalHash(item.selfRepair) === canonicalHash(enrollment.profile));
+      && canonicalHash(item.selfRepair) === canonicalHash(enrolledParentProfile(enrollment)));
     if (profileMatches.length !== 1)
       throw new ApiError(409, 'p5_profile_mismatch', 'The enrolled Parent publication must contain exactly one Repair profile bound to the enrolled P5 profile artifact.');
     const repairPublication = this.store.get(`SELECT p.*, a.sha256 AS snapshot_sha256 FROM workflow_publications p
@@ -488,11 +494,11 @@ export class Engine {
       || attention?.judgeAttemptId !== attempt?.id || !parentWorkflow.capabilities?.includes('protected-self-repair-v1')
       || parent.published_version_id !== enrollment.parentPublication.publishedVersionId
       || parentWorkflow.workflowId !== enrollment.parentPublication.workflowId
-      || profile.selfRepair.artifactId !== enrollment.profile.artifactId || profile.selfRepair.sha256 !== enrollment.profile.sha256
+      || profile.selfRepair.artifactId !== enrolledParentProfile(enrollment).artifactId || profile.selfRepair.sha256 !== enrolledParentProfile(enrollment).sha256
       || profile.repairWorkflowId !== enrollment.repairPublication.workflowId
       || profile.repairPublishedVersion !== enrollment.repairPublication.version
       || profile.repairWorkflowSnapshotSha256 !== enrollment.repairPublication.snapshotSha256
-      || profile.repairWorkspaceId !== enrollment.workspace.workspaceId
+      || !p5EnrollmentWorkspacePool(enrollment).some(entry => entry.workspaceId === profile.repairWorkspaceId)
       || profile.acceptanceMode !== 'judge_post_execution')
       throw new ApiError(409, 'p5_repair_profile_mismatch', 'The exact P4 request, enrolled Parent, P5 profile and Repair publication do not agree.');
     const targetOutcomes = (context.outcomes || []).filter(item => item.outcome?.nodeInstanceId === profile.failedNodeInstanceId);
@@ -754,7 +760,7 @@ export class Engine {
       || node.config.contextId || !state.workflow.capabilities?.includes('protected-self-repair-v1'))
       fail('p5_developer_execution_unsupported', 'The enrolled P5 Developer must be one top-level, context-free Agent Attempt.');
     const p2Profile = authorization.profile;
-    if (p2Profile.selfRepair.artifactId !== enrollment.profile.artifactId || p2Profile.selfRepair.sha256 !== enrollment.profile.sha256
+    if (p2Profile.selfRepair.artifactId !== enrolledParentProfile(enrollment).artifactId || p2Profile.selfRepair.sha256 !== enrolledParentProfile(enrollment).sha256
       || authorization.repairRunId !== state.id || authorization.parentRunId !== link.parent_run_id
       || authorization.incidentId !== link.incident_id || authorization.repairWorkspaceId !== enrollment.workspace.workspaceId
       || !authorization.outcomeId || !Number.isSafeInteger(authorization.outcomeRevision))
@@ -1406,9 +1412,27 @@ export class Engine {
         if (this.blockLogicalRepair(link, 'p5_candidate_invalidated', 'P5 candidate eligibility was revoked before startup continuation.')) report.blocked.push(link.id);
       } else if (projection.stage === 'held_uncertain') {
         report.held.push(link.id);
+      } else if (projection.stage === 'retained_for_p6' && projection.eligible) {
+        this.triggerP6Consumer(link.repair_run_id);
       }
     }
     return report;
+  }
+
+  triggerP6Consumer(repairRunId, targetEngineBuildId = null) {
+    if (!repairRunId || this.p6ConsumerActive) return;
+    this.p6ConsumerActive = true;
+    setImmediate(async () => {
+      try {
+        // The activation is bound by the entry point (runner.mjs). This module never imports the P6 consumer or the builder.
+        if (typeof this.p6Activation !== 'function') throw Object.assign(new Error('The Engine has no P6 activation bound.'), { code: 'p6_activation_unbound' });
+        await this.p6Activation(repairRunId, targetEngineBuildId);
+      } catch (error) {
+        process.stderr.write(`[P6] Activation background task failed for ${repairRunId}${error.code ? ` (${error.code})` : ''}: ${error.stack || error.message}\n`);
+      } finally {
+        this.p6ConsumerActive = false;
+      }
+    });
   }
 
   assertWorkflowJudgeRuntimeAvailable(workflow) {
@@ -1754,6 +1778,8 @@ export class Engine {
     const existing = this.store.get('SELECT * FROM workspaces WHERE id = ?', workspaceId);
     const now = nowIso();
     if (existing) {
+      if (existing.cwd_identity !== identity && this.protectedSelfRepairRootLocked(workspaceId))
+        throw new ApiError(409, 'p5_workspace_enrolled', 'An enrolled or claimed P5 workspace slot keeps its root; it cannot be rebound to another directory (P5-08).');
       if (existing.cwd_identity !== identity && this.activeRun(workspaceId)) throw new ApiError(409, 'conflict', 'A run is active in this workspace; it cannot be rebound now.');
       this.store.run('UPDATE workspaces SET cwd = ?, cwd_identity = ?, updated_at = ? WHERE id = ?', requested, identity, now, workspaceId);
     } else {
@@ -2305,7 +2331,7 @@ export class Engine {
     const incarnation = this.store.get('SELECT incarnation_id FROM cache_node_incarnations WHERE workflow_id = ? AND node_id = ? AND active = 1', workflow.workflowId, nodeId);
     if (!incarnation) throw new ApiError(409, 'conflict', `Cache node "${nodeId}" has no active identity.`);
     const pins = { ...this.pinsFor(workflow.workflowId), [nodeId]: { value } };
-    const fingerprint = this.cacheFingerprints(workflow, pins)[nodeId];
+    const fingerprint = ownEntry(this.cacheFingerprints(workflow, pins), nodeId);
     this.store.run(`INSERT INTO cache_pins(workflow_id, node_id, value_json, source_run_id, source_attempt_id, fingerprint, pinned_at, incarnation_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(workflow_id, node_id) DO UPDATE SET value_json = excluded.value_json, source_run_id = excluded.source_run_id, source_attempt_id = excluded.source_attempt_id, fingerprint = excluded.fingerprint, pinned_at = excluded.pinned_at, incarnation_id = excluded.incarnation_id`,
     workflow.workflowId, nodeId, canonicalize(value), runId, attemptId, fingerprint, nowIso(), incarnation.incarnation_id);
@@ -2677,13 +2703,17 @@ export class Engine {
       const captured = this.store.readJson(run.workflow_snapshot_artifact_id);
       const plan = run.plan_artifact_id ? this.store.readJson(run.plan_artifact_id) : { pins: {} };
       if (plan.effortPolicyVersion !== EFFORT_POLICY_VERSION) continue;
-      if (fingerprints(captured, plan.pins || {})[nodeId] !== fingerprint) continue;
+      if (ownEntry(fingerprints(captured, plan.pins || {}), nodeId) !== fingerprint) continue;
       return { runId: run.id, attemptId: attempt.id, outputs: attempt.outputs_artifact_id, bindingId: attempt.context_binding_id };
     }
     return null;
   }
 
   captureRun({ workflow, snapshot, workspace, kind, options, requestId, publication = null, p5Admission = null }) {
+    // The Engine-side admission barrier (ADR-0010 section 5): while this Engine quiesces for a switch, no executable Run is
+    // admitted, from any path. This check and the INSERT below run in one synchronous turn, so no admission can pass the check
+    // and commit later.
+    if (this.switchQuiescence?.active) throw new ApiError(503, 'switch_in_progress', 'The Engine is being replaced; new Runs are not admitted.');
     const protectedSelfRepair = workflow.capabilities.includes('protected-self-repair-v1');
     if (protectedSelfRepair && !this.protectedSelfRepairEnrollment)
       throw new ApiError(409, 'p5_enrollment_unavailable', 'This runtime cannot start a P5 publication without a loaded installation-owned enrollment and protected admission path.');
@@ -2708,7 +2738,8 @@ export class Engine {
     }
     const active = this.activeRun(workspace.id);
     if (active) throw new ApiError(409, 'conflict', active.state === 'waiting_for_user' ? 'The previous run in this workspace is waiting for recovery; close or stop it first.' : 'Another run is active in this workspace.');
-    if (this.protectedSelfRepairWorkspaceReserved?.(workspace.id))
+    // Only a validated P5 Repair admission may enter an enrolled slot; ordinary and Parent runs never do (P5-08 single use).
+    if (!repairAdmission && this.protectedSelfRepairWorkspaceReserved?.(workspace.id, workspace.cwd))
       throw new ApiError(409, 'p5_workspace_reserved', 'An enrolled P5 workspace slot is single-use and remains reserved after its linked Repair is admitted.');
     // A Host-owned process may still be running in an overlapping workspace (H3): no other Run starts there until its owner confirms the end.
     if (this.custodyHoldOverlapping(workspace.cwd)) throw new ApiError(409, 'conflict', 'A Host-owned process may still be running in this workspace; another run cannot use it until its owner confirms that it has ended.');
@@ -3647,7 +3678,12 @@ export class Engine {
     // A Custody claim is held by the admission above until its work starts (the barrier is inert outside tests).
     const started = () => this.executeAgent(state, scope, node, attempt, workspace, mapping, record, spec);
     (custodied ? afterBarrierWork(this.testBarrier, 'custody-claimed', { runId: state.id, nodeInstanceId: node.id, workspaceCwd: workspace.cwd }, started) : started()).catch(error => {
-      try { this.failAttempt(state, this.store.get('SELECT * FROM attempts WHERE id = ?', attempt.id), error instanceof CorruptionError ? 'corruption' : error.code === 'input_unavailable' ? 'input_unavailable' : 'process', error.message); }
+      // A P5 refusal raised on the agent path (for example a Judge admission refused in the commit transaction) keeps its own code as the
+      // failure's raw code. The canonical code and its cause knowledge stay those of a process failure, as before.
+      const refusalCode = typeof error.code === 'string' && error.code.startsWith('p5_') ? error.code : null;
+      const code = error instanceof CorruptionError ? 'corruption' : error.code === 'input_unavailable' ? 'input_unavailable' : 'process';
+      try { this.failAttempt(state, this.store.get('SELECT * FROM attempts WHERE id = ?', attempt.id), code, error.message,
+        refusalCode ? { rawCode: refusalCode } : {}); }
       catch (journalError) { this.storageUnavailable(journalError); }
     }).finally(() => this.releaseAgent(state, attempt, record));
   }

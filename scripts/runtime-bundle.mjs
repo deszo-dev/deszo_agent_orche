@@ -26,10 +26,12 @@ const packagedRunner = root => ({
   },
 });
 
-export async function bundleRunner({ root, outfile }) {
+export async function bundleRunner({ root, outfile, testFaultHooks = false }) {
+  if (typeof testFaultHooks !== 'boolean') throw new TypeError('testFaultHooks must be boolean.');
   await build({
     entryPoints: [`${root}/runtime/runner.mjs`], outfile, absWorkingDir: root,
     bundle: true, platform: 'node', format: 'esm', target: 'node22', legalComments: 'none',
-    banner: { js: RUNNER_BANNER }, define: { __DESZO_PACKAGED__: 'true' }, plugins: [packagedRunner(root)],
+    banner: { js: RUNNER_BANNER }, define: { __DESZO_PACKAGED__: 'true', __DESZO_TEST_FAULT_HOOKS__: String(testFaultHooks) }, plugins: [packagedRunner(root)],
+    external: ['esbuild'],
   });
 }

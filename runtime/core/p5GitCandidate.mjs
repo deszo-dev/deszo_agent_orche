@@ -3,6 +3,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { canonicalBytes, canonicalHash, compareText, parseStrictJson, sha256 } from './canonical.mjs';
 import { assertValid } from './schemas.mjs';
 import { workspaceRootsOverlap } from './workspaceIsolation.mjs';
+import { materializeVerifiedP6GitObjects, verifyP6GitObjectSource } from './p6GitObjectSource.mjs';
 import { ProtectedSelfRepairError, inventoryP5Source, inventoryP5SourceWithHost, p5SourceDigest,
   runP5GitCommand, runP5GitCommandAsync, validateP5Contract, validateP5SourcePath, verifyP5GitAttributes, verifyP5GitToolIdentity } from './protectedSelfRepair.mjs';
 import { assertP5HostBoundary, deriveP5HostProtection, readP5HostProtection } from './p5HostBoundary.mjs';
@@ -546,7 +547,9 @@ function assertGitSourceEnrollment(store, enrollment, baseline) {
 function assertSafeRemote(remote) {
   let url;
   try { url = new URL(remote.url); } catch { fail('p5_git_remote_invalid', 'The enrolled Git remote is not an absolute URL.'); }
-  const expected = { file: 'file:', https: 'https:' }[remote.protocol];
+  // Only the table's own entries: a protocol of 'constructor' must not reach Object through the prototype chain.
+  const protocols = { file: 'file:', https: 'https:' };
+  const expected = Object.hasOwn(protocols, remote.protocol) ? protocols[remote.protocol] : null;
   if (!expected || url.protocol !== expected || url.username || url.password || url.search || url.hash
     || remote.protocol === 'https' && !url.hostname)
     fail('p5_git_remote_invalid', 'The enrolled Git remote must be a credential-free file or https URL of its declared protocol.');
@@ -560,13 +563,44 @@ function fetchArgs(remote, refspecs) {
     'fetch', '--quiet', '--no-tags', '--no-write-fetch-head', '--no-recurse-submodules', remote.url, ...refspecs];
 }
 
+/** Fetch only refs already authorized by the Owner-enrolled managed-clone source policy. */
+export function fetchP5EnrolledGitRefs({ gitTool, repositoryRoot, gitSource }) {
+  validateP5Contract('gitSource', gitSource);
+  if (gitSource.policy !== P5_GIT_CLONE_POLICY || !gitSource.fetchRefs.length)
+    fail('p5_git_source_policy_invalid', 'The enrolled source must authorize at least one managed-clone fetch ref.');
+  assertSafeRemote(gitSource.remote);
+  try { gitBytes(gitTool, repositoryRoot, fetchArgs(gitSource.remote, [...gitSource.fetchRefs])); }
+  catch { fail('p5_git_source_fetch_failed', 'The enrolled Git remote could not provide the installed source history.'); }
+  return [...gitSource.fetchRefs];
+}
+
+/** Require every commit parent in the selected installed history to exist locally. */
+export function verifyP5GitHistoryComplete({ gitTool, repositoryRoot, sourceCommit }) {
+  let rows;
+  try { rows = gitText(gitTool, repositoryRoot, ['rev-list', '--parents', sourceCommit]).split(/\r?\n/).filter(Boolean); }
+  catch { fail('p5_git_source_ancestry_incomplete', 'The installed source history cannot be read from the managed repository.'); }
+  const present = new Set(rows.map(line => line.split(' ')[0]));
+  for (const line of rows) for (const parent of line.split(' ').slice(1))
+    if (!present.has(parent)) fail('p5_git_source_ancestry_incomplete', 'The managed repository lacks part of the installed commit ancestry.');
+  return { historyLength: rows.length };
+}
+
 function commitPresent(gitTool, root, commit) {
   try { return gitText(gitTool, root, ['cat-file', '-t', commit]) === 'commit'; } catch { return false; }
 }
 
+function materializeP6SourceChain({ gitTool, repositoryRoot, localSource }) {
+  let materialized = null;
+  for (const provenance of localSource.provenanceChain ?? [localSource.provenance])
+    materialized = materializeVerifiedP6GitObjects({ gitTool, repositoryRoot, provenance });
+  return materialized;
+}
+
 // Fetch only the exact installed commit's history. A server that refuses an object-ID want is asked for the
 // enrolled refs instead, but no ref is written locally and a moved ref can never replace the installed commit.
-function fetchInstalledCommit(gitTool, root, source, resultPath, intentRef) {
+function fetchInstalledCommit(gitTool, root, source, resultPath, intentRef, { store, enrollment, baseline }) {
+  const localSource = verifyP6GitObjectSource({ store, enrollment, baseline });
+  const localObjectSourceDigest = localSource ? canonicalHash(localSource.localSource) : null;
   // The marker-owned control directory keeps the first fetch's strategy so pre-journal recovery records what really happened.
   if (existsSync(resultPath)) {
     const info = lstatSync(resultPath);
@@ -574,24 +608,45 @@ function fetchInstalledCommit(gitTool, root, source, resultPath, intentRef) {
     let value;
     try { value = parseStrictJson(readFileSync(resultPath, 'utf8')); } catch { fail('p5_git_fetch_result_invalid', 'The P5 Git fetch result is malformed.'); }
     if (value?.kind !== 'ProtectedSelfRepairGitFetchResult' || canonicalHash(value.intent) !== canonicalHash(asRef(intentRef))
-      || !['commit', 'enrolled-refs'].includes(value.strategy) || !Array.isArray(value.refspecs) || Object.keys(value).length !== 5)
+      || !['commit', 'enrolled-refs', 'present', 'store-objects+enrolled-refs'].includes(value.strategy)
+      || !Array.isArray(value.refspecs) || Object.keys(value).length !== (value.localObjectSourceDigest ? 6 : 5))
       fail('p5_git_fetch_result_invalid', 'The P5 Git fetch result belongs to another durable intent or has an unsupported shape.');
+    if (value.strategy === 'store-objects+enrolled-refs') {
+      if (!localSource || value.localObjectSourceDigest !== localObjectSourceDigest)
+        fail('p5_git_fetch_result_invalid', 'The local Git fetch result is not bound to the current exact P6 source evidence.');
+      materializeP6SourceChain({ gitTool, repositoryRoot: root, localSource });
+      try { fetchP5EnrolledGitRefs({ gitTool, repositoryRoot: root, gitSource: source }); }
+      catch { fail('p5_git_source_fetch_failed', 'The enrolled refs could not restore the accepted P6 commit ancestry.'); }
+    } else if (localSource || value.localObjectSourceDigest) {
+      fail('p5_git_fetch_result_invalid', 'A local P6 source was added or removed after the managed-clone fetch was recorded.');
+    }
     if (!commitPresent(gitTool, root, source.sourceCommit))
       fail('p5_git_source_commit_unavailable', 'The recorded fetch no longer provides the installed source commit; it was not refetched.');
-    return { strategy: value.strategy, refspecs: value.refspecs };
+    return { strategy: value.strategy, refspecs: value.refspecs, localObjectSource: localSource?.localSource ?? null };
   }
-  if (commitPresent(gitTool, root, source.sourceCommit)) return { strategy: 'present', refspecs: [] };
+  if (localSource) {
+    materializeP6SourceChain({ gitTool, repositoryRoot: root, localSource });
+    const refspecs = [...source.fetchRefs];
+    try { fetchP5EnrolledGitRefs({ gitTool, repositoryRoot: root, gitSource: source }); }
+    catch { fail('p5_git_source_fetch_failed', 'The enrolled refs could not provide the accepted P6 commit ancestry.'); }
+    if (!commitPresent(gitTool, root, source.sourceCommit))
+      fail('p5_git_source_commit_unavailable', 'The reconstructed P6 commit is not available in the managed clone.');
+    writeExclusive(resultPath, canonicalBytes({ schemaVersion: 1, kind: 'ProtectedSelfRepairGitFetchResult',
+      intent: asRef(intentRef), strategy: 'store-objects+enrolled-refs', refspecs, localObjectSourceDigest }));
+    return { strategy: 'store-objects+enrolled-refs', refspecs, localObjectSource: localSource.localSource };
+  }
+  if (commitPresent(gitTool, root, source.sourceCommit)) return { strategy: 'present', refspecs: [], localObjectSource: null };
   let strategy = 'commit', refspecs = [source.sourceCommit];
   try { gitBytes(gitTool, root, fetchArgs(source.remote, refspecs)); }
   catch {
     strategy = 'enrolled-refs'; refspecs = [...source.fetchRefs];
-    try { gitBytes(gitTool, root, fetchArgs(source.remote, refspecs)); }
+    try { fetchP5EnrolledGitRefs({ gitTool, repositoryRoot: root, gitSource: source }); }
     catch { fail('p5_git_source_fetch_failed', 'The enrolled Git remote could not provide the installed source history.'); }
   }
   if (!commitPresent(gitTool, root, source.sourceCommit))
     fail('p5_git_source_commit_unavailable', 'The enrolled remote does not contain the exact installed source commit; no other revision is substituted.');
   writeExclusive(resultPath, canonicalBytes({ schemaVersion: 1, kind: 'ProtectedSelfRepairGitFetchResult', intent: asRef(intentRef), strategy, refspecs }));
-  return { strategy, refspecs };
+  return { strategy, refspecs, localObjectSource: null };
 }
 
 function releaseDigestForTree(gitTool, root, commit) {
@@ -617,11 +672,8 @@ function verifyInstalledCommit(gitTool, root, source, baselineEntries) {
   if (releaseDigestForTree(gitTool, root, source.sourceCommit) !== source.releaseSourceDigest)
     fail('p5_git_source_provenance_mismatch', 'The fetched commit bytes do not reproduce the installed release source digest.');
   // Full ancestry is retained: a shallow boundary is refused by the metadata layout check, and every parent must be present.
-  const history = gitText(gitTool, root, ['rev-list', '--parents', source.sourceCommit]).split(/\r?\n/).filter(Boolean);
-  const present = new Set(history.map(line => line.split(' ')[0]));
-  for (const line of history) for (const parent of line.split(' ').slice(1))
-    if (!present.has(parent)) fail('p5_git_source_ancestry_incomplete', 'The managed repository lacks part of the installed commit ancestry.');
-  return { tree: info.tree, historyLength: history.length };
+  const history = verifyP5GitHistoryComplete({ gitTool, repositoryRoot: root, sourceCommit: source.sourceCommit });
+  return { tree: info.tree, historyLength: history.historyLength };
 }
 
 function ensureRepairBranch(gitTool, root, branch, sourceCommit, objectFormat, preparation) {
@@ -737,11 +789,27 @@ export async function prepareP5GitRepositoryFromIntent({ store, intentRef, sourc
   const seedTimestamp = Math.floor(Date.parse(intent.createdAt) / 1000);
   if (!Number.isSafeInteger(seedTimestamp)) fail('p5_git_preparation_invalid', 'The durable preparation intent has no usable creation time for the synthetic seed.');
   const clone = isClone(enrollment.gitCandidatePolicy);
-  let seedCommit = null, seedTree = null, fetchProvenance = null, hostProtection = null, allowedUnreachable = null;
+  let seedCommit = null, seedTree = null, fetchProvenance = null, hostProtection = null, allowedUnreachable = null, localObjectSource = null;
   if (clone) {
     // managed-clone-v1: real installed history from the enrolled remote; the branch starts at the exact installed commit.
     const { source } = assertGitSourceEnrollment(store, enrollment, baseline);
-    const fetched = preparation ? null : fetchInstalledCommit(gitTool, root, source, join(markerRoot, 'git-fetch-result.json'), intentRef);
+    const fetched = preparation ? null : fetchInstalledCommit(gitTool, root, source, join(markerRoot, 'git-fetch-result.json'), intentRef,
+      { store, enrollment, baseline });
+    if (preparation) {
+      const recordedFetch = readFetchProvenance(store, preparation.gitRepository.fetchProvenance);
+      const localSource = verifyP6GitObjectSource({ store, enrollment, baseline });
+      if (recordedFetch.strategy === 'store-objects+enrolled-refs') {
+        if (!localSource || !recordedFetch.localObjectSource
+          || canonicalHash(recordedFetch.localObjectSource) !== canonicalHash(localSource.localSource))
+          fail('p5_git_local_source_invalid', 'The journaled P6 local source differs from the exact current continuation evidence.');
+        localObjectSource = localSource.localSource;
+        materializeP6SourceChain({ gitTool, repositoryRoot: root, localSource });
+      } else if (localSource) {
+        fail('p5_git_prepared_record_mismatch', 'The journaled managed clone omitted its verified local P6 source.');
+      }
+    } else {
+      localObjectSource = fetched.localObjectSource;
+    }
     if (!commitPresent(gitTool, root, source.sourceCommit))
       fail('p5_git_source_commit_unavailable', 'The managed repository no longer holds the installed source commit; it was not refetched.');
     verifyInstalledCommit(gitTool, root, source, baselineEntries);
@@ -760,6 +828,7 @@ export async function prepareP5GitRepositoryFromIntent({ store, intentRef, sourc
         sourceRepositoryId: source.sourceRepositoryId, remoteId: source.remote.remoteId, remoteUrl: source.remote.url,
         protocol: source.remote.protocol, strategy: fetched.strategy, refspecs: fetched.refspecs, sourceCommit: source.sourceCommit,
         sourceTree: source.sourceTree, objectFormat: source.objectFormat, releaseSourceDigest: source.releaseSourceDigest,
+        ...(localObjectSource ? { localObjectSource } : {}),
         unreachableObjects: allowedUnreachable, recordedAt: marker.preparedAt });
     }
   } else if (branchHead) {

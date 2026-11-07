@@ -1,0 +1,1822 @@
+{
+ "modules": 94,
+ "sites": 254,
+ "counts": {
+  "data-receiver": 212,
+  "reflective": 3,
+  "index": 38,
+  "unclassified": 1
+ },
+ "reflective": [
+  {
+   "file": "runtime/core/engine.mjs",
+   "line": 2331,
+   "receiver": "this.cacheFingerprints(workflow, pins)",
+   "key": "nodeId",
+   "cls": "reflective"
+  },
+  {
+   "file": "runtime/core/engine.mjs",
+   "line": 2703,
+   "receiver": "fingerprints(captured, plan.pins || {})",
+   "key": "nodeId",
+   "cls": "reflective"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 54,
+   "receiver": "({ enrollment: 'enrollment', profile: 'profile', sourceBindi",
+   "key": "name",
+   "cls": "reflective"
+  }
+ ],
+ "unclassified": [
+  {
+   "file": "runtime/core/p5GitCandidate.mjs",
+   "line": 550,
+   "receiver": "{ file: 'file:', https: 'https:' }",
+   "key": "remote.protocol",
+   "cls": "unclassified"
+  }
+ ],
+ "all": [
+  {
+   "file": "runtime/core/engine.mjs",
+   "line": 85,
+   "receiver": "table",
+   "key": "`${state}:${event}`",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/engine.mjs",
+   "line": 1015,
+   "receiver": "priorEvidence",
+   "key": "field",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/engine.mjs",
+   "line": 1015,
+   "receiver": "result.evidence",
+   "key": "field",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/engine.mjs",
+   "line": 1883,
+   "receiver": "SCHEMAS",
+   "key": "schemaId",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/engine.mjs",
+   "line": 2289,
+   "receiver": "active",
+   "key": "row.node_id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/engine.mjs",
+   "line": 2290,
+   "receiver": "active",
+   "key": "row.node_id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/engine.mjs",
+   "line": 2292,
+   "receiver": "current",
+   "key": "row.node_id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/engine.mjs",
+   "line": 2302,
+   "receiver": "result",
+   "key": "node.id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/engine.mjs",
+   "line": 2302,
+   "receiver": "prints",
+   "key": "edge.source.nodeId",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/engine.mjs",
+   "line": 2331,
+   "receiver": "this.cacheFingerprints(workflow, pins)",
+   "key": "nodeId",
+   "cls": "reflective"
+  },
+  {
+   "file": "runtime/core/engine.mjs",
+   "line": 2654,
+   "receiver": "pins",
+   "key": "id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/engine.mjs",
+   "line": 2655,
+   "receiver": "pins",
+   "key": "id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/engine.mjs",
+   "line": 2668,
+   "receiver": "current",
+   "key": "id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/engine.mjs",
+   "line": 2689,
+   "receiver": "pins",
+   "key": "id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/engine.mjs",
+   "line": 2703,
+   "receiver": "fingerprints(captured, plan.pins || {})",
+   "key": "nodeId",
+   "cls": "reflective"
+  },
+  {
+   "file": "runtime/core/engine.mjs",
+   "line": 3037,
+   "receiver": "this.store.readJson(source.outputs_artifact_id).values",
+   "key": "edge.source.port",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/engine.mjs",
+   "line": 3203,
+   "receiver": "this.store.readJson(source.outputs_artifact_id).values",
+   "key": "edge.source.port",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/engine.mjs",
+   "line": 3215,
+   "receiver": "this.store.readJson(loopAttempt.inputs_artifact_id).values",
+   "key": "port",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/engine.mjs",
+   "line": 3243,
+   "receiver": "values",
+   "key": "chosen.target.port",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/engine.mjs",
+   "line": 3244,
+   "receiver": "values",
+   "key": "port",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/engine.mjs",
+   "line": 3248,
+   "receiver": "values",
+   "key": "slot.id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/engine.mjs",
+   "line": 3249,
+   "receiver": "texts",
+   "key": "id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/engine.mjs",
+   "line": 3250,
+   "receiver": "values",
+   "key": "chosen.target.port",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/engine.mjs",
+   "line": 3253,
+   "receiver": "state.plan.pins",
+   "key": "node.id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/engine.mjs",
+   "line": 3366,
+   "receiver": "reviewerFingerprints",
+   "key": "slot.id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/engine.mjs",
+   "line": 3382,
+   "receiver": "reviewers",
+   "key": "slot.id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/engine.mjs",
+   "line": 3426,
+   "receiver": "values",
+   "key": "port",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/engine.mjs",
+   "line": 3625,
+   "receiver": "settings.providerLimits",
+   "key": "provider",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/canonical.mjs",
+   "line": 17,
+   "receiver": "text",
+   "key": "index",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/core/canonical.mjs",
+   "line": 24,
+   "receiver": "text",
+   "key": "index++",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/canonical.mjs",
+   "line": 28,
+   "receiver": "text",
+   "key": "index++",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/canonical.mjs",
+   "line": 36,
+   "receiver": "map",
+   "key": "escape",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/canonical.mjs",
+   "line": 52,
+   "receiver": "text",
+   "key": "index",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/core/canonical.mjs",
+   "line": 55,
+   "receiver": "text",
+   "key": "index",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/core/canonical.mjs",
+   "line": 57,
+   "receiver": "text",
+   "key": "index",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/core/canonical.mjs",
+   "line": 61,
+   "receiver": "text",
+   "key": "index++",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/canonical.mjs",
+   "line": 64,
+   "receiver": "text",
+   "key": "index",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/core/canonical.mjs",
+   "line": 65,
+   "receiver": "text",
+   "key": "index",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/core/canonical.mjs",
+   "line": 71,
+   "receiver": "text",
+   "key": "index",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/core/canonical.mjs",
+   "line": 74,
+   "receiver": "text",
+   "key": "index",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/core/canonical.mjs",
+   "line": 75,
+   "receiver": "text",
+   "key": "index",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/core/canonical.mjs",
+   "line": 103,
+   "receiver": "value",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/canonical.mjs",
+   "line": 104,
+   "receiver": "value",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/schemas.mjs",
+   "line": 85,
+   "receiver": "SCHEMAS",
+   "key": "name",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/store.mjs",
+   "line": 60,
+   "receiver": "steps",
+   "key": "index",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/core/store.mjs",
+   "line": 61,
+   "receiver": "steps",
+   "key": "index",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/core/validate.mjs",
+   "line": 137,
+   "receiver": "workflow.nodes",
+   "key": "judgeNodeIndex",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/validate.mjs",
+   "line": 166,
+   "receiver": "workflow.nodes",
+   "key": "failedNodeIndex",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/validate.mjs",
+   "line": 286,
+   "receiver": "ports.get(source.nodeId).outputs",
+   "key": "source.port",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/validate.mjs",
+   "line": 287,
+   "receiver": "ports.get(target.nodeId).inputs",
+   "key": "target.port",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/validate.mjs",
+   "line": 353,
+   "receiver": "users",
+   "key": "i",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/core/validate.mjs",
+   "line": 353,
+   "receiver": "users",
+   "key": "j",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/core/validate.mjs",
+   "line": 430,
+   "receiver": "NODE_DEFS",
+   "key": "node?.type",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/adapters.mjs",
+   "line": 31,
+   "receiver": "env",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/adapters.mjs",
+   "line": 237,
+   "receiver": "text",
+   "key": "offset",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/core/adapters.mjs",
+   "line": 239,
+   "receiver": "text",
+   "key": "offset",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/core/adapters.mjs",
+   "line": 243,
+   "receiver": "text",
+   "key": "offset",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/core/adapters.mjs",
+   "line": 252,
+   "receiver": "message",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/adapters.mjs",
+   "line": 252,
+   "receiver": "message",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/utilities.mjs",
+   "line": 26,
+   "receiver": "current",
+   "key": "Number(part)",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/utilities.mjs",
+   "line": 27,
+   "receiver": "current",
+   "key": "part",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/utilities.mjs",
+   "line": 108,
+   "receiver": "inputs",
+   "key": "input.id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/utilities.mjs",
+   "line": 112,
+   "receiver": "inputs",
+   "key": "input.id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/utilities.mjs",
+   "line": 113,
+   "receiver": "inputs",
+   "key": "input.id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/utilities.mjs",
+   "line": 124,
+   "receiver": "record",
+   "key": "field.name",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/utilities.mjs",
+   "line": 126,
+   "receiver": "inputs",
+   "key": "input.id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/utilities.mjs",
+   "line": 135,
+   "receiver": "record",
+   "key": "field.name",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 43,
+   "receiver": "P5_CAPTURE_HOLD_DELAYS_MS",
+   "key": "previousHolds",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 54,
+   "receiver": "({ enrollment: 'enrollment', profile: 'profile', sourceBindi",
+   "key": "name",
+   "cls": "reflective"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 148,
+   "receiver": "entry",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 175,
+   "receiver": "pool",
+   "key": "index + 1",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 368,
+   "receiver": "response.entries",
+   "key": "index",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 369,
+   "receiver": "batch",
+   "key": "index",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 369,
+   "receiver": "batch",
+   "key": "index",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 370,
+   "receiver": "batch",
+   "key": "index",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 1197,
+   "receiver": "scope",
+   "key": "change.operation",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 1375,
+   "receiver": "baseline.contentRefs",
+   "key": "change.path",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 1599,
+   "receiver": "commandRoots",
+   "key": "name",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 1599,
+   "receiver": "commandRoots",
+   "key": "name",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 1602,
+   "receiver": "commandRoots",
+   "key": "name",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 1602,
+   "receiver": "expectedRoots",
+   "key": "name",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 1612,
+   "receiver": "environment",
+   "key": "P5_VERIFICATION_CANDIDATE_ENTRYPOINT_ENV",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 1661,
+   "receiver": "expectedInputs",
+   "key": "index",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 1661,
+   "receiver": "materialized.inputs",
+   "key": "index",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 1827,
+   "receiver": "before",
+   "key": "prefix",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 1827,
+   "receiver": "after",
+   "key": "prefix",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 1829,
+   "receiver": "before",
+   "key": "before.length - 1 - suffix",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 1829,
+   "receiver": "after",
+   "key": "after.length - 1 - suffix",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 1881,
+   "receiver": "change",
+   "key": "side",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 1883,
+   "receiver": "change",
+   "key": "`${side}Artifact`",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 1883,
+   "receiver": "change",
+   "key": "`${side}Artifact`",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 1887,
+   "receiver": "change",
+   "key": "`${side}Artifact`",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 2031,
+   "receiver": "pattern",
+   "key": "p",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 2036,
+   "receiver": "pattern",
+   "key": "p",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 2036,
+   "receiver": "value",
+   "key": "v",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 2056,
+   "receiver": "pattern",
+   "key": "p",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 2059,
+   "receiver": "pattern",
+   "key": "p",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 2059,
+   "receiver": "value",
+   "key": "v",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 2066,
+   "receiver": "env",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 2067,
+   "receiver": "env",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 2076,
+   "receiver": "env",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 2096,
+   "receiver": "bytes",
+   "key": "index",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 2126,
+   "receiver": "bytes",
+   "key": "contentEnd",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/protectedSelfRepair.mjs",
+   "line": 2741,
+   "receiver": "env",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/p5Gate.mjs",
+   "line": 346,
+   "receiver": "node.expression.elements",
+   "key": "Number(node.argumentExpression.text)",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/p5Gate.mjs",
+   "line": 641,
+   "receiver": "status",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/p5Gate.mjs",
+   "line": 641,
+   "receiver": "status",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/p5Gate.mjs",
+   "line": 961,
+   "receiver": "runtimeEnvironment",
+   "key": "P5_VERIFICATION_CANDIDATE_ENTRYPOINT_ENV",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/p5Gate.mjs",
+   "line": 1061,
+   "receiver": "process.env",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/p5Gate.mjs",
+   "line": 1061,
+   "receiver": "environment",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/p5Gate.mjs",
+   "line": 1061,
+   "receiver": "process.env",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/p5Gate.mjs",
+   "line": 1062,
+   "receiver": "environment",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/p5GitCandidate.mjs",
+   "line": 283,
+   "receiver": "bytes",
+   "key": "index",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/core/p5GitCandidate.mjs",
+   "line": 310,
+   "receiver": "result",
+   "key": "contentEnd",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/p5GitCandidate.mjs",
+   "line": 323,
+   "receiver": "records",
+   "key": "index",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/core/p5GitCandidate.mjs",
+   "line": 323,
+   "receiver": "expectedEntries",
+   "key": "index",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/core/p5GitCandidate.mjs",
+   "line": 550,
+   "receiver": "{ file: 'file:', https: 'https:' }",
+   "key": "remote.protocol",
+   "cls": "unclassified"
+  },
+  {
+   "file": "runtime/core/p5GitCandidate.mjs",
+   "line": 899,
+   "receiver": "records",
+   "key": "index",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/core/p5GitCandidate.mjs",
+   "line": 899,
+   "receiver": "expectedEntries",
+   "key": "index",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/core/transport.mjs",
+   "line": 36,
+   "receiver": "value",
+   "key": "key.replace(/~1/g, '/').replace(/~0/g, '~')",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/transport.mjs",
+   "line": 48,
+   "receiver": "out.properties",
+   "key": "name",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/transport.mjs",
+   "line": 48,
+   "receiver": "out.properties",
+   "key": "name",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/transport.mjs",
+   "line": 48,
+   "receiver": "out.properties",
+   "key": "name",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/transport.mjs",
+   "line": 50,
+   "receiver": "out",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/transport.mjs",
+   "line": 59,
+   "receiver": "properties",
+   "key": "name",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/transport.mjs",
+   "line": 60,
+   "receiver": "properties",
+   "key": "name",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/transport.mjs",
+   "line": 61,
+   "receiver": "properties",
+   "key": "name",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/transport.mjs",
+   "line": 62,
+   "receiver": "properties",
+   "key": "name",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/transport.mjs",
+   "line": 88,
+   "receiver": "schema",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/transport.mjs",
+   "line": 102,
+   "receiver": "plans",
+   "key": "name",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/transport.mjs",
+   "line": 103,
+   "receiver": "properties",
+   "key": "name",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/transport.mjs",
+   "line": 136,
+   "receiver": "out",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/transport.mjs",
+   "line": 136,
+   "receiver": "plan.properties",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/transport.mjs",
+   "line": 154,
+   "receiver": "node.properties",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/planning.mjs",
+   "line": 19,
+   "receiver": "parts",
+   "key": "i",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/core/planning.mjs",
+   "line": 51,
+   "receiver": "pins",
+   "key": "item.id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/planning.mjs",
+   "line": 60,
+   "receiver": "pins",
+   "key": "id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/gate.mjs",
+   "line": 50,
+   "receiver": "PREFIX",
+   "key": "section.kind",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/gate.mjs",
+   "line": 50,
+   "receiver": "PREFIX",
+   "key": "section.kind",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/gate.mjs",
+   "line": 50,
+   "receiver": "PREFIX",
+   "key": "section.kind",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/gate.mjs",
+   "line": 168,
+   "receiver": "reviewerFingerprints",
+   "key": "slot.id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/gate.mjs",
+   "line": 183,
+   "receiver": "outputs",
+   "key": "`${slot.id}-need`",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/gate.mjs",
+   "line": 197,
+   "receiver": "outputs",
+   "key": "slot.id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/gate.mjs",
+   "line": 222,
+   "receiver": "inputs",
+   "key": "slot.id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/gate.mjs",
+   "line": 251,
+   "receiver": "reviewers",
+   "key": "slot.id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/gate.mjs",
+   "line": 253,
+   "receiver": "inputs",
+   "key": "slot.id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/gate.mjs",
+   "line": 412,
+   "receiver": "outputs",
+   "key": "slot.id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/mapRuntime.mjs",
+   "line": 47,
+   "receiver": "files",
+   "key": "rel",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/mapRuntime.mjs",
+   "line": 120,
+   "receiver": "values",
+   "key": "port",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/mapRuntime.mjs",
+   "line": 161,
+   "receiver": "fingerprints",
+   "key": "task.id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/mapRuntime.mjs",
+   "line": 339,
+   "receiver": "cycle.checks",
+   "key": "criterion.id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/mapRuntime.mjs",
+   "line": 340,
+   "receiver": "cycle.checks",
+   "key": "criterion.id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/mapRuntime.mjs",
+   "line": 342,
+   "receiver": "cycle.checks",
+   "key": "criterion.id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/mapRuntime.mjs",
+   "line": 344,
+   "receiver": "outputs",
+   "key": "output.id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/mapRuntime.mjs",
+   "line": 356,
+   "receiver": "cycle.checks",
+   "key": "criterion.id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/mapRuntime.mjs",
+   "line": 373,
+   "receiver": "cycle.checks",
+   "key": "criterion.id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/mapRuntime.mjs",
+   "line": 373,
+   "receiver": "cycle.checks",
+   "key": "criterion.id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/mapRuntime.mjs",
+   "line": 429,
+   "receiver": "task.data.pinned",
+   "key": "producer",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/mapRuntime.mjs",
+   "line": 437,
+   "receiver": "exec.plan.fingerprints",
+   "key": "task.row.task_id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/mapRuntime.mjs",
+   "line": 437,
+   "receiver": "exec.plan.fingerprints",
+   "key": "task.row.task_id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/mapRuntime.mjs",
+   "line": 583,
+   "receiver": "before",
+   "key": "path",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/mapRuntime.mjs",
+   "line": 583,
+   "receiver": "after",
+   "key": "path",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/mapRuntime.mjs",
+   "line": 593,
+   "receiver": "fresh.data.materialized",
+   "key": "path",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/mapRuntime.mjs",
+   "line": 614,
+   "receiver": "outputs",
+   "key": "output.id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/mapRuntime.mjs",
+   "line": 657,
+   "receiver": "freshTask.data.criteria",
+   "key": "criterion.id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/mapRuntime.mjs",
+   "line": 658,
+   "receiver": "freshTask.data.criteria",
+   "key": "criterion.id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/mapRuntime.mjs",
+   "line": 713,
+   "receiver": "task.data.pinned",
+   "key": "dep.taskId",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/mapRuntime.mjs",
+   "line": 860,
+   "receiver": "before",
+   "key": "path",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/mapRuntime.mjs",
+   "line": 860,
+   "receiver": "after",
+   "key": "path",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/mapRuntime.mjs",
+   "line": 883,
+   "receiver": "task.data.cycle.checks",
+   "key": "criterion.id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/mapRuntime.mjs",
+   "line": 884,
+   "receiver": "task.data.criteria",
+   "key": "criterion.id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/mapRuntime.mjs",
+   "line": 885,
+   "receiver": "task.data.criteria",
+   "key": "criterion.id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/mapRuntime.mjs",
+   "line": 1028,
+   "receiver": "task.data.criteria",
+   "key": "criterion.id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/mapRuntime.mjs",
+   "line": 1033,
+   "receiver": "plan.fingerprints",
+   "key": "def.id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/supervision.mjs",
+   "line": 743,
+   "receiver": "journal",
+   "key": "index",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/core/hostAutonomy.mjs",
+   "line": 44,
+   "receiver": "permit.request",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/taskRuntime.mjs",
+   "line": 156,
+   "receiver": "execution.data.config.roles",
+   "key": "step.role",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/taskRuntime.mjs",
+   "line": 172,
+   "receiver": "data.config.roles",
+   "key": "step.role",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/taskRuntime.mjs",
+   "line": 251,
+   "receiver": "content.streams",
+   "key": "name",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/taskRuntime.mjs",
+   "line": 256,
+   "receiver": "entry.streams",
+   "key": "name",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/taskRuntime.mjs",
+   "line": 350,
+   "receiver": "data.baseModes",
+   "key": "entry.path",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/taskRuntime.mjs",
+   "line": 355,
+   "receiver": "value",
+   "key": "field",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/taskRuntime.mjs",
+   "line": 387,
+   "receiver": "data.config.checks",
+   "key": "step.check",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/taskRuntime.mjs",
+   "line": 407,
+   "receiver": "data.baseModes",
+   "key": "entry.path",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/taskRuntime.mjs",
+   "line": 409,
+   "receiver": "data.baseModes",
+   "key": "entry.path",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/taskRuntime.mjs",
+   "line": 470,
+   "receiver": "step.evidenceExpansions",
+   "key": "path",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/taskRuntime.mjs",
+   "line": 501,
+   "receiver": "data.config.scope",
+   "key": "domain",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/taskRuntime.mjs",
+   "line": 535,
+   "receiver": "data.config.roles",
+   "key": "step.role",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/taskProcesses.mjs",
+   "line": 103,
+   "receiver": "chunks",
+   "key": "name",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/taskProcesses.mjs",
+   "line": 103,
+   "receiver": "chunks",
+   "key": "name",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/taskProcesses.mjs",
+   "line": 140,
+   "receiver": "child",
+   "key": "name",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/taskProcesses.mjs",
+   "line": 142,
+   "receiver": "streams",
+   "key": "name",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/taskProcesses.mjs",
+   "line": 143,
+   "receiver": "sizes",
+   "key": "name",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/taskProcesses.mjs",
+   "line": 145,
+   "receiver": "sizes",
+   "key": "name",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/taskProcesses.mjs",
+   "line": 145,
+   "receiver": "chunks",
+   "key": "name",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/workflowJudge.mjs",
+   "line": 472,
+   "receiver": "REASONS",
+   "key": "decision.action.type",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/workflowJudge.mjs",
+   "line": 969,
+   "receiver": "p5.requiredReviewRefs",
+   "key": "index",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/core/workflowJudge.mjs",
+   "line": 969,
+   "receiver": "expansion.items",
+   "key": "index",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/core/custody.mjs",
+   "line": 391,
+   "receiver": "this.eof",
+   "key": "stream",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/custody.mjs",
+   "line": 392,
+   "receiver": "this.cursor",
+   "key": "stream",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/custody.mjs",
+   "line": 400,
+   "receiver": "this.cursor",
+   "key": "stream",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/custody.mjs",
+   "line": 401,
+   "receiver": "this",
+   "key": "stream",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/custody.mjs",
+   "line": 404,
+   "receiver": "this.eof",
+   "key": "stream",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/custody.mjs",
+   "line": 411,
+   "receiver": "committed",
+   "key": "stream",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/custody.mjs",
+   "line": 411,
+   "receiver": "committed",
+   "key": "stream",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/failureOutcomes.mjs",
+   "line": 135,
+   "receiver": "result",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/supervisor-client.mjs",
+   "line": 95,
+   "receiver": "env",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/managed-isolation.mjs",
+   "line": 251,
+   "receiver": "args",
+   "key": "index + 1",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/p6Scope.mjs",
+   "line": 94,
+   "receiver": "changeManifest",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/map.mjs",
+   "line": 12,
+   "receiver": "MAP.$defs",
+   "key": "name",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/map.mjs",
+   "line": 93,
+   "receiver": "task",
+   "key": "field",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/map.mjs",
+   "line": 93,
+   "receiver": "task",
+   "key": "field",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/map.mjs",
+   "line": 117,
+   "receiver": "registry",
+   "key": "task.executorRole",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/map.mjs",
+   "line": 129,
+   "receiver": "registry",
+   "key": "criterion.role",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/map.mjs",
+   "line": 306,
+   "receiver": "fingerprints",
+   "key": "id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/taskAssessment.mjs",
+   "line": 122,
+   "receiver": "CLASSIFICATION_SEVERITY",
+   "key": "analystClassification",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/taskAssessment.mjs",
+   "line": 123,
+   "receiver": "CLASSIFICATION_SEVERITY",
+   "key": "derivedFloor",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/taskAssessment.mjs",
+   "line": 141,
+   "receiver": "roleBindings",
+   "key": "roleKey",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/taskAssessment.mjs",
+   "line": 141,
+   "receiver": "roleBindings",
+   "key": "roleKey",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/taskAssessment.mjs",
+   "line": 141,
+   "receiver": "roleBindings",
+   "key": "roleKey",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/taskAssessment.mjs",
+   "line": 141,
+   "receiver": "roleBindings",
+   "key": "roleKey",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/contextPackage.mjs",
+   "line": 71,
+   "receiver": "roleInclusionReasons",
+   "key": "role",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/contextPackage.mjs",
+   "line": 363,
+   "receiver": "options.criterionBoundaries",
+   "key": "criterion.criterionId",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/branchDelivery.mjs",
+   "line": 62,
+   "receiver": "killer",
+   "key": "name",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/branchDelivery.mjs",
+   "line": 63,
+   "receiver": "output",
+   "key": "name",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/branchDelivery.mjs",
+   "line": 63,
+   "receiver": "output",
+   "key": "name",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/branchDelivery.mjs",
+   "line": 100,
+   "receiver": "sizes",
+   "key": "name",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/branchDelivery.mjs",
+   "line": 104,
+   "receiver": "chunks",
+   "key": "name",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/branchDelivery.mjs",
+   "line": 105,
+   "receiver": "sizes",
+   "key": "name",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/branchDelivery.mjs",
+   "line": 122,
+   "receiver": "chunks",
+   "key": "name",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/core/branchDelivery.mjs",
+   "line": 476,
+   "receiver": "lines",
+   "key": "index",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/core/branchDelivery.mjs",
+   "line": 485,
+   "receiver": "lines",
+   "key": "++index",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/host/runtimeRelease.mjs",
+   "line": 56,
+   "receiver": "ENTRY_ONLY_PACKAGES",
+   "key": "name",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/host/authority.mjs",
+   "line": 187,
+   "receiver": "steps",
+   "key": "index",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/host/authority.mjs",
+   "line": 188,
+   "receiver": "steps",
+   "key": "index",
+   "cls": "index"
+  },
+  {
+   "file": "runtime/host/authority.mjs",
+   "line": 307,
+   "receiver": "limits",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/host/authority.mjs",
+   "line": 534,
+   "receiver": "used",
+   "key": "row.budget_key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/host/authority.mjs",
+   "line": 561,
+   "receiver": "MINIMUM_COST",
+   "key": "request.operation",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/host/authority.mjs",
+   "line": 563,
+   "receiver": "cost",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/host/authority.mjs",
+   "line": 563,
+   "receiver": "request.cost",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/host/authority.mjs",
+   "line": 563,
+   "receiver": "minimum",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/host/authority.mjs",
+   "line": 567,
+   "receiver": "decision.limits",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/host/authority.mjs",
+   "line": 567,
+   "receiver": "used",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/host/authority.mjs",
+   "line": 567,
+   "receiver": "cost",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/host/authority.mjs",
+   "line": 582,
+   "receiver": "cost",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/host/authority.mjs",
+   "line": 584,
+   "receiver": "cost",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/host/authority.mjs",
+   "line": 649,
+   "receiver": "used",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/host/authority.mjs",
+   "line": 649,
+   "receiver": "cost",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/host/authority.mjs",
+   "line": 649,
+   "receiver": "decision.limits",
+   "key": "key",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/host/capabilities.mjs",
+   "line": 26,
+   "receiver": "verified",
+   "key": "capability.id",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/host/controllerQueue.mjs",
+   "line": 28,
+   "receiver": "FIELDS",
+   "key": "step.type",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/host/controllerQueue.mjs",
+   "line": 31,
+   "receiver": "OPERATIONS",
+   "key": "step.type",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/host/controllerQueue.mjs",
+   "line": 82,
+   "receiver": "JSON.parse(row.plan_json).steps",
+   "key": "row.step_index",
+   "cls": "data-receiver"
+  },
+  {
+   "file": "runtime/host/buildAttestation.mjs",
+   "line": 27,
+   "receiver": "b",
+   "key": "index",
+   "cls": "index"
+  }
+ ]
+}

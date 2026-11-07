@@ -1,0 +1,23 @@
+--- .deszo/tests/custody-p5-e2e-p5-final-engine-core-mLrGsv/source/runtime/core/p6Consumer.mjs	2026-11-04 10:10:52.542434500 +0300
++++ runtime/core/p6Consumer.mjs	2026-11-05 08:53:35.553854500 +0300
+@@ -18,7 +18,6 @@
+ import { assertP6CandidateScope, classifyP6CandidateScope } from './p6Scope.mjs';
+ import { reconstructCandidateSource, verifyP6SourceGitProvenance } from './p6Reconstruction.mjs';
+ import { prepareP6Successor } from './p6Successor.mjs';
+-import { buildAndAttestEnginePackage } from './p6Builder.mjs';
+ import { requestEngineSwitch, createSwitchQuiescence } from '../host/p6Switch.mjs';
+ import { nextP5WorkspaceSlot, runP5GitCommand, validateP5Contract } from './protectedSelfRepair.mjs';
+ import { fetchP5EnrolledGitRefs, verifyP5GitHistoryComplete } from './p5GitCandidate.mjs';
+@@ -416,6 +415,12 @@
+   if (!previousRelease || currentBuildId && previousRelease.buildId !== currentBuildId) {
+     throw new P6ConsumerError('p6_consumer_previous_release_mismatch', 'The Host-attested predecessor release differs from the active Engine.');
+   }
++  // The trusted builder comes from the Engine entry point (runner.mjs), not an import here: this module is in the Self-Repair
++  // subject closure, where the P5 resolver refuses the builder's module-loader import (createRequire). It is checked before the
++  // durable operation intent is written, so a missing builder leaves no P6 state.
++  const buildAndAttestEnginePackage = engine.p6Builder?.buildAndAttestEnginePackage;
++  if (typeof buildAndAttestEnginePackage !== 'function')
++    throw new P6ConsumerError('p6_builder_unavailable', 'The Engine has no trusted P6 builder; no operation, build or Host staging was started.');
+   // The successor's slot is decided before the durable operation intent is written: an exhausted pool leaves no P6 state at all.
+   const handoffEnrollment = engine.store.readJson(engine.store.verifyRef(handoff.enrollment).artifactId);
+   const successorSlot = nextP5WorkspaceSlot(handoffEnrollment);

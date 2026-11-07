@@ -6,6 +6,7 @@ import { assertValid } from './schemas.mjs';
 import { workspaceRootsOverlap } from './workspaceIsolation.mjs';
 import { assertP5HostBoundary, classifyP5Mutation, deriveP5HostProtection, P5_SENSITIVE_TIERS, p5HostStaticReason as p5HostProtectedReason,
   verifyP5MutationClassification } from './p5HostBoundary.mjs';
+import { findP6BuildReceiptForRelease, resolveP6Continuation } from './p6Continuation.mjs';
 
 export const P5_CAPABILITY = 'protected-self-repair-v1';
 export const P5_ENROLLMENT_RELATIVE_PATH = join('p5', 'enrollment.json');
@@ -50,7 +51,7 @@ export class ProtectedSelfRepairError extends Error {
 function p5Fail(code, message) { throw new ProtectedSelfRepairError(code, message); }
 
 export function validateP5Contract(name, value) {
-  const definition = ({ enrollment: 'enrollment', profile: 'profile', sourceBinding: 'sourceBinding',
+  const table = ({ enrollment: 'enrollment', profile: 'profile', sourceBinding: 'sourceBinding',
     verificationPolicy: 'verificationPolicy', verificationInputs: 'verificationInputs', baselineManifest: 'baselineManifest', sourceManifest: 'sourceManifest',
     repositoryIdentity: 'repositoryIdentity', sourcePathPolicy: 'sourcePathPolicy', runningSourceRelease: 'runningSourceRelease',
     runningSourceInventory: 'runningSourceInventory',
@@ -67,7 +68,11 @@ export function validateP5Contract(name, value) {
     reviewDossierChunk: 'reviewDossierChunk', reviewDeliveryCarry: 'reviewDeliveryCarry', candidateInvalidation: 'candidateInvalidation',
     verificationReceipt: 'verificationReceipt', acceptance: 'acceptance', p2Outcome: 'p2Outcome',
     causalReproduction: 'causalReproduction', dependencyClosure: 'dependencyClosure', captureHold: 'captureHold',
-    retentionRecord: 'retentionRecord', handoff: 'handoff' })[name];
+    retentionRecord: 'retentionRecord', handoff: 'handoff', p6BuildReceipt: 'p6BuildReceipt',
+    p6Operation: 'p6Operation', p6StageReceipt: 'p6StageReceipt', p6SwitchAdmission: 'p6SwitchAdmission',
+    p6ContinuationReceipt: 'p6ContinuationReceipt', p6SourceRefusal: 'p6SourceRefusal', gitObjectSource: 'gitObjectSource' });
+  // Own entries only: a contract name of 'constructor' must not read Object through the prototype chain.
+  const definition = Object.hasOwn(table, name) ? table[name] : undefined;
   if (!definition) p5Fail('p5_contract_unknown', `Unknown P5 contract "${name}".`);
   assertValid('protected-self-repair.schema.json', definition, value, `P5 ${name}`);
   return canonicalHash(value);
@@ -131,7 +136,65 @@ function readP5EnrollmentFile(profileRoot, maxBytes) {
   return { profileRoot: canonicalProfile, path, bytes, byteSize: bytes.length, fileSha256: sha256(bytes) };
 }
 
-function validateP5EnrollmentFile({ file, store, installationId, runningSourceRelease }) {
+// The ordered pool of pre-enrolled single-use slots. A single-slot enrollment carries a pool of one. Each protected Repair claims
+// exactly one unused slot; a claimed slot is never deleted, recycled or reused (P5-08).
+export function p5EnrollmentWorkspacePool(enrollment) {
+  return enrollment.workspacePool ?? [enrollment.workspace];
+}
+
+export function assertP5WorkspacePool(enrollment) {
+  const pool = p5EnrollmentWorkspacePool(enrollment);
+  if (canonicalHash(pool[0]) !== canonicalHash(enrollment.workspace))
+    p5Fail('p5_workspace_pool_invalid', 'The first enrolled slot must be the enrolled workspace.');
+  for (const key of ['workspaceId', 'allocationId', 'canonicalRoot']) {
+    const values = pool.map(entry => String(entry[key]).toLowerCase());
+    if (new Set(values).size !== values.length) p5Fail('p5_workspace_pool_invalid', `Enrolled single-use slots must be distinct by ${key}.`);
+  }
+  // Slots never nest or overlap: a Repair in one slot cannot reach another slot's retained content.
+  pool.forEach((entry, index) => pool.slice(index + 1).forEach(other => {
+    if (workspaceRootsOverlap(entry.canonicalRoot, other.canonicalRoot))
+      p5Fail('p5_workspace_pool_invalid', `Enrolled single-use slots "${entry.workspaceId}" and "${other.workspaceId}" overlap.`);
+  }));
+}
+
+// The root enrollment file never carries `rootProfile`: only a verified P6 continuation derives it (resolveP6Continuation).
+export function assertP5RootEnrollment(enrollment) {
+  if (enrollment.rootProfile !== undefined)
+    p5Fail('p5_enrollment_invalid', 'A root P5 enrollment never carries rootProfile; only a verified P6 continuation derives it.');
+}
+
+// The Parent publication binds the immutable root profile identity. A P6 successor replaces only the effective `profile`.
+export function enrolledParentProfile(enrollment) {
+  return enrollment.rootProfile ?? enrollment.profile;
+}
+
+// The slot the successor of this release names: the pool entry after the one this release runs on. It is a function of the
+// handoff's effective enrollment alone, so a replayed build and a rebuild after later Repairs name the same slot. Null when the
+// pool is exhausted (the caller refuses before any Host staging).
+export function nextP5WorkspaceSlot(enrollment) {
+  const pool = p5EnrollmentWorkspacePool(enrollment);
+  const index = pool.findIndex(entry => entry.workspaceId === enrollment.workspace.workspaceId);
+  return index < 0 ? null : pool[index + 1] ?? null;
+}
+
+// The verification policy a published Repair node names is the root's: a P6 successor's effective policy keeps the root's checks
+// and bounds and advances only the harness closure digest (resolveP6Continuation), so the immutable publication still binds.
+export function enrolledRootPolicyRef(store, enrollment) {
+  return store.readJson(enrolledParentProfile(enrollment).artifactId).verificationPolicy;
+}
+
+// The enrolled slot a profile-form workspace names (the profile form carries no native identity), or null outside the pool.
+export function poolEntryForProfileWorkspace(enrollment, workspace) {
+  return p5EnrollmentWorkspacePool(enrollment).find(entry => entry.workspaceId === workspace?.workspaceId
+    && entry.allocationId === workspace?.allocationId && String(entry.canonicalRoot).toLowerCase() === String(workspace?.canonicalRoot).toLowerCase()) ?? null;
+}
+
+// The profile-form workspace of one enrolled slot (single-use, clean-committed), as a successor profile names it.
+export function profileWorkspaceOf(entry) {
+  return { workspaceId: entry.workspaceId, allocationId: entry.allocationId, canonicalRoot: entry.canonicalRoot, singleUse: true, cleanCommitted: true };
+}
+
+function validateP5EnrollmentFile({ file, store, installationId, runningSourceRelease, hostSwitchStatus = null }) {
   if (!file) return null;
   if (!store || !installationId || !runningSourceRelease)
     p5Fail('p5_enrollment_unavailable', 'P5 enrollment requires the Store, installation identity and Host source-release proof.');
@@ -140,24 +203,35 @@ function validateP5EnrollmentFile({ file, store, installationId, runningSourceRe
   catch (error) { p5Fail('p5_enrollment_invalid', `The installed P5 enrollment cannot be parsed: ${error.message}`); }
   validateP5Contract('enrollment', enrollment);
   validateP5Contract('runningSourceRelease', runningSourceRelease);
+  assertP5RootEnrollment(enrollment);
+  assertP5WorkspacePool(enrollment);
   if (enrollment.repositoryIdentity.enrollmentId !== enrollment.enrollmentId)
     p5Fail('p5_repository_enrollment_mismatch', 'The installed P5 repository identity does not use the enrollment UUID.');
   store.verifyRef(enrollment.runningSourceRelease);
   const enrolledRelease = store.readJson(enrollment.runningSourceRelease.artifactId);
   validateP5Contract('runningSourceRelease', enrolledRelease);
-  if (canonicalHash(enrolledRelease) !== enrollment.runningSourceRelease.sha256
-    || canonicalHash(enrolledRelease) !== canonicalHash(runningSourceRelease)
-    || enrolledRelease.installationId !== installationId
-    || enrolledRelease.sourceCommit !== enrollment.baseCommit)
+  let effectiveEnrollment = enrollment;
+  if (canonicalHash(enrolledRelease) !== canonicalHash(runningSourceRelease)
+    || enrolledRelease.sourceCommit !== enrollment.baseCommit) {
+    const continuation = resolveP6Continuation({ store, rootEnrollment: enrollment, runningSourceRelease, installationId, hostSwitchStatus });
+    if (!continuation?.effectiveEnrollment) {
+      p5Fail('p5_runtime_source_mismatch', 'The current Host-verified runtime package does not match the enrolled source release and baseline commit.');
+    }
+    effectiveEnrollment = continuation.effectiveEnrollment;
+  } else if (canonicalHash(enrolledRelease) !== enrollment.runningSourceRelease.sha256
+    || enrolledRelease.installationId !== installationId) {
     p5Fail('p5_runtime_source_mismatch', 'The current Host-verified runtime package does not match the enrolled source release and baseline commit.');
-  const profile = store.readJson(enrollment.profile.artifactId);
-  const { enrollmentDigest, profileDigest } = assertP5EnrollmentCurrent({ store, enrollment, profile,
-    parentPublication: enrollment.parentPublication, repairPublication: enrollment.repairPublication,
-    sourceRelease: enrollment.runningSourceRelease, currentRepositoryIdentity: enrollment.repositoryIdentity });
-  if (enrollmentDigest !== canonicalHash(enrollment) || profileDigest !== enrollment.profile.sha256)
+  }
+  const effectiveRelease = store.readJson(effectiveEnrollment.runningSourceRelease.artifactId);
+  const profile = store.readJson(effectiveEnrollment.profile.artifactId);
+  const { enrollmentDigest, profileDigest } = assertP5EnrollmentCurrent({ store, enrollment: effectiveEnrollment, profile,
+    parentPublication: effectiveEnrollment.parentPublication, repairPublication: effectiveEnrollment.repairPublication,
+    sourceRelease: effectiveEnrollment.runningSourceRelease, currentRepositoryIdentity: effectiveEnrollment.repositoryIdentity });
+  if (enrollmentDigest !== canonicalHash(effectiveEnrollment) || profileDigest !== effectiveEnrollment.profile.sha256)
     p5Fail('p5_enrollment_invalid', 'The installed P5 enrollment artifact graph is inconsistent.');
-  return { enrollment, profileRoot: file.profileRoot, path: file.path, fileSha256: file.fileSha256,
-    byteSize: file.byteSize, enrollmentDigest, runningSourceRelease: enrolledRelease };
+  // After a P6 update the installed file is still the root enrollment, so its own digest is kept beside the effective one.
+  return { enrollment: effectiveEnrollment, profileRoot: file.profileRoot, path: file.path, fileSha256: file.fileSha256,
+    byteSize: file.byteSize, enrollmentDigest, fileEnrollmentDigest: canonicalHash(enrollment), runningSourceRelease: effectiveRelease };
 }
 
 export function loadP5Enrollment({ profileRoot, store, installationId, runningSourceRelease, maxBytes = 1024 * 1024 }) {
@@ -201,10 +275,27 @@ export async function captureP5EnrollmentFileWithHostIdentity({ profileRoot, nat
 }
 
 export async function loadP5EnrollmentWithHostIdentity({ profileRoot, store, installationId, runningSourceRelease,
-  nativeSourceReader, expectedHostPid, expectedGeneration, expectedEpoch, maxBytes = 1024 * 1024 }) {
+  nativeSourceReader, expectedHostPid, expectedGeneration, expectedEpoch, hostSwitchStatusReader = null, maxBytes = 1024 * 1024 }) {
   const file = await captureP5EnrollmentFileWithHostIdentity({ profileRoot, nativeSourceReader,
     expectedHostPid, expectedGeneration, expectedEpoch, maxBytes });
-  return validateP5EnrollmentFile({ file, store, installationId, runningSourceRelease });
+  let hostSwitchStatus = null;
+  if (file && store && runningSourceRelease) {
+    let rootEnrollment;
+    try { rootEnrollment = parseStrictJson(file.bytes.toString('utf8')); }
+    catch { return validateP5EnrollmentFile({ file, store, installationId, runningSourceRelease }); }
+    validateP5Contract('enrollment', rootEnrollment);
+    store.verifyRef(rootEnrollment.runningSourceRelease);
+    const rootRelease = store.readJson(rootEnrollment.runningSourceRelease.artifactId);
+    if (canonicalHash(rootRelease) !== canonicalHash(runningSourceRelease)) {
+      const build = findP6BuildReceiptForRelease(store, runningSourceRelease);
+      if (build) {
+        if (typeof hostSwitchStatusReader !== 'function')
+          p5Fail('p5_host_switch_status_unavailable', 'P6 continuation requires the authenticated Lifecycle Host switch-status reader.');
+        hostSwitchStatus = await hostSwitchStatusReader(build.receipt.operationId);
+      }
+    }
+  }
+  return validateP5EnrollmentFile({ file, store, installationId, runningSourceRelease, hostSwitchStatus });
 }
 
 /** Bind the selected, content-addressed P5 baseline files to the active Host-verified build inventory. */
@@ -287,9 +378,10 @@ export async function verifyP5RunningSourceInventory({ store, enrollment, curren
     verifiedFiles: sourceManifest.entries.length, generation };
 }
 
-export async function verifyP5EnrollmentFileCurrent({ profileRoot, path, fileSha256, enrollmentDigest,
-  nativeSourceReader, expectedHostPid, expectedGeneration, expectedEpoch, maxBytes = 1024 * 1024 }) {
-  if (typeof profileRoot !== 'string' || !profileRoot || typeof path !== 'string' || !path || !HEX.test(fileSha256 || '') || !HEX.test(enrollmentDigest || ''))
+export async function verifyP5EnrollmentFileCurrent({ profileRoot, path, fileSha256, enrollmentDigest, fileEnrollmentDigest = enrollmentDigest,
+  enrollment = null, nativeSourceReader, expectedHostPid, expectedGeneration, expectedEpoch, maxBytes = 1024 * 1024 }) {
+  if (typeof profileRoot !== 'string' || !profileRoot || typeof path !== 'string' || !path || !HEX.test(fileSha256 || '') || !HEX.test(enrollmentDigest || '')
+    || !HEX.test(fileEnrollmentDigest || ''))
     p5Fail('p5_enrollment_unavailable', 'The loaded P5 enrollment identity is incomplete.');
   const file = await captureP5EnrollmentFileWithHostIdentity({ profileRoot, nativeSourceReader,
     expectedHostPid, expectedGeneration, expectedEpoch, maxBytes });
@@ -298,9 +390,14 @@ export async function verifyP5EnrollmentFileCurrent({ profileRoot, path, fileSha
   let value;
   try { value = parseStrictJson(file.bytes.toString('utf8')); }
   catch { p5Fail('p5_enrollment_changed', 'The installed P5 enrollment file is no longer readable JSON.'); }
-  if (file.fileSha256 !== fileSha256 || canonicalHash(value) !== enrollmentDigest)
+  if (file.fileSha256 !== fileSha256 || canonicalHash(value) !== fileEnrollmentDigest)
     p5Fail('p5_enrollment_changed', 'The installed P5 enrollment changed after Engine startup.');
-  return value;
+  if (fileEnrollmentDigest === enrollmentDigest) return value;
+  // A P6 successor: the unchanged root file is the one its startup continuation was resolved from, against the Host-committed
+  // release. That loaded enrollment is returned; each caller then checks its release against the Host's current one.
+  if (!enrollment || canonicalHash(enrollment) !== enrollmentDigest)
+    p5Fail('p5_enrollment_unavailable', 'The loaded P6 continuation enrollment is not the one resolved from the installed file.');
+  return enrollment;
 }
 
 export function assertP5EnrollmentCurrent({ store, enrollment, profile, parentPublication, repairPublication,
@@ -387,7 +484,9 @@ export function validateP5SourcePath(path) {
     p5Fail('p5_path_unsupported', 'P5 source paths must be portable ASCII relative paths using forward slashes.');
   const parts = path.split('/');
   if (parts.some(part => !part || part === '.' || part === '..' || part.endsWith('.') || part.endsWith(' ')
-    || DEVICE_NAME.test(part) || /[<>"|?*]/.test(part) || part.toLowerCase() === '.git' || part.toLowerCase() === '.p5'))
+    || DEVICE_NAME.test(part) || /[<>"|?*]/.test(part) || part.toLowerCase() === '.git' || part.toLowerCase() === '.p5'
+    // A Windows 8.3 short name (P6CONS~1.MJS) names an existing file under another spelling; it is never a portable source path.
+    || /~\d/.test(part)))
     p5Fail('p5_path_unsupported', `P5 source path "${path}" contains an unsupported Windows or reserved component.`);
   return path;
 }

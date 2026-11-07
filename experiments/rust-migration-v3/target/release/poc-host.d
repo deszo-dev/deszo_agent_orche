@@ -1,0 +1,1 @@
+C:\my\2026\deszo_agent_orche\experiments\rust-migration-v3\target\release\poc-host.exe: C:\my\2026\deszo_agent_orche\experiments\rust-migration-v3\crates\poc-host\src\main.rs C:\my\2026\deszo_agent_orche\experiments\rust-migration-v3\crates\poc-protocol\src\lib.rs

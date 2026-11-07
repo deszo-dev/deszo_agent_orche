@@ -1,0 +1,13 @@
+{
+  "schema": "deszo-v3-cross-user-result/1",
+  "attempt_id": "20261106T181513972Z",
+  "status": "BLOCKED_CROSS_USER_LAUNCH",
+  "launcher_started": false,
+  "actual_launcher_identity": null,
+  "runas_exit_code": 1,
+  "runner_exit_code": null,
+  "exit_code": 126,
+  "binary_hashes_unchanged": true,
+  "error": "runas.exe returned exit code 1 without a deszo_poc runner identity record.",
+  "attempt_record": "cross-user-launch-20261106T181513972Z.json"
+}

@@ -1,0 +1,163 @@
+{
+  "schemaVersion": 1,
+  "kind": "P6BuildGenuineE2EEvidence",
+  "phases": {
+    "aToB": {
+      "parentRunId": "c383d4fb-2337-4d65-8101-dfd530a86c79",
+      "linkId": "f40085ac-93a5-413d-ab8b-6502d63a7ab2",
+      "repairRunId": "cb929641-aed7-4dcd-9175-a19c6b175687",
+      "handoffSequence": 91,
+      "handoff": {
+        "record": {
+          "artifactId": "2f45bd63-a131-47da-bb1a-7fde572818ce",
+          "sha256": "212c6b0ecb8e242df5983e60bb23577a5d03f7ab5e1b8304d61c53dce3e4f640"
+        },
+        "candidateId": "cfa8c87ee87f7c583aa04201ed13a239ed38ed36269a651404de0018217828b3",
+        "gitCandidate": {
+          "artifactId": "3b6bf411-87b5-43a2-8e84-e5fbca8a0b85",
+          "sha256": "3668b8125ec8a0ecaa674715dbbfb77da6576f859f891b3fe1afaee43c8c3599"
+        }
+      },
+      "operation": {
+        "operationId": "54a74bd5-4e9a-4d86-a0c7-9392b8fc6e65",
+        "phase": "verified",
+        "toBuildId": "engine-cfa8c87ee87f",
+        "packageSha256": "49abdaef7ba44d2ad1b17486e6c0e39f0c54e0d137e351f7f67c10c6a49b513a",
+        "fallbackAttempted": false
+      },
+      "verifiedAt": "1793802200027"
+    },
+    "claimedSlotRefusal": {
+      "slot": "p5-slot-1",
+      "status": 409,
+      "code": "p5_workspace_reserved"
+    },
+    "bContinuation": {
+      "release": {
+        "bootstrap": "engine",
+        "buildId": "engine-cfa8c87ee87f",
+        "committedOperationId": "54a74bd5-4e9a-4d86-a0c7-9392b8fc6e65",
+        "inputsDigest": "17316a5c289561c57d84b387ae0a308b62683021db3dc069c563af027d1c9db6",
+        "installationId": "1017f226e84bca80e0dea25a32dff121",
+        "kind": "ProtectedSelfRepairRunningSourceRelease",
+        "packageSha256": "49abdaef7ba44d2ad1b17486e6c0e39f0c54e0d137e351f7f67c10c6a49b513a",
+        "schemaVersion": 1,
+        "sourceCommit": "2e87f484d8f5ca25a79a6976ff3f9e36cff1c86a",
+        "sourceDigest": "40226cd3df073ed10397812fb4f55a7c5a5422b3609f8e06fb2712ee42837e14"
+      },
+      "admission": {
+        "enabled": true,
+        "reasons": [],
+        "enrollmentId": "5b12f24f-5ac0-46af-bf3e-830284740a26",
+        "lifecycleGeneration": "287fdbef-76f4-4967-a8c9-0dd79967f3f7",
+        "engineEpoch": 4,
+        "decidedAt": "2026-11-04T14:23:19.137Z"
+      }
+    },
+    "bToC": {
+      "parentRunId": "5d2b4b79-c3ae-4303-9ffc-bb3515881b3f",
+      "linkId": "399af1c1-5faa-4dde-af49-6c63951f0308",
+      "repairRunId": "3b356368-5ec4-48e8-93dc-4d2ebce6e6d1",
+      "settled": "handoff",
+      "evidence": {
+        "sequence": 91,
+        "type": "self_repair.handoff_recorded",
+        "payload": {
+          "record": {
+            "artifactId": "840f111c-06b6-4360-92fa-5f4cc53f5d18",
+            "sha256": "07e71675806e2d0dd75f46ac733692dd6326aefc6325b80ad3ba208a88097e5c"
+          }
+        }
+      },
+      "handoff": {
+        "record": {
+          "artifactId": "840f111c-06b6-4360-92fa-5f4cc53f5d18",
+          "sha256": "07e71675806e2d0dd75f46ac733692dd6326aefc6325b80ad3ba208a88097e5c"
+        },
+        "candidateId": "2a7ba4dc231effa88c5ac87b3a3787d14440439416aea5ce3e71be11694913c2",
+        "gitCandidate": {
+          "artifactId": "727397df-4c2a-4d6b-b888-a714df4fc586",
+          "sha256": "2b02ea06a6576840d076d21befe7badc2c0ed10c486ea7c8ec0b14d764437d0c"
+        }
+      }
+    }
+  },
+  "source": {
+    "releaseCommit": "2a1a2cf77dda01d12c9a3c9cf921907570d97945",
+    "historyRoot": "4f95d95bbb3be3ec15305edfa9debd45693a3565"
+  },
+  "engineA": {
+    "buildId": "engine-a",
+    "sourceCommit": "2a1a2cf77dda01d12c9a3c9cf921907570d97945",
+    "sourceDigest": "8a715d26f06aa6d19496e5340d0620a98315cd35d21250f43a6708f3f15c301e",
+    "inputsDigest": "0bdaf2aabb4c0803a694dec9a8c6a4c32359f9bbfc99bb0a3bcaec9a7fd30365"
+  },
+  "enrollment": {
+    "enrollmentId": "5b12f24f-5ac0-46af-bf3e-830284740a26",
+    "baselineId": "958a76accdbf902d3c99e25bb335528f0b076ec5c334c75f7e5ca0d299264b66",
+    "verificationPolicy": {
+      "artifactId": "7ef56f91-7f89-405b-8d67-c087b604c9ee",
+      "sha256": "379dba524fa2b0a76325c63f9bff76ceb347b9b6e67030f86bc0489cf41f326b"
+    },
+    "runningSourceRelease": {
+      "artifactId": "d6e8e4bf-2fd0-4ba5-b49a-82445412148e",
+      "sha256": "ddbd2558ce336bc9c637cf31ee8b2ffe9bfe20f156dc66bfcbc4d1c1151ea435"
+    }
+  },
+  "exhaustion": {
+    "pool": [
+      "p5-slot-1",
+      "p5-slot-2"
+    ],
+    "claims": [
+      {
+        "repairRunId": "3b356368-5ec4-48e8-93dc-4d2ebce6e6d1",
+        "slot": "p5-slot-2",
+        "state": "succeeded"
+      },
+      {
+        "repairRunId": "cb929641-aed7-4dcd-9175-a19c6b175687",
+        "slot": "p5-slot-1",
+        "state": "succeeded"
+      }
+    ],
+    "stagedEvents": 1,
+    "refusal": [
+      "[P6] Activation background task failed for 3b356368-5ec4-48e8-93dc-4d2ebce6e6d1 (p6_successor_workspace_exhausted): P6ConsumerError: The enrolled single-use P5 slot pool has no slot left for the successor; no operation, build or Host staging was started."
+    ]
+  },
+  "ownerActions": {
+    "setupCalls": 13,
+    "window": [
+      {
+        "window": "a_to_c",
+        "method": "GET",
+        "path": "/api/v2/installation/source-release",
+        "status": 200
+      },
+      {
+        "window": "a_to_c",
+        "method": "POST",
+        "path": "/api/v2/runs",
+        "status": 409
+      },
+      {
+        "window": "a_to_c",
+        "method": "POST",
+        "path": "/api/v2/runs",
+        "status": 202
+      }
+    ],
+    "forbidden": [],
+    "boundaries": {
+      "open": {
+        "rootEnrollmentSha256": "bb57d5ba94b977e0bfda99c3b495b96db7b06cba83c3eae1855e8c9cc40d4216",
+        "originRefs": "refs/heads/main 2a1a2cf77dda01d12c9a3c9cf921907570d97945"
+      },
+      "close": {
+        "rootEnrollmentSha256": "bb57d5ba94b977e0bfda99c3b495b96db7b06cba83c3eae1855e8c9cc40d4216",
+        "originRefs": "refs/heads/main 2a1a2cf77dda01d12c9a3c9cf921907570d97945"
+      }
+    }
+  }
+}

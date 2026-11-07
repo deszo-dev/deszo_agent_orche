@@ -4,7 +4,7 @@
 // Repair Judge → P2 acceptance. The test only provisions inputs and observes; every P5 record is produced by the Engine.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
@@ -346,7 +346,9 @@ function replayReproducer(context, commit, verificationInputs, label) {
   const tree = join(context.scratch.root, `replay-${label}`), tar = join(context.scratch.root, `replay-${label}.tar`);
   mkdirSync(tree);
   context.git(`${context.slotRoot}\\source`, ['archive', '--format=tar', '-o', tar, commit]);
-  const untar = spawnSync('tar', ['-xf', tar, '-C', tree], { windowsHide: true, encoding: 'utf8' });
+  // Windows' own tar, not the first tar on PATH: Git for Windows ships a GNU tar that reads "C:" as a remote host.
+  const systemTar = process.platform === 'win32' ? join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe') : 'tar';
+  const untar = spawnSync(systemTar, ['-xf', tar, '-C', tree], { windowsHide: true, encoding: 'utf8' });
   assert.equal(untar.status, 0, untar.stderr);
   for (const name of context.dependencyPackages) cpSync(join(repoRoot, 'node_modules', ...name.split('/')), join(tree, 'node_modules', ...name.split('/')), { recursive: true });
   const inputs = join(context.scratch.root, `replay-${label}-inputs`);
@@ -510,6 +512,14 @@ test('P5-E2E1-HAPPY: an installed test release repairs its own Engine source thr
       return repairEvents.find(item => item.type === 'self_repair.handoff_recorded') ?? null;
     }, 'the durable P6 handoff', 600_000, 500);
     const evidence = await collectLifecycleEvidence(context, call, { parentRunId, repairRunId, linkId: link.id, handoffRef: handoff.payload.record });
+    // The engine names the refusal code in the log line: "Activation background task failed for <id> (<code>): ...".
+    const p6ConsumerRefusal = `[P6] Activation background task failed for ${repairRunId} (p6_consumer_no_installation):`;
+    const p6ConsumerLog = await eventually(() => host?.stderr.includes(p6ConsumerRefusal) ? host.stderr : null,
+      'the production P5 acceptance callback to invoke the P6 consumer', 60_000, 100);
+    assert.ok(p6ConsumerLog.includes(p6ConsumerRefusal),
+      'the genuine accepted Repair reached the production P6 consumer');
+    assert.match(p6ConsumerLog, /Installation root is not available/,
+      'this runtime-bootstrap fixture refuses desktop P6 activation because it has no installed Shell release');
     t.diagnostic(`P5-E2E1-HAPPY evidence: ${JSON.stringify(evidence)}`);
     await host.shutdown(); host = null;
     const rebuilt = await reconstructHandoff({ profile: context.profile, handoffRef: handoff.payload.record, outDir: join(context.scratch.root, 'reconstructed') });
@@ -852,6 +862,72 @@ test('P5-CLOSURE-UNCERTAIN-TREE: an unproven P5 Developer tree is never captured
     assert.equal(outcome.count(type), 0, `${type} after an unproven Developer tree`);
   assertNoAcceptance(outcome, 'P5-CLOSURE-UNCERTAIN-TREE');
   t.diagnostic(`P5-CLOSURE-UNCERTAIN-TREE: ${JSON.stringify(observed)}`);
+});
+
+test('P5-CLOSURE-GRACEFUL-CAPTURE: managed graceful shutdown during the candidate-capture Host await preserves the same Attempt and Custody evidence', { timeout: 1_200_000 }, async t => {
+  const context = await provisionInstallation('graceful-capture', { developerModel: 'custody-p5-developer-gated' });
+  const armFile = join(context.scratch.fixtureState, 'p5-graceful-capture-arm.flag');
+  const enteredFile = join(context.scratch.fixtureState, 'p5-graceful-capture-entered.txt');
+  context.hostArgs.custodyTest = { testSourceIdentityPauseArmFile: armFile, testSourceIdentityPauseEnteredFile: enteredFile,
+    testSourceIdentityPauseMs: 3_000 };
+  let host = null, parentRunId = null, repairRunId = null;
+  try {
+    host = startLifecycleHost(context.hostArgs);
+    const firstConnection = await host.firstConnection();
+    let call = api(firstConnection, firstConnection.firstPartyToken);
+    const started = await startParent(context, call);
+    assert.equal(started.status, 202, JSON.stringify(started.body));
+    parentRunId = started.body.run.runId;
+    const link = await eventually(() => profileQuery(context.profile, 'SELECT * FROM run_links WHERE parent_run_id = ?', parentRunId)[0] ?? null,
+      'the P2 linked Repair', 240_000, 250);
+    repairRunId = link.repair_run_id;
+
+    const marker = name => join(context.scratch.fixtureState, name);
+    await eventually(() => existsSync(marker('READY-P5_DEVELOPER.marker')), 'the custodied Developer to reach its barrier', 300_000, 100);
+    const [developerBefore] = attemptOf(context.profile, repairRunId, 'developer');
+    const custodyBefore = profileQuery(context.profile, 'SELECT custody_id FROM attempt_custody WHERE attempt_id = ?', developerBefore.id)[0]?.custody_id;
+    assert.ok(custodyBefore, 'the Developer Attempt already has its Host Custody identity');
+    writeFileSync(armFile, 'armed\n');
+    writeFileSync(marker('RELEASE-P5_DEVELOPER.marker'), 'release\n');
+    await eventually(() => existsSync(enteredFile)
+      && attemptOf(context.profile, repairRunId, 'developer').find(item => item.id === developerBefore.id)?.state === 'running',
+    'the Engine to be awaiting the Host source identity during P5 capture', 180_000, 50);
+    assert.equal(journal(context.profile, repairRunId).filter(item => item.type === 'self_repair.candidate_capture_started').length, 0,
+      'the capture await is before its durable anchor, so shutdown tests the in-flight boundary');
+    rmSync(armFile, { force: true });
+
+    await host.shutdown();
+    host = null;
+    const afterShutdown = attemptOf(context.profile, repairRunId, 'developer').find(item => item.id === developerBefore.id);
+    assert.ok(afterShutdown, 'graceful shutdown preserves the original Developer Attempt row');
+    assert.notEqual(afterShutdown.state, 'canceled', 'managed shutdown is not misrecorded as a user cancellation');
+    assert.equal(profileQuery(context.profile, 'SELECT custody_id FROM attempt_custody WHERE attempt_id = ?', developerBefore.id)[0]?.custody_id,
+      custodyBefore, 'the original Host Custody identity remains bound to the Attempt');
+
+    host = startLifecycleHost(context.hostArgs);
+    const replacementConnection = await host.firstConnection();
+    call = api(replacementConnection, replacementConnection.firstPartyToken);
+    const handoff = await eventually(() => journal(context.profile, repairRunId).find(item => item.type === 'self_repair.handoff_recorded') ?? null,
+      'the replacement Engine to reconcile the original capture and finish P5', 600_000, 500);
+    const events = journal(context.profile, repairRunId);
+    assert.equal(attemptOf(context.profile, repairRunId, 'developer').length, 1, 'the replacement does not create a second Developer Attempt');
+    assert.equal(events.filter(item => item.type === 'self_repair.candidate_capture_started').length, 1, 'one capture anchor survives the shutdown boundary');
+    assert.equal(events.filter(item => item.type === 'self_repair.git_commit_intent').length, 1, 'one durable Git commit intent is reconciled');
+    assert.equal(events.filter(item => item.type === 'self_repair.candidate_captured').length, 1, 'one candidate is captured');
+    assert.equal(events.filter(item => item.type === 'self_repair.handoff_recorded').length, 1, 'one accepted handoff is recorded');
+    assert.equal(profileQuery(context.profile, 'SELECT custody_id FROM attempt_custody WHERE attempt_id = ?', developerBefore.id)[0]?.custody_id,
+      custodyBefore, 'replacement reconciliation retains the original Custody evidence');
+    t.diagnostic(`P5-CLOSURE-GRACEFUL-CAPTURE: attempt=${developerBefore.id} custody=${custodyBefore} handoff=${handoff.payload.record.artifactId}`);
+  } catch (error) {
+    error.message += `\n${diagnostics(context, host, [parentRunId, repairRunId])}`;
+    throw error;
+  } finally {
+    const release = join(context.scratch.fixtureState, 'RELEASE-P5_DEVELOPER.marker');
+    if (!existsSync(release)) writeFileSync(release, 'teardown\n');
+    rmSync(armFile, { force: true });
+    if (host) await host.shutdown();
+    await context.close();
+  }
 });
 
 // P5-CLOSURE H3 / original C07: the Engine exits after the verifier's terminal completion and before the receipt transaction.

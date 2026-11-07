@@ -61,8 +61,9 @@ test('P5 native source identity is Host measured, stable, generation fenced, and
     assert.deepEqual(second.rootIdentity, first.rootIdentity);
     assert.deepEqual(second.rootIdentity, rootIdentity.rootIdentity);
 
-    const pathGit = execFileSync('where.exe', ['git.exe'], { encoding: 'utf8', windowsHide: true }).split(/\r?\n/).find(Boolean).trim();
-    const gitPath = resolve(dirname(pathGit), '..', 'mingw64', 'bin', 'git.exe');
+    // `where` lists the command shim and the real binary in PATH order. The real git.exe is the mingw64 one, wherever it is listed.
+    const gitPaths = execFileSync('where.exe', ['git.exe'], { encoding: 'utf8', windowsHide: true }).split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+    const gitPath = gitPaths.find(path => /[\\/]mingw64[\\/]bin[\\/]git\.exe$/i.test(path)) ?? resolve(dirname(gitPaths[0]), '..', 'mingw64', 'bin', 'git.exe');
     assert.ok(existsSync(gitPath), 'the native integration proof needs Git for Windows actual git.exe, not its hard-linked command shim');
     const gitEnvironment = { ...process.env };
     for (const key of Object.keys(gitEnvironment)) if (key.toUpperCase().startsWith('GIT_')) delete gitEnvironment[key];

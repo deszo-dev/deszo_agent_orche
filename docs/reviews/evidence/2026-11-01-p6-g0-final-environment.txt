@@ -1,0 +1,4 @@
+frozen snapshot 7bcb4e992f2772ff7effafb92b36cee8bbd4771a43097b7f7016e86b16701410 (796 files); HEAD 1f54c47fe265c6b47bf36695be56214056fc3af1; branch codex/adr-0003-0005-completion
+v22.20.0
+cargo 1.97.1 (c980f4866 2026-06-30)
+rustc 1.97.1 (8bab26f4f 2026-07-14)

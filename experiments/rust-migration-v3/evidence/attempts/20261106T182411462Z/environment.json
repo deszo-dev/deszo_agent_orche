@@ -1,0 +1,36 @@
+{
+  "os": {
+    "environment_osversion": "10.0.26300.0",
+    "edition": "Windows 10 Home Single Language",
+    "edition_id": "CoreSingleLanguage",
+    "build": "26300.9711",
+    "current_build_number": "26300",
+    "display_version": "26H2",
+    "build_lab": "26100.1.amd64fre.ge_release.240331-1435",
+    "installation_type": "Client",
+    "winver_observation": "Not captured automatically by the non-interactive launcher; compare from the desktop session if needed."
+  },
+  "toolchain": {
+    "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "active_toolchain": "stable-x86_64-pc-windows-msvc (default)",
+    "target": "x86_64-pc-windows-msvc"
+  },
+  "machine": {
+    "processor": "Intel64 Family 6 Model 142 Stepping 12, GenuineIntel",
+    "architecture": "AMD64"
+  },
+  "repository": {
+    "branch": "codex/adr-0003-0005-completion",
+    "head": "1f54c47fe265c6b47bf36695be56214056fc3af1",
+    "dirty_paths_at_snapshot": 1262,
+    "experiment_source_sha256": "fb45eadd59c1d5d96a0eefdcdd7a063d38290d4ea2ae09e518e512d493cc7d77"
+  },
+  "execution": {
+    "account": "LAPTOP-UT09MGNR\\jusse",
+    "process_id": 26320,
+    "session_id": 1,
+    "build_mode": "reuse_prebuilt_release_artifacts",
+    "build_evidence_attempt": "20261106T175233511Z"
+  }
+}

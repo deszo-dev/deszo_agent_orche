@@ -302,8 +302,7 @@ export function installWorkflowJudge(Engine, { ApiError }) {
       || candidate.parentRunId !== link.parent_run_id || candidate.linkId !== link.id || candidate.incidentId !== link.incident_id
       || candidate.candidateId !== receipt.candidateId || candidate.candidateSourceDigest !== receipt.candidateSourceDigest
       || candidate.baselineId !== receipt.baselineId
-      || candidate.selfRepairProfile?.sha256 !== authorization.selfRepairProfile?.sha256
-      || authorization.profile.selfRepair?.sha256 !== candidate.selfRepairProfile?.sha256)
+      || candidate.selfRepairProfile?.sha256 !== authorization.selfRepairProfile?.sha256)
       return null;
     const repair = this.store.get('SELECT * FROM runs WHERE id=?', state.id);
     const parent = this.store.get('SELECT * FROM runs WHERE id=?', link.parent_run_id);
@@ -603,6 +602,13 @@ export function installWorkflowJudge(Engine, { ApiError }) {
           attention: attentionRecord, context: current, decision: parsed });
         spec.p5AcceptanceAdmission = await this.prepareProtectedSelfRepairAcceptanceAdmission({ state, attempt: currentAttempt,
           attention: attentionRecord, context: current, decision: parsed, evidence });
+        // The Engine-side barrier for a Repair that would admit a Run. It runs after the last await, so it is adjacent to the
+        // synchronous commit that would create the Repair Run. A refusal releases the admissions this call prepared.
+        if (parsed?.action?.type === 'request_repair' && this.switchQuiescence?.active) {
+          if (spec.p5RepairAdmission) this.protectedSelfRepairRepairAdmissions.delete(spec.p5RepairAdmission);
+          if (spec.p5AcceptanceAdmission) this.protectedSelfRepairAcceptanceAdmissions.delete(spec.p5AcceptanceAdmission);
+          throw new ApiError(503, 'switch_in_progress', 'The Engine is being replaced; a Judge decision that admits new work is not admitted.');
+        }
         return { p5RepairAdmission: spec.p5RepairAdmission, p5AcceptanceAdmission: spec.p5AcceptanceAdmission };
       },
       commit: (parsed, events, currentAttempt, commitContext) => {
@@ -735,6 +741,8 @@ export function installWorkflowJudge(Engine, { ApiError }) {
     const attempt = this.store.get('SELECT * FROM attempts WHERE id=?', attention.judgeAttemptId);
     if (!attempt) return false;
     if (ACTIVE_ATTEMPTS.has(attempt.state) && ['scheduled', 'waiting'].includes(attempt.state)) {
+      // A Judge attempt settles work the Engine already admitted, so a quiescing Engine lets it run. A decision that would admit a
+      // Repair Run is refused at commit (prepareCommit); nothing else is blocked.
       if (!this.workflowJudgePreparePendingAttention(state, attempt, attention)) return true;
       const located = this.locate(state, attempt.node_instance_id);
       const node = this.workflowJudgeExecutionNode(state, located.node);

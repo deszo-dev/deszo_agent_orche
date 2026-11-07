@@ -1,0 +1,14 @@
+BLOCKED before Core/Worker launch and before CreateAppContainerProfile.
+Preflight exit code: 5
+Decision: BLOCKED: launcher identity is not the required deszo_poc account; CreateAppContainerProfile was not attempted
+Observed account: LAPTOP-UT09MGNR\jusse
+Observed integrity RID: 12288
+No profile creation was attempted by this preflight.
+
+The required runtime account for this experiment is deszo_poc. Diagnose the cross-user logon; do not retry under jusse.
+Evidence files:
+  experiments\rust-migration-v3\evidence\launcher-preflight.json
+  experiments\rust-migration-v3\evidence\environment.json
+  experiments\rust-migration-v3\evidence\preflight-output.txt
+  experiments\rust-migration-v3\evidence\artifact-integrity.json
+Also include launcher-failure.txt and run.json if the PoC progresses past preflight.

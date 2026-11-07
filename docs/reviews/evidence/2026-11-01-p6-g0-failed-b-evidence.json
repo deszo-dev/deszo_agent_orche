@@ -1,0 +1,242 @@
+{
+  "schemaVersion": 1,
+  "kind": "P6G0FailedCandidateEvidence",
+  "capturedAt": "2026-11-01T09:28:04.346Z",
+  "shell": {
+    "path": "installation/shell/deszo.exe",
+    "sha256Before": "60cd2526f37c649d444aeeee74f150a62b32fe53d649cac8e2607f1ddbd72dbe",
+    "shellBuildId": "shell-g0",
+    "sha256After": "60cd2526f37c649d444aeeee74f150a62b32fe53d649cac8e2607f1ddbd72dbe"
+  },
+  "host": {
+    "path": "C:\\my\\2026\\deszo_agent_orche\\lifecycle-host\\target\\debug\\deszo-lifecycle-host.exe",
+    "sha256Before": "190efe9beda1edb019f6b3db97532a890cb9d5c3445c6df73d4f9774056b2a56",
+    "sha256After": "190efe9beda1edb019f6b3db97532a890cb9d5c3445c6df73d4f9774056b2a56"
+  },
+  "engines": {
+    "A": {
+      "engineBuildId": "engine-a",
+      "shellBuildId": "shell-g0",
+      "sourceCommit": "2919dca14c8e9d801dd13e3ac9c12116c8f25cba",
+      "runnerSha256": "1c947140416eb5f31325274901f90c194095415ce286e539851c7f2f5da955f7",
+      "packageSha256": "89b9744c613dd18d1ea0b299004da6b6735272cf239985f08da59615663f11f2"
+    },
+    "B": {
+      "engineBuildId": "engine-b",
+      "shellBuildId": "shell-g0",
+      "sourceCommit": "b7967bdd5c43c96272229f7f472e8549a1f693d0",
+      "runnerSha256": "3d0f0e90ee7a966a59c73ea7701cd2a490cd176bab4f6fa4ebfc13be1e299925",
+      "packageSha256": "f2c988022b92c5f290e08da19893de50245674f6cb5e52b00876cc0dcc80f189"
+    }
+  },
+  "operation": {
+    "operationId": "b781c57e-4903-4b52-b4b6-0cede7f105b1",
+    "productionStoreSha256BeforeSwitch": "101dce63c4c1b84daa4066fd45d2720101bf17e9502c34c558e910aa2490bee3",
+    "triggerStatus": 202,
+    "triggerBody": {
+      "operationId": "b781c57e-4903-4b52-b4b6-0cede7f105b1",
+      "accepted": true,
+      "phase": "fenced",
+      "stagedPhase": "staged"
+    },
+    "phase": "rolled_back",
+    "failure": "the candidate exited before its preflight result with status exit code: 1",
+    "fallbackAttempted": true,
+    "previousGeneration": "c6441e80-2d49-4af7-97b6-5b356db98f07",
+    "candidateGeneration": "baba4e08-7750-4074-a8b6-96a7fe1b7ab8",
+    "preflight": null,
+    "copiedStateSha256": "101dce63c4c1b84daa4066fd45d2720101bf17e9502c34c558e910aa2490bee3",
+    "productionStateSha256AtBoundary": "101dce63c4c1b84daa4066fd45d2720101bf17e9502c34c558e910aa2490bee3"
+  },
+  "selectorBefore": {
+    "buildId": "engine-a",
+    "digest": "89b9744c613dd18d1ea0b299004da6b6735272cf239985f08da59615663f11f2",
+    "generation": "c6441e80-2d49-4af7-97b6-5b356db98f07"
+  },
+  "selectorAfter": {
+    "buildId": "engine-a",
+    "digest": "89b9744c613dd18d1ea0b299004da6b6735272cf239985f08da59615663f11f2",
+    "generation": "c6441e80-2d49-4af7-97b6-5b356db98f07"
+  },
+  "journal": [
+    {
+      "at": "1793525317833",
+      "type": "host_started",
+      "payload": {
+        "hostPid": 13564,
+        "installationId": "60e7cb930c6c684efe2a4d32acd683a8",
+        "profileRoot": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\p6-g0-failed-b-evidence-BGwtJe\\profile"
+      }
+    },
+    {
+      "at": "1793525324206",
+      "type": "application_spawned",
+      "payload": {
+        "applicationPid": 23276,
+        "arguments": [
+          "--host-managed"
+        ],
+        "bootstrap": "engine",
+        "buildId": "engine-a",
+        "executable": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\p6-g0-failed-b-evidence-BGwtJe\\installation\\shell\\deszo.exe",
+        "generation": "c6441e80-2d49-4af7-97b6-5b356db98f07",
+        "pid": 23276,
+        "profileRoot": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\p6-g0-failed-b-evidence-BGwtJe\\profile"
+      }
+    },
+    {
+      "at": "1793525327095",
+      "type": "engine_ready",
+      "payload": {
+        "applicationPid": 23276,
+        "buildId": "engine-a",
+        "enginePid": 5448,
+        "generation": "c6441e80-2d49-4af7-97b6-5b356db98f07",
+        "pid": 5448,
+        "receiptId": null,
+        "runtimeInstanceId": "5b608303-df40-48e1-b444-bcbb0fc39d32",
+        "storeId": "047bc979-5865-4cc5-9a08-ff433edcd7b5"
+      }
+    },
+    {
+      "at": "1793525344586",
+      "type": "engine_staged",
+      "payload": {
+        "candidateGeneration": "baba4e08-7750-4074-a8b6-96a7fe1b7ab8",
+        "engineBuildId": "engine-b",
+        "operationId": "b781c57e-4903-4b52-b4b6-0cede7f105b1",
+        "packageSha256": "f2c988022b92c5f290e08da19893de50245674f6cb5e52b00876cc0dcc80f189"
+      }
+    },
+    {
+      "at": "1793525352807",
+      "type": "engine_switch_accepted",
+      "payload": {
+        "fromEngineBuildId": "engine-a",
+        "generation": "c6441e80-2d49-4af7-97b6-5b356db98f07",
+        "operationId": "b781c57e-4903-4b52-b4b6-0cede7f105b1",
+        "toEngineBuildId": "engine-b"
+      }
+    },
+    {
+      "at": "1793525355931",
+      "type": "managed_process_tree_stopped",
+      "payload": {
+        "applicationPid": 23276,
+        "bootstrap": "engine",
+        "buildId": "engine-a",
+        "enginePid": 5448,
+        "generation": "c6441e80-2d49-4af7-97b6-5b356db98f07",
+        "pid": 23276
+      }
+    },
+    {
+      "at": "1793525359897",
+      "type": "application_spawned",
+      "payload": {
+        "applicationPid": 27592,
+        "arguments": [
+          "--host-managed"
+        ],
+        "bootstrap": "engine",
+        "buildId": "engine-b",
+        "executable": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\p6-g0-failed-b-evidence-BGwtJe\\installation\\shell\\deszo.exe",
+        "generation": "baba4e08-7750-4074-a8b6-96a7fe1b7ab8",
+        "pid": 27592,
+        "profileRoot": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\p6-g0-failed-b-evidence-BGwtJe\\profile"
+      }
+    },
+    {
+      "at": "1793525360966",
+      "type": "managed_process_tree_stopped",
+      "payload": {
+        "applicationPid": 27592,
+        "bootstrap": "engine",
+        "buildId": "engine-b",
+        "enginePid": null,
+        "generation": "baba4e08-7750-4074-a8b6-96a7fe1b7ab8",
+        "pid": 27592
+      }
+    },
+    {
+      "at": "1793525365178",
+      "type": "application_spawned",
+      "payload": {
+        "applicationPid": 30820,
+        "arguments": [
+          "--host-managed"
+        ],
+        "bootstrap": "engine",
+        "buildId": "engine-a",
+        "executable": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\p6-g0-failed-b-evidence-BGwtJe\\installation\\shell\\deszo.exe",
+        "generation": "c6441e80-2d49-4af7-97b6-5b356db98f07",
+        "pid": 30820,
+        "profileRoot": "C:\\my\\2026\\deszo_agent_orche\\.deszo\\tests\\p6-g0-failed-b-evidence-BGwtJe\\profile"
+      }
+    },
+    {
+      "at": "1793525366807",
+      "type": "engine_ready",
+      "payload": {
+        "applicationPid": 30820,
+        "buildId": "engine-a",
+        "enginePid": 5668,
+        "generation": "c6441e80-2d49-4af7-97b6-5b356db98f07",
+        "pid": 5668,
+        "receiptId": null,
+        "runtimeInstanceId": "9d834e78-84e3-416b-ac43-3cb1e9e389bb",
+        "storeId": "047bc979-5865-4cc5-9a08-ff433edcd7b5"
+      }
+    },
+    {
+      "at": "1793525366817",
+      "type": "engine_switch_rolled_back",
+      "payload": {
+        "engineBuildId": "engine-a",
+        "message": "the candidate exited before its preflight result with status exit code: 1",
+        "operationId": "b781c57e-4903-4b52-b4b6-0cede7f105b1"
+      }
+    },
+    {
+      "at": "1793525367062",
+      "type": "managed_process_tree_stopped",
+      "payload": {
+        "applicationPid": 30820,
+        "bootstrap": "engine",
+        "buildId": "engine-a",
+        "enginePid": 5668,
+        "generation": "c6441e80-2d49-4af7-97b6-5b356db98f07",
+        "pid": 30820
+      }
+    },
+    {
+      "at": "1793525367082",
+      "type": "host_stopped",
+      "payload": {
+        "hostPid": 13564
+      }
+    }
+  ],
+  "launches": [
+    {
+      "buildId": "engine-a",
+      "applicationPid": 23276,
+      "alive": false
+    },
+    {
+      "buildId": "engine-b",
+      "applicationPid": 27592,
+      "alive": false
+    },
+    {
+      "buildId": "engine-a",
+      "applicationPid": 30820,
+      "alive": false
+    }
+  ],
+  "engineReadyBuilds": [
+    "engine-a",
+    "engine-a"
+  ],
+  "committedEvents": 0
+}

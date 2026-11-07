@@ -3,7 +3,15 @@
   "heavy": [
     "tauri-host-proof-b.test.mjs",
     "control-host-exploration.test.mjs",
-    "f7-detached-maintenance.test.mjs"
+    "f7-detached-maintenance.test.mjs",
+    "p6-build-e2e.test.mjs",
+    "p6-g0-identity.test.mjs",
+    "p6-g0-switch.test.mjs",
+    "p6-g0-recovery.test.mjs",
+    "p6-g0-c09.test.mjs",
+    "p6-g0-c02-c13.test.mjs",
+    "p6-g0-custody-e2e.test.mjs",
+    "p6-g0-legacy-installed.test.mjs"
   ],
   "integration": [
     "custody-audit.test.mjs",
@@ -39,6 +47,7 @@
     "adr6-regressions.test.mjs",
     "supervision.test.mjs",
     "p5-managed-clone.test.mjs",
-    "p5-e2e.test.mjs"
+    "p5-e2e.test.mjs",
+    "desktop-build-isolation.test.mjs"
   ]
 }

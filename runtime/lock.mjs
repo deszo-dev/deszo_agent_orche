@@ -1,6 +1,7 @@
 import { readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
+import { testFaultHooksEnabled } from './core/testFaultPolicy.mjs';
 
 // One Engine owns a runtime root for its whole life. Ownership is an exclusive SQLite lock on a dedicated database next to the marker
 // (`runner.lock.db`), never on the runtime store: in EXCLUSIVE locking mode the connection keeps the file lock it took for its first write
@@ -11,7 +12,7 @@ import { DatabaseSync } from 'node:sqlite';
 // Verified on Windows, where SQLite opens the database without delete sharing, so it cannot be removed while held. On POSIX the lock is an
 // fcntl lock: removing or renaming `runner.lock.db` (or its directory) while an Engine runs would let a second one lock a new file, any other
 // open and close of the file inside the owning process would drop the lock, and network file systems may not honour it. None of this is tested.
-const PACKAGED = typeof __DESZO_PACKAGED__ !== 'undefined' && __DESZO_PACKAGED__;
+const TEST_FAULTS_ENABLED = testFaultHooksEnabled(import.meta.url);
 const CONTENDED = new Set([5, 6]); // SQLITE_BUSY, SQLITE_LOCKED (primary codes)
 const DAMAGED = new Set([11, 26]); // SQLITE_CORRUPT, SQLITE_NOTADB
 const ATTEMPTS = 5;
@@ -22,7 +23,7 @@ const held = new Set();
 
 // Test-only crash points around the marker write. Inert unless the variable names one, and absent from the packaged runtime.
 function testFault(point) {
-  if (!PACKAGED && process.env.DESZO_RUNNER_LOCK_TEST_FAULT === point) process.exit(97);
+  if (TEST_FAULTS_ENABLED && process.env.DESZO_RUNNER_LOCK_TEST_FAULT === point) process.exit(97);
 }
 
 const sleep = ms => new Promise(done => setTimeout(done, ms));

@@ -240,6 +240,44 @@ test('P5-GIT-2 managed clone: real ancestry, immutable Host boundary and Engine 
     const v0Git = join(rustFixtureDir(v0Source, join(testsRoot, 'custody-artifacts', 'git-v0')), 'git.exe');
     buildRustFixture(v0Source, v0Git);
     writeFileSync(join(dirname(v0Git), 'git-real.txt'), gitPath);
+
+    // P6-BUILD-CONTINUITY M1 / F-15: a real candidate commit exists in a test-owned source
+    // checkout, but the publication-disabled enrolled origin does not advertise it. This
+    // reproduces the Git transport failure; it does not claim a production P5 acceptance.
+    const candidateRoot = join(scratch.root, 'candidate-b');
+    git(scratch.root, ['clone', '--quiet', upstreamRoot, candidateRoot]);
+    git(candidateRoot, ['checkout', '--quiet', '--detach', installedCommit]);
+    writeFileSync(join(candidateRoot, 'runtime', 'core', 'feature.mjs'), 'export const boundary = "accepted candidate B";\n');
+    git(candidateRoot, ['add', '--all']);
+    git(candidateRoot, ['commit', '--quiet', '-m', 'unpublished candidate B']);
+    const candidateCommitB = git(candidateRoot, ['rev-parse', 'HEAD']).trim();
+    const candidateTreeB = git(candidateRoot, ['rev-parse', `${candidateCommitB}^{tree}`]).trim();
+    git(candidateRoot, ['push', '--quiet', pathToFileURL(remoteRoot).href, `${candidateCommitB}:refs/heads/temporary/p6-b`]);
+    git(remoteRoot, ['update-ref', '-d', 'refs/heads/temporary/p6-b', candidateCommitB]);
+    assert.equal(git(remoteRoot, ['cat-file', '-t', candidateCommitB]).trim(), 'commit', 'B is a genuine Git commit object retained by the test-owned server');
+    assert.ok(!git(scratch.root, ['ls-remote', pathToFileURL(remoteRoot).href]).includes(candidateCommitB), 'B is not advertised by the enrolled remote');
+    const f15Probe = join(scratch.root, 'f15-probe.git');
+    git(scratch.root, ['init', '--quiet', '--bare', f15Probe]);
+    const f15Fetch = spawnSync(v0Git, ['-C', f15Probe, '-c', 'protocol.file.allow=always', 'fetch', '--quiet', '--no-write-fetch-head',
+      pathToFileURL(remoteRoot).href, candidateCommitB],
+    { encoding: 'utf8', windowsHide: true, env: { SystemRoot: process.env.SystemRoot, PATH: process.env.PATH, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: 'NUL' } });
+    assert.notEqual(f15Fetch.status, 0, 'protocol-v0 refuses B when it is not an advertised object');
+    assert.match(f15Fetch.stderr, /unadvertised object/, f15Fetch.stderr);
+    const candidateCommon = await readers.nativeSourceReader({ root: join(candidateRoot, '.git'), include: [], exclude: [], maxFiles: 0, maxBytes: 0 });
+    assert.equal(candidateCommon.refused, undefined, candidateCommon.message);
+    const f15 = await enrollFixture({ ...enrollArgs, gitPath: v0Git, label: 'f15-unpublished-b', upstreamRoot: candidateRoot,
+      installedCommit: candidateCommitB, repositoryIdentity: { enrollmentId: randomUUID(), canonicalCommonDirectory: candidateCommon.canonicalRoot,
+        nativeDirectoryIdentity: candidateCommon.rootIdentity }, remoteUrl: pathToFileURL(remoteRoot).href });
+    fixtures.push(f15);
+    const f15Preparation = await prepareP5WorkspaceFromIntent({ store: f15.store, intentRef: f15.intentRef,
+      nativeSourceReader: readers.nativeSourceReader, prepareGitRepository: f15.prepareGitRepository }).catch(error => error);
+    assert.equal(f15Preparation.code, 'p5_git_source_commit_unavailable', 'actual P5 managed-clone preparation cannot obtain unpublished B from enrolled refs');
+    assert.equal(f15.enrollment.gitSource.sourceCommit, candidateCommitB);
+    assert.deepEqual(f15.enrollment.gitSource.fetchRefs, ['refs/heads/main']);
+    assert.equal(f15.enrollment.gitSource.publication.enabled, false);
+    assert.equal(git(candidateRoot, ['rev-parse', `${candidateCommitB}^`]).trim(), installedCommit, 'B is an accepted successor to the advertised A baseline');
+    console.log(`F-15 reproduction: A=${installedCommit} A-tree=${git(upstreamRoot, ['rev-parse', `${installedCommit}^{tree}`]).trim()} B=${candidateCommitB} B-tree=${candidateTreeB} repository=${f15.enrollment.gitSource.sourceRepositoryId}/${f15.enrollment.gitSource.remote.remoteId} fetchRefs=${f15.enrollment.gitSource.fetchRefs.join(',')} publication=${f15.enrollment.gitSource.publication.enabled} command=git fetch ${pathToFileURL(remoteRoot).href} ${candidateCommitB} error=${f15Fetch.stderr.trim()}`);
+
     const probeRoot = join(scratch.root, 'v0-probe.git');
     git(scratch.root, ['init', '--quiet', '--bare', probeRoot]);
     const refused = spawnSync(v0Git, ['-C', probeRoot, '-c', 'protocol.file.allow=always', 'fetch', '--quiet', '--no-write-fetch-head', pathToFileURL(remoteRoot).href, installedCommit],

@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "evidence": "switch",
+  "capturedAt": "2026-11-02T12:36:22.608Z",
+  "node": "v22.20.0",
+  "platform": "win32 x64",
+  "operationId": "c5e6d2f2-afbd-4a94-ba7b-dade22828382",
+  "packageSha256": "7e529542eb0bb6672a65c93045ccd4bb117be4585a91c2b387ff5343ba0d5741",
+  "engineA": {
+    "applicationBuildId": "engine-a",
+    "enginePid": 25420,
+    "packageSha256": "be17e22cfbd3ecc90fa45539935a10bde402fb188b68df518e75464adc6caf18"
+  },
+  "engineB": {
+    "applicationBuildId": "engine-b",
+    "enginePid": 27984,
+    "runtimeInstanceId": "6ccc891a-719a-4287-9ba1-ac7621573670",
+    "packageSha256": "7e529542eb0bb6672a65c93045ccd4bb117be4585a91c2b387ff5343ba0d5741"
+  },
+  "selector": {
+    "buildId": "engine-b",
+    "committedOperationId": "c5e6d2f2-afbd-4a94-ba7b-dade22828382"
+  },
+  "operation": {
+    "phase": "verified",
+    "fallbackAttempted": false,
+    "preflightCopySha256": "3ce1f03a6940b38134fe007b6f6a2f04ba6f88f2d3645187f46b41f4ba15c57f"
+  },
+  "journalOrder": [
+    {
+      "type": "engine_staged",
+      "index": 3
+    },
+    {
+      "type": "engine_switch_accepted",
+      "index": 4
+    },
+    {
+      "type": "engine_preflight_passed",
+      "index": 7
+    },
+    {
+      "type": "engine_store_boundary_verified",
+      "index": 8
+    },
+    {
+      "type": "engine_switch_committed",
+      "index": 9
+    },
+    {
+      "type": "engine_switch_verified",
+      "index": 10
+    }
+  ],
+  "shellSha256": {
+    "before": "60cd2526f37c649d444aeeee74f150a62b32fe53d649cac8e2607f1ddbd72dbe",
+    "after": "60cd2526f37c649d444aeeee74f150a62b32fe53d649cac8e2607f1ddbd72dbe"
+  },
+  "hostSha256": {
+    "before": "c7015bf60ec67628c29d7ec290507e6588c5a4e282f8334df07468e463287ac2",
+    "after": "c7015bf60ec67628c29d7ec290507e6588c5a4e282f8334df07468e463287ac2"
+  }
+}
